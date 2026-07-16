@@ -50,7 +50,11 @@ def doctor(repo_root: Path) -> list[Check]:
         Check(
             importlib.util.find_spec("mlx_audio") is not None,
             "Python dependencies",
-            "mlx-audio is importable" if importlib.util.find_spec("mlx_audio") else "run uv sync --all-groups",
+            (
+                "mlx-audio is importable"
+                if importlib.util.find_spec("mlx_audio")
+                else "run uv sync --extra mlx-runtime"
+            ),
         )
     )
     frontend = frontend_dist_path(repo_root) / "index.html"

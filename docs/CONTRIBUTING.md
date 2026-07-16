@@ -36,5 +36,9 @@ npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
 
+GitHub pull-request checks run the cross-platform backend suite with tests marked
+`uses_audio_decoder` or `runs_models` excluded. Before release, run the complete backend suite on a
+configured Apple Silicon development machine.
+
 Do not commit books, generated user artifacts, model weights, or other material you do not have the
 right to redistribute. Tests should use synthetic or appropriately licensed fixtures.

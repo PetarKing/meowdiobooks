@@ -112,6 +112,7 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
     return package, dialogue, review
 
 
+@pytest.mark.uses_audio_decoder
 def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_path, monkeypatch):
     generated: dict[str, object] = {}
     transcribed: dict[str, object] = {}

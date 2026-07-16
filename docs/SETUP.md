@@ -42,7 +42,7 @@ validation.
 ## Install and run
 
 ```bash
-uv sync --all-groups
+uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
 uv run meowdiobooks doctor
@@ -51,3 +51,8 @@ uv run meowdiobooks serve
 
 `doctor` reports every missing dependency or asset and changes nothing. Once it passes, start the app
 and open <http://127.0.0.1:8000>. The server binds to localhost by default.
+
+The base project dependencies are cross-platform. `mlx-runtime` selects the current Apple Silicon
+inference backend; it does not download llama.cpp or any model weights. The equivalent wheel install
+is `pip install "meowdiobooks[mlx-runtime]"`; installing the wheel without that extra provides only
+the cross-platform application core.

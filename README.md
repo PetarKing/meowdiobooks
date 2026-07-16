@@ -151,7 +151,7 @@ packages generated chapters as M4B.
 ```bash
 # Clone or download this repository, then:
 cd meowdiobooks
-uv sync --all-groups
+uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
 uv run meowdiobooks doctor
@@ -160,6 +160,8 @@ uv run meowdiobooks serve
 
 Before `doctor` can pass, install llama.cpp and the configured local model assets using the
 [local-model guide](docs/MODELS.md). They are intentionally not downloaded by the dependency commands.
+The `mlx-runtime` extra installs the current Apple Silicon inference packages; future runtime
+backends can be added as separate extras without changing the cross-platform application core.
 Local voice-sample transcription requires the pinned **Qwen3-ASR 0.6B 4-bit** model at
 `models/qwen3_asr_0_6b_4bit/`; the guide includes its exact revision and download command alongside
 the text, VoiceDesign and Base TTS models. `doctor` reports it as **Speech recognition** when installed.
@@ -211,6 +213,10 @@ npm --prefix frontend test -- --run
 npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
+
+Pull-request CI installs only the cross-platform core and skips tests marked
+`uses_audio_decoder` or `runs_models`. The complete local suite above remains the release-confidence
+check on Apple Silicon.
 
 Contributions should start with an issue describing user value, scope, affected contracts, test
 strategy, and dependencies. New services, databases, caches, cross-service coupling, or runtime
