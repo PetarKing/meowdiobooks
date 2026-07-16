@@ -210,6 +210,46 @@ def test_explicit_note_section_groups_wrapped_lines_into_complete_footnotes():
     ]
 
 
+def test_web_addresses_are_source_anchored_without_sentence_punctuation():
+    text = (
+        "Project page: https://example.test/books/11?lang=en#sample.\n"
+        "Mirror (www.example.test/archive).\n"
+        "A bare example.test domain stays ordinary prose.\n"
+    )
+    extraction, dialogue = _artifacts([{"id": "p1", "page": 1, "text": text}])
+
+    workspace = build_review_workspace(extraction, dialogue)
+    warning = _warning(workspace, "web-address")
+
+    assert warning["availableActions"] == ["keep", "exclude"]
+    assert [row["source"] for row in warning["occurrences"]] == [
+        "https://example.test/books/11?lang=en#sample",
+        "www.example.test/archive",
+    ]
+
+
+def test_nested_web_address_policy_overrides_only_its_exact_footnote_range():
+    text = "Translation Notes:\n[1] Details at https://example.test/source for readers.\n"
+    extraction, dialogue = _artifacts([{"id": "p1", "page": 1, "text": text}])
+    workspace = build_review_workspace(extraction, dialogue)
+    footnote = _warning(workspace, "footnote")["occurrences"][0]
+    web_address = _warning(workspace, "web-address")["occurrences"][0]
+    review = {
+        "warningSnapshot": workspace["warnings"],
+        "decisions": [
+            {"occurrenceId": footnote["id"], "action": "narrate"},
+            {"occurrenceId": web_address["id"], "action": "exclude"},
+        ],
+    }
+
+    rendered = apply_review_render_policies(dialogue, review)
+
+    assert "".join(row["source"] for row in rendered["spans"]) == text
+    assert [row["source"] for row in rendered["spans"] if row["reviewAction"] == "exclude"] == [
+        "https://example.test/source"
+    ]
+
+
 def test_note_continuation_crosses_adjacent_page_and_stops_at_chapter_heading():
     blocks = [
         {
@@ -559,6 +599,8 @@ def test_review_rejects_dialogue_linked_to_another_extraction():
         ("repeated-matter", "exclude"),
         ("page-number", "keep"),
         ("page-number", "exclude"),
+        ("web-address", "keep"),
+        ("web-address", "exclude"),
         ("footnote", "keep"),
         ("footnote", "narrate"),
         ("footnote", "exclude"),

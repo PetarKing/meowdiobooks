@@ -36,6 +36,7 @@ export function reviewQuestion(kind: string) {
   if (kind === "reading-order") return "Is this in the right reading order?";
   if (kind === "repeated-matter") return "Should listeners hear this repeated text?";
   if (kind === "page-number") return "Should listeners hear this page number?";
+  if (kind === "web-address") return "Should listeners hear this web address?";
   if (kind === "footnote") return "Should listeners hear these footnotes?";
   return "Should listeners hear this text?";
 }
@@ -47,6 +48,7 @@ export function reviewGuidance(warning: ReviewWarning) {
     "reading-order": "The extractor reported a possible column or reading-order problem. Accept it only when the highlighted source follows the order a listener should hear.",
     "repeated-matter": "This text repeats near page edges and may be a header or footer. Remove running matter; keep repeated prose that belongs to the story.",
     "page-number": "The highlighted value looks like a printed page number. Remove it unless it is meaningful story text.",
+    "web-address": "The highlighted text is a web address. Leave it out unless listeners need to hear it.",
     footnote: "Choose whether listeners should hear these notes.",
     "front-back-matter": "Choose whether listeners should hear this front, back, or editorial text.",
   };
@@ -54,5 +56,5 @@ export function reviewGuidance(warning: ReviewWarning) {
 }
 
 export function reviewWarningLabel(kind: string) {
-  return ({ "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? kind.replaceAll("-", " ");
+  return ({ "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? kind.replaceAll("-", " ");
 }
