@@ -12,24 +12,33 @@ from pathlib import Path
 from .assets import application_root, checkout_root
 
 
+def _add_server_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument("--host", default="127.0.0.1")
+    command.add_argument("--port", type=int, default=8000)
+    command.add_argument("--data", default=".meowdiobooks")
+    command.add_argument(
+        "--library",
+        default=str(Path.home() / "Music" / "Meowdiobooks"),
+        help="Directory for completed M4B audiobooks",
+    )
+
+
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="meowdiobooks")
     commands = root.add_subparsers(required=True)
     serve_command = commands.add_parser("serve", help="Run the local Meowdiobooks wizard")
-    serve_command.add_argument("--host", default="127.0.0.1")
-    serve_command.add_argument("--port", type=int, default=8000)
-    serve_command.add_argument("--data", default=".meowdiobooks")
+    _add_server_arguments(serve_command)
     serve_command.add_argument(
         "--rebuild-frontend",
         action="store_true",
         help="Install and build the frontend once before starting the server",
     )
-    serve_command.add_argument(
-        "--library",
-        default=str(Path.home() / "Music" / "Meowdiobooks"),
-        help="Directory for completed M4B audiobooks",
-    )
     serve_command.set_defaults(handler=_serve)
+    dev_command = commands.add_parser(
+        "dev", help="Rebuild the frontend once, then run the local wizard"
+    )
+    _add_server_arguments(dev_command)
+    dev_command.set_defaults(handler=_serve, rebuild_frontend=True)
     doctor_command = commands.add_parser(
         "doctor", help="Check dependencies, configured models, and local build readiness"
     )

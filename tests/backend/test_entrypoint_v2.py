@@ -40,9 +40,17 @@ def test_cli_serves_v2_application(monkeypatch, tmp_path) -> None:
 def test_serve_parser_exposes_explicit_frontend_rebuild() -> None:
     default = cli.parser().parse_args(["serve"])
     enabled = cli.parser().parse_args(["serve", "--rebuild-frontend"])
+    shortcut = cli.parser().parse_args(["dev"])
 
     assert default.rebuild_frontend is False
     assert enabled.rebuild_frontend is True
+    assert shortcut.rebuild_frontend is True
+    assert shortcut.handler is cli._serve
+    assert (shortcut.host, shortcut.port, shortcut.data) == (
+        default.host,
+        default.port,
+        default.data,
+    )
 
 
 def test_frontend_rebuild_runs_locked_install_then_build(monkeypatch, tmp_path) -> None:
