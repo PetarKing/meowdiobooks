@@ -37,6 +37,62 @@ def test_cli_serves_v2_application(monkeypatch, tmp_path) -> None:
     assert "/api/books/{book_id}/chapters/{chapter_id}/{revision}/audio" in paths
 
 
+def test_serve_parser_exposes_explicit_frontend_rebuild() -> None:
+    default = cli.parser().parse_args(["serve"])
+    enabled = cli.parser().parse_args(["serve", "--rebuild-frontend"])
+
+    assert default.rebuild_frontend is False
+    assert enabled.rebuild_frontend is True
+
+
+def test_frontend_rebuild_runs_locked_install_then_build(monkeypatch, tmp_path) -> None:
+    frontend = tmp_path / "frontend"
+    frontend.mkdir()
+    (frontend / "package.json").write_text("{}")
+    (frontend / "package-lock.json").write_text("{}")
+    calls: list[tuple[tuple[str, ...], object, bool]] = []
+
+    monkeypatch.setattr(cli, "checkout_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        cli.subprocess,
+        "run",
+        lambda command, *, cwd, check: calls.append((command, cwd, check)),
+    )
+
+    cli._rebuild_frontend()
+
+    assert calls == [
+        (("npm", "ci"), frontend, True),
+        (("npm", "run", "build"), frontend, True),
+    ]
+
+
+def test_frontend_rebuild_requires_a_source_checkout(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "checkout_root", lambda: None)
+
+    with pytest.raises(OSError, match="available only from a source checkout"):
+        cli._rebuild_frontend()
+
+
+def test_frontend_rebuild_finishes_before_server_start(monkeypatch, tmp_path) -> None:
+    events: list[str] = []
+
+    monkeypatch.setattr(cli, "_rebuild_frontend", lambda: events.append("rebuild"))
+    monkeypatch.setattr("uvicorn.run", lambda *_args, **_kwargs: events.append("serve"))
+
+    result = cli._serve(
+        Namespace(
+            data=str(tmp_path),
+            host="127.0.0.1",
+            port=8123,
+            rebuild_frontend=True,
+        )
+    )
+
+    assert result == 0
+    assert events == ["rebuild", "serve"]
+
+
 def test_second_backend_is_rejected_before_running_job_recovery(monkeypatch, tmp_path) -> None:
     jobs = JsonStore(tmp_path / "jobs.json", Job)
     running = jobs.put(Job(kind="v2:generate", status=JobStatus.RUNNING))
