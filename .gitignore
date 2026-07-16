@@ -1,0 +1,69 @@
+# Local sensitive data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Operating-system metadata
+.DS_Store
+
+# Python environments and tool caches
+.venv/
+.uv-cache/
+.hf-cache/
+.pip-cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.coverage
+coverage/
+htmlcov/
+*.log
+
+# Local model runtimes and downloaded weights
+.local/
+models/
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+
+# Local application state and user exports
+.meowdiobooks/
+.meowdiobooks-v2/
+library/
+*.sqlite
+*.sqlite3
+*.db
+*.m4b
+*.mp3
+*.flac
+*.wav
+!docs/demo/*.wav
+
+# Generated runs, experiments and temporary output
+.bench/
+runs/
+results/
+output/
+tmp/
+fixtures/downloaded/
+
+# Generation troubleshooting note (2026-07-14): chapter WAV assembly changed from whole-chapter
+# NumPy concatenation to bounded-memory copying of staged segment WAVs. If output ordering, 240 ms
+# gaps, or WAV readability regress, inspect src/meowdiobooks/backend/tts_v2.py and its byte-exact
+# tests first.
+
+# Maintainer-only evaluation material. Only the documented public-domain set is publishable.
+internal-docs/
+audit/downloads/
+audit/extracted/
+*.pdf
+SampleBooks/*
+!SampleBooks/public-domain-evaluation/
+!SampleBooks/public-domain-evaluation/README.md
+!SampleBooks/public-domain-evaluation/*.pdf

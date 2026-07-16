@@ -1,0 +1,82 @@
+[project]
+name = "meowdiobooks"
+version = "0.1.0"
+description = "A local, dialogue-first audiobook studio for Apple Silicon Macs."
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.12,<3.13"
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: MacOS X",
+  "License :: Other/Proprietary License",
+  "Operating System :: MacOS :: MacOS X",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Multimedia :: Sound/Audio :: Speech",
+]
+dependencies = [
+  "fastapi==0.139.0",
+  "lxml==6.0.0",
+  "mlx-audio==0.4.5",
+  "misaki[en]==0.9.4",
+  "pdfplumber==0.11.7",
+  "pydantic==2.11.7",
+  "pypdf==5.8.0",
+  "python-multipart==0.0.32",
+  "reportlab==4.4.3",
+  "uvicorn==0.51.0",
+  "en-core-web-sm @ https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl",
+]
+
+[project.scripts]
+meowdiobooks = "meowdiobooks.cli:main"
+
+[dependency-groups]
+dev = [
+  "httpx2==2.5.0",
+  "pytest==8.4.1",
+  "ruff==0.12.3",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meowdiobooks"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"frontend/dist" = "meowdiobooks/web"
+"models.toml" = "meowdiobooks/resources/models.toml"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/src/meowdiobooks",
+  "/frontend/dist",
+  "/LICENSE",
+  "/README.md",
+  "/models.toml",
+  "/pyproject.toml",
+]
+exclude = [
+  "/frontend/node_modules",
+  "/internal-docs",
+  "/models",
+  "/SampleBooks",
+  "/.local",
+  "/.meowdiobooks",
+  "/.meowdiobooks-v2",
+  "/runs",
+  "/results",
+  "/audit",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"

@@ -1,0 +1,560 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
+import type { CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
+import { suggestedMemberIds } from "../voiceRoutes";
+
+interface Props {
+  bookId: string;
+  cast: CastArtifact;
+  selections: Record<string, string>;
+  routes: Record<string, VoiceRoute>;
+  confirmedRoutes?: Record<string, boolean>;
+  onRouteChange: (characterId: string, route: VoiceRoute) => void;
+  onConfirmRoute?: (characterId: string) => void;
+  onApprove: (characterId: string, revision: string) => void;
+  onRegenerate: (characterId: string, settings: VoiceSettings) => void;
+  onTranscribe?: (file: File) => Promise<VoiceSampleTranscript>;
+  onUpload?: (characterId: string, file: File, referenceText: string) => void;
+  onDelete?: (characterId: string, revision: string) => void;
+  regeneratingCharacterId?: string;
+  uploadingCharacterId?: string;
+  deletingVoiceRevision?: string;
+}
+
+function candidatesFor(voice: CastVoice): VoiceCandidate[] {
+  if (voice.voiceCandidates?.length) return voice.voiceCandidates;
+  if (!voice.voicePreviewRevision) return [];
+  return [{
+    revision: voice.voicePreviewRevision,
+    previewUrl: voice.previewUrl ?? "",
+    referenceText: voice.referenceText ?? "",
+    direction: voice.voiceDirection ?? "",
+  }];
+}
+
+function candidateForRevision(voice: CastVoice, revision?: string) {
+  return candidatesFor(voice).find((candidate) => candidate.revision === revision);
+}
+
+function approvedRevisionFor(voice: CastVoice, selections: Record<string, string>) {
+  const revision = selections[voice.characterId];
+  return candidateForRevision(voice, revision) ? revision : undefined;
+}
+
+function tilePreviewFor(voice: CastVoice, selections: Record<string, string>) {
+  const approvedRevision = approvedRevisionFor(voice, selections);
+  return candidateForRevision(voice, approvedRevision)
+    ?? candidateForRevision(voice, voice.voicePreviewRevision)
+    ?? candidatesFor(voice).at(-1);
+}
+
+function routeFor(voice: CastVoice, routes: Record<string, VoiceRoute>): VoiceRoute {
+  return voice.category === "group"
+    ? routes[voice.characterId] ?? voice.voiceRoute ?? { kind: "dedicated" }
+    : { kind: "dedicated" };
+}
+
+function layeredPreviewUrl(
+  bookId: string,
+  voice: CastVoice,
+  voices: CastVoice[],
+  routes: Record<string, VoiceRoute>,
+  selections: Record<string, string>,
+) {
+  const route = routeFor(voice, routes);
+  if (route.kind !== "layered" || route.characterIds.length < 2) return undefined;
+  const params = new URLSearchParams();
+  for (const characterId of route.characterIds) {
+    const member = voices.find((candidate) => candidate.characterId === characterId);
+    const audition = member ? tilePreviewFor(member, selections) : undefined;
+    if (!member || member.category !== "character" || !audition) return undefined;
+    params.append("member", `${characterId}:${audition.revision}`);
+  }
+  return `/api/books/${encodeURIComponent(bookId)}/voices/layered/audio?${params.toString()}`;
+}
+
+function candidateSummary(candidate: VoiceCandidate) {
+  if (candidate.source === "upload") {
+    return candidate.durationSeconds == null
+      ? "Cloned from an uploaded sample"
+      : `Cloned from a ${candidate.durationSeconds.toFixed(1)} sec sample`;
+  }
+  const settings = candidate.voiceSettings;
+  if (!settings) return candidate.direction;
+  const accent = settings.accent && settings.accent !== "unspecified" ? settings.accent : "neutral accent";
+  return `${label(settings.tone)} · ${label(settings.pace)} · ${accent}`;
+}
+
+function initials(name: string) {
+  const parts = name.match(/[\p{L}\p{N}]+|&/gu) ?? [];
+  const words = parts
+    .map((part, index) => ({ part, index }))
+    .filter(({ part }) => part !== "&")
+    .slice(0, 2);
+  if (!words.length) return "—";
+  const connector = words.length === 2 && parts.slice(words[0].index + 1, words[1].index).includes("&") ? "&" : "";
+  return words.map(({ part }) => part[0]).join(connector).toUpperCase();
+}
+
+function settingsFor(voice: CastVoice): VoiceSettings {
+  return voice.voiceSettings ?? {
+    presentation: "unspecified",
+    age: voice.characterId === "narrator" ? "adult" : "unspecified",
+    tone: voice.characterId === "narrator" ? "warm" : "neutral",
+    pitch: voice.characterId === "narrator" ? "medium" : "unspecified",
+    pace: voice.characterId === "narrator" ? "measured" : "natural",
+    energy: "balanced",
+    accent: "unspecified",
+    description: "",
+  };
+}
+
+function comparisonKey(value: string) {
+  return value.normalize("NFKC").trim().toLocaleLowerCase();
+}
+
+function lineCountFor(voice: CastVoice, cast: CastArtifact) {
+  if (typeof voice.lineCount === "number") return voice.lineCount;
+  if (voice.characterId === "narrator") return undefined;
+  const labels = new Set((voice.literalLabels ?? []).map(comparisonKey));
+  return cast.dossiers.reduce(
+    (total, dossier) => total + (labels.has(comparisonKey(dossier.label)) ? dossier.occurrenceCount ?? 0 : 0),
+    0,
+  );
+}
+
+function lineCountLabel(count: number | undefined) {
+  if (count == null) return "Line count pending";
+  return `${count} ${count === 1 ? "line" : "lines"}`;
+}
+
+const options = {
+  presentation: ["unspecified", "feminine", "masculine", "androgynous"],
+  age: ["unspecified", "child", "young-adult", "adult", "older-adult"],
+  tone: ["neutral", "warm", "bright", "dark", "gentle", "crisp", "gravelly"],
+  pitch: ["unspecified", "low", "medium", "high"],
+  pace: ["measured", "natural", "brisk"],
+  energy: ["restrained", "balanced", "animated"],
+} as const;
+
+const accentLimit = 48;
+const performanceNotesLimit = 180;
+const sampleTranscriptLimit = 2_000;
+
+function label(value: string) {
+  return value === "unspecified" ? "Unspecified" : value.replaceAll("-", " ").replace(/^./, (character) => character.toUpperCase());
+}
+
+function audioTime(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+  const whole = Math.floor(seconds);
+  return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
+}
+
+export function CastVoiceReview({
+  bookId, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
+}: Props) {
+  const { t } = useTranslation();
+  const voices = useMemo(
+    () => [
+      cast.narrator,
+      ...(cast.identities ?? []).slice().sort((left, right) =>
+        (lineCountFor(right, cast) ?? 0) - (lineCountFor(left, cast) ?? 0)
+          || left.name.localeCompare(right.name),
+      ),
+    ].filter(Boolean) as CastVoice[],
+    [cast],
+  );
+  const voiceById = useMemo(
+    () => Object.fromEntries(voices.map((voice) => [voice.characterId, voice])),
+    [voices],
+  );
+  const previewUrlFor = (voice: CastVoice) => routeFor(voice, routes).kind === "layered"
+    ? layeredPreviewUrl(bookId, voice, voices, routes, selections)
+    : tilePreviewFor(voice, selections)?.previewUrl;
+  const routeReady = (voice: CastVoice) => {
+    const route = routeFor(voice, routes);
+    return route.kind === "layered"
+      ? confirmedRoutes[voice.characterId] === true
+        && route.characterIds.length >= 2
+        && new Set(route.characterIds).size === route.characterIds.length
+        && route.characterIds.every((id) => voiceById[id]?.category === "character" && Boolean(tilePreviewFor(voiceById[id], selections)))
+      : Boolean(approvedRevisionFor(voice, selections));
+  };
+  const [inspectedId, setInspectedId] = useState<string>();
+  const inspected = voices.find((voice) => voice.characterId === inspectedId);
+  const [settings, setSettings] = useState<VoiceSettings>();
+  const [auditionSource, setAuditionSource] = useState<"designed" | "sample">("designed");
+  const [sampleTranscript, setSampleTranscript] = useState("");
+  const [sampleFile, setSampleFile] = useState<File>();
+  const [samplePreviewUrl, setSamplePreviewUrl] = useState("");
+  const [sampleTranscription, setSampleTranscription] = useState<"idle" | "transcribing" | "ready" | "failed">("idle");
+  const [sampleLanguage, setSampleLanguage] = useState<string>();
+  const [samplePlaying, setSamplePlaying] = useState(false);
+  const [sampleElapsed, setSampleElapsed] = useState(0);
+  const [sampleDuration, setSampleDuration] = useState(0);
+  const [pendingRevision, setPendingRevision] = useState<string>();
+  const [playingTileId, setPlayingTileId] = useState<string>();
+  const [inspectorClosing, setInspectorClosing] = useState(false);
+  const closeTimer = useRef<number | undefined>(undefined);
+  const tileAudioRef = useRef<HTMLAudioElement | null>(null);
+  const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
+  const transcriptionRequest = useRef(0);
+  const focusAfterClose = useRef<string | undefined>(undefined);
+  const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const previousInspectedId = useRef<string | undefined>(undefined);
+  const previousPreviewRevision = useRef<string | undefined>(undefined);
+
+  useEffect(() => {
+    if (!inspected) {
+      previousInspectedId.current = undefined;
+      previousPreviewRevision.current = undefined;
+      return;
+    }
+    const sameCharacter = previousInspectedId.current === inspected.characterId;
+    const regenerated = sameCharacter
+      && previousPreviewRevision.current !== undefined
+      && previousPreviewRevision.current !== inspected.voicePreviewRevision;
+    setSettings(settingsFor(inspected));
+    if (!sameCharacter) {
+      setAuditionSource("designed");
+      setSampleTranscript("");
+      setSampleFile(undefined);
+      setSamplePreviewUrl("");
+      setSampleTranscription("idle");
+      setSampleLanguage(undefined);
+      setSamplePlaying(false);
+      setSampleElapsed(0);
+      setSampleDuration(0);
+      transcriptionRequest.current += 1;
+    }
+    setPendingRevision(
+      regenerated
+        ? inspected.voicePreviewRevision
+        : approvedRevisionFor(inspected, selections) ?? inspected.voicePreviewRevision,
+    );
+    previousInspectedId.current = inspected.characterId;
+    previousPreviewRevision.current = inspected.voicePreviewRevision;
+  }, [inspected, selections]);
+
+  useEffect(() => () => {
+    if (samplePreviewUrl) URL.revokeObjectURL(samplePreviewUrl);
+  }, [samplePreviewUrl]);
+
+  useEffect(() => () => {
+    if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    const audio = tileAudioRef.current;
+    if (audio?.getAttribute("src")) audio.pause();
+    sampleAudioRef.current?.pause();
+  }, []);
+
+  async function chooseSample(sample: File) {
+    const request = transcriptionRequest.current + 1;
+    transcriptionRequest.current = request;
+    sampleAudioRef.current?.pause();
+    setSampleFile(sample);
+    setSamplePreviewUrl(URL.createObjectURL(sample));
+    setSampleTranscript("");
+    setSampleLanguage(undefined);
+    setSamplePlaying(false);
+    setSampleElapsed(0);
+    setSampleDuration(0);
+    if (!onTranscribe) {
+      setSampleTranscription("idle");
+      return;
+    }
+    setSampleTranscription("transcribing");
+    try {
+      const draft = await onTranscribe(sample);
+      if (transcriptionRequest.current !== request) return;
+      setSampleTranscript(draft.text.slice(0, sampleTranscriptLimit));
+      setSampleLanguage(draft.language?.trim() || undefined);
+      setSampleTranscription("ready");
+    } catch {
+      if (transcriptionRequest.current !== request) return;
+      setSampleTranscription("failed");
+    }
+  }
+
+  function toggleSamplePreview() {
+    const audio = sampleAudioRef.current;
+    if (!audio) return;
+    if (samplePlaying) {
+      audio.pause();
+      setSamplePlaying(false);
+      return;
+    }
+    try {
+      const playback = audio.play();
+      setSamplePlaying(true);
+      if (playback) void playback.catch(() => setSamplePlaying(false));
+    } catch {
+      setSamplePlaying(false);
+    }
+  }
+
+  function toggleTilePreview(voice: CastVoice) {
+    const audio = tileAudioRef.current;
+    const previewUrl = previewUrlFor(voice);
+    if (!audio || !previewUrl) return;
+    if (playingTileId === voice.characterId) {
+      audio.pause();
+      setPlayingTileId(undefined);
+      return;
+    }
+    audio.pause();
+    audio.src = previewUrl;
+    setPlayingTileId(voice.characterId);
+    try {
+      const playback = audio.play();
+      if (playback) void playback.catch(() => setPlayingTileId(undefined));
+    } catch {
+      setPlayingTileId(undefined);
+    }
+  }
+
+  function openInspector(characterId: string) {
+    if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    if (playingTileId) tileAudioRef.current?.pause();
+    setPlayingTileId(undefined);
+    setInspectorClosing(false);
+    setInspectedId(characterId);
+  }
+
+  function finishInspectorClose() {
+    if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    closeTimer.current = undefined;
+    setInspectedId(undefined);
+    setInspectorClosing(false);
+    if (focusAfterClose.current) tileRefs.current[focusAfterClose.current]?.focus();
+    focusAfterClose.current = undefined;
+  }
+
+  function closeInspector() {
+    if (!inspected) return;
+    focusAfterClose.current = inspected.characterId;
+    setInspectorClosing(true);
+    closeTimer.current = window.setTimeout(finishInspectorClose, 260);
+  }
+
+  function approvePendingVoice() {
+    if (!inspected || !pendingRevision || !candidateForRevision(inspected, pendingRevision)) return;
+    onApprove(inspected.characterId, pendingRevision);
+    closeInspector();
+  }
+
+  const inspectedCandidates = inspected ? candidatesFor(inspected) : [];
+  const approvedRevision = inspected ? approvedRevisionFor(inspected, selections) : undefined;
+  const inspectedRoute = inspected ? routeFor(inspected, routes) : { kind: "dedicated" } as VoiceRoute;
+  const inspectedReady = inspected ? routeReady(inspected) : false;
+  const inspectedPreviewUrl = inspected ? previewUrlFor(inspected) : undefined;
+  const memberVoices = (cast.identities ?? []).filter((voice) => voice.category === "character");
+  const suggestedIds = inspected?.category === "group" ? suggestedMemberIds(inspected, memberVoices) : [];
+  const pendingCandidateNumber = inspectedCandidates.findIndex(
+    (candidate) => candidate.revision === pendingRevision,
+  ) + 1;
+  const performanceNotesTooLong = (settings?.description.length ?? 0) > performanceNotesLimit;
+
+  return <div className="cast-workbench voice-cast-workbench">
+    <div className="cast-toolbar voice-cast-toolbar">
+      <div>
+        <b>{t("{{selected}} of {{count}} voices selected", { selected: voices.filter(routeReady).length, count: voices.length })}</b>
+        <small>{t("Open a cast member to preview and tune their voice.")}</small>
+      </div>
+      <div className="voice-cast-toolbar-meta">
+        <span>{cast.language ? t(cast.language) : "—"}</span>
+      </div>
+    </div>
+
+    <section className="cast-board voice-cast-board" aria-label={t("Cast voice auditions")}>
+      {voices.map((voice, index) => {
+        const selected = routeReady(voice);
+        const isNarrator = voice.characterId === "narrator";
+        const lineCount = lineCountFor(voice, cast);
+        const previewUrl = previewUrlFor(voice);
+        const playing = playingTileId === voice.characterId;
+        return <div className="cast-tile-shell" key={voice.characterId}>
+          <button
+            type="button"
+            ref={(element) => { tileRefs.current[voice.characterId] = element; }}
+            aria-label={t("Open {{name}} voice", { name: voice.name })}
+            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : "voice-unselected"}`}
+            onClick={() => openInspector(voice.characterId)}
+          >
+            <span className="cast-atomic-number">{isNarrator ? "N" : String(index).padStart(2, "0")}</span>
+            <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>
+            <strong>{isNarrator ? "♬" : initials(voice.name)}</strong>
+            <b>{voice.name}</b>
+            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : selected ? "voice selected" : "choose voice")}</small>
+          </button>
+          <button
+            type="button"
+            className={`voice-tile-listen ${playing ? "playing" : ""}`}
+            aria-label={t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name })}
+            disabled={!previewUrl}
+            onClick={() => toggleTilePreview(voice)}
+          >{playing ? "Ⅱ" : "▶"}</button>
+        </div>;
+      })}
+    </section>
+    <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => setPlayingTileId(undefined)} onError={() => setPlayingTileId(undefined)} />
+
+    {inspected && <div className={`cast-inspector-backdrop ${inspectorClosing ? "closing" : ""}`} onClick={(event) => { if (event.target === event.currentTarget) closeInspector(); }}>
+      <section role="dialog" aria-modal="true" className={`cast-inspector voice-inspector ${inspectorClosing ? "closing" : ""}`} aria-label={t("{{name}} voice", { name: inspected.name })} onAnimationEnd={(event) => { if (event.target === event.currentTarget && inspectorClosing) finishInspectorClose(); }}>
+        <header className="cast-inspector-head">
+          <div>
+            <span className={`cast-status-dot ${inspectedReady ? "ready" : "needs-review"}`} />
+            <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : "Needs a voice")}</small>
+            <h2>{inspected.name}</h2>
+            <p>{t(inspected.category ?? (inspected.characterId === "narrator" ? "Narrator" : "Character"))} · {t(lineCountLabel(lineCountFor(inspected, cast)))} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
+          </div>
+          <div className="cast-inspector-actions">
+            {inspectedRoute.kind === "dedicated" && pendingRevision && pendingRevision !== approvedRevision && <button type="button" className="primary voice-header-approve" onClick={approvePendingVoice}>{pendingCandidateNumber ? t("Approve Audition {{number}}", { number: pendingCandidateNumber }) : t("Approve selected voice")}</button>}
+            <button type="button" className="cast-inspector-close" aria-label={t("Close voice")} onClick={closeInspector}>×</button>
+          </div>
+        </header>
+
+        <div className="voice-inspector-body">
+          {inspected.category === "group" && <section className="voice-route-section">
+            <div className="cast-section-heading"><div><small>{t("Group voice")}</small><h3>{t("How should this group sound?")}</h3></div></div>
+            <p className="voice-route-help">{t("Keep one dedicated performance, or layer voices already in this cast. This changes audio routing only; source labels and identities stay untouched.")}</p>
+            <div className="voice-route-choices" role="radiogroup" aria-label={t("Group voice route")}>
+              <button type="button" role="radio" aria-checked={inspectedRoute.kind === "dedicated"} className={inspectedRoute.kind === "dedicated" ? "selected" : ""} onClick={() => onRouteChange(inspected.characterId, { kind: "dedicated" })}>
+                <span>{inspectedRoute.kind === "dedicated" ? "●" : "○"}</span><b>{t("Dedicated group voice")}</b><small>{t("Use one audition made for {{name}}.", { name: inspected.name })}</small>
+              </button>
+              <button type="button" role="radio" aria-checked={inspectedRoute.kind === "layered"} className={inspectedRoute.kind === "layered" ? "selected" : ""} onClick={() => onRouteChange(inspected.characterId, { kind: "layered", characterIds: inspectedRoute.kind === "layered" ? inspectedRoute.characterIds : suggestedIds })}>
+                <span>{inspectedRoute.kind === "layered" ? "●" : "○"}</span><b>{t("Layer existing cast voices")}</b><small>{t("Each selected character performs the same group line.")}</small>
+              </button>
+            </div>
+            {inspectedRoute.kind === "dedicated" && suggestedIds.length >= 2 && <div className="voice-route-suggestion">
+              <span><b>{t("Suggested voices")}</b><small>{suggestedIds.map((id) => voiceById[id]?.name).filter(Boolean).join(" + ")}</small></span>
+              <button type="button" className="ghost" onClick={() => onRouteChange(inspected.characterId, { kind: "layered", characterIds: suggestedIds })}>{t("Use suggestion")}</button>
+            </div>}
+            {inspectedRoute.kind === "layered" && <div className="voice-route-members">
+              <div className={`voice-route-confirmation ${confirmedRoutes[inspected.characterId] ? "confirmed" : "pending"}`}>
+                <span><b>{t(confirmedRoutes[inspected.characterId] ? "Layered route confirmed" : "Confirm suggested voices")}</b><small>{inspectedRoute.characterIds.map((id) => voiceById[id]?.name).filter(Boolean).join(" + ") || t("Choose the members of this group.")}</small></span>
+                {!confirmedRoutes[inspected.characterId] && <button type="button" className="primary" disabled={!inspectedPreviewUrl} onClick={() => onConfirmRoute?.(inspected.characterId)}>{t("Confirm layered voices")}</button>}
+              </div>
+              <div className="voice-route-chips">
+                {inspectedRoute.characterIds.map((characterId) => <button type="button" key={characterId} aria-label={`Remove ${voiceById[characterId]?.name ?? characterId}`} onClick={() => onRouteChange(inspected.characterId, { kind: "layered", characterIds: inspectedRoute.characterIds.filter((id) => id !== characterId) })}>{voiceById[characterId]?.name ?? characterId}<span>×</span></button>)}
+              </div>
+              <label>{t("Add an existing cast voice")}<select aria-label={t("Add an existing cast voice")} value="" onChange={(event) => { const characterId = event.target.value; if (characterId) onRouteChange(inspected.characterId, { kind: "layered", characterIds: [...inspectedRoute.characterIds, characterId] }); }}><option value="">{t("Choose a character…")}</option>{memberVoices.filter((voice) => !inspectedRoute.characterIds.includes(voice.characterId)).map((voice) => <option key={voice.characterId} value={voice.characterId}>{voice.name}</option>)}</select></label>
+              {inspectedPreviewUrl
+                ? <div className="voice-route-preview"><span><b>{t("Combined preview")}</b><small>{t("Layers the currently applied member auditions.")}</small></span><audio key={inspectedPreviewUrl} controls preload="metadata" src={inspectedPreviewUrl} /></div>
+                : <p className="voice-route-incomplete">{t("Choose at least two characters with playable auditions.")}</p>}
+            </div>}
+          </section>}
+
+          {inspectedRoute.kind === "dedicated" && settings && <section className="voice-settings-section voice-audition-settings">
+            <div className="cast-section-heading"><div><small>{t("Audition setup")}</small><h3>{t("Tune and generate")}</h3></div></div>
+            <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>
+            {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
+              <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><b>{t("Design a voice")}</b><small>{t("Use voice traits and direction.")}</small></button>
+              <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the voice reference.")}</small></button>
+            </div>}
+            {auditionSource === "designed" && <><div className="voice-settings-groups">
+              <fieldset className="voice-setting-group voice-traits-group"><legend>{t("Voice traits")}</legend><div className="voice-trait-columns">
+                <div className="voice-trait-column"><h4>{t("Character")}</h4><div className="voice-fields">
+                  <VoiceSelect title={t("Gender")} field="presentation" value={settings.presentation} values={options.presentation} onChange={(value) => setSettings({ ...settings, presentation: value })} />
+                  <VoiceSelect title={t("Age")} field="age" value={settings.age} values={options.age} onChange={(value) => setSettings({ ...settings, age: value })} />
+                </div></div>
+                <div className="voice-trait-column"><h4>{t("Sound")}</h4><div className="voice-fields">
+                  <VoiceSelect title={t("Tone")} field="tone" value={settings.tone} values={options.tone} onChange={(value) => setSettings({ ...settings, tone: value })} />
+                  <VoiceSelect title={t("Pitch")} field="pitch" value={settings.pitch} values={options.pitch} onChange={(value) => setSettings({ ...settings, pitch: value })} />
+                </div></div>
+                <div className="voice-trait-column"><h4>{t("Delivery")}</h4><div className="voice-fields">
+                  <VoiceSelect title={t("Pace")} field="pace" value={settings.pace} values={options.pace} onChange={(value) => setSettings({ ...settings, pace: value })} />
+                  <VoiceSelect title={t("Energy")} field="energy" value={settings.energy} values={options.energy} onChange={(value) => setSettings({ ...settings, energy: value })} />
+                </div></div>
+              </div></fieldset>
+              <fieldset className="voice-setting-group voice-direction-group"><legend>{t("Direction")}</legend><div className="voice-fields">
+                <label>{t("Accent")}<input maxLength={accentLimit} placeholder={t("e.g. Japanese or Southern English")} value={settings.accent} onChange={(event) => setSettings({ ...settings, accent: event.target.value })} /></label>
+                <label><span className="field-label">{t("Performance notes")} <em>{t("Optional")}</em></span><textarea aria-label={t("Performance notes")} aria-describedby="performance-notes-help" aria-invalid={performanceNotesTooLong} maxLength={performanceNotesLimit} rows={4} value={settings.description} onChange={(event) => setSettings({ ...settings, description: event.target.value })} /><small id="performance-notes-help" className={performanceNotesTooLong ? "field-error" : "field-counter"}>{performanceNotesTooLong ? t("Use {{count}} characters or fewer.", { count: performanceNotesLimit }) : `${settings.description.length}/${performanceNotesLimit}`}</small></label>
+              </div></fieldset>
+            </div>
+            <div className="voice-regenerate-footer">
+              <small>{inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls."} Settings affect only the next audition; earlier auditions remain available below.</small>
+              <button
+                type="button"
+                className="ghost regenerate-voice-action"
+                disabled={performanceNotesTooLong || regeneratingCharacterId === inspected.characterId}
+                onClick={() => onRegenerate(inspected.characterId, { ...settings, accent: settings.accent.trim() || "unspecified", description: settings.description.trim() })}
+              >
+                {t(regeneratingCharacterId === inspected.characterId ? "Creating audition…" : "Generate new audition →")}
+              </button>
+            </div></>}
+            {auditionSource === "sample" && onUpload && <div className="voice-sample-panel">
+              <div><b>{t("Generate this line in the sampled voice")}</b><p>{t("Choose a clear 3–30 second WAV, MP3, or FLAC clip of one speaker. We’ll draft the words locally; replay the sample and correct every word before generating.")}</p></div>
+              {!sampleFile && <label className={`voice-sample-upload ${uploadingCharacterId === inspected.characterId ? "busy" : ""}`}>
+                <input
+                  type="file"
+                  aria-label={t("Choose voice sample")}
+                  accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac"
+                  disabled={uploadingCharacterId === inspected.characterId}
+                  onChange={(event) => {
+                    const sample = event.target.files?.[0];
+                    event.target.value = "";
+                    if (!sample) return;
+                    void chooseSample(sample);
+                  }}
+                />
+                <span>{t("Choose voice sample")}</span>
+              </label>}
+              {sampleFile && samplePreviewUrl && <div className="voice-sample-preview">
+                <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}>{samplePlaying ? "Ⅱ" : "▶"}</button>
+                <span className="voice-sample-preview-copy"><b title={sampleFile.name}>{sampleFile.name}</b><small>{sampleTranscription === "transcribing" ? t("Drafting transcript locally…") : t("Play while checking the transcript below.")}</small></span>
+                <span className="voice-sample-time">{audioTime(sampleElapsed)} / {audioTime(sampleDuration)}</span>
+                <label className="voice-sample-replace"><input type="file" aria-label={t("Choose a different sample")} accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" disabled={uploadingCharacterId === inspected.characterId} onChange={(event) => { const sample = event.target.files?.[0]; event.target.value = ""; if (sample) void chooseSample(sample); }} /><span>{t("Replace")}</span></label>
+                <audio ref={sampleAudioRef} aria-label={t("Selected voice sample preview")} preload="metadata" src={samplePreviewUrl} onLoadedMetadata={(event) => setSampleDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setSampleElapsed(event.currentTarget.currentTime)} onPause={() => setSamplePlaying(false)} onEnded={() => { setSamplePlaying(false); setSampleElapsed(sampleDuration); }} />
+              </div>}
+              <label className="voice-sample-transcript"><span>{t("What is said in the sample?")}</span><textarea aria-label={t("Voice sample transcript")} disabled={!sampleFile || sampleTranscription === "transcribing"} maxLength={sampleTranscriptLimit} rows={4} placeholder={t(!sampleFile ? "Choose a sample to draft its words…" : sampleTranscription === "transcribing" ? "Listening and drafting…" : "Type the sample’s exact spoken words…")} value={sampleTranscript} onChange={(event) => setSampleTranscript(event.target.value)} /><small>{sampleTranscript.length}/{sampleTranscriptLimit}</small></label>
+              {sampleFile && <p className={`voice-transcript-status ${sampleTranscription}`} aria-live="polite">{sampleTranscription === "transcribing" ? t("Detecting the language and drafting the transcript locally…") : sampleTranscription === "ready" ? t(sampleLanguage ? "Drafted in {{language}}. Check every word before continuing." : "Draft ready. Check every word before continuing.", { language: sampleLanguage }) : sampleTranscription === "failed" ? t("A draft could not be made. Type the exact words manually.") : t("Type the exact words spoken in the sample.")}</p>}
+              <button
+                type="button"
+                className="primary voice-sample-submit"
+                disabled={!sampleFile || !sampleTranscript.trim() || sampleTranscription === "transcribing" || uploadingCharacterId === inspected.characterId}
+                onClick={() => { if (sampleFile) onUpload(inspected.characterId, sampleFile, sampleTranscript.trim()); }}
+              >{t(uploadingCharacterId === inspected.characterId ? "Creating cloned audition…" : "Create sampled audition →")}</button>
+            </div>}
+          </section>}
+
+          {inspectedRoute.kind === "dedicated" && <section className="voice-candidates-section">
+            <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
+            <p className="voice-candidates-help">{t("Listen, compare, then approve the audition you want to use.")}</p>
+            <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
+              const applied = candidate.revision === approvedRevision;
+              const selected = candidate.revision === pendingRevision;
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
+                <div className="voice-candidate-actions">
+                  <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
+                    <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
+                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
+                    {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
+                  </button>
+                  {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}
+                </div>
+                <p>{candidateSummary(candidate)}</p>
+                {candidate.previewUrl
+                  ? <audio controls preload="metadata" src={candidate.previewUrl} />
+                  : <small className="cast-muted">{t("No playable audio.")}</small>}
+              </article>;
+            })}</div>
+          </section>}
+        </div>
+      </section>
+    </div>}
+  </div>;
+}
+
+function VoiceSelect<K extends keyof Pick<VoiceSettings, "presentation" | "age" | "tone" | "pitch" | "pace" | "energy">>({
+  title, field, value, values, onChange,
+}: {
+  title: string;
+  field: K;
+  value: VoiceSettings[K];
+  values: readonly VoiceSettings[K][];
+  onChange: (value: VoiceSettings[K]) => void;
+}) {
+  const { t } = useTranslation();
+  return <label>{title}<select aria-label={title} value={value} onChange={(event) => onChange(event.target.value as VoiceSettings[K])}>{values.map((option) => <option key={option} value={option}>{t(label(option))}</option>)}</select><input type="hidden" name={field} value={value} /></label>;
+}

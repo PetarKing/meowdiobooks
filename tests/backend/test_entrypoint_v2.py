@@ -1,0 +1,83 @@
+from __future__ import annotations
+
+import os
+from argparse import Namespace
+
+import pytest
+from fastapi.testclient import TestClient
+
+from meowdiobooks import cli
+from meowdiobooks.backend.app import create_app
+from meowdiobooks.backend.app_v2 import create_app_v2
+from meowdiobooks.backend.models import Job, JobStatus
+from meowdiobooks.backend.storage import JsonStore
+
+
+def test_production_entrypoint_is_v2() -> None:
+    assert create_app is create_app_v2
+
+
+def test_cli_serves_v2_application(monkeypatch, tmp_path) -> None:
+    observed: dict[str, object] = {}
+
+    def fake_run(app, *, host: str, port: int) -> None:
+        observed.update(app=app, host=host, port=port)
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    result = cli._serve(Namespace(data=str(tmp_path), host="127.0.0.1", port=8123))
+
+    assert result == 0
+    assert observed["host"] == "127.0.0.1"
+    assert observed["port"] == 8123
+    assert observed["app"].title == "Meowdiobooks v2"
+    paths = {route.path for route in observed["app"].routes}
+    assert "/api/books/{book_id}/dialogue/preview" in paths
+    assert "/api/books/{book_id}/stages/{stage}/process" in paths
+    assert "/api/books/{book_id}/chapters/{chapter_id}/{revision}/audio" in paths
+
+
+def test_second_backend_is_rejected_before_running_job_recovery(monkeypatch, tmp_path) -> None:
+    jobs = JsonStore(tmp_path / "jobs.json", Job)
+    running = jobs.put(Job(kind="v2:generate", status=JobStatus.RUNNING))
+    uvicorn_called = False
+
+    def fake_run(*_args, **_kwargs) -> None:
+        nonlocal uvicorn_called
+        uvicorn_called = True
+
+    monkeypatch.setattr("uvicorn.run", fake_run)
+
+    with cli._single_instance_lock(tmp_path):
+        with pytest.raises(OSError, match=r"already running.*PID"):
+            cli._serve(Namespace(data=str(tmp_path), host="127.0.0.1", port=8123))
+
+    assert uvicorn_called is False
+    assert jobs.get(running.id).status == JobStatus.RUNNING
+
+
+def test_instance_lock_is_released_for_a_later_restart(tmp_path) -> None:
+    with cli._single_instance_lock(tmp_path):
+        assert (tmp_path / "server.lock").read_text() == str(os.getpid())
+
+    with cli._single_instance_lock(tmp_path):
+        pass
+
+
+def test_cli_exposes_read_only_doctor(monkeypatch) -> None:
+    monkeypatch.setattr("meowdiobooks.diagnostics.print_doctor", lambda _root: 7)
+
+    assert cli._doctor(Namespace()) == 7
+    assert "doctor" in cli.parser().format_help()
+
+
+def test_explicit_frontend_build_is_served_at_root(tmp_path) -> None:
+    frontend = tmp_path / "dist"
+    frontend.mkdir()
+    (frontend / "index.html").write_text("<h1>Meowdiobooks v2</h1>")
+
+    with TestClient(create_app(tmp_path / "data", frontend_dist=frontend)) as client:
+        responses = [client.get(path) for path in ("/", "/library", "/player")]
+
+    assert all(response.status_code == 200 for response in responses)
+    assert all("Meowdiobooks v2" in response.text for response in responses)

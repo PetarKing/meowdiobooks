@@ -1,0 +1,83 @@
+schema_version = 1
+
+[defaults]
+text = "qwen-3.5-9b-q4"
+voice = "qwen-voice-design-1.7b"
+transcription = "qwen3-asr-0.6b-4bit"
+
+[dialogue_attribution]
+default_route = "local"
+large_review_threshold = 100
+local_policy = "selective-exact-consensus"
+remote_profile = "luna-dialogue"
+
+[text_models."qwen-3.5-9b-q4"]
+label = "Qwen3.5 9B Q4_K_M"
+display_name = "Qwen"
+engine = "llama_cpp"
+runtime_path = ".local/llama.cpp/b9637/llama-server"
+model_path = ".local/models/qwen35-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+context_size = 32768
+gpu_layers = 99
+source = "bartowski/Qwen_Qwen3.5-9B-GGUF"
+revision = "e3abf1f4e3c6cf7c24bf1dd17ec327cd66ba4e76"
+
+[text_models."qwen-3.5-9b-q4".dialogue_benchmark]
+sample_size = 233
+false_character_rate = 0.093
+speaker_recall = 0.205
+policy = "selective-exact-consensus"
+
+[remote_text_models."luna-dialogue"]
+display_name = "Luna"
+engine = "openai_responses"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-5.6-luna"
+reasoning_effort = "low"
+policy = "dual-perspective-exact"
+# USD charged per 1,000,000 provider-reported tokens.
+input_usd_per_million_tokens = 1.0
+cached_input_usd_per_million_tokens = 0.1
+output_usd_per_million_tokens = 6.0
+# Ordered Dialogue targets sent together with the same surrounding context.
+max_targets_per_batch = 6
+# Each batch runs two independent matching passes, so 6 allows 12 requests in flight.
+max_concurrent_batches = 6
+# Pre-run planning heuristic; completed runs use the token prices above.
+estimated_usd_per_target = 0.000725
+
+[remote_text_models."luna-dialogue".dialogue_benchmark]
+sample_size = 233
+false_character_rate = 0.0136
+speaker_recall = 0.763
+policy = "dual-perspective-exact"
+
+[voice_pipelines."qwen-voice-design-1.7b"]
+label = "Qwen3-TTS 1.7B VoiceDesign"
+engine = "mlx_audio"
+audition_path = "models/qwen_1_7b_voice_design"
+renderer_path = "models/qwen_1_7b_base_4bit"
+audition_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
+audition_revision = "7d3824abff87e49756bb0f83fb5411de75d160c4"
+renderer_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit"
+renderer_revision = "37e955a1deb861c088ae5f3a67043185f3d1a60c"
+languages = [
+  "chinese",
+  "english",
+  "french",
+  "german",
+  "italian",
+  "japanese",
+  "korean",
+  "portuguese",
+  "russian",
+  "spanish",
+]
+
+[speech_models."qwen3-asr-0.6b-4bit"]
+label = "Qwen3-ASR 0.6B 4-bit"
+engine = "mlx_audio"
+model_path = "models/qwen3_asr_0_6b_4bit"
+source = "mlx-community/Qwen3-ASR-0.6B-4bit"
+revision = "313d850181767edf09f00a9c289becca70e58cd0"
