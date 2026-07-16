@@ -50,6 +50,7 @@ library/
 runs/
 results/
 output/
+outputs/
 tmp/
 fixtures/downloaded/
 
