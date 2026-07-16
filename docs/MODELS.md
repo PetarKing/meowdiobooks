@@ -18,8 +18,8 @@ used to develop and verify the alpha.
 | Chapter audio | Qwen3-TTS Base through MLX-Audio | Loaded inside the Python process for the generation job |
 | Voice-sample transcript draft | Qwen3-ASR 0.6B 4-bit through MLX-Audio | Loaded for one draft, with automatic language detection, then released |
 
-Do not start `llama-server` separately. MLX-Audio is installed by `uv sync`; llama.cpp and all model
-weights are user-managed assets.
+Do not start `llama-server` separately. MLX-Audio is installed by
+`uv sync --extra mlx-runtime`; llama.cpp and all model weights are user-managed assets.
 
 ## Install the tested defaults
 

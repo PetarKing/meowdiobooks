@@ -28,6 +28,9 @@ runtime dependencies require maintainer approval before implementation.
 
 ## Quality checks
 
+Set up the development environment using the [setup reference](SETUP.md), the source of truth for
+platform- and runtime-specific dependencies.
+
 ```bash
 uv run pytest -q
 uv run ruff check src/meowdiobooks tests
@@ -35,6 +38,10 @@ npm --prefix frontend test -- --run
 npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
+
+GitHub pull-request checks run the cross-platform backend suite with tests marked
+`uses_audio_decoder` or `runs_models` excluded. Before release, run the complete backend suite in
+each supported runtime environment affected by the change.
 
 Do not commit books, generated user artifacts, model weights, or other material you do not have the
 right to redistribute. Tests should use synthetic or appropriately licensed fixtures.

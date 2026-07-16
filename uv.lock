@@ -680,17 +680,23 @@ name = "meowdiobooks"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "en-core-web-sm" },
     { name = "fastapi" },
     { name = "lxml" },
-    { name = "misaki", extra = ["en"] },
-    { name = "mlx-audio" },
+    { name = "numpy" },
     { name = "pdfplumber" },
     { name = "pydantic" },
     { name = "pypdf" },
     { name = "python-multipart" },
     { name = "reportlab" },
+    { name = "scipy" },
     { name = "uvicorn" },
+]
+
+[package.optional-dependencies]
+mlx-runtime = [
+    { name = "en-core-web-sm" },
+    { name = "misaki", extra = ["en"] },
+    { name = "mlx-audio" },
 ]
 
 [package.dev-dependencies]
@@ -702,18 +708,21 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "en-core-web-sm", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
+    { name = "en-core-web-sm", marker = "extra == 'mlx-runtime'", url = "https://github.com/explosion/spacy-models/releases/download/en_core_web_sm-3.8.0/en_core_web_sm-3.8.0-py3-none-any.whl" },
     { name = "fastapi", specifier = "==0.139.0" },
     { name = "lxml", specifier = "==6.0.0" },
-    { name = "misaki", extras = ["en"], specifier = "==0.9.4" },
-    { name = "mlx-audio", specifier = "==0.4.5" },
+    { name = "misaki", extras = ["en"], marker = "extra == 'mlx-runtime'", specifier = "==0.9.4" },
+    { name = "mlx-audio", marker = "extra == 'mlx-runtime'", specifier = "==0.4.5" },
+    { name = "numpy", specifier = "==2.5.1" },
     { name = "pdfplumber", specifier = "==0.11.7" },
     { name = "pydantic", specifier = "==2.11.7" },
     { name = "pypdf", specifier = "==5.8.0" },
     { name = "python-multipart", specifier = "==0.0.32" },
     { name = "reportlab", specifier = "==4.4.3" },
+    { name = "scipy", specifier = "==1.18.0" },
     { name = "uvicorn", specifier = "==0.51.0" },
 ]
+provides-extras = ["mlx-runtime"]
 
 [package.metadata.requires-dev]
 dev = [
