@@ -145,7 +145,7 @@ FFmpeg 用于把生成的章节打包为 M4B。
 ```bash
 # 克隆或下载此仓库，然后执行：
 cd meowdiobooks
-uv sync --all-groups
+uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
 uv run meowdiobooks doctor
@@ -153,7 +153,9 @@ uv run meowdiobooks serve
 ```
 
 在 `doctor` 可以通过之前，请按照[本地模型指南](docs/MODELS.md)安装 llama.cpp 和配置中指定的
-本地模型文件。这些文件不会由上述依赖安装命令自动下载。本地声音样本文本识别需要固定版本的
+本地模型文件。这些文件不会由上述依赖安装命令自动下载。`mlx-runtime` 可选依赖会安装当前
+Apple Silicon 推理后端所需的 Python 软件包；未来可将其他平台的运行时后端作为独立可选依赖
+加入，而无需改变跨平台的应用核心。本地声音样本文本识别需要固定版本的
 **Qwen3-ASR 0.6B 4-bit** 模型，并应放在 `models/qwen3_asr_0_6b_4bit/`；指南中列出了它与
 文本、VoiceDesign 和 Base TTS 模型的精确版本及下载命令。安装完成后，`doctor` 会将其显示为
 **Speech recognition**。启动 `serve` 后，打开
@@ -202,6 +204,9 @@ npm --prefix frontend test -- --run
 npm --prefix frontend run lint
 npm --prefix frontend run build
 ```
+
+拉取请求 CI 只安装跨平台核心，并跳过标记为 `uses_audio_decoder` 或 `runs_models` 的测试。
+完整测试套件仍需在配置完毕且受支持的运行时环境中运行，作为发布前的信心检查。
 
 贡献前请先创建 issue，说明用户价值、范围、受影响的契约、测试策略和依赖项。
 新增服务、数据库、缓存、跨服务耦合或运行时依赖，必须在实现前获得维护者批准。
