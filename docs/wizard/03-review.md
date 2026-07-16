@@ -33,12 +33,19 @@ Review deliberately exposes a small, consequence-oriented warning vocabulary:
 - reading order;
 - repeated page matter;
 - page number;
+- web address;
 - footnote;
 - front or back matter.
 
 Chapter starts remain a separate binary decision because they assign chapter ownership rather than
-change delivery. Internal detector codes and near-duplicate categories are normalized into the seven
+change delivery. Internal detector codes and near-duplicate categories are normalized into the eight
 warning types above.
+
+Web-address detection is conservative: explicit `http://`, `https://`, and `www.` forms are
+source-anchored for a keep-or-exclude decision. Sentence punctuation immediately after the address is
+not included. When a web address sits inside a broader warning such as a footnote, the narrower
+web-address decision controls only that exact range and the broader policy controls the surrounding
+text.
 
 Warnings that require changing Dialogue link back to a new Dialogue revision rather than mutating the
 accepted transcript invisibly.
@@ -93,5 +100,6 @@ without replacing its source evidence. Cast cannot start while blocking warnings
 - per-occurrence and previewed bulk decisions;
 - source reconstruction and Dialogue revision linkage;
 - wrapped and adjacent-page footnotes, plus chapter/list negative boundaries;
+- standalone and nested web addresses, including trailing-punctuation boundaries;
 - durable history and post-completion inspection;
 - no silent default action.
