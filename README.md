@@ -166,6 +166,7 @@ Local voice-sample transcription requires the pinned **Qwen3-ASR 0.6B 4-bit** mo
 `models/qwen3_asr_0_6b_4bit/`; the guide includes its exact revision and download command alongside
 the text, VoiceDesign and Base TTS models. `doctor` reports it as **Speech recognition** when installed.
 Open <http://127.0.0.1:8000> after `serve` starts.
+When changing the frontend, use `uv run meowdiobooks dev` to rebuild it once before starting the server.
 
 Only one backend may use a data directory at a time. A second `serve` command exits before reading
 or changing job state and reports the PID of the running instance. Restarting the browser is safe;

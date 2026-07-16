@@ -160,6 +160,7 @@ Apple Silicon 推理后端所需的 Python 软件包；未来可将其他平台�
 文本、VoiceDesign 和 Base TTS 模型的精确版本及下载命令。安装完成后，`doctor` 会将其显示为
 **Speech recognition**。启动 `serve` 后，打开
 <http://127.0.0.1:8000>。
+开发前端时，运行 `uv run meowdiobooks dev`；它会先重新构建一次前端，再启动服务器。
 
 同一时间只能有一个后端使用同一个数据目录。第二个 `serve` 命令会在读取或修改任务状态前退出，
 并显示正在运行的进程 PID。重新启动浏览器是安全的；正在进行的生成任务仍由原来的后端进程负责。
