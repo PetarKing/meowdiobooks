@@ -42,9 +42,9 @@ validation.
 ## Install and run
 
 ```bash
-uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
+uv sync --extra mlx-runtime
 uv run meowdiobooks doctor
 uv run meowdiobooks serve
 ```

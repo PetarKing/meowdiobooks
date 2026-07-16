@@ -145,9 +145,9 @@ FFmpeg 用于把生成的章节打包为 M4B。
 ```bash
 # 克隆或下载此仓库，然后执行：
 cd meowdiobooks
-uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
+uv sync --extra mlx-runtime
 uv run meowdiobooks doctor
 uv run meowdiobooks serve
 ```

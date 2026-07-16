@@ -151,9 +151,9 @@ packages generated chapters as M4B.
 ```bash
 # Clone or download this repository, then:
 cd meowdiobooks
-uv sync --extra mlx-runtime
 npm --prefix frontend ci
 npm --prefix frontend run build
+uv sync --extra mlx-runtime
 uv run meowdiobooks doctor
 uv run meowdiobooks serve
 ```
