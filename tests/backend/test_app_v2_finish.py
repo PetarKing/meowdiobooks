@@ -113,12 +113,21 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
 
 
 @pytest.mark.uses_audio_decoder
-def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_path, monkeypatch):
+def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_path):
     generated: dict[str, object] = {}
     transcribed: dict[str, object] = {}
 
     def clone_audition(
-        repo_root, reference_audio, reference_text, text, language, model_id
+        repo_root,
+        package,
+        book_id,
+        character_id,
+        voice_revision,
+        reference_audio,
+        reference_text,
+        text,
+        language,
+        model_id,
     ):
         generated.update(
             reference_audio=reference_audio,
@@ -126,6 +135,10 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
             text=text,
             language=language,
             model_id=model_id,
+            package=package,
+            book_id=book_id,
+            character_id=character_id,
+            voice_revision=voice_revision,
         )
         output = BytesIO()
         timeline = np.arange(24_000, dtype=np.float32) / 24_000
@@ -136,19 +149,23 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
         )
         return output.getvalue()
 
-    monkeypatch.setattr(
-        "meowdiobooks.backend.app_v2.generate_cloned_audition", clone_audition
-    )
-
-    def draft_transcript(repo_root, sample_path):
+    def draft_transcript(repo_root, book_id, sample_path):
         rate, audio = wavfile.read(sample_path)
-        transcribed.update(repo_root=repo_root, rate=rate, samples=audio.shape[0])
+        transcribed.update(
+            repo_root=repo_root,
+            book_id=book_id,
+            rate=rate,
+            samples=audio.shape[0],
+        )
         return TranscriptionDraft("Alice says these exact sample words.", "English")
 
-    monkeypatch.setattr(
-        "meowdiobooks.backend.app_v2.transcribe_voice_sample", draft_transcript
-    )
-    with TestClient(create_app_v2(tmp_path)) as client:
+    with TestClient(
+        create_app_v2(
+            tmp_path,
+            voice_sample_auditioner=clone_audition,
+            voice_sample_transcriber=draft_transcript,
+        )
+    ) as client:
         imported = client.post(
             "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
         ).json()
@@ -209,6 +226,7 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
         }
         assert transcribed == {
             "repo_root": Path(__file__).resolve().parents[2],
+            "book_id": book_id,
             "rate": 24_000,
             "samples": 24_000 * 4,
         }
@@ -249,6 +267,10 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
         assert generated["reference_text"] == "Alice says these exact sample words."
         assert generated["text"] == "This is Alice."
         assert generated["language"] == "english"
+        assert generated["package"] == package
+        assert generated["book_id"] == book_id
+        assert generated["character_id"] == "alice"
+        assert generated["voice_revision"] == uploaded["revision"]
 
         accepted = _accept_voice_revisions(
             uploaded_cast,

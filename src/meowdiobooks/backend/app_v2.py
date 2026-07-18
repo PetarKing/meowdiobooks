@@ -130,7 +130,7 @@ from .recording_script import (
 )
 from .storage import JsonStore, ModelStore
 from .tts_v2 import render_plan_audio
-from .transcription import transcribe_voice_sample
+from .transcription import TranscriptionDraft, transcribe_voice_sample
 from .workflow.commands import (
     BuildCast,
     ExtractBook,
@@ -258,6 +258,8 @@ def create_app_v2(
     library_dir: Path | str | None = None,
     *,
     voice_auditioner: Callable[..., list[dict[str, Any]]] | None = None,
+    voice_sample_auditioner: Callable[..., bytes] | None = None,
+    voice_sample_transcriber: Callable[..., TranscriptionDraft] | None = None,
     chapter_renderer: Callable[..., list[dict[str, Any]]] | None = None,
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
@@ -278,6 +280,8 @@ def create_app_v2(
     root = Path(data_dir)
     repo_root = application_root()
     voice_auditioner = voice_auditioner or generate_cast_previews
+    voice_sample_auditioner = voice_sample_auditioner or _local_voice_sample_auditioner
+    voice_sample_transcriber = voice_sample_transcriber or _local_voice_sample_transcriber
     chapter_renderer = chapter_renderer or render_plan_audio
     cast_proposer = cast_proposer or propose_cast
     voice_profiler = voice_profiler or suggest_voice_settings
@@ -1498,12 +1502,20 @@ def create_app_v2(
         )
         if active:
             raise HTTPException(status_code=409, detail={"jobId": active.id})
+        payload = {
+            **command.to_job_payload(),
+            "workflow_version": PUBLIC_WORKFLOW.version,
+        }
+        resumable = (
+            _matching_failed_generation_job(jobs.all(), kind, payload)
+            if parsed == WizardStage.GENERATE
+            else None
+        )
         job = queue.enqueue(
             kind,
-            {
-                **command.to_job_payload(),
-                "workflow_version": PUBLIC_WORKFLOW.version,
-            },
+            payload,
+            retry_of=resumable.id if resumable else None,
+            attempt=resumable.attempt + 1 if resumable else 1,
         )
         return job.model_dump(mode="json")
 
@@ -1565,7 +1577,7 @@ def create_app_v2(
             with tempfile.NamedTemporaryFile(suffix=".wav") as sample:
                 sample.write(normalized)
                 sample.flush()
-                draft = transcribe_voice_sample(repo_root, Path(sample.name))
+                draft = voice_sample_transcriber(repo_root, book_id, Path(sample.name))
         except RuntimeError as error:
             raise HTTPException(status_code=503, detail=str(error)) from error
         except ValueError as error:
@@ -1654,8 +1666,12 @@ def create_app_v2(
             raise HTTPException(status_code=422, detail="Cast voice has an invalid storage path")
         try:
             atomic_write(reference_output, normalized)
-            audition = generate_cloned_audition(
+            audition = voice_sample_auditioner(
                 repo_root,
+                package,
+                book_id,
+                character_id,
+                voice_revision,
                 reference_output,
                 reference_text,
                 audition_text,
@@ -1954,6 +1970,36 @@ def create_app_v2(
     app.router.routes.extend(create_jobs_router(jobs, queue, require_book).routes)
     mount_local_frontend(app, frontend_dist_path(repo_root, explicit=frontend_dist))
     return app
+
+
+def _local_voice_sample_transcriber(
+    repo_root: Path,
+    _book_id: str,
+    sample_path: Path,
+) -> TranscriptionDraft:
+    return transcribe_voice_sample(repo_root, sample_path)
+
+
+def _local_voice_sample_auditioner(
+    repo_root: Path,
+    _package: Path,
+    _book_id: str,
+    _character_id: str,
+    _voice_revision: str,
+    reference_audio: Path,
+    reference_text: str,
+    text: str,
+    language: str,
+    model_id: str,
+) -> bytes:
+    return generate_cloned_audition(
+        repo_root,
+        reference_audio,
+        reference_text,
+        text,
+        language,
+        model_id,
+    )
 
 
 def _candidate_result(
@@ -2255,3 +2301,20 @@ def _accept_voice_revisions(
 def _chapter_display_title(chapter_id: str) -> str:
     words = chapter_id.replace("_", " ").replace("-", " ").split()
     return " ".join(word if word.isdigit() else word.capitalize() for word in words) or "Chapter"
+
+
+def _matching_failed_generation_job(
+    rows: list[Job], kind: str, payload: dict[str, object]
+) -> Job | None:
+    """Return the latest failed Generate job with exactly the same immutable inputs."""
+
+    expected = {key: value for key, value in payload.items() if key != "_job_id"}
+    candidates = [
+        row
+        for row in rows
+        if row.kind == kind
+        and row.status == JobStatus.FAILED
+        and {key: value for key, value in row.payload.items() if key != "_job_id"}
+        == expected
+    ]
+    return max(candidates, key=lambda row: row.created_at, default=None)
