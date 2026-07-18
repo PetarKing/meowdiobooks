@@ -143,6 +143,8 @@ VOICE_PROFILE_OPTIONS = {
     "energy": {"restrained", "balanced", "animated"},
 }
 
+VOICE_DIRECTION_MAX_CHARACTERS = 250
+
 
 def propose_cast(
     repo_root,
@@ -501,83 +503,63 @@ def validate_voice_settings(raw: object, *, fallback_category: str = "character"
 
 
 def compile_voice_direction(settings: Mapping[str, Any], *, language: str = "english") -> str:
-    """Compile editable handles into one concise, natural VoiceDesign description."""
+    """Compile editable handles into one provider-portable VoiceDesign description."""
 
     presentation = {
-        "feminine": "feminine-presenting",
-        "masculine": "masculine-presenting",
-        "androgynous": "androgynous-presenting",
+        "feminine": "female",
+        "masculine": "male",
+        "androgynous": "androgynous",
     }.get(str(settings.get("presentation", "unspecified")).strip().lower())
     age = {
         "child": "child",
-        "young-adult": "young-adult",
+        "young-adult": "young adult",
         "adult": "adult",
-        "older-adult": "older-adult",
+        "older-adult": "older adult",
     }.get(str(settings.get("age", "unspecified")).strip().lower())
     tone = {
-        "warm": "a warm, rounded timbre",
-        "bright": "a bright, clear timbre",
-        "dark": "a dark, weighty timbre",
-        "gentle": "a gentle, soft-edged timbre",
-        "crisp": "a crisp, sharply articulated timbre",
-        "gravelly": "a gravelly, textured timbre",
-        "neutral": "a neutral, natural timbre",
+        "warm": "warm, rounded timbre",
+        "bright": "bright, clear timbre",
+        "dark": "dark, weighty timbre",
+        "gentle": "gentle, soft-edged timbre",
+        "crisp": "crisp, articulated timbre",
+        "gravelly": "gravelly, textured timbre",
+        "neutral": "neutral, natural timbre",
     }.get(str(settings.get("tone", "unspecified")).strip().lower())
     pitch = {
-        "low": "a low pitch",
-        "medium": "a medium pitch",
-        "high": "a high pitch",
+        "low": "low pitch",
+        "medium": "medium pitch",
+        "high": "high pitch",
     }.get(str(settings.get("pitch", "unspecified")).strip().lower())
     pace = {
-        "measured": "a measured, unhurried pace",
-        "natural": "a natural conversational pace",
-        "brisk": "a brisk pace",
+        "measured": "measured pace",
+        "natural": "natural pace",
+        "brisk": "brisk pace",
     }.get(str(settings.get("pace", "unspecified")).strip().lower())
     energy = {
-        "restrained": "restrained, controlled energy",
-        "balanced": "balanced, steady energy",
-        "animated": "animated, energetic delivery",
+        "restrained": "restrained energy",
+        "balanced": "balanced energy",
+        "animated": "animated energy",
     }.get(str(settings.get("energy", "unspecified")).strip().lower())
 
     voice_qualifiers = [value for value in (presentation, age) if value]
-    acoustic_traits = [value for value in (tone, pitch) if value]
-    delivery_traits = [value for value in (pace, energy) if value]
-    selected_traits = [*voice_qualifiers, *acoustic_traits, *delivery_traits]
-
-    voice_phrase = " ".join([*voice_qualifiers, "voice"])
-    parts: list[str] = []
-    if voice_qualifiers or acoustic_traits:
-        identity = f"Create a {voice_phrase}"
-        if acoustic_traits:
-            identity += f" with {_natural_list(acoustic_traits)}"
-        parts.append(identity + ".")
-    if delivery_traits:
-        parts.append(f"Deliver the line with {_natural_list(delivery_traits)}.")
+    voice_phrase = " ".join([*voice_qualifiers, "voice"]).capitalize()
+    parts = [voice_phrase, *[value for value in (tone, pitch, pace, energy) if value]]
 
     accent = normalize_label(settings.get("accent", ""))
     if accent and accent.lower() != "unspecified":
         spoken_language = normalize_label(language).replace("-", " ").title() or "Selected language"
         accent = accent[0].upper() + accent[1:]
-        parts.append(
-            f"Speak the {spoken_language} text with a clearly audible {accent} accent or dialect. "
-            f"Keep every word in {spoken_language}; change the pronunciation and rhythm, not the language."
-        )
+        parts.append(f"{accent} accent in {spoken_language}")
     description = normalize_label(settings.get("description", ""))
     if description:
-        parts.append(f"Additional performance direction: {description.rstrip('.')}.")
-    if description and selected_traits:
-        parts.append(
-            "Keep the selected voice traits if the additional performance direction conflicts with them."
+        parts.append(description.rstrip("."))
+    direction = "; ".join(parts) + "."
+    if len(direction) > VOICE_DIRECTION_MAX_CHARACTERS:
+        raise CastContractError(
+            f"Voice direction exceeds {VOICE_DIRECTION_MAX_CHARACTERS} characters; "
+            "shorten the performance notes or accent"
         )
-    return " ".join(parts)
-
-
-def _natural_list(values: Sequence[str]) -> str:
-    if len(values) < 2:
-        return values[0] if values else ""
-    if len(values) == 2:
-        return f"{values[0]} and {values[1]}"
-    return f"{', '.join(values[:-1])}, and {values[-1]}"
+    return direction
 
 
 def _voice_profile_prompt(
