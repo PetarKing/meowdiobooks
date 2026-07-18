@@ -1,6 +1,6 @@
 [project]
 name = "meowdiobooks-workflow"
-version = "0.1.6"
+version = "0.1.7"
 description = "Composable Meowdiobooks workflow, artifact, and local reference implementations."
 requires-python = ">=3.12,<3.13"
 dependencies = [
