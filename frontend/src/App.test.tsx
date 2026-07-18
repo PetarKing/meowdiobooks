@@ -653,24 +653,48 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Build transcript →' })).toBeDisabled()
   })
 
-  it('uses the shared accepted-state treatment while revising a completed transcript', async () => {
-    await open({ ...base, dialogue: { ...base.dialogue!, attributionTargets: ['unlabelled-candidates', 'open-speakers'], summary: { ...base.dialogue!.summary, explicitTurns: 5, aiAttributed: 1, aiContributions: 3, userCorrected: 4, unresolved: 2 } } })
+  it('reopens the accepted Dialogue result with prior corrections and no AI rerun', async () => {
+    const candidate = {
+      revision: 'dialogue-ai', strategy: 'fill-gaps' as const, attributionTargets: ['unlabelled-candidates'] as const,
+      resultSummary: { totalTurns: 1, explicitTurns: 0, aiAttributed: 1, aiContributions: 1, unresolved: 0, userCorrected: 0 },
+      spans: [{ id: 'target', page: 8, source: '“We should go.”', text: 'We should go.', renderRole: 'dialogue', resolvedSpeakerLabel: 'Alice', speakerStatus: 'ai', origin: 'qwen:targeted-speaker-v2' }],
+      aiWindows: [{ id: 'window-target', ownerIds: ['target'], dossiers: [{ page: 8, before: 'They reached the platform.', target: '“We should go.”', after: 'The train was waiting.' }] }],
+    }
+    const accepted = {
+      ...candidate,
+      revision: 'd1', correctedFromRevision: 'dialogue-ai',
+      resultSummary: { ...candidate.resultSummary, aiAttributed: 0, aiContributions: 0, userCorrected: 1 },
+      spans: [{ ...candidate.spans[0], resolvedSpeakerLabel: 'Bob', speakerStatus: 'user', origin: 'user:dialogue-speaker' }],
+      userCorrections: [{ spanId: 'target', action: 'speaker', speakerLabel: 'Bob', provenance: 'user' }],
+    }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValueOnce(accepted).mockResolvedValueOnce(candidate)
+    await open({ ...base, dialogue: { ...base.dialogue!, summary: { ...base.dialogue!.summary, explicitTurns: 5, aiAttributed: 0, aiContributions: 0, userCorrected: 1, unresolved: 2 } } })
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
 
     expect(screen.getByText('Pre-labelled').closest('span')).toHaveTextContent('5')
-    expect(screen.getByText(/AI-assisted/).closest('span')).toHaveTextContent('3AI-assisted Kept after review')
-    expect(screen.getByText('Corrected by you').closest('span')).toHaveTextContent('4')
+    expect(screen.getByText('Corrected by you').closest('span')).toHaveTextContent('1')
     expect(screen.getByText('Narrator fallback').closest('span')).toHaveTextContent('2')
 
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
 
-    const accepted = screen.getByRole('region', { name: 'Current accepted transcript' })
-    expect(within(accepted).getByText('Current transcript')).toBeInTheDocument()
-    expect(within(accepted).getByText('Stays active until you approve a replacement.')).toBeInTheDocument()
-    expect(screen.queryByText('ᓚᘏᗢ')).not.toBeInTheDocument()
-    const scopes = screen.getByRole('group', { name: 'Choose what AI may identify' })
-    expect(within(scopes).getAllByRole('checkbox')[0]).toBeChecked()
-    expect(within(scopes).getAllByRole('checkbox')[1]).not.toBeChecked()
+    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    expect(wizardApi.getStageCandidate).toHaveBeenNthCalledWith(1, 'book-1', 'dialogue', 'd1')
+    expect(wizardApi.getStageCandidate).toHaveBeenNthCalledWith(2, 'book-1', 'dialogue', 'dialogue-ai')
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(screen.queryByRole('region', { name: 'Current accepted transcript' })).not.toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByRole('button', { name: /Dialogue Complete/ })).not.toHaveClass('revising')
+    const accept = screen.getByRole('button', { name: 'Accept dialogue result →' })
+    expect(accept).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 1' }))
+    const row = screen.getByText('“We should go.”', { selector: 'mark' }).closest('article') as HTMLElement
+    expect(within(row).getByText('Your correction')).toBeInTheDocument()
+    expect(row).toHaveTextContent('Bob')
+    fireEvent.click(within(row).getByRole('button', { name: 'Restore AI choice' }))
+    expect(accept).toBeEnabled()
+    fireEvent.click(accept)
+
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'dialogue', 'dialogue-ai', []))
   })
 
   it('shows a compact remote-model cost receipt without changing the overview grid', async () => {
@@ -711,9 +735,12 @@ describe('v2 wizard', () => {
   })
 
   it('refreshes routing before rebuilding a completed transcript and shows the route choice', async () => {
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'd1', strategy: 'fill-gaps', attributionTargets: ['unlabelled-candidates'], resultSummary: {}, spans: [], aiWindows: [] })
     await open(base)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Change strategy' }))
+    expect(screen.queryByRole('region', { name: 'Current accepted transcript' })).not.toBeInTheDocument()
     vi.mocked(wizardApi.previewDialogue).mockResolvedValueOnce({
       ...base.dialogue!,
       routing: {
@@ -739,9 +766,11 @@ describe('v2 wizard', () => {
   })
 
   it('never silently starts Local when routing choices cannot be refreshed', async () => {
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'd1', strategy: 'fill-gaps', attributionTargets: ['unlabelled-candidates'], resultSummary: {}, spans: [], aiWindows: [] })
     await open(base)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Change strategy' }))
     vi.mocked(wizardApi.previewDialogue).mockResolvedValueOnce(base.dialogue!)
 
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
