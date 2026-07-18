@@ -19,3 +19,29 @@
   intended work, preserve it with an explicitly named handoff, or ask the user.
 - Before pushing `main`, run the test, lint, and build checks appropriate to the changed scope. Finish
   by reporting `git status -sb`, open pull requests, and any remaining unmerged local or remote branch.
+
+## Publishing workflow releases
+
+- Release only from a clean commit already merged into `origin/main`. Before versioning or tagging,
+  fetch with pruning, confirm the local and remote `main` SHAs match, inspect open pull requests and
+  worktrees, and reconcile any concurrent committed work. If `main` advances during the release, stop
+  and rebuild from the new commit; if an immutable release was already published, increment the
+  version and publish a new release instead of changing it.
+- Keep the Python and UI versions aligned in `release/python/pyproject.toml`,
+  `frontend/package.json`, and both version fields in `frontend/package-lock.json`.
+- Run the complete backend and frontend verification appropriate to the release, including tests,
+  Ruff, ESLint, and the production frontend build. Build assets with
+  `scripts/build_shared_release.sh`, then verify `dist/release/SHA256SUMS` and confirm the directory
+  contains exactly the wheel, UI tarball, checksum manifest, and its tracked `.gitignore`. Remove only
+  explicitly identified stale generated assets; never use an unresolved glob as a cleanup target.
+- Preserve GitHub's **Verified** provenance badge. Prefer a lightweight release tag that points
+  directly at a GitHub-verified merge commit, after checking the commit's GitHub verification status.
+  If an annotated tag is required, sign it with a configured GPG or SSH key. Never publish an unsigned
+  annotated release tag.
+- Repository release immutability must be enabled before publication. Push the verified tag, create a
+  draft release with the wheel, UI tarball, and `SHA256SUMS` named explicitly, inspect its tag target
+  and exact asset list, then publish it. Verify through the GitHub API that the published release is
+  non-draft and `immutable: true`.
+- An immutable release, its tag, and its assets are final. Never delete, replace, or amend them. Fixes
+  require a new patch version. Hand the exact tag, peeled commit SHA, asset filenames, and SHA-256
+  values to the Cloud repository for pinning.
