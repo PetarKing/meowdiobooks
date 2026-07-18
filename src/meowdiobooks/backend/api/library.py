@@ -11,11 +11,11 @@ from fastapi.responses import FileResponse, Response
 
 from ..m4b import FFmpegUnavailableError, M4BExportError, extract_embedded_cover
 from ..models import LibraryExport
-from ..storage import JsonStore
+from ..storage import ModelStore
 
 
 def create_library_router(
-    library: JsonStore[LibraryExport],
+    library: ModelStore[LibraryExport],
     require_export: Callable[[str], tuple[LibraryExport, Path]],
     package_for: Callable[[str], Path],
     payload_for: Callable[..., dict[str, object]],

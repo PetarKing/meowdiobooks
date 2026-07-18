@@ -7,28 +7,25 @@ from pathlib import Path
 
 from meowdiobooks.util import write_json
 
+from .artifact_registry import ArtifactRegistry, PUBLIC_ARTIFACTS
 from .artifacts import active_artifacts, artifact_history, read_artifact, write_artifact
-
-
-DOWNSTREAM_ARTIFACTS = {
-    "extraction": ("dialogue", "review", "cast", "enrichment", "script"),
-    "dialogue": ("review", "cast", "enrichment", "script"),
-    "review": ("cast", "enrichment", "script"),
-    "cast": ("enrichment", "script"),
-    "enrichment": ("script",),
-    "script": (),
-}
 
 
 @dataclass(frozen=True, slots=True)
 class BookWorkspace:
     root: Path
+    artifacts: ArtifactRegistry = PUBLIC_ARTIFACTS
 
     @classmethod
-    def under(cls, data_root: Path, book_id: str) -> BookWorkspace:
+    def under(
+        cls,
+        data_root: Path,
+        book_id: str,
+        artifacts: ArtifactRegistry = PUBLIC_ARTIFACTS,
+    ) -> BookWorkspace:
         if not book_id:
             raise ValueError("Book ID is required")
-        return cls(data_root / "packages" / book_id)
+        return cls(data_root / "packages" / book_id, artifacts)
 
     @property
     def preview_root(self) -> Path:
@@ -46,13 +43,13 @@ class BookWorkspace:
         return self.root / "source" / filename
 
     def active(self) -> dict[str, str]:
-        return active_artifacts(self.root)
+        return active_artifacts(self.root, self.artifacts)
 
     def read(self, kind: str) -> dict[str, object]:
-        return read_artifact(self.root, kind)
+        return read_artifact(self.root, kind, self.artifacts)
 
     def history(self, kind: str) -> list[dict[str, object]]:
-        return artifact_history(self.root, kind)
+        return artifact_history(self.root, kind, self.artifacts)
 
     def candidate(self, kind: str, revision: str) -> dict[str, object]:
         candidate = next(
@@ -66,17 +63,20 @@ class BookWorkspace:
     def write_candidate(
         self, kind: str, payload: dict[str, object]
     ) -> tuple[Path, dict[str, object]]:
-        return write_artifact(self.root, kind, payload, publish=False)
+        return write_artifact(
+            self.root,
+            kind,
+            payload,
+            publish=False,
+            registry=self.artifacts,
+        )
 
     def publish(self, kind: str, path: Path) -> None:
         """Atomically publish one revision and invalidate only active downstream pointers."""
 
         if not path.is_file():
             raise ValueError(f"Cannot publish missing {kind} artifact: {path}")
-        try:
-            downstream = DOWNSTREAM_ARTIFACTS[kind]
-        except KeyError as error:
-            raise ValueError(f"Unsupported artifact kind: {kind}") from error
+        downstream = self.artifacts.downstream(kind)
         active = self.active()
         active[kind] = str(path)
         for downstream_kind in downstream:

@@ -6,9 +6,8 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 from .models import Job, JobStatus, utc_now
-from .storage import JsonStore
+from .storage import ModelStore
 
-ProgressReporter = Callable[[float, str | None], None]
 JobHandler = Callable[..., dict[str, object] | None]
 BeforeRun = Callable[[Job], None]
 ActivityFactory = Callable[[], AbstractContextManager[object]]
@@ -17,7 +16,7 @@ ActivityFactory = Callable[[], AbstractContextManager[object]]
 class JobQueue:
     def __init__(
         self,
-        store: JsonStore[Job],
+        store: ModelStore[Job],
         handlers: dict[str, JobHandler] | None = None,
         *,
         before_run: BeforeRun | None = None,

@@ -10,6 +10,7 @@ from meowdiobooks.backend.app_v2 import (
     _expand_cast_label_mapping,
     create_app_v2,
 )
+from meowdiobooks.backend.storage import JsonStore
 from meowdiobooks.backend.artifacts import read_artifact, write_artifact
 from meowdiobooks.backend.dialogue_ai import resolve_dialogue
 from meowdiobooks.backend.models import Job, LibraryExport
@@ -823,3 +824,17 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             json={"chapters": [{"chapterId": "opening-matter", "revision": "render-1"}]},
         )
         assert changed_inputs.status_code == 409
+
+
+def test_hosted_store_factory_replaces_only_mutable_collection_storage(tmp_path: Path):
+    created: list[str] = []
+
+    def store_factory(name, model):
+        created.append(name)
+        return JsonStore(tmp_path / "database" / f"{name}.json", model)
+
+    app = create_app_v2(tmp_path / "workspace", store_factory=store_factory)
+
+    assert created == ["books", "jobs", "library"]
+    assert app.state.books.path == tmp_path / "database" / "books.json"
+    assert app.state.jobs.path == tmp_path / "database" / "jobs.json"

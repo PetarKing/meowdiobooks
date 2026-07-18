@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -126,7 +126,7 @@ from .recording_script import (
     recording_script_matches,
     split_recording_script_chapter,
 )
-from .storage import JsonStore
+from .storage import JsonStore, ModelStore
 from .tts_v2 import render_plan_audio
 from .transcription import transcribe_voice_sample
 from .workflow.commands import (
@@ -139,6 +139,7 @@ from .workflow.commands import (
     command_for_stage,
 )
 from .workflow.runner import WorkflowRunner
+from .workflow.defaults import PUBLIC_WORKFLOW
 from .workspace import BookWorkspace
 
 
@@ -221,15 +222,43 @@ def create_app_v2(
     data_dir: Path | str = Path(".meowdiobooks"),
     frontend_dist: Path | str | None = None,
     library_dir: Path | str | None = None,
+    *,
+    voice_auditioner: Callable[..., list[dict[str, Any]]] | None = None,
+    chapter_renderer: Callable[..., list[dict[str, Any]]] | None = None,
+    cast_proposer: Callable[..., dict[str, Any]] | None = None,
+    voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
+    voice_languages: Callable[[Path, str], list[str]] | None = None,
+    voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
+    default_voice_model: str | None = None,
+    store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
+    on_book_imported: Callable[[Book, Path], None] | None = None,
+    on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
 ) -> FastAPI:
-    """Create the production v2 wizard API."""
+    """Create the v2 API with explicit provider seams for local or hosted composition."""
 
     root = Path(data_dir)
     repo_root = application_root()
-    default_voice_id = load_model_registry(repo_root).default_voice_id
-    books = JsonStore(root / "books.json", Book)
-    jobs = JsonStore(root / "jobs.json", Job)
-    library = JsonStore(root / "library.json", LibraryExport)
+    voice_auditioner = voice_auditioner or generate_cast_previews
+    chapter_renderer = chapter_renderer or render_plan_audio
+    cast_proposer = cast_proposer or propose_cast
+    voice_profiler = voice_profiler or suggest_voice_settings
+    voice_languages = voice_languages or supported_voice_languages
+    voice_models = voice_models or voice_model_capabilities
+    default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
+    books = cast(
+        ModelStore[Book],
+        store_factory("books", Book) if store_factory else JsonStore(root / "books.json", Book),
+    )
+    jobs = cast(
+        ModelStore[Job],
+        store_factory("jobs", Job) if store_factory else JsonStore(root / "jobs.json", Job),
+    )
+    library = cast(
+        ModelStore[LibraryExport],
+        store_factory("library", LibraryExport)
+        if store_factory
+        else JsonStore(root / "library.json", LibraryExport),
+    )
     library_root = Path(library_dir) if library_dir is not None else root / "library"
     library_cover_root = root / "library-covers"
     queue = JobQueue(
@@ -237,7 +266,7 @@ def create_app_v2(
         before_run=lambda _job: require_free_disk(root),
         activity=SleepInhibitor,
     )
-    runner = WorkflowRunner()
+    runner = WorkflowRunner(PUBLIC_WORKFLOW)
 
     def require_book(book_id: str) -> Book:
         book = books.get(book_id)
@@ -427,7 +456,7 @@ def create_app_v2(
             spans = list(dialogue.get("spans", []))
             extraction = read_artifact(package, "extraction")
             proposal = (
-                propose_cast(repo_root, spans, report)
+                cast_proposer(repo_root, spans, report)
                 if any(
                     row.get("sourceSpeakerLabel") or row.get("resolvedSpeakerLabel")
                     for row in spans
@@ -494,7 +523,7 @@ def create_app_v2(
                     character["voiceSettings"], language=language
                 )
                 report(2, f"Regenerating the {target.get('name', character_id)} audition")
-                generated = generate_cast_previews(
+                generated = voice_auditioner(
                     repo_root, package, book.id, [character], report, language, model_id
                 )[0]
                 updated = _audition_identity(generated, package, base=target)
@@ -531,11 +560,11 @@ def create_app_v2(
             language = normalize_language(
                 settings.get("language", proposal.get("language", "english"))
             )
-            if not language or language not in supported_voice_languages(repo_root, model_id):
+            if not language or language not in voice_languages(repo_root, model_id):
                 raise CastContractError(
                     "Select a language supported by the selected voice-audition model"
                 )
-            profiles = suggest_voice_settings(
+            profiles = voice_profiler(
                 repo_root,
                 finalized["identities"],
                 proposal.get("dossiers", []),
@@ -560,7 +589,7 @@ def create_app_v2(
                 *identities,
             ]
             report(2, f"Generating {len(characters)} required voice auditions")
-            generated = generate_cast_previews(
+            generated = voice_auditioner(
                 repo_root,
                 package,
                 book.id,
@@ -679,7 +708,7 @@ def create_app_v2(
             chapter_ids,
             enrichment=enrichment,
         )
-        results = render_plan_audio(
+        results = chapter_renderer(
             repo_root,
             package,
             book.id,
@@ -710,20 +739,16 @@ def create_app_v2(
         books.put(book)
         return {"bookId": book.id, "renderPlan": plan, "chapters": results}
 
-    runner.register("v2:extract", process_extraction)
-    runner.register("v2:dialogue", process_dialogue)
-    runner.register("v2:review", process_review)
-    runner.register("v2:cast", process_cast)
-    runner.register("v2:enrich", process_enrichment)
-    runner.register("v2:generate", process_generation)
-    for command_kind in (
-        "v2:extract",
-        "v2:dialogue",
-        "v2:review",
-        "v2:cast",
-        "v2:enrich",
-        "v2:generate",
-    ):
+    for stage_id, handler in {
+        "extract": process_extraction,
+        "dialogue": process_dialogue,
+        "review": process_review,
+        "cast": process_cast,
+        "enrich": process_enrichment,
+        "generate": process_generation,
+    }.items():
+        runner.register_stage(stage_id, handler)
+    for command_kind in PUBLIC_WORKFLOW.command_kinds:
         queue.register(command_kind, runner.job_handler(command_kind))
 
     @asynccontextmanager
@@ -737,6 +762,7 @@ def create_app_v2(
     app.state.jobs = jobs
     app.state.job_queue = queue
     app.state.workflow_runner = runner
+    app.state.workflow_definition = PUBLIC_WORKFLOW
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -809,6 +835,8 @@ def create_app_v2(
                 )
             ],
         )
+        if on_book_imported is not None:
+            on_book_imported(book, target)
         books.put(book)
         return {
             "book": {
@@ -966,7 +994,7 @@ def create_app_v2(
                 ],
             },
             "cast": visible_cast,
-            "voiceModels": voice_model_capabilities(repo_root),
+            "voiceModels": voice_models(repo_root),
             "voiceSelection": {
                 "modelId": visible_cast.get("voiceModel"),
                 "language": visible_cast.get("language"),
@@ -1232,6 +1260,8 @@ def create_app_v2(
             shutil.copy2(cover, temporary_cover)
             os.replace(temporary_destination, destination)
             os.replace(temporary_cover, cover_destination)
+            if on_library_exported is not None:
+                on_library_exported(item, destination, cover_destination)
             library.put(item)
         except (OSError, RuntimeError) as error:
             temporary_destination.unlink(missing_ok=True)
@@ -1346,22 +1376,23 @@ def create_app_v2(
             raise HTTPException(
                 status_code=404 if str(error) == "Book not found" else 422, detail=str(error)
             ) from error
-        if parsed not in {*_STAGE_KIND, WizardStage.GENERATE}:
-            raise HTTPException(status_code=422, detail=f"Stage {stage} has no v2 processor")
-        if parsed == WizardStage.EXTRACT:
-            accepted = {row.stage for row in book.accepted_stage_revisions}
-            if WizardStage.IMPORT not in accepted:
-                raise HTTPException(status_code=409, detail="Accept import first")
-        else:
-            prerequisite_kind = {
-                WizardStage.DIALOGUE: "extraction",
-                WizardStage.REVIEW: "dialogue",
-                WizardStage.CAST: "review",
-                WizardStage.ENRICH: "cast",
-                WizardStage.GENERATE: "cast",
-            }[parsed]
-            if prerequisite_kind not in active_artifacts(package_for(book_id)):
-                raise HTTPException(status_code=409, detail=f"Accept {prerequisite_kind} first")
+        try:
+            stage_spec = PUBLIC_WORKFLOW.stage(parsed.value)
+        except ValueError as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        accepted = {row.stage.value for row in book.accepted_stage_revisions}
+        active_artifact_kinds = active_artifacts(package_for(book_id))
+        for prerequisite_id in stage_spec.prerequisites:
+            prerequisite = PUBLIC_WORKFLOW.stage(prerequisite_id)
+            if prerequisite_id == "import":
+                if prerequisite_id not in accepted:
+                    raise HTTPException(status_code=409, detail="Accept import first")
+                continue
+            if prerequisite.artifact_kind not in active_artifact_kinds:
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Accept {prerequisite.artifact_kind or prerequisite_id} first",
+                )
         try:
             command = command_for_stage(book_id, parsed, body.settings)
         except ValueError as error:
@@ -1379,7 +1410,13 @@ def create_app_v2(
         )
         if active:
             raise HTTPException(status_code=409, detail={"jobId": active.id})
-        job = queue.enqueue(kind, command.to_job_payload())
+        job = queue.enqueue(
+            kind,
+            {
+                **command.to_job_payload(),
+                "workflow_version": PUBLIC_WORKFLOW.version,
+            },
+        )
         return job.model_dump(mode="json")
 
     @app.get("/api/books/{book_id}/stages/{stage}/candidates/{revision}")

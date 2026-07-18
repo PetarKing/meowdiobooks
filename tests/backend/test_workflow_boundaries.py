@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
+from meowdiobooks.backend.artifact_registry import ArtifactSpec, PUBLIC_ARTIFACTS
 from meowdiobooks.backend.models import WizardStage
 from meowdiobooks.backend.workflow.commands import (
     ExtractBook,
@@ -11,6 +12,7 @@ from meowdiobooks.backend.workflow.commands import (
     command_from_job,
 )
 from meowdiobooks.backend.workflow.runner import WorkflowRunner
+from meowdiobooks.backend.workflow import PUBLIC_WORKFLOW, StageSpec
 from meowdiobooks.backend.workspace import BookWorkspace
 
 
@@ -35,7 +37,7 @@ def test_generation_command_rejects_empty_or_unknown_settings():
 
 
 def test_runner_dispatches_a_typed_command_without_queue_or_http_state():
-    runner = WorkflowRunner()
+    runner = WorkflowRunner(PUBLIC_WORKFLOW)
     runner.register(
         "v2:generate",
         lambda command, _report: {
@@ -54,6 +56,82 @@ def test_runner_dispatches_a_typed_command_without_queue_or_http_state():
     )
 
     assert result == {"bookId": "book-1", "chapters": ["chapter-1"]}
+
+
+def test_private_composition_can_insert_and_remove_an_optional_stage():
+    artifacts = PUBLIC_ARTIFACTS.with_spec(
+        ArtifactSpec(
+            "ambient-plan",
+            "meowdiobooks-cloud.ambient-plan.v1",
+            requires=("cast",),
+        )
+    )
+    definition = PUBLIC_WORKFLOW.with_artifacts(artifacts).insert_after(
+        "cast",
+        StageSpec(
+            "ambient",
+            prerequisites=("cast",),
+            command_kind="cloud:ambient",
+            command_model=GenerateChapters,
+            artifact_kind="ambient-plan",
+        ),
+    )
+
+    assert definition.stage("ambient").artifact_kind == "ambient-plan"
+    assert definition.artifacts.downstream("cast") == (
+        "enrichment",
+        "script",
+        "ambient-plan",
+    )
+    assert definition.remove("ambient").stage("generate").id == "generate"
+
+
+def test_private_composition_can_replace_a_handler_without_changing_the_stage_contract():
+    runner = WorkflowRunner(PUBLIC_WORKFLOW)
+    runner.register_stage(
+        "generate",
+        lambda command, _report: {
+            "provider": "hosted-qwen",
+            "bookId": command.book_id,
+        },
+    )
+
+    result = runner.run(
+        command_for_stage(
+            "book-1", WizardStage.GENERATE, {"chapterIds": ["chapter-1"]}
+        ),
+        lambda _progress, _message=None: None,
+    )
+
+    assert result == {"provider": "hosted-qwen", "bookId": "book-1"}
+
+
+def test_composition_rejects_removing_a_required_stage():
+    with pytest.raises(ValueError, match="still required"):
+        PUBLIC_WORKFLOW.remove("dialogue")
+
+
+def test_custom_artifact_registry_preserves_private_artifacts_and_invalidation(tmp_path):
+    artifacts = PUBLIC_ARTIFACTS.with_spec(
+        ArtifactSpec(
+            "ambient-plan",
+            "meowdiobooks-cloud.ambient-plan.v1",
+            requires=("script",),
+        )
+    )
+    workspace = BookWorkspace.under(tmp_path, "book-private", artifacts)
+    script_path, _ = workspace.write_candidate("script", {"revision": "s1"})
+    ambient_path, ambient = workspace.write_candidate(
+        "ambient-plan", {"revision": "a1", "events": []}
+    )
+    workspace.publish("script", script_path)
+    workspace.publish("ambient-plan", ambient_path)
+
+    replacement, _ = workspace.write_candidate("script", {"revision": "s2"})
+    workspace.publish("script", replacement)
+
+    assert ambient["contract"] == "meowdiobooks-cloud.ambient-plan.v1"
+    assert workspace.active() == {"script": str(replacement)}
 
 
 def test_workspace_publication_invalidates_active_downstream_without_deleting_history(

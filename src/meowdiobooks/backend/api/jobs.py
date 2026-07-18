@@ -8,11 +8,11 @@ from fastapi import APIRouter, HTTPException
 
 from ..models import Book, Job
 from ..queue import JobQueue
-from ..storage import JsonStore
+from ..storage import ModelStore
 
 
 def create_jobs_router(
-    jobs: JsonStore[Job],
+    jobs: ModelStore[Job],
     queue: JobQueue,
     require_book: Callable[[str], Book],
 ) -> APIRouter:

@@ -29,13 +29,16 @@ class ApiError extends Error {
 }
 
 export class HttpWizardApi implements WorkflowGateway {
-  constructor(private readonly baseUrl = "/api") {}
+  constructor(
+    private readonly baseUrl = "/api",
+    private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
+  ) {}
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const headers = init?.body instanceof FormData
       ? init.headers
       : { "Content-Type": "application/json", ...init?.headers };
-    const response = await fetch(`${this.baseUrl}${path}`, {
+    const response = await this.fetcher(`${this.baseUrl}${path}`, {
       signal: init?.signal ?? AbortSignal.timeout(30_000),
       ...init,
       headers,
@@ -290,7 +293,7 @@ export class HttpWizardApi implements WorkflowGateway {
     if (options.author) body.append("author", options.author);
     if (options.cover) body.append("cover", options.cover);
     if (options.coverPage) body.append("coverPage", String(options.coverPage));
-    const response = await fetch(`${this.baseUrl}/books/${bookId}/exports/m4b`, {
+    const response = await this.fetcher(`${this.baseUrl}/books/${bookId}/exports/m4b`, {
       method: "POST",
       body,
     });

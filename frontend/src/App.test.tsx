@@ -1,9 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import App from './App'
+import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
 import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, WizardSnapshot, WizardStage } from './api/contracts'
 import { buildReviewWarningDecisions } from './reviewDecisions'
+import { publicJourney } from './workflow/navigation'
 
 vi.mock('./api/client', () => ({ wizardApi: {
   importBook: vi.fn(), getBookSnapshot: vi.fn(), previewExtraction: vi.fn(), previewDialogue: vi.fn(),
@@ -41,6 +42,7 @@ async function open(
   localBooks = [{ id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 }],
   representativePages = [{ page: 1, reason: 'opening' }],
   snapshotAfterPreparation?: WizardSnapshot,
+  appProps?: AppProps,
 ) {
   vi.mocked(wizardApi.listBooks).mockResolvedValue(localBooks)
   if (snapshotAfterPreparation) {
@@ -61,7 +63,7 @@ async function open(
   })
   vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue(representativePages)
   vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
-  render(<App />)
+  render(<App {...appProps} />)
   await screen.findByRole('button', { name: /Alice.*Continue/ })
   await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledWith('book-1'))
   fireEvent.click(screen.getByRole('button', { name: /Alice.*Continue/ }))
@@ -180,6 +182,20 @@ describe('v2 wizard', () => {
     for (const label of ['Extract','Dialogue','Review','Cast & voices','Enrich','Generate','Export']) expect(within(nav).getByText(label)).toBeInTheDocument()
     expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
     expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
+  })
+
+  it('lets a hosted shell insert a private step and replace the header without copying the public app', async () => {
+    const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
+
+    await open(base, undefined, undefined, undefined, {
+      journey,
+      stepOverrides: { soundscape: () => <h1>Private ambient-effects workflow</h1> },
+      renderHeader: ({ libraryCount }) => <header>Hosted account · {libraryCount} books</header>,
+    })
+
+    expect(screen.getByText('Hosted account · 0 books')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
+    expect(screen.getByRole('heading', { name: 'Private ambient-effects workflow' })).toBeInTheDocument()
   })
 
   it('collapses the wizard rail without changing the active stage', async () => {
