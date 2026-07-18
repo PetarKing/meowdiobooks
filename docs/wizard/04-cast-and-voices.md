@@ -134,11 +134,13 @@ Audition lines and voice direction stay out of identity classification.
 
 ## AI contract B — voice-profile suggestion
 
-After identity review, Qwen receives one finalized cast member at a time. The application selects the
-first representative target line for each reviewed literal label, up to three labels, and expands each
-line into its previous, current and next structural source unit. It does not add filler scenes after the
-reviewed labels are represented. This is structural context gathering, not a name, keyword, pronoun or
-language-specific text search. The model sees surrounding
+After identity review, Qwen receives one finalized cast member at a time. The default local policy
+selects the first representative target line for each reviewed literal label, up to three labels. A
+hosted provider may inject a larger bounded evidence policy without changing the identity or artifact
+contract. Evidence is allocated round-robin across labels, with frequently occurring labels winning
+ties when the total cap cannot represent every alias. Each selected line expands into its previous,
+current and next structural source unit. This is structural context gathering, not a name, keyword,
+pronoun or language-specific text search. The model sees surrounding
 narration plus the target's own speech; other characters' dialogue is omitted so their vocal qualities
 cannot leak into the suggestion. Narrator is one additional focused call using at most three narration
 snippets.
