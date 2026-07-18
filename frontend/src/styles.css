@@ -890,8 +890,8 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
   .workspace,.workspace.rail-collapsed { --workspace-rail-width:0px; display:block; }
   .rail { top:66px; z-index:9; display:block; width:100%; height:auto; padding:6px 8px 7px; overflow:hidden; border-right:0; border-bottom:1px solid var(--line); background:rgba(255,250,241,.96); box-shadow:0 5px 16px rgba(51,37,59,.06); backdrop-filter:blur(14px); }
   .rail-toggle,.book-mini,.workflow-familiar { display:none; }
-  .rail nav { display:grid; grid-template-columns:repeat(auto-fit,minmax(40px,1fr)); gap:3px; padding:0; }
-  .rail nav button,.rail-collapsed .rail nav button { min-width:0; min-height:38px; justify-content:center; gap:0; padding:4px 2px; text-align:center; }
+  .rail nav { display:flex; flex-direction:row; gap:3px; padding:0; }
+  .rail nav button,.rail-collapsed .rail nav button { flex:1 1 0; min-width:0; min-height:38px; justify-content:center; gap:0; padding:4px 2px; text-align:center; }
   .rail nav button:hover:not(:disabled) { transform:none; }
   .rail nav b { flex:0 0 auto; width:25px; height:25px; border-radius:8px; }
   .rail nav button > span,.rail-collapsed .rail nav button > span { display:none; }
