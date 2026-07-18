@@ -586,6 +586,42 @@ def test_duplicate_bytes_reopen_canonical_book_without_writing_a_second_source(t
         assert [row.name for row in sources] == ["original.pdf"]
 
 
+def test_import_hook_observes_persisted_book_and_failed_hook_allows_retry(tmp_path):
+    attempts = 0
+    observed_book_ids: list[str] = []
+    app = None
+    raw = _pdf()
+
+    def persist_import(book, _source):
+        nonlocal attempts
+        attempts += 1
+        assert app is not None
+        persisted = app.state.books.get(book.id)
+        assert persisted is not None
+        observed_book_ids.append(persisted.id)
+        if attempts == 1:
+            raise RuntimeError("Hosted persistence failed")
+
+    app = create_app_v2(tmp_path, on_book_imported=persist_import)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        first = client.post(
+            "/api/books/import", files={"file": ("book.pdf", raw, "application/pdf")}
+        )
+
+        assert first.status_code == 500
+        assert app.state.books.all() == []
+        assert list((tmp_path / "packages").rglob("original.pdf")) == []
+
+        second = client.post(
+            "/api/books/import", files={"file": ("book.pdf", raw, "application/pdf")}
+        )
+
+        assert second.status_code == 201
+        assert second.json()["duplicate"] is False
+        assert attempts == 2
+        assert observed_book_ids == [second.json()["book"]["id"]] * 2
+
+
 def test_snapshot_exposes_installed_voice_model_languages(tmp_path):
     with TestClient(create_app_v2(tmp_path)) as client:
         book_id = client.post(
