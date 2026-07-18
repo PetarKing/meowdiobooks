@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CastArtifact } from "../api/contracts";
 import type { IdentityDecision } from "../castIdentity";
 import { CastIdentityReview } from "./CastIdentityReview";
@@ -79,7 +79,18 @@ function transfer() {
   };
 }
 
+function dragOverAt(target: Element, clientY: number, dataTransfer: ReturnType<typeof transfer>) {
+  const event = new Event("dragover", { bubbles: true, cancelable: true });
+  Object.defineProperties(event, {
+    clientY: { value: clientY },
+    dataTransfer: { value: dataTransfer },
+  });
+  fireEvent(target, event);
+}
+
 describe("CastIdentityReview", () => {
+  afterEach(() => vi.restoreAllMocks());
+
   it("keeps reclassification hidden unless cast editing explicitly enables it", () => {
     const reclassify = vi.fn();
     const { rerender } = render(<Harness />);
@@ -200,6 +211,60 @@ describe("CastIdentityReview", () => {
     expect(screen.queryByRole("button", { name: "Inspect Cecilus" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Inspect Emilia" })).toHaveTextContent("2 labels");
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Emilia");
+
+    expect(screen.getByText("Merged Cecilus into Emilia.")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    expect(screen.getByRole("button", { name: "Inspect Cecilus" })).toBeInTheDocument();
+    expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Cecilus");
+  });
+
+  it("scrolls progressively near the viewport edge and stops when the drag leaves it", () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let frameId = 0;
+    vi.spyOn(window, "requestAnimationFrame").mockImplementation((callback) => {
+      frameId += 1;
+      frames.set(frameId, callback);
+      return frameId;
+    });
+    vi.spyOn(window, "cancelAnimationFrame").mockImplementation((id) => {
+      frames.delete(id);
+    });
+    const scrollBy = vi.fn();
+    Object.defineProperty(window, "scrollBy", { configurable: true, value: scrollBy });
+    Object.defineProperty(window, "innerHeight", { configurable: true, value: 800 });
+    const runFrame = (id: number, timestamp: number) => {
+      const callback = frames.get(id)!;
+      frames.delete(id);
+      callback(timestamp);
+    };
+    render(<Harness />);
+    const source = screen.getByRole("button", { name: "Inspect Cecilus" });
+    const dataTransfer = transfer();
+
+    fireEvent.dragStart(source, { clientY: 400, dataTransfer });
+    dragOverAt(source, 720, dataTransfer);
+    expect(screen.getByText("↓ Scroll down")).toBeInTheDocument();
+
+    runFrame(1, 100);
+    runFrame(2, 116);
+    expect(scrollBy).toHaveBeenCalledOnce();
+    const shallowEdgeDistance = scrollBy.mock.calls[0][0].top;
+    expect(shallowEdgeDistance).toBeGreaterThan(0);
+
+    dragOverAt(source, 795, dataTransfer);
+    runFrame(3, 132);
+    expect(scrollBy.mock.calls[1][0].top).toBeGreaterThan(shallowEdgeDistance);
+
+    dragOverAt(source, 400, dataTransfer);
+    expect(screen.queryByText("↓ Scroll down")).not.toBeInTheDocument();
+    const scrollCount = scrollBy.mock.calls.length;
+    expect(frames.size).toBe(0);
+    expect(scrollBy).toHaveBeenCalledTimes(scrollCount);
+
+    dragOverAt(source, 1, dataTransfer);
+    expect(screen.getByText("↑ Scroll up")).toBeInTheDocument();
+    fireEvent.dragEnd(source, { dataTransfer });
+    expect(screen.queryByText("↑ Scroll up")).not.toBeInTheDocument();
   });
 
   it("routes a cast member to Narrator and allows its labels to be restored", () => {
