@@ -17,7 +17,11 @@ Gate:   every material identity decision and every required voice is explicitly 
 When a new Review revision leaves the accepted Dialogue revision unchanged, the existing accepted
 identities and exact audition revisions are reused as a fresh Cast candidate. The user re-accepts that
 candidate against the new Review. **Review cast** opens the existing identity mapping for manual edits;
-applying those edits creates fresh auditions. **Reclassify from Dialogue** explicitly reruns label
+applying those edits keeps unaffected auditions and generates only voices invalidated by the structural
+change. Display-name, source-label and primary-label changes keep the exact audition. A merge generates
+one audition for the resulting identity; a split generates auditions for its resulting changed
+identities. Category changes invalidate that identity, while audition-language or voice-model changes
+invalidate the whole cast. **Reclassify from Dialogue** explicitly reruns label
 classification from the accepted Dialogue and Review without overwriting the previously accepted Cast
 revision. The new candidate must still be accepted. A Dialogue change also requires fresh classification.
 

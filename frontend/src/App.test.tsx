@@ -2359,9 +2359,9 @@ describe('v2 wizard', () => {
     const editActions = screen.getByRole('group', { name: 'Cast edit actions' })
     expect(within(editActions).getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Cancel cast edits',
-      'Apply cast edits & regenerate →',
+      'Apply cast edits →',
     ])
-    const applyEdits = within(editActions).getByRole('button', { name: 'Apply cast edits & regenerate →' })
+    const applyEdits = within(editActions).getByRole('button', { name: 'Apply cast edits →' })
     expect(applyEdits).toBeDisabled()
     expect(screen.getByText('No cast changes to apply')).toBeInTheDocument()
 

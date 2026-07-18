@@ -411,7 +411,10 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
 
     monkeypatch.setattr("meowdiobooks.backend.app_v2.suggest_voice_settings", fake_voice_settings)
 
+    audition_batches = []
+
     def fake_auditions(_repo, package, _book_id, characters, report, _language, _model_id):
+        audition_batches.append([row["id"] for row in characters])
         for row in characters:
             candidates = list(row.get("voiceCandidates", []))
             revision = f"voice-{row['id']}-{len(candidates) + 1}"
@@ -479,6 +482,8 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             "The bright morning carried a gentle breeze across the quiet village."
         )
         assert candidate["identities"][0]["lineCount"] == 1
+        original_narrator_revision = candidate["narrator"]["voicePreviewRevision"]
+        original_alice_revision = candidate["identities"][0]["voicePreviewRevision"]
         narrated = _process(
             client,
             book_id,
@@ -502,6 +507,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         ).json()
         assert narrated_candidate["identities"] == []
         assert narrated_candidate["labelToCharacterId"] == {"Alice": None}
+        batches_before_label_edit = len(audition_batches)
         edited = _process(
             client,
             book_id,
@@ -524,6 +530,9 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             f"/api/books/{book_id}/stages/cast/candidates/{edited['revision']}"
         ).json()
         assert candidate["identities"][0]["name"] == "Alicia"
+        assert len(audition_batches) == batches_before_label_edit
+        assert candidate["narrator"]["voicePreviewRevision"] == original_narrator_revision
+        assert candidate["identities"][0]["voicePreviewRevision"] == original_alice_revision
         missing = _accept(client, book_id, "cast", edited["revision"], [])
         assert missing.status_code == 409
         alice_id = candidate["identities"][0]["characterId"]

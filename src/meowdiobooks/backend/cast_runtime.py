@@ -12,6 +12,52 @@ from .cast_service import compile_voice_direction, default_voice_settings
 from .languages import audition_line
 
 
+def _voice_identity_signature(identity: dict[str, Any]) -> tuple[str, frozenset[str]]:
+    """Return the cast properties that can materially change a generated voice."""
+
+    return (
+        str(identity.get("category", "")),
+        frozenset(
+            label_comparison_key(label)
+            for label in identity.get("literalLabels", [])
+            if label_comparison_key(label)
+        ),
+    )
+
+
+def _reuse_unchanged_cast_voices(
+    finalized: dict[str, Any], previous: dict[str, Any]
+) -> dict[str, dict[str, Any]]:
+    """Reuse auditions for identities whose membership and voice category did not change.
+
+    Canonical/display names intentionally do not participate in the signature.  When a
+    name changes, the previous opaque character ID is retained so its immutable audition
+    URLs and on-disk voice references remain valid.
+    """
+
+    previous_by_signature = {}
+    for row in previous.get("identities", []):
+        if not isinstance(row, dict):
+            continue
+        signature = _voice_identity_signature(row)
+        if signature[1]:
+            previous_by_signature[signature] = row
+    reused: dict[str, dict[str, Any]] = {}
+    for identity in finalized.get("identities", []):
+        signature = _voice_identity_signature(identity)
+        prior = previous_by_signature.get(signature) if signature[1] else None
+        if prior is None:
+            continue
+        generated_id = str(identity["characterId"])
+        character_id = str(prior["characterId"])
+        identity["characterId"] = character_id
+        for label, mapped_id in finalized.get("labelToCharacterId", {}).items():
+            if mapped_id == generated_id:
+                finalized["labelToCharacterId"][label] = character_id
+        reused[character_id] = {**deepcopy(prior), **identity}
+    return reused
+
+
 def _rebase_accepted_cast(
     package: Path,
     *,

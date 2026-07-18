@@ -58,6 +58,7 @@ from .cast_runtime import (
     _cast_with_line_counts,
     _expand_cast_label_mapping,
     _rebase_accepted_cast,
+    _reuse_unchanged_cast_voices,
 )
 from .cast_service import (
     compile_voice_direction,
@@ -603,41 +604,82 @@ def create_app_v2(
                 raise CastContractError(
                     "Select a language supported by the selected voice-audition model"
                 )
-            profiles = voice_profiler(
-                repo_root,
-                finalized["identities"],
-                proposal.get("dossiers", []),
-                dialogue.get("spans", []),
-                lambda progress, message=None: report(2 + progress * 0.28, message),
+            reuse_existing = (
+                phase == "audition-review"
+                and model_id == str(proposal.get("voiceModel", default_voice_id))
+                and language == normalize_language(proposal.get("language", "english"))
             )
-            identities = [
-                _audition_character(row, profiles.get(str(row["characterId"])), language=language)
+            reused = (
+                _reuse_unchanged_cast_voices(finalized, proposal) if reuse_existing else {}
+            )
+            affected = [
+                row
                 for row in finalized["identities"]
+                if str(row["characterId"]) not in reused
             ]
-            narrator_settings = profiles.get("narrator", default_voice_settings("narrator"))
+            profile_targets = affected if reuse_existing else finalized["identities"]
+            profiles = (
+                voice_profiler(
+                    repo_root,
+                    profile_targets,
+                    proposal.get("dossiers", []),
+                    dialogue.get("spans", []),
+                    lambda progress, message=None: report(2 + progress * 0.28, message),
+                )
+                if profile_targets or not reuse_existing
+                else {}
+            )
             characters = [
-                {
-                    "id": "narrator",
+                _audition_character(
+                    row, profiles.get(str(row["characterId"])), language=language
+                )
+                for row in profile_targets
+            ]
+            if not reuse_existing:
+                narrator_settings = profiles.get(
+                    "narrator", default_voice_settings("narrator")
+                )
+                characters.insert(
+                    0,
+                    {
+                        "id": "narrator",
+                        "name": "Narrator",
+                        "category": "narrator",
+                        "lineCount": narrator_line_count,
+                        "voiceSettings": narrator_settings,
+                        "voiceDirection": compile_voice_direction(
+                            narrator_settings, language=language
+                        ),
+                        "previewLine": _audition_line("Narrator", language),
+                    },
+                )
+            if characters:
+                report(2, f"Generating {len(characters)} affected voice auditions")
+                generated = voice_auditioner(
+                    repo_root,
+                    package,
+                    book.id,
+                    characters,
+                    lambda progress, message=None: report(30 + progress * 0.70, message),
+                    language,
+                    model_id,
+                )
+            else:
+                report(90, "Cast labels updated; all existing auditions remain valid")
+                generated = []
+            by_id = {str(row["id"]): row for row in generated}
+            if reuse_existing:
+                previous_narrator = proposal.get("narrator")
+                if not isinstance(previous_narrator, dict):
+                    raise CastContractError("Editable Cast candidate is missing the narrator voice")
+                narrator = {
+                    **previous_narrator,
                     "name": "Narrator",
                     "category": "narrator",
                     "lineCount": narrator_line_count,
-                    "voiceSettings": narrator_settings,
-                    "voiceDirection": compile_voice_direction(narrator_settings, language=language),
-                    "previewLine": _audition_line("Narrator", language),
-                },
-                *identities,
-            ]
-            report(2, f"Generating {len(characters)} required voice auditions")
-            generated = voice_auditioner(
-                repo_root,
-                package,
-                book.id,
-                characters,
-                lambda progress, message=None: report(30 + progress * 0.70, message),
-                language,
-                model_id,
-            )
-            by_id = {str(row["id"]): row for row in generated}
+                }
+            else:
+                narrator = _audition_identity(by_id.pop("narrator"), package)
             body = {
                 **proposal,
                 **finalized,
@@ -646,9 +688,10 @@ def create_app_v2(
                 "status": "needs-voice-review",
                 "language": language,
                 "voiceModel": model_id,
-                "narrator": _audition_identity(by_id.pop("narrator"), package),
+                "narrator": narrator,
                 "identities": [
-                    _audition_identity(by_id[str(row["characterId"])], package, base=row)
+                    reused.get(str(row["characterId"]))
+                    or _audition_identity(by_id[str(row["characterId"])], package, base=row)
                     for row in finalized["identities"]
                 ],
                 "identityDecisions": raw_decisions,
