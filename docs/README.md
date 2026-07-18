@@ -28,3 +28,7 @@ change; proposed plans are clearly marked as unimplemented.
 ## Contributing
 
 - [Contributor reference](CONTRIBUTING.md)
+
+## Future design notes
+
+- [Selective artifact storage and materialization](future/ARTIFACT_STORAGE_AND_MATERIALIZATION.md)

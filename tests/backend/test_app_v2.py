@@ -1,5 +1,6 @@
 import time
 import json
+from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
@@ -662,9 +663,22 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
     cover.write_bytes(b"cover")
     captured = {}
     rendered_pages = []
+    materialized_paths = []
+
+    @contextmanager
+    def materialize_audio(_book_id, chapter_id, revision, expected):
+        materialized = tmp_path / "materialized" / chapter_id / revision / "chapter.wav"
+        materialized.parent.mkdir(parents=True, exist_ok=True)
+        materialized.write_bytes(expected.read_bytes())
+        materialized_paths.append(materialized)
+        try:
+            yield materialized
+        finally:
+            materialized.unlink(missing_ok=True)
 
     def fake_package(chapters, output, **metadata):
         captured["chapters"] = chapters
+        captured["audio_bytes"] = [chapter.audio_path.read_bytes() for chapter in chapters]
         captured["metadata"] = metadata
         captured["cover_bytes"] = Path(metadata["cover"]).read_bytes()
         output.write_bytes(b"packaged-m4b")
@@ -676,7 +690,7 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
 
     monkeypatch.setattr("meowdiobooks.backend.app_v2.render_pdf_page", fake_render_pdf_page)
     monkeypatch.setattr("meowdiobooks.backend.app_v2.package_m4b", fake_package)
-    with TestClient(create_app_v2(tmp_path)) as client:
+    with TestClient(create_app_v2(tmp_path, chapter_audio_source=materialize_audio)) as client:
         imported = client.post(
             "/api/books/import",
             files={"file": ("fallback.pdf", _metadata_pdf(), "application/pdf")},
@@ -756,6 +770,8 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
         assert response.status_code == 200, response.text
         assert response.content == b"packaged-m4b"
         assert [chapter.title for chapter in captured["chapters"]] == ["Opening matter"]
+        assert captured["audio_bytes"] == [b"wav"]
+        assert materialized_paths and all(not path.exists() for path in materialized_paths)
         assert captured["metadata"] == {
             "title": "A Cat Finds a Voice",
             "author": "Maou",

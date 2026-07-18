@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import asynccontextmanager
+from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, nullcontext
 from pathlib import Path
 from typing import Any, Callable, Mapping, cast
 from uuid import uuid4
@@ -251,6 +251,7 @@ _STAGE_KIND = {
 # Backward-compatible test seam; new code imports the projection by its public name.
 _generated_chapters = generated_chapters
 _MAX_VOICE_SAMPLE_BYTES = 25_000_000
+ChapterAudioSource = Callable[[str, str, str, Path], AbstractContextManager[Path]]
 
 
 def create_app_v2(
@@ -272,11 +273,14 @@ def create_app_v2(
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
+    chapter_audio_source: ChapterAudioSource | None = None,
 ) -> FastAPI:
     """Create the v2 API with explicit provider seams for local or hosted composition.
 
     The post-import hook observes an already-persisted book. Raising from the hook removes the new
-    book and source so the same bytes can be retried as a fresh import.
+    book and source so the same bytes can be retried as a fresh import. Chapter audio is local and
+    durable by default; hosted compositions may provide a context-managed source that materializes
+    an exact revision only while an export consumes it.
     """
 
     root = Path(data_dir)
@@ -290,6 +294,9 @@ def create_app_v2(
     enricher = enricher or _run_enrichment_qwen
     voice_languages = voice_languages or supported_voice_languages
     voice_models = voice_models or voice_model_capabilities
+    chapter_audio_source = chapter_audio_source or (
+        lambda _book_id, _chapter_id, _revision, expected: nullcontext(expected)
+    )
     default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
     books = cast(
         ModelStore[Book],
@@ -1230,6 +1237,7 @@ def create_app_v2(
             raise HTTPException(status_code=422, detail="Cover page is outside this PDF")
         requested = [(row.chapterId, row.revision) for row in body.chapters]
         requested_ids = [chapter_id for chapter_id, _revision in requested]
+        requested_revisions = dict(requested)
         if len(requested_ids) != len(set(requested_ids)):
             raise HTTPException(status_code=422, detail="Each chapter may be exported only once")
 
@@ -1317,19 +1325,45 @@ def create_app_v2(
         filename = export_filename(title, partial=partial)
         output = work / filename
         try:
-            package_m4b(
-                export_chapters,
-                output,
-                title=title,
-                author=author,
-                cover=cover,
-            )
+            with ExitStack() as audio_sources:
+                materialized_chapters: list[M4BChapter] = []
+                for chapter in export_chapters:
+                    materialized_path = Path(
+                        audio_sources.enter_context(
+                            chapter_audio_source(
+                                book.id,
+                                chapter.chapter_id,
+                                requested_revisions[chapter.chapter_id],
+                                chapter.audio_path,
+                            )
+                        )
+                    )
+                    if not materialized_path.is_file():
+                        raise FileNotFoundError(
+                            f"Audio source did not provide {chapter.title}"
+                        )
+                    materialized_chapters.append(
+                        M4BChapter(chapter.chapter_id, chapter.title, materialized_path)
+                    )
+                package_m4b(
+                    materialized_chapters,
+                    output,
+                    title=title,
+                    author=author,
+                    cover=cover,
+                )
         except FFmpegUnavailableError as error:
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(status_code=503, detail=str(error)) from error
         except M4BExportError as error:
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except (OSError, RuntimeError) as error:
+            shutil.rmtree(work, ignore_errors=True)
+            raise HTTPException(
+                status_code=409,
+                detail="Chapter audio could not be prepared for export",
+            ) from error
         library_root.mkdir(parents=True, exist_ok=True)
         destination = _available_library_path(library_root, filename)
         temporary_destination = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
