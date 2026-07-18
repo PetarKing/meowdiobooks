@@ -536,6 +536,7 @@ export interface ArtifactCandidate {
 
 export interface RawDialogueCandidate extends ArtifactCandidate {
   conflicts?: unknown[];
+  correctedFromRevision?: string;
   strategy?: DialogueStrategy;
   attributionTargets?: DialogueAttributionTarget[];
   resultSummary?: Record<string, unknown>;
@@ -546,6 +547,7 @@ export interface RawDialogueCandidate extends ArtifactCandidate {
   blocks?: Array<Record<string, unknown>>;
   attributionChecks?: Array<Record<string, unknown>>;
   remoteAttributionChecks?: Array<Record<string, unknown>>;
+  userCorrections?: Array<Record<string, unknown>>;
 }
 
 export interface ReviewCandidate extends ArtifactCandidate {

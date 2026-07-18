@@ -20,6 +20,8 @@ type ReviewRow = { row: DialogueExample; category: DialogueCategory };
 type Props = {
   result: DialogueArtifact;
   busy: boolean;
+  initialDecisions?: DialogueCorrectionDecision[];
+  requireChanges?: boolean;
   onChangeStrategy: () => void;
   onAccept: (decisions: DialogueCorrectionDecision[]) => void;
 };
@@ -54,7 +56,7 @@ const filterOptions: Array<[DialogueFilter, string]> = [
   ["not-dialogue", "Not dialogue"],
 ];
 
-export function DialogueResultReview({ result, busy, onChangeStrategy, onAccept }: Props) {
+export function DialogueResultReview({ result, busy, initialDecisions = [], requireChanges = false, onChangeStrategy, onAccept }: Props) {
   const { t } = useTranslation();
   const [view, setView] = useState<DialogueView>("overview");
   const [filter, setFilter] = useState<DialogueFilter>("all");
@@ -64,7 +66,7 @@ export function DialogueResultReview({ result, busy, onChangeStrategy, onAccept 
   const [checkedSpanIds, setCheckedSpanIds] = useState<Record<string, boolean>>({});
   const [editingSpanId, setEditingSpanId] = useState<string>();
   const [draftSpeaker, setDraftSpeaker] = useState("");
-  const [corrections, setCorrections] = useState<Record<string, DialogueCorrectionDecision>>({});
+  const [corrections, setCorrections] = useState<Record<string, DialogueCorrectionDecision>>(() => correctionRecord(initialDecisions));
   const [expandedContext, setExpandedContext] = useState<Record<string, boolean>>({});
   const speakerFieldId = useId();
   const speakerOptionsId = useId();
@@ -92,7 +94,12 @@ export function DialogueResultReview({ result, busy, onChangeStrategy, onAccept 
   const orderedReaderAssignments = useMemo(() => prioritizeNarrator(readerAssignments), [readerAssignments]);
   const visibleReaderAssignments = orderedReaderAssignments.slice(0, readerLimit);
   const hiddenReaderCount = Math.max(0, orderedReaderAssignments.length - visibleReaderAssignments.length);
-  const orderedDecisions = result.examples.flatMap((row) => corrections[row.spanId] ? [corrections[row.spanId]] : []);
+  const exampleOrder = new Map(result.examples.map((row, index) => [row.spanId, index]));
+  const orderedDecisions = Object.values(corrections).sort((left, right) =>
+    (exampleOrder.get(left.spanId) ?? Number.MAX_SAFE_INTEGER) - (exampleOrder.get(right.spanId) ?? Number.MAX_SAFE_INTEGER)
+    || left.spanId.localeCompare(right.spanId),
+  );
+  const decisionsChanged = correctionSignature(orderedDecisions) !== correctionSignature(initialDecisions);
 
   const filteredRows = rows.filter(({ category }) => filter === "all" || category === filter || filter === "review" && (category === "suggested" || category === "unsure"));
   const pageCount = Math.ceil(filteredRows.length / pageSize);
@@ -327,8 +334,18 @@ export function DialogueResultReview({ result, busy, onChangeStrategy, onAccept 
       </> : <div className="empty-dialogue"><b>{t("No AI decisions to review.")}</b><span>{t("Every detected line already had a clear reader.")}</span></div>}
     </section>}
 
-    <div className="phase-action"><button className="ghost" onClick={onChangeStrategy}>{t("Change strategy")}</button><button className="primary" disabled={busy} onClick={() => onAccept(orderedDecisions)}>{t("Accept dialogue result")} →</button></div>
+    <div className="phase-action dialogue-floating-action" role="group" aria-label={`${t("Change strategy")} / ${t("Accept dialogue result")}`}><button className="ghost" onClick={onChangeStrategy}>{t("Change strategy")}</button><button className="primary" disabled={busy || requireChanges && !decisionsChanged} onClick={() => onAccept(orderedDecisions)}>{t("Accept dialogue result")} →</button></div>
   </section>;
+}
+
+function correctionRecord(decisions: DialogueCorrectionDecision[]) {
+  return Object.fromEntries(decisions.map((decision) => [decision.spanId, decision]));
+}
+
+function correctionSignature(decisions: DialogueCorrectionDecision[]) {
+  return JSON.stringify([...decisions]
+    .sort((left, right) => left.spanId.localeCompare(right.spanId))
+    .map(({ spanId, action, speakerLabel }) => ({ spanId, action, ...(action === "speaker" ? { speakerLabel: speakerLabel?.trim() } : {}) })));
 }
 
 function needsAttention(row: DialogueExample) {

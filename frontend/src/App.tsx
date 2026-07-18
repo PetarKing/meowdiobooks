@@ -41,7 +41,7 @@ import { strongConfirmationLabelsForCast, type IdentityDecision } from "./castId
 import { CastIdentityReview } from "./components/CastIdentityReview";
 import { CastVoiceReview } from "./components/CastVoiceReview";
 import { confirmedVoiceRoutesForCast, voiceRoutesForCast } from "./voiceRoutes";
-import { DialogueComposition, DialogueResultReview } from "./components/DialogueResultReview";
+import { DialogueResultReview, type DialogueCorrectionDecision } from "./components/DialogueResultReview";
 import { PhaseHelp } from "./components/PhaseHelp";
 import { DialogueRoutingChoice } from "./components/DialogueRoutingChoice";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -206,6 +206,8 @@ export default function App({
   const [dialogueStrategy, setDialogueStrategy] = useState<DialogueStrategy>("fill-gaps");
   const [attributionTargets, setAttributionTargets] = useState<DialogueAttributionTarget[]>(["unlabelled-candidates"]);
   const [dialogueCandidate, setDialogueCandidate] = useState<RawDialogueCandidate>();
+  const [dialogueInitialDecisions, setDialogueInitialDecisions] = useState<DialogueCorrectionDecision[]>([]);
+  const [editingAcceptedDialogue, setEditingAcceptedDialogue] = useState(false);
   const [conflictChoices, setConflictChoices] = useState<Record<string, string>>({});
   const [structuralChoices, setStructuralChoices] = useState<Record<string, DialogueStructuralAction>>({});
   const [dialogueRulesOpen, setDialogueRulesOpen] = useState(false);
@@ -276,7 +278,7 @@ export default function App({
     ? stageIndex("export")
     : snapshot ? Math.min(stageIndex("generate"), Math.max(0, nextStage(completed))) : 0;
   const hasDraft = (stageId?: WizardStep) => {
-    if (stageId === "dialogue") return Boolean(dialogueCandidate);
+    if (stageId === "dialogue") return Boolean(dialogueCandidate) && !editingAcceptedDialogue;
     if (stageId === "review") return Boolean(reviewCandidate);
     if (stageId === "cast") return Boolean(castCandidate && castCandidate.revision !== snapshot?.cast?.revision);
     if (stageId === "enrich") return Boolean(enrichmentCandidate && enrichmentCandidate.revision !== snapshot?.enrichment?.revision);
@@ -412,6 +414,8 @@ export default function App({
     setSnapshot(next);
     setDialogue(pendingNeedsPreflight && !stalePreflightCandidate ? pendingDialoguePreview! : hydratedDialogue);
     setDialogueCandidate(pendingNeedsPreflight ? undefined : pendingDialogue);
+    setDialogueInitialDecisions([]);
+    setEditingAcceptedDialogue(false);
     setReviewCandidate(undefined);
     setReviewDecisions({});
     setBoundaryDecisions({});
@@ -647,10 +651,36 @@ export default function App({
       ...dialogueSettings(dialogue, dialogueStrategy, targets),
       attributionRoute: route,
     };
+    setDialogueInitialDecisions([]);
+    setEditingAcceptedDialogue(false);
     void processCandidate("dialogue", settings)
       .then(setDialogueCandidate)
       .catch((reason) => setError(message(reason)))
       .finally(() => setDialogueLaunchPending(false));
+  }
+
+  async function reopenAcceptedDialogueReview() {
+    const acceptedRevision = snapshot?.activeArtifacts.dialogue;
+    if (!book || !acceptedRevision || busy) return;
+    setBusy(true);
+    setError(undefined);
+    try {
+      const accepted = await gateway.getStageCandidate(book.id, "dialogue", acceptedRevision);
+      const baseRevision = accepted.correctedFromRevision || accepted.revision;
+      const candidate = baseRevision === accepted.revision
+        ? accepted
+        : await gateway.getStageCandidate(book.id, "dialogue", baseRevision);
+      setDialogueStrategy(candidate.strategy ?? accepted.strategy ?? dialogue.strategy ?? "fill-gaps");
+      setAttributionTargets(candidate.attributionTargets ?? accepted.attributionTargets ?? dialogue.attributionTargets ?? ["unlabelled-candidates"]);
+      setDialogueInitialDecisions(dialogueCorrections(accepted));
+      setEditingAcceptedDialogue(true);
+      setDialogueCandidate(candidate);
+      setRevisingStages((current) => [...new Set([...current, "dialogue"])]);
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function requestDialogueTranscript() {
@@ -900,10 +930,9 @@ export default function App({
       setDialogue(next);
       void refreshDialogue(next);
     }
-    if (completed.includes("dialogue") && !dialogueCandidate && !revisingStages.includes("dialogue")) return <AcceptedSummary stage="dialogue" step={t("Step 2")} title={t("Transcript ready")} revision={snapshot?.activeArtifacts.dialogue} receipt={remoteCostReceipt} onRevise={() => { setAttributionTargets(["unlabelled-candidates"]); setRevisingStages([...new Set([...revisingStages, "dialogue"])]); }}><span><b>{dialogue.summary.explicitTurns}</b><small>{t("Pre-labelled")}</small></span><span className="ai-contribution"><b>{dialogue.summary.aiContributions ?? 0}</b><small>{t("AI-assisted")} <em>{t("Kept after review")}</em></small></span><span><b>{dialogue.summary.userCorrected ?? 0}</b><small>{t("Corrected by you")}</small></span><span><b>{dialogue.summary.unresolved ?? 0}</b><small>{t("Narrator fallback")}</small></span></AcceptedSummary>;
-    if (result) return <DialogueResultReview key={result.revision} result={result} busy={busy} onChangeStrategy={() => setDialogueCandidate(undefined)} onAccept={(decisions) => void acceptCandidate("dialogue", dialogueCandidate, decisions.map((decision) => ({ ...decision })))}/>;
+    if (completed.includes("dialogue") && !dialogueCandidate && !revisingStages.includes("dialogue")) return <AcceptedSummary stage="dialogue" step={t("Step 2")} title={t("Transcript ready")} revision={snapshot?.activeArtifacts.dialogue} receipt={remoteCostReceipt} onRevise={() => void reopenAcceptedDialogueReview()}><span><b>{dialogue.summary.explicitTurns}</b><small>{t("Pre-labelled")}</small></span><span className="ai-contribution"><b>{dialogue.summary.aiContributions ?? 0}</b><small>{t("AI-assisted")} <em>{t("Kept after review")}</em></small></span><span><b>{dialogue.summary.userCorrected ?? 0}</b><small>{t("Corrected by you")}</small></span><span><b>{dialogue.summary.unresolved ?? 0}</b><small>{t("Narrator fallback")}</small></span></AcceptedSummary>;
+    if (result) return <DialogueResultReview key={`${result.revision}:${editingAcceptedDialogue ? "accepted" : "candidate"}`} result={result} busy={busy} initialDecisions={dialogueInitialDecisions} requireChanges={editingAcceptedDialogue} onChangeStrategy={() => { setDialogueInitialDecisions([]); setEditingAcceptedDialogue(false); setDialogueCandidate(undefined); }} onAccept={(decisions) => void acceptCandidate("dialogue", dialogueCandidate, decisions.map((decision) => ({ ...decision })))}/>;
     return <><PageTitle stage="dialogue" step={t("Step 2")} title={t("Build the transcript")} copy={t("Review detected dialogue and decide who reads anything unresolved.")} />
-      {completed.includes("dialogue") && !dialogueCandidate && <section className="dialogue-accepted-strip" aria-label={t("Current accepted transcript")}><span className="dialogue-accepted-check" aria-hidden="true">✓</span><div className="dialogue-accepted-copy"><small>{t("Accepted dialogue")}</small><b>{t("Current transcript")}</b><span>{t("Stays active until you approve a replacement.")}</span></div><DialogueComposition dialogue={dialogue} compact /><Tag tone="good">{t("Accepted")}</Tag></section>}
       {!result && (hasPreflightIssues ? <div className="dialogue-stats conflict-stats"><span><b>{dialogueRegexClaimCount(dialogue)}</b><small>{t("regex interpretations")}</small></span><span className="warn"><b>{unresolvedStructuralIssues.length + dialogue.summary.conflicts}</b><small>{t("issues to review")}</small></span><span><b>{t("Pending")}</b><small>{t("AI scope after review")}</small></span></div> : <div className="dialogue-stats"><span><b>{dialogue.summary.totalTurns}</b><small>{t("turns found")}</small></span><span><b>{dialogue.summary.explicitTurns}</b><small>{t("pre-labelled turns")}</small></span><span className={dialogue.summary.openSpeakerTurns ? "warn" : "good"}><b>{dialogue.summary.openSpeakerTurns}</b><small>{t("unknown labels")}</small></span><span className={dialogue.summary.unlabeledCandidates ? "warn" : "good"}><b>{dialogue.summary.unlabeledCandidates}</b><small>{t("dialogue without labels")}</small></span></div>)}
       {!result && <><DialogueRulesSection regexes={dialogue.regexes} open={dialogueRulesOpen} strategy={dialogueStrategy} attributionTargets={attributionTargets} onToggle={() => setDialogueRulesOpen((open) => !open)} onToggleRegex={(id, enabled) => updateRegex(id, { enabled })} onAddRegex={async (regex) => { const next = { ...dialogue, regexes: [...dialogue.regexes, { id: `custom-${Date.now()}`, ...regex, priority: dialogue.regexes.length + 100, enabled: true, builtIn: false, matchCount: 0, examples: [] }] }; return refreshDialogue(next); }} onError={setError} /><UnknownSpeakerLabelsSection patterns={dialogue.openSpeakerPatterns} onRemove={(pattern) => { const next = { ...dialogue, openSpeakerPatterns: dialogue.openSpeakerPatterns.filter((row) => row !== pattern) }; setDialogue(next); void refreshDialogue(next); }} onAdd={(pattern) => { const next = { ...dialogue, openSpeakerPatterns: [...dialogue.openSpeakerPatterns, pattern] }; setDialogue(next); void refreshDialogue(next); }} /></>}
       {!result && !dialogueRulesOpen && unresolvedStructuralIssues.length > 0 && <DialogueStructuralReview issues={unresolvedStructuralIssues} choices={structuralChoices} onChoose={(issueId, action) => setStructuralChoices((current) => ({ ...current, [issueId]: action }))} onApply={applyStructuralResolutions} />}
@@ -1666,6 +1695,17 @@ function AcceptedSummary({ stage, step, title, receipt, onRevise, children }: { 
 function formatApiCost(value: number) {
   if (value === 0) return "$0.00";
   return `$${value < 0.01 ? value.toFixed(4) : value.toFixed(2)}`;
+}
+
+function dialogueCorrections(candidate: RawDialogueCandidate): DialogueCorrectionDecision[] {
+  return (candidate.userCorrections ?? []).flatMap((raw) => {
+    const spanId = String(raw.spanId ?? "").trim();
+    const action = String(raw.action ?? "");
+    if (!spanId || (action !== "speaker" && action !== "narrator")) return [];
+    const speakerLabel = String(raw.speakerLabel ?? "").trim();
+    if (action === "speaker" && !speakerLabel) return [];
+    return [{ spanId, action, ...(action === "speaker" ? { speakerLabel } : {}), provenance: "user" as const }];
+  });
 }
 
 function methodLabel(method: ExtractionMethod) {
