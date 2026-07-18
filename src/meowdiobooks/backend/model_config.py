@@ -46,6 +46,7 @@ class RemoteTextModelConfig:
     base_url: str
     api_key_env: str
     model: str
+    pricing_version: str
     reasoning_effort: str | None
     policy: str
     input_usd_per_million_tokens: float
@@ -294,6 +295,7 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         base_url=base_url,
         api_key_env=_string(row, "api_key_env"),
         model=_string(row, "model"),
+        pricing_version=_string(row, "pricing_version"),
         reasoning_effort=reasoning_effort,
         policy=_string(row, "policy"),
         input_usd_per_million_tokens=_non_negative_number(row, "input_usd_per_million_tokens"),

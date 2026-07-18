@@ -19,7 +19,7 @@ from .dialogue_ai import (
     resolve_dialogue,
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
-from .remote_llm import remote_chat_completion, remote_usage_cost
+from .remote_llm import RemoteUsageObserver, remote_chat_completion, remote_usage_cost
 
 MULTI_SYSTEM = """Attribute every marked target in the ordered source excerpt.
 
@@ -175,11 +175,14 @@ def _pass(
     system: str,
     prompt: str,
     expected_ids: Sequence[str],
+    usage_observer: RemoteUsageObserver | None,
 ) -> tuple[dict[str, str], dict[str, Any]]:
     retry = prompt
     failures = []
     for _attempt in range(2):
-        response = remote_chat_completion(repo_root, config, system, retry)
+        response = remote_chat_completion(
+            repo_root, config, system, retry, usage_observer=usage_observer
+        )
         try:
             return parse_remote_rows(response["text"], expected_ids), response
         except DialogueContractError as error:
@@ -199,6 +202,7 @@ def _run_window(
     repo_root,
     config: RemoteTextModelConfig,
     window: Mapping[str, Any],
+    usage_observer: RemoteUsageObserver | None,
 ) -> tuple[
     dict[str, str],
     str,
@@ -214,10 +218,22 @@ def _run_window(
         raise DialogueContractError("Remote Dialogue passes planned different targets")
     with ThreadPoolExecutor(max_workers=2) as executor:
         base_future = executor.submit(
-            _pass, repo_root, config, MULTI_SYSTEM, base_prompt, list(base_ids)
+            _pass,
+            repo_root,
+            config,
+            MULTI_SYSTEM,
+            base_prompt,
+            list(base_ids),
+            usage_observer,
         )
         ledger_future = executor.submit(
-            _pass, repo_root, config, LEDGER_SYSTEM, second_prompt, list(second_ids)
+            _pass,
+            repo_root,
+            config,
+            LEDGER_SYSTEM,
+            second_prompt,
+            list(second_ids),
+            usage_observer,
         )
         base_rows, base_response = base_future.result()
         ledger_rows, ledger_response = ledger_future.result()
@@ -236,6 +252,7 @@ def run_dialogue_remote(
     strategy: str,
     report: RemoteReporter | None = None,
     attribution_targets: Sequence[str] = ("open-speakers", "unlabelled-candidates"),
+    usage_observer: RemoteUsageObserver | None = None,
 ) -> dict[str, Any]:
     """Run two independent ordered-passage passes and retain only exact agreement."""
 
@@ -285,7 +302,10 @@ def run_dialogue_remote(
     total_usage = {"inputTokens": 0, "cachedInputTokens": 0, "outputTokens": 0}
     provider_models: set[str] = set()
     with ThreadPoolExecutor(max_workers=config.max_concurrent_batches) as executor:
-        futures = [executor.submit(_run_window, repo_root, config, window) for window in windows]
+        futures = [
+            executor.submit(_run_window, repo_root, config, window, usage_observer)
+            for window in windows
+        ]
         try:
             for index, future in enumerate(futures, 1):
                 base_ids, passage, base_rows, ledger_rows, responses = future.result()

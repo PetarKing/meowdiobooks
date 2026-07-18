@@ -34,6 +34,7 @@ engine = "openai_responses"
 base_url = "https://api.openai.com/v1"
 api_key_env = "OPENAI_API_KEY"
 model = "gpt-5.6-luna"
+pricing_version = "openai-gpt-5.6-luna-2026-07-18"
 reasoning_effort = "low"
 policy = "dual-perspective-exact"
 # USD charged per 1,000,000 provider-reported tokens.

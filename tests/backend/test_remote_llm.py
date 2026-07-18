@@ -22,6 +22,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
     config = load_model_registry(REPO_ROOT).remote_dialogue_model()
     assert config is not None
     captured = {}
+    observed = []
 
     def open_response(request, timeout):
         captured["url"] = request.full_url
@@ -51,7 +52,14 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
     monkeypatch.setattr("urllib.request.urlopen", open_response)
 
     result = remote_chat_completion(
-        REPO_ROOT, config, "system rules", "source passage", max_completion_tokens=500
+        REPO_ROOT,
+        config,
+        "system rules",
+        "source passage",
+        max_completion_tokens=500,
+        usage_observer=lambda observed_config, event: observed.append(
+            (observed_config, event)
+        ),
     )
 
     assert captured["url"] == "https://api.openai.com/v1/responses"
@@ -66,3 +74,68 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
     assert result["text"] == "T001|D|Alice"
     assert result["usage"]["input_tokens"] == 100
     assert remote_usage_cost(config, result["usage"]) == pytest.approx(0.000142)
+    assert observed == [
+        (
+            config,
+            {
+                "outcome": "response",
+                "attempt": 1,
+                "model": "gpt-5.6-luna",
+                "usage": {
+                    "input_tokens": 100,
+                    "input_tokens_details": {"cached_tokens": 20},
+                    "output_tokens": 10,
+                },
+                "ambiguousBillable": False,
+                "httpStatus": None,
+            },
+        )
+    ]
+    assert config.pricing_version == "openai-gpt-5.6-luna-2026-07-18"
+
+
+def test_usage_observer_sees_provider_usage_before_invalid_output_retry(monkeypatch):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    assert config is not None
+    responses = iter(
+        [
+            {
+                "model": config.model,
+                "output": [],
+                "usage": {"input_tokens": 10, "output_tokens": 2},
+            },
+            {
+                "model": config.model,
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [{"type": "output_text", "text": "T001|D|Alice"}],
+                    }
+                ],
+                "usage": {"input_tokens": 12, "output_tokens": 3},
+            },
+        ]
+    )
+    observed = []
+    monkeypatch.setattr(
+        "meowdiobooks.backend.remote_llm.configured_api_key",
+        lambda *_args: "test-key",
+    )
+    monkeypatch.setattr(
+        "urllib.request.urlopen", lambda *_args, **_kwargs: _Response(next(responses))
+    )
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda *_args: None)
+
+    result = remote_chat_completion(
+        REPO_ROOT,
+        config,
+        "system rules",
+        "source passage",
+        usage_observer=lambda _config, event: observed.append(event),
+    )
+
+    assert result["text"] == "T001|D|Alice"
+    assert [event["usage"] for event in observed] == [
+        {"input_tokens": 10, "output_tokens": 2},
+        {"input_tokens": 12, "output_tokens": 3},
+    ]

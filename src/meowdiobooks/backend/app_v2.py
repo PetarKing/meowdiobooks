@@ -96,6 +96,7 @@ from .documents import (
 from .generation_status import chapter_audio_stale_reasons, generated_chapters
 from .models import Book, Job, JobStatus, LibraryExport, StageRevision, WizardStage, utc_now
 from .model_config import dialogue_routing_preview, load_model_registry
+from .remote_llm import RemoteUsageObserver
 from .m4b import (
     FFmpegUnavailableError,
     M4BChapter,
@@ -264,6 +265,7 @@ def create_app_v2(
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
     enricher: Callable[..., dict[str, Any]] | None = None,
+    remote_usage_observer: RemoteUsageObserver | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
@@ -427,7 +429,12 @@ def create_app_v2(
             elif route == "remote":
                 report(15, "Preparing the remote speaker check")
                 result = run_dialogue_remote(
-                    repo_root, scan, strategy, report, attribution_targets
+                    repo_root,
+                    scan,
+                    strategy,
+                    report,
+                    attribution_targets,
+                    usage_observer=remote_usage_observer,
                 )
             else:
                 raise DialogueContractError(f"Unknown Dialogue attribution route: {route}")

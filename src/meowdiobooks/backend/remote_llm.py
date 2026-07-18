@@ -7,7 +7,7 @@ import os
 import time
 import urllib.error
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,9 @@ from .model_config import RemoteTextModelConfig
 
 class RemoteModelUnavailableError(RuntimeError):
     """A recoverable remote-model configuration or transport failure."""
+
+
+RemoteUsageObserver = Callable[[RemoteTextModelConfig, Mapping[str, Any]], None]
 
 
 def configured_api_key(repo_root: Path, variable: str) -> str | None:
@@ -48,6 +51,7 @@ def remote_chat_completion(
     prompt: str,
     *,
     max_completion_tokens: int = 4096,
+    usage_observer: RemoteUsageObserver | None = None,
 ) -> dict[str, Any]:
     """Run one bounded remote request without persisting the credential or source passage."""
 
@@ -92,32 +96,110 @@ def remote_chat_completion(
             method="POST",
         )
         try:
-            response = json.loads(urllib.request.urlopen(request, timeout=600).read())
-            content = (
-                _responses_output_text(response)
-                if config.engine == "openai_responses"
-                else str(response["choices"][0]["message"]["content"] or "").strip()
-            )
-            if not content:
-                raise ValueError("response was empty")
-            return {
-                "text": content,
-                "usage": dict(response.get("usage", {})),
-                "model": str(response.get("model") or config.model),
-                "attempts": attempt,
-            }
+            raw_response = urllib.request.urlopen(request, timeout=600).read()
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")[:1000]
             last_error = f"HTTP {error.code}: {detail}"
+            _observe_remote_call(
+                config,
+                usage_observer,
+                outcome="http-error",
+                attempt=attempt,
+                ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                http_status=error.code,
+            )
             if error.code not in {429, 500, 502, 503, 504} or not delay:
                 break
-        except (OSError, urllib.error.URLError, KeyError, TypeError, ValueError) as error:
+        except (OSError, urllib.error.URLError) as error:
             last_error = f"{type(error).__name__}: {error}"
+            _observe_remote_call(
+                config,
+                usage_observer,
+                outcome="transport-error",
+                attempt=attempt,
+                ambiguous_billable=True,
+            )
             if not delay:
                 break
+        else:
+            try:
+                response = json.loads(raw_response)
+            except (json.JSONDecodeError, TypeError) as error:
+                last_error = f"{type(error).__name__}: {error}"
+                _observe_remote_call(
+                    config,
+                    usage_observer,
+                    outcome="invalid-response",
+                    attempt=attempt,
+                    ambiguous_billable=True,
+                )
+                if not delay:
+                    break
+                time.sleep(delay)
+                continue
+            usage = response.get("usage", {}) if isinstance(response, Mapping) else {}
+            model = (
+                str(response.get("model") or config.model)
+                if isinstance(response, Mapping)
+                else config.model
+            )
+            _observe_remote_call(
+                config,
+                usage_observer,
+                outcome="response",
+                attempt=attempt,
+                ambiguous_billable=not bool(usage),
+                model=model,
+                usage=usage if isinstance(usage, Mapping) else {},
+            )
+            try:
+                content = (
+                    _responses_output_text(response)
+                    if config.engine == "openai_responses"
+                    else str(response["choices"][0]["message"]["content"] or "").strip()
+                )
+                if not content:
+                    raise ValueError("response was empty")
+            except (KeyError, TypeError, ValueError) as error:
+                last_error = f"{type(error).__name__}: {error}"
+                if not delay:
+                    break
+            else:
+                return {
+                    "text": content,
+                    "usage": dict(usage),
+                    "model": model,
+                    "attempts": attempt,
+                }
         time.sleep(delay)
     raise RemoteModelUnavailableError(
         f"{config.display_name} could not complete this speaker check. {last_error}"
+    )
+
+
+def _observe_remote_call(
+    config: RemoteTextModelConfig,
+    observer: RemoteUsageObserver | None,
+    *,
+    outcome: str,
+    attempt: int,
+    ambiguous_billable: bool,
+    model: str | None = None,
+    usage: Mapping[str, Any] | None = None,
+    http_status: int | None = None,
+) -> None:
+    if observer is None:
+        return
+    observer(
+        config,
+        {
+            "outcome": outcome,
+            "attempt": attempt,
+            "model": model or config.model,
+            "usage": dict(usage or {}),
+            "ambiguousBillable": ambiguous_billable,
+            "httpStatus": http_status,
+        },
     )
 
 
