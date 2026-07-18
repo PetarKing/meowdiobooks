@@ -121,6 +121,7 @@ def test_cloned_audition_speaks_preview_line_from_sample(tmp_path):
     ]
 
 
+@pytest.mark.uses_audio_decoder
 def test_uploaded_voice_sample_is_normalized_to_mono_24khz_wav():
     sample_rate = 16_000
     timeline = np.arange(sample_rate * 4, dtype=np.float32) / sample_rate
@@ -140,6 +141,7 @@ def test_uploaded_voice_sample_is_normalized_to_mono_24khz_wav():
     assert duration == pytest.approx(4.0)
 
 
+@pytest.mark.uses_audio_decoder
 def test_uploaded_voice_sample_rejects_unsupported_format_and_silence():
     with pytest.raises(ValueError, match="WAV, MP3, or FLAC"):
         normalize_voice_sample(b"voice", "sample.m4a")

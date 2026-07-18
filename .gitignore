@@ -52,6 +52,7 @@ runs/
 results/
 output/
 dist/
+outputs/
 tmp/
 fixtures/downloaded/
 

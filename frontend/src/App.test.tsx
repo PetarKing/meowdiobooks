@@ -2403,8 +2403,10 @@ describe('v2 wizard', () => {
     finishUpload(uploaded)
     expect(await screen.findByText('Audition 2')).toBeInTheDocument()
     expect(screen.getByText('Cloned from a 4.0 sec sample')).toBeInTheDocument()
-    expect(await screen.findByRole('button', { name: 'Approve Audition 2' })).toBeInTheDocument()
-    expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived')
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Approve Audition 2' })).toBeInTheDocument()
+      expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived', 'selected')
+    })
 
     const afterDelete: CastArtifact = {
       ...uploaded,

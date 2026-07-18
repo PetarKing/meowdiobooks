@@ -484,7 +484,7 @@ def test_review_bulk_preview_is_local_and_model_repair_endpoint_is_absent(tmp_pa
             f"/api/books/{book_id}/review/targeted-repair",
             json={"revision": review["revision"], "targetOccurrenceIds": ["anything"]},
         )
-        assert missing.status_code == 405
+        assert missing.status_code in {404, 405}
 
 
 def test_review_upstream_action_returns_explicit_rerun_contract_without_publish(

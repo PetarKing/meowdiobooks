@@ -41,6 +41,10 @@ WARNING_CONFIG: dict[str, dict[str, Any]] = {
         "severity": "warning",
         "actions": ("keep", "exclude"),
     },
+    "web-address": {
+        "severity": "warning",
+        "actions": ("keep", "exclude"),
+    },
     "footnote": {
         "severity": "warning",
         "actions": ("keep", "narrate", "exclude"),
@@ -59,6 +63,8 @@ _INTERNAL_WARNING_CONFIG = {
     }
 }
 _PAGE_NUMBER = re.compile(r"^\s*(?:\d{1,4}|[ivxlcdm]{1,10})\s*$", re.IGNORECASE)
+_WEB_ADDRESS = re.compile(r"\b(?:https?://|www\.)[^\s<>{}\[\]\"']+", re.IGNORECASE)
+_WEB_ADDRESS_TRAILING_PUNCTUATION = ".,;:!?)]}"
 _FOOTNOTE = re.compile(r"^\s*(?:\[?\d{1,3}\]?|[*†‡])(?:[.)\]]|\s{1,3})\s*\S")
 _CHAPTER_LIST_ENTRY = re.compile(r"^\s*\d{1,3}[.)]\s+chapter\s+\d+\b", re.IGNORECASE)
 _NOTE_SECTION_HEADER = re.compile(
@@ -293,6 +299,9 @@ def apply_review_render_policies(
         ordered = sorted(cuts)
         for piece_start, piece_end in zip(ordered, ordered[1:]):
             owners = [row for row in overlaps if row[0] <= piece_start and piece_end <= row[1]]
+            if owners:
+                narrowest_width = min(row[1] - row[0] for row in owners)
+                owners = [row for row in owners if row[1] - row[0] == narrowest_width]
             if len({row[2] for row in owners}) > 1:
                 raise ReviewContractError(
                     f"Conflicting Review render policies overlap {span.get('blockId')} "
@@ -580,6 +589,28 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
             stripped = value.strip()
             if not stripped:
                 continue
+            for web_match in _WEB_ADDRESS.finditer(value):
+                web_end = web_match.end()
+                while (
+                    web_end > web_match.start()
+                    and value[web_end - 1] in _WEB_ADDRESS_TRAILING_PUNCTUATION
+                ):
+                    web_end -= 1
+                if web_end > web_match.start():
+                    start = match.start() + web_match.start()
+                    end = match.start() + web_end
+                    result.append(
+                        _occurrence(
+                            "web-address",
+                            str(block["id"]),
+                            start,
+                            end,
+                            text[start:end],
+                            int(block["page"]),
+                            "Web address that may not belong in the spoken edition.",
+                            block_text=text,
+                        )
+                    )
             if "�" in value or re.search(r"(?:\w\s){4,}\w", value):
                 result.append(
                     _from_match(
