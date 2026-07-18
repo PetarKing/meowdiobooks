@@ -152,6 +152,16 @@ export interface WorkflowHeaderContext {
   navigate: (view: ProductView) => void;
 }
 
+function ProductTabIcon({ view }: { view: ProductView }) {
+  if (view === "create") {
+    return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 4 5 5L9 20l-5-5L15 4Z" /><path d="m14 5 5 5M6 4v3M4.5 5.5h3M18 16v4M16 18h4" /></svg>;
+  }
+  if (view === "library") {
+    return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5h5v14H4zM10 5.5h5v14h-5zM16.5 5l3.5-.8 2.6 13.6-3.5.8z" /></svg>;
+  }
+  return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z" /></svg>;
+}
+
 export default function App({
   gateway = defaultWorkflowGateway,
   journey = publicJourney,
@@ -734,9 +744,9 @@ export default function App({
           <span>Meowdiobooks<small>{t("Books, finding their voice.")}</small></span>
         </button>
         <nav className="product-tabs" aria-label={t("Product areas")}>
-          <button className={productView === "create" ? "active" : ""} onClick={() => navigateProduct("create")}><span>{t("Create")}</span></button>
-          <button className={productView === "library" ? "active" : ""} aria-label={libraryExports.length ? t("Library, {{count}} audiobooks", { count: libraryExports.length }) : t("Library")} onClick={() => navigateProduct("library")}><span>{t("Library")}</span>{libraryExports.length > 0 && <small className="product-count" aria-hidden="true">{libraryExports.length}</small>}</button>
-          <button className={productView === "player" ? "active" : ""} onClick={() => navigateProduct("player")}><span>{t("Player")}</span><small className="product-soon">{t("Coming soon")}</small></button>
+          <button className={productView === "create" ? "active" : ""} onClick={() => navigateProduct("create")}><ProductTabIcon view="create" /><span className="product-tab-label">{t("Create")}</span></button>
+          <button className={productView === "library" ? "active" : ""} aria-label={libraryExports.length ? t("Library, {{count}} audiobooks", { count: libraryExports.length }) : t("Library")} onClick={() => navigateProduct("library")}><ProductTabIcon view="library" /><span className="product-tab-label">{t("Library")}</span>{libraryExports.length > 0 && <small className="product-count" aria-hidden="true">{libraryExports.length}</small>}</button>
+          <button className={productView === "player" ? "active" : ""} disabled><ProductTabIcon view="player" /><span className="product-tab-label">{t("Player")}</span><small className="product-soon">{t("Coming soon")}</small></button>
         </nav>
         <div className="topbar-actions">
           <LanguageToggle />

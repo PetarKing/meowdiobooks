@@ -106,10 +106,11 @@ describe('v2 wizard', () => {
     expect(preview).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps Player as an honest coming-soon preview', async () => {
+  it('keeps Player visible but disables its unavailable navigation', async () => {
+    window.history.replaceState({}, "", "/player")
     render(<App />)
 
-    fireEvent.click(screen.getByRole('button', { name: /Player Coming soon/ }))
+    expect(screen.getByRole('button', { name: /Player Coming soon/ })).toBeDisabled()
     expect(screen.getByRole('heading', { name: 'Your audiobook, ready to listen.' })).toBeInTheDocument()
     expect(screen.getByText(/future path to open it securely on another device/)).toBeInTheDocument()
 
@@ -165,8 +166,8 @@ describe('v2 wizard', () => {
     resolveLibrary([])
     await screen.findByRole('heading', { name: 'No audiobooks yet.' })
 
-    fireEvent.click(screen.getByRole('button', { name: /Player Coming soon/ }))
-    expect(window.location.pathname).toBe('/player')
+    expect(screen.getByRole('button', { name: /Player Coming soon/ })).toBeDisabled()
+    expect(window.location.pathname).toBe('/library')
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
     expect(window.location.pathname).toBe('/')
 
