@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from .cast import (
@@ -18,6 +19,7 @@ from .cast import (
 from .local_llm import complete_json, qwen_server
 
 Report = Callable[[float, str | None], None]
+JsonCompletion = Callable[[str, str, int], object]
 
 SPEAKER_TYPES = {
     "one-person": "character",
@@ -107,36 +109,59 @@ def propose_cast(
 ) -> dict[str, Any]:
     """Classify each literal label independently, then combine relationships in code."""
 
+    with qwen_server(repo_root) as base:
+        return propose_cast_with_completion(
+            turns,
+            lambda system, prompt, max_tokens: complete_json(
+                base, system, prompt, max_tokens=max_tokens
+            ),
+            model_name="Qwen 3.5 9B local",
+            report=report,
+        )
+
+
+def propose_cast_with_completion(
+    turns: Sequence[Mapping[str, Any]],
+    complete: JsonCompletion,
+    *,
+    model_name: str,
+    report: Report | None = None,
+    max_workers: int = 1,
+) -> dict[str, Any]:
+    """Run provider-neutral Cast classification through the shared validation contract."""
+
+    if max_workers < 1:
+        raise CastContractError("Cast completion concurrency must be positive")
+
     notify = report or (lambda _progress, _message=None: None)
     dossiers = build_label_dossiers(turns)
     fuzzy = suggest_fuzzy_candidates(dossiers, threshold=RELATIONSHIP_CANDIDATE_THRESHOLD)
     dossier_by_label = {str(row["label"]): row for row in dossiers}
     fuzzy_by_label = _fuzzy_by_label(fuzzy)
-    proposals: list[dict[str, Any]] = []
     notify(2, f"Reviewing {len(dossiers)} character labels with AI")
-    with qwen_server(repo_root) as base:
-        for index, dossier in enumerate(dossiers, 1):
-            label = str(dossier["label"])
-            candidate_labels = fuzzy_by_label.get(label_comparison_key(label), [])
-            notify(
-                5 + (index - 1) / max(len(dossiers), 1) * 90,
-                f"Analyzing cast label {index} of {len(dossiers)}: {label}",
-            )
-            decision = _complete_validated_decision(
-                base,
-                _label_prompt(
-                    dossier,
-                    dossier_by_label,
-                    candidate_labels,
-                ),
-                label,
-                [label, *candidate_labels],
-            )
-            proposals.append(_proposal_from_decision(dossier, decision))
-            notify(
-                5 + index / max(len(dossiers), 1) * 90,
-                f"Classified cast label {index} of {len(dossiers)}: {label}",
-            )
+
+    def classify(dossier: Mapping[str, Any]) -> dict[str, Any]:
+        label = str(dossier["label"])
+        candidate_labels = fuzzy_by_label.get(label_comparison_key(label), [])
+        decision = _complete_validated_decision_with(
+            complete,
+            _label_prompt(dossier, dossier_by_label, candidate_labels),
+            label,
+            [label, *candidate_labels],
+        )
+        return _proposal_from_decision(dossier, decision)
+
+    if max_workers == 1:
+        proposals = [classify(dossier) for dossier in dossiers]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            proposals = list(executor.map(classify, dossiers))
+    for index, dossier in enumerate(dossiers, 1):
+        label = str(dossier["label"])
+        notify(
+            5 + index / max(len(dossiers), 1) * 90,
+            f"Classified cast label {index} of {len(dossiers)}: {label}",
+        )
     proposals = _combine_confirmed_relationships(proposals)
     summary = build_relationship_summary([proposals], dossiers)
     notify(100, "Cast proposals are ready for identity review")
@@ -152,7 +177,7 @@ def propose_cast(
             "labels": len(dossiers),
             "batches": len(dossiers),
             "modelCalls": len(dossiers),
-            "model": "Qwen 3.5 9B local",
+            "model": model_name,
         },
     }
 
@@ -165,6 +190,32 @@ def suggest_voice_settings(
     report: Report | None = None,
 ) -> dict[str, dict[str, str]]:
     """Suggest one scene-grounded voice profile per identity with one model call each."""
+
+    with qwen_server(repo_root) as base:
+        return suggest_voice_settings_with_completion(
+            identities,
+            dossiers,
+            story_spans,
+            lambda system, prompt, max_tokens: complete_json(
+                base, system, prompt, max_tokens=max_tokens
+            ),
+            report=report,
+        )
+
+
+def suggest_voice_settings_with_completion(
+    identities: Sequence[Mapping[str, Any]],
+    dossiers: Sequence[Mapping[str, Any]],
+    story_spans: Sequence[Mapping[str, Any]],
+    complete: JsonCompletion,
+    *,
+    report: Report | None = None,
+    max_workers: int = 1,
+) -> dict[str, dict[str, str]]:
+    """Run provider-neutral voice profiling through the shared validation contract."""
+
+    if max_workers < 1:
+        raise CastContractError("Voice-profile completion concurrency must be positive")
 
     notify = report or (lambda _progress, _message=None: None)
     dossiers_by_label = {label_comparison_key(row.get("label", "")): row for row in dossiers}
@@ -185,24 +236,27 @@ def suggest_voice_settings(
     for identity in identities:
         targets.append(_voice_target(identity, dossiers_by_label, story_spans))
 
-    profiles: dict[str, dict[str, str]] = {}
     notify(2, f"Preparing {len(targets)} voice profiles with AI")
-    with qwen_server(repo_root) as base:
-        for index, target in enumerate(targets, 1):
-            notify(
-                5 + (index - 1) / max(len(targets), 1) * 90,
-                f"Suggesting voice {index} of {len(targets)}: {target['name']}",
-            )
-            fallback = default_voice_settings(str(target["category"]))
-            prompt = _voice_profile_prompt(target)
-            try:
-                profiles[str(target["characterId"])] = _complete_voice_settings(base, prompt)
-            except CastContractError:
-                profiles[str(target["characterId"])] = fallback
-            notify(
-                5 + index / max(len(targets), 1) * 90,
-                f"Prepared voice {index} of {len(targets)}: {target['name']}",
-            )
+
+    def profile(target: Mapping[str, Any]) -> tuple[str, dict[str, str]]:
+        fallback = default_voice_settings(str(target["category"]))
+        try:
+            settings = _complete_voice_settings_with(complete, _voice_profile_prompt(target))
+        except CastContractError:
+            settings = fallback
+        return str(target["characterId"]), settings
+
+    if max_workers == 1:
+        completed = [profile(target) for target in targets]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            completed = list(executor.map(profile, targets))
+    profiles = dict(completed)
+    for index, target in enumerate(targets, 1):
+        notify(
+            5 + index / max(len(targets), 1) * 90,
+            f"Prepared voice {index} of {len(targets)}: {target['name']}",
+        )
     notify(100, "Voice suggestions are ready for auditions")
     return profiles
 
@@ -512,10 +566,21 @@ def _bounded_voice_prompt(prompt: str) -> str:
 
 
 def _complete_voice_settings(base: str, prompt: str) -> dict[str, str]:
+    return _complete_voice_settings_with(
+        lambda system, value, max_tokens: complete_json(
+            base, system, value, max_tokens=max_tokens
+        ),
+        prompt,
+    )
+
+
+def _complete_voice_settings_with(
+    complete: JsonCompletion, prompt: str
+) -> dict[str, str]:
     failures: list[str] = []
     retry_prompt = prompt
     for _attempt in range(2):
-        raw = complete_json(base, VOICE_PROFILE_SYSTEM, retry_prompt, max_tokens=384)
+        raw = complete(VOICE_PROFILE_SYSTEM, retry_prompt, 384)
         try:
             return validate_voice_settings(raw)
         except CastContractError as error:
@@ -533,10 +598,26 @@ def _complete_validated_decision(
     target_label: str,
     relationship_labels: Sequence[str],
 ) -> dict[str, Any]:
+    return _complete_validated_decision_with(
+        lambda system, value, max_tokens: complete_json(
+            base, system, value, max_tokens=max_tokens
+        ),
+        prompt,
+        target_label,
+        relationship_labels,
+    )
+
+
+def _complete_validated_decision_with(
+    complete: JsonCompletion,
+    prompt: str,
+    target_label: str,
+    relationship_labels: Sequence[str],
+) -> dict[str, Any]:
     failures: list[str] = []
     retry_prompt = prompt
     for _attempt in range(3):
-        result = complete_json(base, SYSTEM, retry_prompt, max_tokens=512)
+        result = complete(SYSTEM, retry_prompt, 512)
         try:
             return _validate_decision(result, target_label, relationship_labels)
         except CastContractError as error:
@@ -548,7 +629,7 @@ def _complete_validated_decision(
                 + "\nReturn only the three required fields."
             )
     raise CastContractError(
-        "Qwen failed Cast label validation after 3 attempts: " + " | ".join(failures)
+        "Text model failed Cast label validation after 3 attempts: " + " | ".join(failures)
     )
 
 
