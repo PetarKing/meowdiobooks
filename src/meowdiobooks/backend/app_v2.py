@@ -234,7 +234,11 @@ def create_app_v2(
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
 ) -> FastAPI:
-    """Create the v2 API with explicit provider seams for local or hosted composition."""
+    """Create the v2 API with explicit provider seams for local or hosted composition.
+
+    The post-import hook observes an already-persisted book. Raising from the hook removes the new
+    book and source so the same bytes can be retried as a fresh import.
+    """
 
     root = Path(data_dir)
     repo_root = application_root()
@@ -835,9 +839,15 @@ def create_app_v2(
                 )
             ],
         )
-        if on_book_imported is not None:
-            on_book_imported(book, target)
-        books.put(book)
+        try:
+            books.put(book)
+            if on_book_imported is not None:
+                on_book_imported(book, target)
+        except BaseException:
+            books.delete(book.id)
+            if created:
+                target.unlink(missing_ok=True)
+            raise
         return {
             "book": {
                 **book.model_dump(mode="json"),
