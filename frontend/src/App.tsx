@@ -40,6 +40,7 @@ import { Choice, Panel, Tag } from "./components/Ui";
 import { strongConfirmationLabelsForCast, type IdentityDecision } from "./castIdentity";
 import { CastIdentityReview } from "./components/CastIdentityReview";
 import { CastVoiceReview } from "./components/CastVoiceReview";
+import { ChapterAudioPlayer } from "./components/ChapterAudioPlayer";
 import { confirmedVoiceRoutesForCast, voiceRoutesForCast } from "./voiceRoutes";
 import { DialogueResultReview, type DialogueCorrectionDecision } from "./components/DialogueResultReview";
 import { PhaseHelp } from "./components/PhaseHelp";
@@ -1477,7 +1478,7 @@ export default function App({
           <button type="button" className="chapter-player-close" aria-label={t("Close player")} onClick={() => setListeningChapterId(undefined)}>×</button>
           <div className="chapter-player-book" aria-hidden="true"><span>{t("Chapter")}</span><b>{String(chapters.findIndex((chapter) => chapter.id === listeningChapter.id) + 1).padStart(2, "0")}</b><i>♪</i></div>
           <div className="chapter-player-copy"><span className="eyebrow">{t(listeningAudio.current ? "Chapter audio" : "Older recording")}</span><h2 id="chapter-player-title">{listeningChapter.title || t("Untitled chapter")}</h2></div>
-          <audio controls preload="metadata" src={listeningAudio.audioUrl} />
+          <ChapterAudioPlayer src={listeningAudio.audioUrl} />
         </section>
       </div>}
     </>;
