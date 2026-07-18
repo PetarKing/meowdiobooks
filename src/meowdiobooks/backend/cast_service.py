@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import dataclass
 from typing import Any
 
 from .cast import (
@@ -30,11 +31,52 @@ SPEAKER_TYPES = {
 
 RELATIONSHIP_CANDIDATE_THRESHOLD = 0.72
 MAX_RELATIONSHIP_CANDIDATES = 8
-MAX_VOICE_PROFILE_EXAMPLES = 3
-MAX_VOICE_PROFILE_LINE_CHARACTERS = 1_200
-MAX_VOICE_PROFILE_CONTEXT_CHARACTERS = 4_000
-MAX_VOICE_PROFILE_PROMPT_CHARACTERS = 6_000
 VOICE_PROFILE_TRUNCATION_MARKER = "[…truncated to voice-profile prompt budget]"
+
+
+@dataclass(frozen=True)
+class VoiceEvidencePolicy:
+    """Bound and distribute evidence for one provider-specific voice-profile call."""
+
+    max_examples: int = 3
+    max_examples_per_label: int = 1
+    max_line_characters: int = 1_200
+    max_context_characters: int = 4_000
+    max_prompt_characters: int = 6_000
+
+    def __post_init__(self) -> None:
+        values = {
+            "max_examples": self.max_examples,
+            "max_examples_per_label": self.max_examples_per_label,
+            "max_line_characters": self.max_line_characters,
+            "max_context_characters": self.max_context_characters,
+            "max_prompt_characters": self.max_prompt_characters,
+        }
+        invalid = [name for name, value in values.items() if value < 1]
+        if invalid:
+            raise CastContractError(
+                "Voice evidence limits must be positive: " + ", ".join(invalid)
+            )
+        if self.max_examples_per_label > self.max_examples:
+            raise CastContractError(
+                "Voice evidence per-label limit cannot exceed the total example limit"
+            )
+        marker_size = len(VOICE_PROFILE_TRUNCATION_MARKER)
+        if self.max_line_characters <= marker_size:
+            raise CastContractError(
+                "Voice evidence line limit must fit the truncation marker"
+            )
+        if self.max_prompt_characters <= marker_size + 1:
+            raise CastContractError(
+                "Voice evidence prompt limit must fit the truncation marker"
+            )
+
+
+DEFAULT_VOICE_EVIDENCE_POLICY = VoiceEvidencePolicy()
+MAX_VOICE_PROFILE_EXAMPLES = DEFAULT_VOICE_EVIDENCE_POLICY.max_examples
+MAX_VOICE_PROFILE_LINE_CHARACTERS = DEFAULT_VOICE_EVIDENCE_POLICY.max_line_characters
+MAX_VOICE_PROFILE_CONTEXT_CHARACTERS = DEFAULT_VOICE_EVIDENCE_POLICY.max_context_characters
+MAX_VOICE_PROFILE_PROMPT_CHARACTERS = DEFAULT_VOICE_EVIDENCE_POLICY.max_prompt_characters
 
 SYSTEM = """Classify one literal audiobook speaker label.
 
@@ -211,12 +253,14 @@ def suggest_voice_settings_with_completion(
     *,
     report: Report | None = None,
     max_workers: int = 1,
+    evidence_policy: VoiceEvidencePolicy | None = None,
 ) -> dict[str, dict[str, str]]:
     """Run provider-neutral voice profiling through the shared validation contract."""
 
     if max_workers < 1:
         raise CastContractError("Voice-profile completion concurrency must be positive")
 
+    policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
     notify = report or (lambda _progress, _message=None: None)
     dossiers_by_label = {label_comparison_key(row.get("label", "")): row for row in dossiers}
     targets = [
@@ -228,20 +272,31 @@ def suggest_voice_settings_with_completion(
                 normalize_label(row.get("text", ""))
                 for row in story_spans
                 if row.get("renderRole") == "narration" and normalize_label(row.get("text", ""))
-            ][:3],
+            ][: min(3, policy.max_examples)],
             "labels": [],
             "storyContext": [],
         }
     ]
     for identity in identities:
-        targets.append(_voice_target(identity, dossiers_by_label, story_spans))
+        targets.append(
+            _voice_target(
+                identity,
+                dossiers_by_label,
+                story_spans,
+                evidence_policy=policy,
+            )
+        )
 
     notify(2, f"Preparing {len(targets)} voice profiles with AI")
 
     def profile(target: Mapping[str, Any]) -> tuple[str, dict[str, str]]:
         fallback = default_voice_settings(str(target["category"]))
         try:
-            settings = _complete_voice_settings_with(complete, _voice_profile_prompt(target))
+            settings = _complete_voice_settings_with(
+                complete,
+                _voice_profile_prompt(target, evidence_policy=policy),
+                max_prompt_characters=policy.max_prompt_characters,
+            )
         except CastContractError:
             settings = fallback
         return str(target["characterId"]), settings
@@ -265,25 +320,15 @@ def _voice_target(
     identity: Mapping[str, Any],
     dossiers_by_label: Mapping[str, Mapping[str, Any]],
     story_spans: Sequence[Mapping[str, Any]],
+    *,
+    evidence_policy: VoiceEvidencePolicy | None = None,
 ) -> dict[str, Any]:
     """Assemble language-agnostic structural context before the single voice-profile call."""
 
     labels = [normalize_label(value) for value in identity.get("literalLabels", [])]
     labels = [value for value in labels if value]
-    selected: list[Mapping[str, Any]] = []
-    seen_text: set[str] = set()
-    for label in labels:
-        dossier = dossiers_by_label.get(label_comparison_key(label))
-        if dossier is None:
-            continue
-        for example in dossier.get("examples", []):
-            text = normalize_label(example.get("sourceText", ""))
-            if text and text not in seen_text:
-                seen_text.add(text)
-                selected.append(example)
-                break
-        if len(selected) == MAX_VOICE_PROFILE_EXAMPLES:
-            break
+    policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
+    selected = _select_voice_examples(labels, dossiers_by_label, policy)
     return {
         "characterId": str(identity["characterId"]),
         "name": str(identity["name"]),
@@ -292,6 +337,49 @@ def _voice_target(
         "evidence": [normalize_label(row.get("sourceText", "")) for row in selected],
         "storyContext": _surrounding_story_context(selected, labels, story_spans),
     }
+
+
+def _select_voice_examples(
+    labels: Sequence[str],
+    dossiers_by_label: Mapping[str, Mapping[str, Any]],
+    policy: VoiceEvidencePolicy,
+) -> list[Mapping[str, Any]]:
+    """Allocate examples round-robin, prioritizing labels with more source occurrences."""
+
+    groups: list[dict[str, Any]] = []
+    for position, label in enumerate(labels):
+        dossier = dossiers_by_label.get(label_comparison_key(label))
+        if dossier is None:
+            continue
+        examples = [row for row in dossier.get("examples", []) if isinstance(row, Mapping)]
+        if examples:
+            groups.append(
+                {
+                    "position": position,
+                    "occurrences": int(dossier.get("occurrenceCount", len(examples))),
+                    "examples": examples,
+                    "cursor": 0,
+                }
+            )
+    groups.sort(key=lambda row: (-row["occurrences"], row["position"]))
+
+    selected: list[Mapping[str, Any]] = []
+    seen_text: set[str] = set()
+    for _round in range(policy.max_examples_per_label):
+        for group in groups:
+            examples = group["examples"]
+            while group["cursor"] < len(examples):
+                example = examples[group["cursor"]]
+                group["cursor"] += 1
+                text = normalize_label(example.get("sourceText", ""))
+                if not text or text in seen_text:
+                    continue
+                seen_text.add(text)
+                selected.append(example)
+                break
+            if len(selected) == policy.max_examples:
+                return selected
+    return selected
 
 
 def _surrounding_story_context(
@@ -492,16 +580,20 @@ def _natural_list(values: Sequence[str]) -> str:
     return f"{', '.join(values[:-1])}, and {values[-1]}"
 
 
-def _voice_profile_prompt(target: Mapping[str, Any]) -> str:
+def _voice_profile_prompt(
+    target: Mapping[str, Any], *, evidence_policy: VoiceEvidencePolicy | None = None
+) -> str:
+    policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
     evidence = [
-        _bounded_voice_text(str(value))
+        _bounded_voice_text(str(value), max_characters=policy.max_line_characters)
         for value in target.get("evidence", [])
         if str(value).strip()
     ]
     labels = [str(value) for value in target.get("labels", []) if str(value).strip()]
     story_context = _bounded_voice_lines(
         [str(value) for value in target.get("storyContext", []) if str(value).strip()],
-        MAX_VOICE_PROFILE_CONTEXT_CHARACTERS,
+        policy.max_context_characters,
+        max_line_characters=policy.max_line_characters,
     )
     evidence_heading = (
         "REPRESENTATIVE NARRATION"
@@ -524,25 +616,34 @@ def _voice_profile_prompt(target: Mapping[str, Any]) -> str:
     )
     if story_context:
         sections.extend(["", "TARGET-SCOPED STORY CONTEXT", *story_context])
-    return _bounded_voice_prompt("\n".join(sections))
+    return _bounded_voice_prompt(
+        "\n".join(sections), max_characters=policy.max_prompt_characters
+    )
 
 
-def _bounded_voice_text(value: str) -> str:
+def _bounded_voice_text(
+    value: str, *, max_characters: int = MAX_VOICE_PROFILE_LINE_CHARACTERS
+) -> str:
     """Keep one source line useful without allowing it to consume the whole prompt."""
 
-    if len(value) <= MAX_VOICE_PROFILE_LINE_CHARACTERS:
+    if len(value) <= max_characters:
         return value
-    keep = MAX_VOICE_PROFILE_LINE_CHARACTERS - len(VOICE_PROFILE_TRUNCATION_MARKER)
+    keep = max_characters - len(VOICE_PROFILE_TRUNCATION_MARKER)
     return value[:keep].rstrip() + VOICE_PROFILE_TRUNCATION_MARKER
 
 
-def _bounded_voice_lines(values: Sequence[str], max_characters: int) -> list[str]:
+def _bounded_voice_lines(
+    values: Sequence[str],
+    max_characters: int,
+    *,
+    max_line_characters: int = MAX_VOICE_PROFILE_LINE_CHARACTERS,
+) -> list[str]:
     """Bound a prompt section while preserving as many ordered source lines as possible."""
 
     result: list[str] = []
     used = 0
     for value in values:
-        line = _bounded_voice_text(value)
+        line = _bounded_voice_text(value, max_characters=max_line_characters)
         separator = 1 if result else 0
         if used + separator + len(line) <= max_characters:
             result.append(line)
@@ -556,12 +657,14 @@ def _bounded_voice_lines(values: Sequence[str], max_characters: int) -> list[str
     return result
 
 
-def _bounded_voice_prompt(prompt: str) -> str:
+def _bounded_voice_prompt(
+    prompt: str, *, max_characters: int = MAX_VOICE_PROFILE_PROMPT_CHARACTERS
+) -> str:
     """Apply a final defensive ceiling so malformed source metadata cannot block Cast."""
 
-    if len(prompt) <= MAX_VOICE_PROFILE_PROMPT_CHARACTERS:
+    if len(prompt) <= max_characters:
         return prompt
-    keep = MAX_VOICE_PROFILE_PROMPT_CHARACTERS - len(VOICE_PROFILE_TRUNCATION_MARKER) - 1
+    keep = max_characters - len(VOICE_PROFILE_TRUNCATION_MARKER) - 1
     return prompt[:keep].rstrip() + "\n" + VOICE_PROFILE_TRUNCATION_MARKER
 
 
@@ -575,7 +678,10 @@ def _complete_voice_settings(base: str, prompt: str) -> dict[str, str]:
 
 
 def _complete_voice_settings_with(
-    complete: JsonCompletion, prompt: str
+    complete: JsonCompletion,
+    prompt: str,
+    *,
+    max_prompt_characters: int = MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
 ) -> dict[str, str]:
     failures: list[str] = []
     retry_prompt = prompt
@@ -587,7 +693,8 @@ def _complete_voice_settings_with(
             failures.append(str(error))
             retry_prompt = _bounded_voice_prompt(
                 "Please try once more. Use only the exact allowed values and all eight fields.\n\n"
-                + prompt
+                + prompt,
+                max_characters=max_prompt_characters,
             )
     raise CastContractError("Voice profile validation failed: " + " | ".join(failures))
 

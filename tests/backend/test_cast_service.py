@@ -6,6 +6,7 @@ from meowdiobooks.backend.cast import CastContractError, build_label_dossiers
 from meowdiobooks.backend.cast_service import (
     MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
     SYSTEM,
+    VoiceEvidencePolicy,
     VOICE_PROFILE_SYSTEM,
     _combine_confirmed_relationships,
     _complete_voice_settings,
@@ -121,6 +122,92 @@ def test_voice_target_uses_one_first_representative_example_per_alias():
         "Lady Emilia: First.",
         "Emilia: Here.",
     ]
+
+
+def test_expanded_voice_evidence_is_round_robin_and_frequency_prioritized():
+    target = _voice_target(
+        {
+            "characterId": "emilia",
+            "name": "Emilia",
+            "category": "character",
+            "literalLabels": ["Rare Emilia", "Emilia", "Lady Emilia"],
+        },
+        {
+            "rare emilia": {
+                "occurrenceCount": 1,
+                "examples": [
+                    {"sourceText": "Rare Emilia: One."},
+                    {"sourceText": "Rare Emilia: Two."},
+                ],
+            },
+            "emilia": {
+                "occurrenceCount": 20,
+                "examples": [
+                    {"sourceText": "Emilia: One."},
+                    {"sourceText": "Emilia: Two."},
+                ],
+            },
+            "lady emilia": {
+                "occurrenceCount": 8,
+                "examples": [
+                    {"sourceText": "Lady Emilia: One."},
+                    {"sourceText": "Lady Emilia: Two."},
+                ],
+            },
+        },
+        [],
+        evidence_policy=VoiceEvidencePolicy(
+            max_examples=5,
+            max_examples_per_label=2,
+        ),
+    )
+
+    assert target["evidence"] == [
+        "Emilia: One.",
+        "Lady Emilia: One.",
+        "Rare Emilia: One.",
+        "Emilia: Two.",
+        "Lady Emilia: Two.",
+    ]
+
+
+def test_expanded_voice_evidence_total_cap_prefers_frequent_labels():
+    target = _voice_target(
+        {
+            "characterId": "emilia",
+            "name": "Emilia",
+            "literalLabels": ["Rare", "Frequent", "Middle"],
+        },
+        {
+            "rare": {"occurrenceCount": 1, "examples": [{"sourceText": "Rare line."}]},
+            "frequent": {
+                "occurrenceCount": 30,
+                "examples": [{"sourceText": "Frequent line."}],
+            },
+            "middle": {
+                "occurrenceCount": 10,
+                "examples": [{"sourceText": "Middle line."}],
+            },
+        },
+        [],
+        evidence_policy=VoiceEvidencePolicy(max_examples=2),
+    )
+
+    assert target["evidence"] == ["Frequent line.", "Middle line."]
+
+
+@pytest.mark.parametrize(
+    "policy",
+    [
+        {"max_examples": 0},
+        {"max_examples": 2, "max_examples_per_label": 3},
+        {"max_line_characters": 10},
+        {"max_prompt_characters": 10},
+    ],
+)
+def test_voice_evidence_policy_rejects_unsafe_limits(policy):
+    with pytest.raises(CastContractError, match="Voice evidence"):
+        VoiceEvidencePolicy(**policy)
 
 
 def test_surrounding_voice_context_is_structural_unicode_safe_and_target_scoped():
