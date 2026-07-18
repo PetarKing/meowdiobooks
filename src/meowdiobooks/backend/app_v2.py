@@ -1502,12 +1502,20 @@ def create_app_v2(
         )
         if active:
             raise HTTPException(status_code=409, detail={"jobId": active.id})
+        payload = {
+            **command.to_job_payload(),
+            "workflow_version": PUBLIC_WORKFLOW.version,
+        }
+        resumable = (
+            _matching_failed_generation_job(jobs.all(), kind, payload)
+            if parsed == WizardStage.GENERATE
+            else None
+        )
         job = queue.enqueue(
             kind,
-            {
-                **command.to_job_payload(),
-                "workflow_version": PUBLIC_WORKFLOW.version,
-            },
+            payload,
+            retry_of=resumable.id if resumable else None,
+            attempt=resumable.attempt + 1 if resumable else 1,
         )
         return job.model_dump(mode="json")
 
@@ -2293,3 +2301,20 @@ def _accept_voice_revisions(
 def _chapter_display_title(chapter_id: str) -> str:
     words = chapter_id.replace("_", " ").replace("-", " ").split()
     return " ".join(word if word.isdigit() else word.capitalize() for word in words) or "Chapter"
+
+
+def _matching_failed_generation_job(
+    rows: list[Job], kind: str, payload: dict[str, object]
+) -> Job | None:
+    """Return the latest failed Generate job with exactly the same immutable inputs."""
+
+    expected = {key: value for key, value in payload.items() if key != "_job_id"}
+    candidates = [
+        row
+        for row in rows
+        if row.kind == kind
+        and row.status == JobStatus.FAILED
+        and {key: value for key, value in row.payload.items() if key != "_job_id"}
+        == expected
+    ]
+    return max(candidates, key=lambda row: row.created_at, default=None)
