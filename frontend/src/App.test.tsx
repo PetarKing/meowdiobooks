@@ -198,8 +198,24 @@ describe('v2 wizard', () => {
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
     expect(within(nav).queryByText('Import')).not.toBeInTheDocument()
     for (const label of ['Extract','Dialogue','Review','Cast & voices','Enrich','Generate','Export']) expect(within(nav).getByText(label)).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Generate Complete' })).toHaveClass('done')
     expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
     expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
+  })
+
+  it('does not mark Generate complete when its only chapter audio is stale', async () => {
+    await open({
+      ...base,
+      generatedChapters: base.generatedChapters.map((chapter) => ({
+        ...chapter,
+        current: false,
+        staleReasons: ['cast:c1->c2'],
+      })),
+    })
+
+    const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
+    expect(within(nav).getByRole('button', { name: 'Generate In progress' })).not.toHaveClass('done')
+    expect(within(nav).getByRole('button', { name: 'Export Generate audio first' })).toBeDisabled()
   })
 
   it('lets a hosted shell insert a private step and replace the header without copying the public app', async () => {

@@ -293,7 +293,8 @@ export default function App({
 
   const book = snapshot?.book;
   const completed = snapshot?.book.completedStages ?? [];
-  const unlockedThrough = snapshot?.generatedChapters.some((row) => row.current)
+  const generateComplete = Boolean(snapshot?.generatedChapters.some((row) => row.current));
+  const unlockedThrough = generateComplete
     ? stageIndex("export")
     : snapshot ? Math.min(stageIndex("generate"), Math.max(0, nextStage(completed))) : 0;
   const hasDraft = (stageId?: WizardStep) => {
@@ -812,7 +813,7 @@ export default function App({
       {showWizard && <aside id="wizard-sidebar" className="rail">
         <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
         <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
-        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : locked ? "Generate audio first" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const localizedStatus = t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={sidebarCollapsed ? `${label} · ${localizedStatus}` : undefined} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
+        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : locked ? "Generate audio first" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const localizedStatus = t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={sidebarCollapsed ? `${label} · ${localizedStatus}` : undefined} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
         <figure className="workflow-familiar" aria-label={t("Your wizard cat companion")}>
           <img src={catWizardArtwork} alt={t("A cat wizard guiding a manuscript into dialogue and sound")} />
         </figure>

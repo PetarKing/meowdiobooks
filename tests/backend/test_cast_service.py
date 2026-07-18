@@ -373,15 +373,10 @@ def test_voice_settings_validate_fixed_handles_and_compile_one_direction():
     )
 
     direction = compile_voice_direction(settings)
-    assert "Additional performance direction: Soft-spoken but resolute." in direction
-    assert direction.startswith("Create a feminine-presenting young-adult voice with")
-    assert "feminine-presenting" in direction
-    assert "young-adult" in direction
-    assert "warm, rounded timbre" in direction
-    assert "medium pitch" in direction
-    assert "measured, unhurried pace" in direction
-    assert "restrained, controlled energy" in direction
-    assert "selected voice traits" in direction
+    assert direction == (
+        "Female young adult voice; warm, rounded timbre; medium pitch; measured pace; "
+        "restrained energy; Soft-spoken but resolute."
+    )
 
 
 def test_voice_performance_note_is_optional():
@@ -393,7 +388,7 @@ def test_voice_performance_note_is_optional():
     )
 
     assert settings["description"] == ""
-    assert "Additional performance direction:" not in compile_voice_direction(settings)
+    assert compile_voice_direction(settings).endswith("balanced energy.")
 
 
 def test_voice_direction_makes_accent_a_direct_audible_instruction():
@@ -405,9 +400,40 @@ def test_voice_direction_makes_accent_a_direct_audible_instruction():
 
     direction = compile_voice_direction(settings, language="english")
 
-    assert "clearly audible Japanese accent or dialect" in direction
-    assert "Keep every word in English" in direction
-    assert "change the pronunciation and rhythm, not the language" in direction
+    assert "Japanese accent in English" in direction
+
+
+def test_voice_direction_preserves_subaru_traits_and_notes_within_provider_limit():
+    settings = {
+        "presentation": "masculine",
+        "age": "child",
+        "tone": "bright",
+        "pitch": "low",
+        "pace": "brisk",
+        "energy": "animated",
+        "accent": "unspecified",
+        "description": (
+            "Deliver the lines with a lively, startled edge and quick shifts into worried "
+            "sarcasm. 13 yo guy from Japan."
+        ),
+    }
+
+    direction = compile_voice_direction(settings)
+
+    assert direction.startswith("Male child voice; bright, clear timbre; low pitch")
+    assert "13 yo guy from Japan" in direction
+    assert len(direction) <= 250
+
+
+def test_voice_direction_rejects_overflow_instead_of_dropping_user_text():
+    settings = {
+        **default_voice_settings(),
+        "accent": "a" * 48,
+        "description": "b" * 180,
+    }
+
+    with pytest.raises(CastContractError, match="exceeds 250 characters"):
+        compile_voice_direction(settings)
 
 
 def test_decision_contract_accepts_multiple_exact_relationships():
