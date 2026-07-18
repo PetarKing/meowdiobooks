@@ -13,6 +13,7 @@
 .uv-cache/
 .hf-cache/
 .pip-cache/
+.npm-cache/
 .pytest_cache/
 .ruff_cache/
 __pycache__/
@@ -50,6 +51,7 @@ library/
 runs/
 results/
 output/
+dist/
 tmp/
 fixtures/downloaded/
 

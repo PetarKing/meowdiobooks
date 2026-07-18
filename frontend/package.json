@@ -1,8 +1,22 @@
 {
-  "name": "meowdiobooks-frontend",
+  "name": "meowdiobooks-workflow-ui",
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "files": [
+    "src",
+    "!src/**/*.test.*",
+    "!src/test",
+    "!src/main.tsx"
+  ],
+  "exports": {
+    ".": "./src/App.tsx",
+    "./api": "./src/api/client.ts",
+    "./contracts": "./src/api/contracts.ts",
+    "./workflow": "./src/workflow/navigation.ts",
+    "./styles.css": "./src/styles.css",
+    "./media.css": "./src/media.css"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,8 +26,8 @@
   "dependencies": {
     "@vitejs/plugin-react": "4.4.1",
     "i18next": "^26.3.6",
-    "react": "19.1.0",
-    "react-dom": "19.1.0",
+    "react": "19.1.4",
+    "react-dom": "19.1.4",
     "react-i18next": "^17.0.9",
     "typescript": "5.8.3",
     "vite": "6.4.3"

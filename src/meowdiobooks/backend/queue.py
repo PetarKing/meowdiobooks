@@ -7,8 +7,8 @@ from contextlib import AbstractContextManager, nullcontext
 
 from .models import Job, JobStatus, utc_now
 from .storage import JsonStore
+from .workflow.runtime import ProgressReporter
 
-ProgressReporter = Callable[[float, str | None], None]
 JobHandler = Callable[..., dict[str, object] | None]
 BeforeRun = Callable[[Job], None]
 ActivityFactory = Callable[[], AbstractContextManager[object]]

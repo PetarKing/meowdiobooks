@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models import WizardStage
 
@@ -117,35 +117,22 @@ WorkflowCommand = Annotated[
     ExtractBook | RunDialogue | RunReview | BuildCast | RunEnrichment | GenerateChapters,
     Field(discriminator="kind"),
 ]
-_COMMAND_ADAPTER = TypeAdapter(WorkflowCommand)
-
-_STAGE_KIND = {
-    WizardStage.EXTRACT: "v2:extract",
-    WizardStage.DIALOGUE: "v2:dialogue",
-    WizardStage.REVIEW: "v2:review",
-    WizardStage.CAST: "v2:cast",
-    WizardStage.ENRICH: "v2:enrich",
-    WizardStage.GENERATE: "v2:generate",
-}
-
-
 def command_for_stage(
     book_id: str, stage: WizardStage, settings: dict[str, object]
 ) -> WorkflowCommand:
-    try:
-        kind = _STAGE_KIND[stage]
-    except KeyError as error:
-        raise ValueError(f"Stage {stage.value} has no workflow command") from error
-    return _COMMAND_ADAPTER.validate_python(
-        {"kind": kind, "book_id": book_id, "settings": settings}
+    from typing import cast
+
+    from .defaults import PUBLIC_WORKFLOW
+
+    return cast(
+        WorkflowCommand,
+        PUBLIC_WORKFLOW.command_for_stage(stage.value, book_id, settings),
     )
 
 
 def command_from_job(kind: str, payload: dict[str, object]) -> WorkflowCommand:
-    return _COMMAND_ADAPTER.validate_python(
-        {
-            "kind": kind,
-            "book_id": payload.get("book_id"),
-            "settings": payload.get("settings", {}),
-        }
-    )
+    from typing import cast
+
+    from .defaults import PUBLIC_WORKFLOW
+
+    return cast(WorkflowCommand, PUBLIC_WORKFLOW.command_from_job(kind, payload))

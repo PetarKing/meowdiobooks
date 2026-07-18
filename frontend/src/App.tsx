@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ComponentType, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { normalizeDialogueArtifact, wizardApi as defaultWorkflowGateway } from "./api/client";
 import { buildReviewWarningDecisions } from "./reviewDecisions";
 import type {
+  Book,
   CastArtifact,
   CastVoice,
   DialogueArtifact,
@@ -48,13 +49,14 @@ import heroArtwork from "./assets/brand/meowdiobooks-hero.png";
 import brandMark from "./assets/brand/meowdiobooks-mark.png";
 import catWizardArtwork from "./assets/illustrations/cat-wizard-workflow.png";
 import {
-  nextStage,
   persistedSidebarCollapsed,
   productPaths,
   productViewFromPath,
+  publicJourney,
   sidebarPreferenceKey,
-  stageIndex,
-  stages,
+  type JourneyDefinition,
+  type JourneyStep,
+  type JourneyStepId,
   type ProductView,
   type WizardStep,
 } from "./workflow/navigation";
@@ -128,10 +130,38 @@ const dialogueScanVersion = 6;
 
 export interface AppProps {
   gateway?: WorkflowGateway;
+  journey?: JourneyDefinition;
+  stepOverrides?: Readonly<Record<JourneyStepId, ComponentType<WorkflowStepOverrideProps>>>;
+  renderHeader?: (context: WorkflowHeaderContext) => ReactNode;
 }
 
-export default function App({ gateway = defaultWorkflowGateway }: AppProps) {
+export interface WorkflowStepOverrideProps {
+  step: JourneyStep;
+  gateway: WorkflowGateway;
+  book?: Book;
+  snapshot?: WizardSnapshot;
+  completedStages: readonly WizardStage[];
+  busy: boolean;
+  refresh: () => Promise<void>;
+  navigateToStep: (stepId: JourneyStepId) => void;
+}
+
+export interface WorkflowHeaderContext {
+  productView: ProductView;
+  libraryCount: number;
+  navigate: (view: ProductView) => void;
+}
+
+export default function App({
+  gateway = defaultWorkflowGateway,
+  journey = publicJourney,
+  stepOverrides = {},
+  renderHeader,
+}: AppProps) {
   const wizardApi = gateway;
+  const stages = journey.steps;
+  const stageIndex = (stageId: JourneyStepId) => journey.indexOf(stageId);
+  const nextStage = (accepted: readonly WizardStage[]) => journey.next(accepted);
   const { t, i18n } = useTranslation();
   const uiLocale = i18n.resolvedLanguage === "zh-CN" ? "zh-CN" : "en";
   const [productView, setProductView] = useState<ProductView>(() => productViewFromPath(window.location.pathname));
@@ -235,7 +265,7 @@ export default function App({ gateway = defaultWorkflowGateway }: AppProps) {
   const unlockedThrough = snapshot?.generatedChapters.some((row) => row.current)
     ? stageIndex("export")
     : snapshot ? Math.min(stageIndex("generate"), Math.max(0, nextStage(completed))) : 0;
-  const hasDraft = (stageId: WizardStep) => {
+  const hasDraft = (stageId?: WizardStep) => {
     if (stageId === "dialogue") return Boolean(dialogueCandidate);
     if (stageId === "review") return Boolean(reviewCandidate);
     if (stageId === "cast") return Boolean(castCandidate && castCandidate.revision !== snapshot?.cast?.revision);
@@ -650,15 +680,33 @@ export default function App({ gateway = defaultWorkflowGateway }: AppProps) {
     runDialogueTranscript(preferred);
   }
 
-  const createView = home ? <Home /> : [
-    ExtractStage(),
-    DialogueStage(),
-    ReviewStage(),
-    CastStage(),
-    <EnrichmentStage key="enrich" />,
-    <GenerateStage key="generate" />,
-    ExportStage(),
-  ][stage];
+  const activeJourneyStep = stages[stage];
+  const builtinViews: Partial<Record<WizardStep, ReactNode>> = {
+    extract: ExtractStage(),
+    dialogue: DialogueStage(),
+    review: ReviewStage(),
+    cast: CastStage(),
+    enrich: <EnrichmentStage key="enrich" />,
+    generate: <GenerateStage key="generate" />,
+    export: ExportStage(),
+  };
+  const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
+  const createView = home
+    ? <Home />
+    : StepOverride && activeJourneyStep
+      ? <StepOverride
+          step={activeJourneyStep}
+          gateway={gateway}
+          book={book}
+          snapshot={snapshot}
+          completedStages={completed}
+          busy={busy}
+          refresh={async () => { if (book) await hydrate(book.id); }}
+          navigateToStep={(stepId) => setStage(stageIndex(stepId))}
+        />
+      : activeJourneyStep?.builtin
+        ? builtinViews[activeJourneyStep.builtin]
+        : null;
 
   const view = productView === "create" ? createView : productView === "library" ? LibraryView() : <ComingSoonView />;
   const showWizard = productView === "create" && !home;
@@ -679,7 +727,7 @@ export default function App({ gateway = defaultWorkflowGateway }: AppProps) {
   }
 
   return <div className="app-shell">
-    <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
+    {renderHeader ? renderHeader({ productView, libraryCount: libraryExports.length, navigate: navigateProduct }) : <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       <div className="topbar-inner">
         <button className="brand" aria-label={t("Go to Home")} onClick={() => { navigateProduct("create"); setHome(true); }}>
           <span className="cat-mark"><img src={brandMark} alt="" /></span>
@@ -695,12 +743,12 @@ export default function App({ gateway = defaultWorkflowGateway }: AppProps) {
           <div className="local-pill"><i /> {t("Local-first")}</div>
         </div>
       </div>
-    </header>
+    </header>}
     <div className={`workspace ${!showWizard ? "home-workspace" : ""} ${showWizard && sidebarCollapsed ? "rail-collapsed" : ""}`} inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       {showWizard && <aside id="wizard-sidebar" className="rail">
         <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
         <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
-        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.id !== "export" && completed.includes(row.id); const draft = hasDraft(row.id); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : locked ? "Generate audio first" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const localizedStatus = t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={sidebarCollapsed ? `${label} · ${localizedStatus}` : undefined} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
+        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : locked ? "Generate audio first" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const localizedStatus = t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={sidebarCollapsed ? `${label} · ${localizedStatus}` : undefined} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
         <figure className="workflow-familiar" aria-label={t("Your wizard cat companion")}>
           <img src={catWizardArtwork} alt={t("A cat wizard guiding a manuscript into dialogue and sound")} />
         </figure>

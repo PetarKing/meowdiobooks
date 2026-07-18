@@ -42,22 +42,23 @@ The detailed artifact rules remain canonical in [PACKAGE_CONTRACT_V2.md](PACKAGE
 
 ## Public extension boundary
 
-A separately maintained companion must depend on an exact tagged public release. It may compose
-around these public seams:
+A separately maintained companion may depend on verified artifacts from an exact immutable GitHub
+release. It composes around these public seams:
 
 - typed workflow commands and `WorkflowRunner`;
 - `BookWorkspace` and immutable artifact contracts;
 - narrow runtime-provider protocols;
 - the frontend `WorkflowGateway` and the public workflow UI source.
 
-It must not copy or patch public workflow files, replace backend acceptance authority, or introduce
-account, billing, storage, or queue identifiers into public artifact JSON. Generally useful extension
-points are added here first, contract-tested, released, and then consumed by the companion.
+The companion starts with the public workflow and journey definitions, then explicitly inserts,
+removes, groups, or replaces stages and handlers. A replacement that preserves its public output
+artifact may keep public downstream consumers; an incompatible artifact requires an adapter or private
+replacement of those consumers. Account, billing, tenant, object-storage, and queue identifiers never
+belong in public artifact JSON.
 
-The current release intentionally does not add hosted services or split the repository into separate
-core and UI packages. That packaging move should happen only when the first companion integration
-requires independently versioned Python and JavaScript artifacts. Until then, the Python wheel is the
-installable local release and the public Git tag is the matching source/UI release.
+The current release intentionally does not add hosted services. Reusable Python and React modules are
+workspace implementation details of the complete local application; when a companion integration is
+ready, CI may attach them as verified release assets without requiring public package registries.
 
 ## Distribution contents
 

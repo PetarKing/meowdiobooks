@@ -6,7 +6,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Protocol
 
-from ..queue import ProgressReporter
+from .runtime import ProgressReporter
 
 
 class DocumentExtractor(Protocol):

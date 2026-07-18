@@ -10,6 +10,8 @@ from uuid import uuid4
 
 from meowdiobooks.util import write_json
 
+from .artifact_registry import ArtifactRegistry, PUBLIC_ARTIFACTS
+
 from .contracts.artifacts import (
     Artifact,
     CastArtifact,
@@ -20,17 +22,12 @@ from .contracts.artifacts import (
     ReviewArtifact,
 )
 
-ARTIFACT_KINDS = {
-    "extraction",
-    "dialogue",
-    "review",
-    "cast",
-    "enrichment",
-    "script",
-}
+ARTIFACT_KINDS = PUBLIC_ARTIFACTS.kinds
 
 
-def active_artifacts(package: Path) -> dict[str, str]:
+def active_artifacts(
+    package: Path, registry: ArtifactRegistry = PUBLIC_ARTIFACTS
+) -> dict[str, str]:
     """Return only the current v2 pointer map; legacy per-kind pointers are unsupported."""
     pointer = package / "artifacts" / "latest.json"
     if not pointer.is_file():
@@ -39,15 +36,17 @@ def active_artifacts(package: Path) -> dict[str, str]:
     if not isinstance(payload, dict):
         raise RuntimeError("Artifact pointer must contain an object")
     result = {str(kind): str(path) for kind, path in payload.items()}
-    unknown = sorted(set(result) - ARTIFACT_KINDS)
+    unknown = sorted(set(result) - registry.kinds)
     if unknown:
         raise RuntimeError(f"Unsupported legacy artifact kinds: {unknown}")
     return result
 
 
-def artifact_path(package: Path, kind: str) -> Path:
-    _validate_kind(kind)
-    value = active_artifacts(package).get(kind)
+def artifact_path(
+    package: Path, kind: str, registry: ArtifactRegistry = PUBLIC_ARTIFACTS
+) -> Path:
+    _validate_kind(kind, registry)
+    value = active_artifacts(package, registry).get(kind)
     if not value:
         raise ValueError(f"{kind.title()} has not completed")
     path = Path(value)
@@ -84,12 +83,14 @@ def read_artifact(package: Path, kind: Literal["script"]) -> RecordingScriptArti
 def read_artifact(package: Path, kind: str) -> Artifact: ...
 
 
-def read_artifact(package: Path, kind: str) -> Artifact:
-    payload = json.loads(artifact_path(package, kind).read_text(encoding="utf-8"))
+def read_artifact(
+    package: Path, kind: str, registry: ArtifactRegistry = PUBLIC_ARTIFACTS
+) -> Artifact:
+    payload = json.loads(artifact_path(package, kind, registry).read_text(encoding="utf-8"))
     if not isinstance(payload, dict):
         raise RuntimeError(f"{kind.title()} artifact must contain an object")
     if (
-        payload.get("contract") != f"meowdiobooks.{kind}.v2"
+        payload.get("contract") != registry.spec(kind).contract
         or payload.get("kind") != kind
         or not payload.get("revision")
     ):
@@ -103,13 +104,14 @@ def write_artifact(
     payload: Mapping[str, object],
     *,
     publish: bool = True,
+    registry: ArtifactRegistry = PUBLIC_ARTIFACTS,
 ) -> tuple[Path, Artifact]:
     """Write one immutable revision and optionally atomically make it active."""
-    _validate_kind(kind)
+    _validate_kind(kind, registry)
     revision = str(payload.get("revision") or uuid4().hex)
     artifact = {
         **payload,
-        "contract": f"meowdiobooks.{kind}.v2",
+        "contract": registry.spec(kind).contract,
         "kind": kind,
         "revision": revision,
     }
@@ -121,28 +123,35 @@ def write_artifact(
     else:
         write_json(path, artifact)
     if publish:
-        publish_artifact(package, kind, path)
+        publish_artifact(package, kind, path, registry)
     return path, cast(Artifact, artifact)
 
 
-def publish_artifact(package: Path, kind: str, path: Path) -> None:
-    _validate_kind(kind)
+def publish_artifact(
+    package: Path,
+    kind: str,
+    path: Path,
+    registry: ArtifactRegistry = PUBLIC_ARTIFACTS,
+) -> None:
+    _validate_kind(kind, registry)
     if not path.is_file():
         raise ValueError(f"Cannot publish missing {kind} artifact: {path}")
-    active = active_artifacts(package)
+    active = active_artifacts(package, registry)
     active[kind] = str(path)
     write_json(package / "artifacts" / "latest.json", active)
 
 
-def artifact_history(package: Path, kind: str) -> list[Artifact]:
-    _validate_kind(kind)
+def artifact_history(
+    package: Path, kind: str, registry: ArtifactRegistry = PUBLIC_ARTIFACTS
+) -> list[Artifact]:
+    _validate_kind(kind, registry)
     directory = package / "artifacts" / kind
     rows: list[Artifact] = []
     for path in sorted(directory.glob("*.json"), key=lambda item: (item.stat().st_mtime_ns, item.name)):
         payload = json.loads(path.read_text(encoding="utf-8"))
         if (
             isinstance(payload, dict)
-            and payload.get("contract") == f"meowdiobooks.{kind}.v2"
+            and payload.get("contract") == registry.spec(kind).contract
             and payload.get("kind") == kind
             and payload.get("revision")
         ):
@@ -150,6 +159,5 @@ def artifact_history(package: Path, kind: str) -> list[Artifact]:
     return rows
 
 
-def _validate_kind(kind: str) -> None:
-    if kind not in ARTIFACT_KINDS:
-        raise ValueError(f"Unsupported artifact kind: {kind}")
+def _validate_kind(kind: str, registry: ArtifactRegistry = PUBLIC_ARTIFACTS) -> None:
+    registry.spec(kind)
