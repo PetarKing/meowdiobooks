@@ -2313,8 +2313,8 @@ def _matching_failed_generation_job(
         row
         for row in rows
         if row.kind == kind
-        and row.status == JobStatus.FAILED
         and {key: value for key, value in row.payload.items() if key != "_job_id"}
         == expected
     ]
-    return max(candidates, key=lambda row: row.created_at, default=None)
+    latest = max(candidates, key=lambda row: row.created_at, default=None)
+    return latest if latest and latest.status == JobStatus.FAILED else None

@@ -2,7 +2,7 @@ from meowdiobooks.backend.app_v2 import _matching_failed_generation_job
 from meowdiobooks.backend.models import Job, JobStatus
 
 
-def test_same_input_generate_click_reuses_latest_failed_job() -> None:
+def test_success_after_same_input_failure_starts_regeneration() -> None:
     payload = {
         "book_id": "book-1",
         "chapter_ids": ["chapter-1"],
@@ -35,8 +35,25 @@ def test_same_input_generate_click_reuses_latest_failed_job() -> None:
         _matching_failed_generation_job(
             [different_inputs, succeeded, resumable], "v2:generate", payload
         )
-        == resumable
+        is None
     )
+
+
+def test_latest_same_input_failure_is_resumable() -> None:
+    payload = {
+        "book_id": "book-1",
+        "chapter_ids": ["chapter-1"],
+        "language": "english",
+        "workflow_version": "2.0",
+    }
+    failed = Job(
+        id="attempt-2",
+        kind="v2:generate",
+        payload=payload,
+        status=JobStatus.FAILED,
+    )
+
+    assert _matching_failed_generation_job([failed], "v2:generate", payload) == failed
 
 
 def test_changed_generate_inputs_create_a_new_attempt() -> None:
