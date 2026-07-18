@@ -1,7 +1,7 @@
 {
   "name": "meowdiobooks-workflow-ui",
   "private": true,
-  "version": "0.1.2",
+  "version": "0.1.3",
   "type": "module",
   "files": [
     "src",
@@ -13,6 +13,7 @@
     ".": "./src/App.tsx",
     "./api": "./src/api/client.ts",
     "./contracts": "./src/api/contracts.ts",
+    "./i18n": "./src/i18n.ts",
     "./workflow": "./src/workflow/navigation.ts",
     "./styles.css": "./src/styles.css",
     "./media.css": "./src/media.css"

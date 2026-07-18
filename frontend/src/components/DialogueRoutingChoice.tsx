@@ -45,7 +45,7 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
       <header className="dialogue-routing-heading">
         <span className="eyebrow">{t("A lot to review")}</span>
         <h2 id="dialogue-routing-title">{t("{{count}} dialogue lines need a speaker check", { count: routing.targetCount.toLocaleString() })}</h2>
-        <p>{t("Choose between keeping every passage on this computer or using a stronger remote model to reduce manual review.")}</p>
+        <p>{t("dialogue.routingDescription", { ns: "edition" })}</p>
       </header>
 
       <div className="dialogue-routing-options">
@@ -53,11 +53,11 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
           <button type="button" className="dialogue-route-select" aria-pressed={selected === "local"} onClick={() => setSelected("local")}>
             <span className="dialogue-route-head">
               <span className="dialogue-route-icon"><LocalIcon /></span>
-              <span><b>{routing.local.displayName}</b><small>{t("Runs on this computer")}</small></span>
+              <span><b>{routing.local.displayName}</b><small>{t("dialogue.localRuntime", { ns: "edition" })}</small></span>
             </span>
             <strong className="dialogue-route-price">{money(routing.local.apiCostUsd)}</strong>
             <span className="dialogue-route-section good"><b>{t("Benefits")}</b><ul>
-              <Benefit>{t("Everything stays local")}</Benefit>
+              <Benefit>{t("dialogue.localBenefit", { ns: "edition" })}</Benefit>
               <Benefit>{t("Free to run")}</Benefit>
             </ul></span>
             <span className="dialogue-route-section caution"><b>{t("Trade-offs")}</b><ul>
@@ -83,8 +83,8 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
               <Benefit>{t("Likely much faster for a long book")}</Benefit>
             </ul></span>
             <span className="dialogue-route-section caution"><b>{t("Trade-offs")}</b><ul>
-              <Tradeoff>{t("Privacy depends on your API provider and setup")}</Tradeoff>
-              <Tradeoff>{t("Your API provider charges the estimated cost above")}</Tradeoff>
+              <Tradeoff>{t("dialogue.remotePrivacyTradeoff", { ns: "edition" })}</Tradeoff>
+              <Tradeoff>{t("dialogue.remoteBillingTradeoff", { ns: "edition" })}</Tradeoff>
             </ul></span>
           </button>
           {selected === "remote" && remote?.credentialConfigured && <button type="button" className="dialogue-route-proceed remote" onClick={() => onChoose("remote")}>
@@ -93,7 +93,7 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
         </article>
       </div>
 
-      <p className="dialogue-routing-privacy">{t("Only selected source passages are sent remotely. Audio, voices, and other books stay local.")}</p>
+      <p className="dialogue-routing-privacy">{t("dialogue.routingPrivacyNote", { ns: "edition" })}</p>
     </section>
   </div>;
 }

@@ -154,6 +154,23 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Down the Rabbit-Hole · The Pool of Tears + 2 more')).not.toBeInTheDocument()
   })
 
+  it('lets a composed edition replace local Library actions', async () => {
+    vi.mocked(wizardApi.listLibrary).mockResolvedValue([{
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'Alice.m4b',
+      location: '/library/Alice.m4b', chapterCount: 12, partial: false,
+      sizeBytes: 12 * 1024 * 1024, createdAt: '2026-07-13T14:00:00Z',
+    }])
+    const renderLibraryActions = vi.fn(() => <button>Download M4B</button>)
+    render(<App renderLibraryActions={renderLibraryActions} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+
+    expect(await screen.findByRole('button', { name: 'Download M4B' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Open audiobook' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show in Finder' })).not.toBeInTheDocument()
+    expect(renderLibraryActions).toHaveBeenCalledWith(expect.objectContaining({ id: 'export-1', bookId: 'book-1' }))
+  })
+
   it('restores top-level product URLs and uses a skeleton only for a cold Library load', async () => {
     let resolveLibrary!: (value: Awaited<ReturnType<typeof wizardApi.listLibrary>>) => void
     vi.mocked(wizardApi.listLibrary).mockImplementation(() => new Promise((resolve) => { resolveLibrary = resolve }))
@@ -676,6 +693,23 @@ describe('v2 wizard', () => {
     expect(document.querySelectorAll('.accepted-summary > span')).toHaveLength(4)
   })
 
+  it('lets a hosted composition hide supplier cost receipts', async () => {
+    await open({
+      ...base,
+      dialogue: {
+        ...base.dialogue!,
+        remoteUsage: {
+          inputTokens: 1200, cachedInputTokens: 200, outputTokens: 80,
+          estimatedCostUsd: 0.42, modelProfile: 'luna-dialogue',
+          modelDisplayName: 'Luna', providerModels: ['gpt-5.6-luna'],
+        },
+      },
+    }, undefined, undefined, undefined, { capabilities: { showProviderCostReceipts: false } })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
+
+    expect(screen.queryByText('Luna · ≈$0.42 API')).not.toBeInTheDocument()
+  })
+
   it('refreshes routing before rebuilding a completed transcript and shows the route choice', async () => {
     await open(base)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
@@ -1078,6 +1112,37 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Proceed with Qwen' }))
 
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'dialogue', expect.objectContaining({ attributionRoute: 'local' })))
+  })
+
+  it('uses the configured remote route without exposing local choices in a hosted composition', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract'] as WizardStage[] },
+      dialogue: {
+        ...base.dialogue!,
+        routing: {
+          targetCount: 938, largeReviewThreshold: 100, shouldPrompt: true, defaultRoute: 'remote',
+          local: { displayName: 'Qwen', apiCostUsd: 0 },
+          remote: {
+            displayName: 'Luna', domain: 'api.openai.com', credentialConfigured: true,
+            apiKeyEnvironmentVariable: 'OPENAI_API_KEY', estimatedCostUsd: .68,
+          },
+        },
+      },
+    }
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'job-dialogue', status: 'succeeded', result: { revision: 'dialogue-candidate' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'dialogue-candidate', resultSummary: {}, spans: [] })
+
+    await open(snapshot, undefined, undefined, undefined, { capabilities: {
+      localDialogueAttribution: false,
+      showExecutionBadge: false,
+      showProviderCostReceipts: false,
+    } })
+    expect(screen.queryByText('Local-first')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
+
+    expect(screen.queryByRole('dialog', { name: '938 dialogue lines need a speaker check' })).not.toBeInTheDocument()
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'dialogue', expect.objectContaining({ attributionRoute: 'remote' })))
   })
 
   it('shows every AI-processed dialogue span without mixing in regex-owned turns', async () => {

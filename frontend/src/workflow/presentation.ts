@@ -14,13 +14,30 @@ export function monogram(title: string) {
 
 export function message(reason: unknown) {
   const raw = reason instanceof Error ? reason.message : "";
-  if (/model.+not installed/i.test(raw)) return "The required local AI is not available. Check Setup, then try again.";
+  if (/model.+not installed/i.test(raw)) return "errors.aiUnavailable";
+  if (/Wait for this book's processing to finish/i.test(raw)) return "errors.bookProcessingActive";
+  if (/Could not remove this book's working files/i.test(raw)) return "errors.deleteWorkingData";
   if (/No voice auditions could be created/i.test(raw)) return "No voice auditions could be created. Try again; your accepted choices are unchanged.";
   if (/API \d+|llama-server|\bQwen\b|\bJSON\b|characterId|render[- ]plan|superseded inputs/i.test(raw)) return "Something went wrong while completing this step. Try again; your accepted work is unchanged.";
   return raw || "Something went wrong. Try again; your accepted work is unchanged.";
 }
 
+const editionErrorKeys = new Set([
+  "errors.aiUnavailable",
+  "errors.bookProcessingActive",
+  "errors.deleteWorkingData",
+]);
+
+export function localizeErrorMessage(value: string, t: TFunction) {
+  return editionErrorKeys.has(value)
+    ? t(value, { ns: "edition" })
+    : t(value, { defaultValue: value });
+}
+
 export function localizeProcessMessage(value: string, t: TFunction) {
+  if (value === "Preparing the remote speaker check") {
+    return t("dialogue.preparingSpeakerCheck", { ns: "edition" });
+  }
   const direct = t(value, { defaultValue: value });
   if (direct !== value) return direct;
   const patterns: Array<[RegExp, string, string[]]> = [

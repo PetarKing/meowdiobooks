@@ -48,13 +48,22 @@ release. It composes around these public seams:
 - typed workflow commands and `WorkflowRunner`;
 - `BookWorkspace` and immutable artifact contracts;
 - narrow runtime-provider protocols;
-- the frontend `WorkflowGateway` and the public workflow UI source.
+- the frontend `WorkflowGateway` and the public workflow UI source;
+- typed UI capabilities and render hooks for behavior that differs by composition;
+- the `edition` i18next namespace, whose semantic keys let a companion register complete per-locale
+  copy overrides without copying the shared UI or replacing ordinary workflow translations.
 
 The companion starts with the public workflow and journey definitions, then explicitly inserts,
 removes, groups, or replaces stages and handlers. A replacement that preserves its public output
 artifact may keep public downstream consumers; an incompatible artifact requires an adapter or private
 replacement of those consumers. Account, billing, tenant, object-storage, and queue identifiers never
 belong in public artifact JSON.
+
+Edition translations change presentation only. They must not be used to disguise an unavailable
+capability: filesystem actions, provider routes, and supplier-cost visibility remain explicit typed
+composition choices. Every edition bundle must implement the complete key contract for every supported
+locale so a hosted locale can fall back only to its own truthful English copy, never to local-product
+claims.
 
 The current release intentionally does not add hosted services. Reusable Python and React modules are
 workspace implementation details of the complete local application; when a companion integration is

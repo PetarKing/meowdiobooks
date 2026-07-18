@@ -917,7 +917,7 @@ def create_app_v2(
         if active_jobs:
             raise HTTPException(
                 status_code=409,
-                detail="Wait for this book's local processing to finish or cancel it before deleting.",
+                detail="Wait for this book's processing to finish or cancel it before deleting.",
             )
         package = package_for(book_id)
         try:
@@ -926,7 +926,7 @@ def create_app_v2(
         except OSError as error:
             raise HTTPException(
                 status_code=500,
-                detail="Could not remove this book's local working files.",
+                detail="Could not remove this book's working files.",
             ) from error
         jobs.delete_where(lambda row: row.payload.get("book_id") == book_id)
         books.delete(book_id)

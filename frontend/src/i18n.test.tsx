@@ -1,10 +1,17 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { LanguageToggle } from "./components/LanguageToggle";
-import i18n, { changeAppLocale, localePreferenceKey, normalizeAppLocale } from "./i18n";
+import i18n, {
+  changeAppLocale,
+  localePreferenceKey,
+  normalizeAppLocale,
+  publicEditionTranslations,
+  registerEditionTranslations,
+} from "./i18n";
 
 describe("interface localization", () => {
   afterEach(async () => {
+    registerEditionTranslations(publicEditionTranslations);
     localStorage.clear();
     await changeAppLocale("en");
     localStorage.clear();
@@ -33,5 +40,17 @@ describe("interface localization", () => {
     await waitFor(() => expect(document.documentElement.lang).toBe("zh-CN"));
     expect(screen.getByRole("group", { name: "界面语言" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "切换界面为简体中文" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("overrides only the edition namespace for every supported locale", async () => {
+    registerEditionTranslations({
+      en: { ...publicEditionTranslations.en, "processing.contextLabel": "Working in hosted English" },
+      "zh-CN": { ...publicEditionTranslations["zh-CN"], "processing.contextLabel": "正在使用托管中文" },
+    });
+
+    expect(i18n.t("processing.contextLabel", { ns: "edition" })).toBe("Working in hosted English");
+    await changeAppLocale("zh-CN");
+    expect(i18n.t("processing.contextLabel", { ns: "edition" })).toBe("正在使用托管中文");
+    expect(i18n.t("Create")).toBe("制作");
   });
 });
