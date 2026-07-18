@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
@@ -10,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next";
 import type { CastArtifact, CastDossier, CastProposal } from "../api/contracts";
 import { strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
+import "./CastIdentityReview.css";
 
 interface CastGroup {
   key: string;
@@ -40,6 +42,9 @@ interface Props {
 }
 
 const NARRATOR_KEY = "narrator";
+const DRAG_SCROLL_EDGE_PX = 96;
+const DRAG_SCROLL_MIN_PX_PER_SECOND = 160;
+const DRAG_SCROLL_MAX_PX_PER_SECOND = 1050;
 const flags: Record<string, string> = {
   english: "🇬🇧", chinese: "🇨🇳", german: "🇩🇪", italian: "🇮🇹", portuguese: "🇵🇹",
   spanish: "🇪🇸", japanese: "🇯🇵", korean: "🇰🇷", french: "🇫🇷", russian: "🇷🇺",
@@ -131,6 +136,83 @@ function exampleLine(dossier?: CastDossier) {
   return row?.sourceText ?? row?.source ?? row?.text ?? "No source line available";
 }
 
+function useDragAutoScroll(active: boolean) {
+  const [direction, setDirection] = useState<"up" | "down">();
+  const speedRef = useRef(0);
+  const frameRef = useRef<number | undefined>(undefined);
+  const previousFrameTimeRef = useRef<number | undefined>(undefined);
+
+  const scrollFrame = useCallback((timestamp: number) => {
+    const previousTimestamp = previousFrameTimeRef.current;
+    previousFrameTimeRef.current = timestamp;
+    if (previousTimestamp !== undefined) {
+      const elapsedSeconds = Math.min(timestamp - previousTimestamp, 50) / 1000;
+      window.scrollBy({ top: speedRef.current * elapsedSeconds, behavior: "auto" });
+    }
+    frameRef.current = window.requestAnimationFrame(scrollFrame);
+  }, []);
+
+  const stop = useCallback(() => {
+    if (frameRef.current !== undefined) window.cancelAnimationFrame(frameRef.current);
+    frameRef.current = undefined;
+    previousFrameTimeRef.current = undefined;
+    speedRef.current = 0;
+    setDirection(undefined);
+  }, []);
+
+  const updatePointer = useCallback((clientY: number) => {
+    if (!active) return;
+    const viewportHeight = window.innerHeight;
+    const topbarBottom = Math.max(
+      document.querySelector<HTMLElement>(".topbar")?.getBoundingClientRect().bottom ?? 0,
+      0,
+    );
+    const topBoundary = Math.min(topbarBottom + DRAG_SCROLL_EDGE_PX, viewportHeight / 2);
+    const bottomBoundary = Math.max(viewportHeight - DRAG_SCROLL_EDGE_PX, viewportHeight / 2);
+    let nextDirection: "up" | "down" | undefined;
+    let strength = 0;
+
+    if (clientY < topBoundary) {
+      nextDirection = "up";
+      strength = clientY <= topbarBottom
+        ? 1
+        : (topBoundary - clientY) / Math.max(topBoundary - topbarBottom, 1);
+    } else if (clientY > bottomBoundary) {
+      nextDirection = "down";
+      strength = (clientY - bottomBoundary) / Math.max(viewportHeight - bottomBoundary, 1);
+    }
+
+    if (!nextDirection) {
+      stop();
+      return;
+    }
+
+    const progressiveSpeed = DRAG_SCROLL_MIN_PX_PER_SECOND
+      + (DRAG_SCROLL_MAX_PX_PER_SECOND - DRAG_SCROLL_MIN_PX_PER_SECOND)
+        * Math.min(Math.max(strength, 0), 1) ** 2;
+    speedRef.current = nextDirection === "up" ? -progressiveSpeed : progressiveSpeed;
+    setDirection(nextDirection);
+    if (frameRef.current === undefined) {
+      frameRef.current = window.requestAnimationFrame(scrollFrame);
+    }
+  }, [active, scrollFrame, stop]);
+
+  useEffect(() => {
+    if (!active) {
+      stop();
+      return;
+    }
+    const trackPointer = (event: globalThis.DragEvent) => updatePointer(event.clientY);
+    window.addEventListener("dragover", trackPointer);
+    return () => {
+      window.removeEventListener("dragover", trackPointer);
+      stop();
+    };
+  }, [active, stop, updatePointer]);
+
+  return { direction, stop, updatePointer };
+}
+
 export function CastIdentityReview({
   cast, decisions, setDecisions, resolvedLabels, setResolvedLabels, voiceModels, voiceModel,
   language, onVoiceModelChange, onLanguageChange, onReclassify,
@@ -150,10 +232,17 @@ export function CastIdentityReview({
   const [draggedGroupKey, setDraggedGroupKey] = useState<string>();
   const [dropTargetKey, setDropTargetKey] = useState<string>();
   const [mergeSuccessKey, setMergeSuccessKey] = useState<string>();
+  const [mergeUndo, setMergeUndo] = useState<{
+    message: string;
+    decisions: Record<string, IdentityDecision>;
+    resolvedLabels: string[];
+  }>();
   const closeTimer = useRef<number | undefined>(undefined);
   const mergeTimer = useRef<number | undefined>(undefined);
+  const undoTimer = useRef<number | undefined>(undefined);
   const focusAfterClose = useRef<string | undefined>(undefined);
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const dragAutoScroll = useDragAutoScroll(Boolean(draggedGroupKey));
   const inspectingNarrator = inspectorOpen && inspectedLabel === NARRATOR_KEY;
   const active = inspectorOpen && !inspectingNarrator
     ? groups.find((group) => group.labels.includes(inspectedLabel ?? ""))
@@ -166,6 +255,7 @@ export function CastIdentityReview({
   useEffect(() => () => {
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
     if (mergeTimer.current !== undefined) window.clearTimeout(mergeTimer.current);
+    if (undoTimer.current !== undefined) window.clearTimeout(undoTimer.current);
   }, []);
 
   function finishInspectorClose() {
@@ -214,8 +304,28 @@ export function CastIdentityReview({
     mergeTimer.current = window.setTimeout(() => setMergeSuccessKey(undefined), 620);
   }
 
+  function offerMergeUndo(source: string, target: string) {
+    setMergeUndo({
+      message: t("Merged {{source}} into {{target}}.", { source, target }),
+      decisions,
+      resolvedLabels,
+    });
+    if (undoTimer.current !== undefined) window.clearTimeout(undoTimer.current);
+    undoTimer.current = window.setTimeout(() => setMergeUndo(undefined), 6000);
+  }
+
+  function undoLastMerge() {
+    if (!mergeUndo) return;
+    setDecisions(mergeUndo.decisions);
+    setResolvedLabels(mergeUndo.resolvedLabels);
+    setMergeUndo(undefined);
+    if (undoTimer.current !== undefined) window.clearTimeout(undoTimer.current);
+    undoTimer.current = undefined;
+  }
+
   function mergeGroup(source: CastGroup, target: CastGroup) {
     if (source.key === target.key) return;
+    offerMergeUndo(source.name, target.name);
     updateLabels(source.labels, (decision) => ({
       ...decision,
       category: target.category,
@@ -228,6 +338,7 @@ export function CastIdentityReview({
   }
 
   function assignGroupToNarrator(source: CastGroup) {
+    offerMergeUndo(source.name, t("Narrator"));
     updateLabels(source.labels, (decision) => ({
       ...decision,
       category: NARRATOR_KEY,
@@ -318,6 +429,7 @@ export function CastIdentityReview({
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", group.key);
     setDraggedGroupKey(group.key);
+    dragAutoScroll.updatePointer(event.clientY);
   }
 
   function dragOver(event: DragEvent<HTMLButtonElement>, key: string) {
@@ -338,6 +450,7 @@ export function CastIdentityReview({
     }
     setDraggedGroupKey(undefined);
     setDropTargetKey(undefined);
+    dragAutoScroll.stop();
   }
 
   const outsideLabels = active
@@ -393,7 +506,7 @@ export function CastIdentityReview({
         className={`cast-tile ${group.needsReview ? "needs-review" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
         onClick={() => openInspector(group.primaryLabel)}
         onDragStart={(event) => startDrag(event, group)}
-        onDragEnd={() => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); }}
+        onDragEnd={() => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }}
         onDragOver={(event) => dragOver(event, group.key)}
         onDragLeave={() => setDropTargetKey(undefined)}
         onDrop={(event) => dropOn(event, group)}
@@ -404,6 +517,9 @@ export function CastIdentityReview({
         <small>{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</small>
       </button>; })}
     </section>
+
+    {dragAutoScroll.direction && <div className={`cast-drag-scroll-cue ${dragAutoScroll.direction}`} aria-hidden="true"><span>{dragAutoScroll.direction === "up" ? `↑ ${t("Scroll up")}` : `↓ ${t("Scroll down")}`}</span></div>}
+    {mergeUndo && <div className="cast-merge-undo" role="status"><span>{mergeUndo.message}</span><button type="button" onClick={undoLastMerge}>{t("Undo")}</button></div>}
 
     {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
