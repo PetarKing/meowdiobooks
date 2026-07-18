@@ -10,7 +10,7 @@ import subprocess
 import tempfile
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -126,7 +126,7 @@ from .recording_script import (
     recording_script_matches,
     split_recording_script_chapter,
 )
-from .storage import JsonStore
+from .storage import JsonStore, ModelStore
 from .tts_v2 import render_plan_audio
 from .transcription import transcribe_voice_sample
 from .workflow.commands import (
@@ -230,6 +230,9 @@ def create_app_v2(
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
+    store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
+    on_book_imported: Callable[[Book, Path], None] | None = None,
+    on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
 ) -> FastAPI:
     """Create the v2 API with explicit provider seams for local or hosted composition."""
 
@@ -242,9 +245,20 @@ def create_app_v2(
     voice_languages = voice_languages or supported_voice_languages
     voice_models = voice_models or voice_model_capabilities
     default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
-    books = JsonStore(root / "books.json", Book)
-    jobs = JsonStore(root / "jobs.json", Job)
-    library = JsonStore(root / "library.json", LibraryExport)
+    books = cast(
+        ModelStore[Book],
+        store_factory("books", Book) if store_factory else JsonStore(root / "books.json", Book),
+    )
+    jobs = cast(
+        ModelStore[Job],
+        store_factory("jobs", Job) if store_factory else JsonStore(root / "jobs.json", Job),
+    )
+    library = cast(
+        ModelStore[LibraryExport],
+        store_factory("library", LibraryExport)
+        if store_factory
+        else JsonStore(root / "library.json", LibraryExport),
+    )
     library_root = Path(library_dir) if library_dir is not None else root / "library"
     library_cover_root = root / "library-covers"
     queue = JobQueue(
@@ -821,6 +835,8 @@ def create_app_v2(
                 )
             ],
         )
+        if on_book_imported is not None:
+            on_book_imported(book, target)
         books.put(book)
         return {
             "book": {
@@ -1244,6 +1260,8 @@ def create_app_v2(
             shutil.copy2(cover, temporary_cover)
             os.replace(temporary_destination, destination)
             os.replace(temporary_cover, cover_destination)
+            if on_library_exported is not None:
+                on_library_exported(item, destination, cover_destination)
             library.put(item)
         except (OSError, RuntimeError) as error:
             temporary_destination.unlink(missing_ok=True)

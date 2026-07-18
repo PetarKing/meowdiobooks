@@ -6,11 +6,23 @@ import tempfile
 import threading
 from pathlib import Path
 from collections.abc import Callable
-from typing import Generic, TypeVar
+from typing import Generic, Protocol, TypeVar
 
 from pydantic import BaseModel
 
 T = TypeVar("T", bound=BaseModel)
+
+
+class ModelStore(Protocol[T]):
+    """Persistence contract shared by local JSON and hosted database adapters."""
+
+    def all(self) -> list[T]: ...
+    def get(self, item_id: str) -> T | None: ...
+    def put(self, item: T) -> T: ...
+    def put_many(self, values: list[T]) -> list[T]: ...
+    def update(self, item_id: str, change: Callable[[T], T]) -> T | None: ...
+    def delete(self, item_id: str) -> T | None: ...
+    def delete_where(self, predicate: Callable[[T], bool]) -> list[T]: ...
 
 
 class JsonStore(Generic[T]):
