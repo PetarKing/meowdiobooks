@@ -484,7 +484,7 @@ export function CastVoiceReview({
               </button>
             </div></>}
             {auditionSource === "sample" && onUpload && <div className="voice-sample-panel">
-              <div><b>{t("Generate this line in the sampled voice")}</b><p>{t("Choose a clear 3–30 second WAV, MP3, or FLAC clip of one speaker. We’ll draft the words locally; replay the sample and correct every word before generating.")}</p></div>
+              <div><b>{t("Generate this line in the sampled voice")}</b><p>{t("voiceSample.help", { ns: "edition" })}</p></div>
               {!sampleFile && <label className={`voice-sample-upload ${uploadingCharacterId === inspected.characterId ? "busy" : ""}`}>
                 <input
                   type="file"
@@ -502,13 +502,13 @@ export function CastVoiceReview({
               </label>}
               {sampleFile && samplePreviewUrl && <div className="voice-sample-preview">
                 <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}>{samplePlaying ? "Ⅱ" : "▶"}</button>
-                <span className="voice-sample-preview-copy"><b title={sampleFile.name}>{sampleFile.name}</b><small>{sampleTranscription === "transcribing" ? t("Drafting transcript locally…") : t("Play while checking the transcript below.")}</small></span>
+                <span className="voice-sample-preview-copy"><b title={sampleFile.name}>{sampleFile.name}</b><small>{sampleTranscription === "transcribing" ? t("voiceSample.draftingShort", { ns: "edition" }) : t("Play while checking the transcript below.")}</small></span>
                 <span className="voice-sample-time">{audioTime(sampleElapsed)} / {audioTime(sampleDuration)}</span>
                 <label className="voice-sample-replace"><input type="file" aria-label={t("Choose a different sample")} accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" disabled={uploadingCharacterId === inspected.characterId} onChange={(event) => { const sample = event.target.files?.[0]; event.target.value = ""; if (sample) void chooseSample(sample); }} /><span>{t("Replace")}</span></label>
                 <audio ref={sampleAudioRef} aria-label={t("Selected voice sample preview")} preload="metadata" src={samplePreviewUrl} onLoadedMetadata={(event) => setSampleDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setSampleElapsed(event.currentTarget.currentTime)} onPause={() => setSamplePlaying(false)} onEnded={() => { setSamplePlaying(false); setSampleElapsed(sampleDuration); }} />
               </div>}
               <label className="voice-sample-transcript"><span>{t("What is said in the sample?")}</span><textarea aria-label={t("Voice sample transcript")} disabled={!sampleFile || sampleTranscription === "transcribing"} maxLength={sampleTranscriptLimit} rows={4} placeholder={t(!sampleFile ? "Choose a sample to draft its words…" : sampleTranscription === "transcribing" ? "Listening and drafting…" : "Type the sample’s exact spoken words…")} value={sampleTranscript} onChange={(event) => setSampleTranscript(event.target.value)} /><small>{sampleTranscript.length}/{sampleTranscriptLimit}</small></label>
-              {sampleFile && <p className={`voice-transcript-status ${sampleTranscription}`} aria-live="polite">{sampleTranscription === "transcribing" ? t("Detecting the language and drafting the transcript locally…") : sampleTranscription === "ready" ? t(sampleLanguage ? "Drafted in {{language}}. Check every word before continuing." : "Draft ready. Check every word before continuing.", { language: sampleLanguage }) : sampleTranscription === "failed" ? t("A draft could not be made. Type the exact words manually.") : t("Type the exact words spoken in the sample.")}</p>}
+              {sampleFile && <p className={`voice-transcript-status ${sampleTranscription}`} aria-live="polite">{sampleTranscription === "transcribing" ? t("voiceSample.draftingStatus", { ns: "edition" }) : sampleTranscription === "ready" ? t(sampleLanguage ? "Drafted in {{language}}. Check every word before continuing." : "Draft ready. Check every word before continuing.", { language: sampleLanguage }) : sampleTranscription === "failed" ? t("A draft could not be made. Type the exact words manually.") : t("Type the exact words spoken in the sample.")}</p>}
               <button
                 type="button"
                 className="primary voice-sample-submit"

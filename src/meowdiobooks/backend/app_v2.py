@@ -8,9 +8,10 @@ import os
 import shutil
 import subprocess
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, Callable, cast
+from typing import Any, Callable, Mapping, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
@@ -166,6 +167,30 @@ def _run_enrichment_qwen(
 ) -> dict[str, Any]:
     """Run bounded decorator windows and return one mechanically complete result."""
 
+    with qwen_server(repo_root) as base:
+        return run_enrichment_with_completion(
+            turns,
+            plan,
+            lambda system, prompt, max_tokens: complete_json(
+                base, system, prompt, max_tokens=max_tokens
+            ),
+            report,
+        )
+
+
+def run_enrichment_with_completion(
+    turns: list[dict[str, Any]],
+    plan: dict[str, Any],
+    complete: Callable[[str, str, int], object],
+    report,
+    *,
+    max_workers: int = 1,
+) -> dict[str, Any]:
+    """Run provider-neutral decorator windows through the shared enrichment contract."""
+
+    if max_workers < 1:
+        raise EnrichmentValidationError("Enrichment completion concurrency must be positive")
+
     by_id = {str(row["id"]): row for row in turns}
     state_rows: list[dict[str, Any]] = []
     range_rows: list[dict[str, Any]] = []
@@ -175,34 +200,42 @@ def _run_enrichment_qwen(
         "Return strict JSON with turnStates and rangeDecorators only. State must be one of: neutral, "
         "happy, sad, angry, afraid, surprised, disgusted, embarrassed, determined, confused, pained, tender."
     )
-    with qwen_server(repo_root) as base:
-        for index, window in enumerate(windows, 1):
-            owner_ids = [str(value) for value in window["ownerTurnIds"]]
-            payload = {
-                "options": plan["options"],
-                "ownerTurnIds": owner_ids,
-                "contextOnlyTurnIds": window["contextTurnIds"],
-                "turns": [by_id[str(value)] for value in window["inputTurnIds"]],
-                "output": {
-                    "turnStates": [{"turnId": "owner ID", "state": "allowed state"}],
-                    "rangeDecorators": [
-                        {
-                            "kind": "ambience|effect",
-                            "startTurnId": "owner ID",
-                            "endTurnId": "owner ID",
-                            "value": "brief descriptor",
-                        }
-                    ],
-                },
-            }
-            result = complete_json(
-                base, system, json.dumps(payload, ensure_ascii=False), max_tokens=5000
-            )
-            state_rows.extend(result.get("turnStates", []))
-            range_rows.extend(result.get("rangeDecorators", []))
-            report(
-                5 + index / max(len(windows), 1) * 90, f"Enriched window {index} of {len(windows)}"
-            )
+
+    def enrich(window: dict[str, Any]) -> Mapping[str, Any]:
+        owner_ids = [str(value) for value in window["ownerTurnIds"]]
+        payload = {
+            "options": plan["options"],
+            "ownerTurnIds": owner_ids,
+            "contextOnlyTurnIds": window["contextTurnIds"],
+            "turns": [by_id[str(value)] for value in window["inputTurnIds"]],
+            "output": {
+                "turnStates": [{"turnId": "owner ID", "state": "allowed state"}],
+                "rangeDecorators": [
+                    {
+                        "kind": "ambience|effect",
+                        "startTurnId": "owner ID",
+                        "endTurnId": "owner ID",
+                        "value": "brief descriptor",
+                    }
+                ],
+            },
+        }
+        result = complete(system, json.dumps(payload, ensure_ascii=False), 5000)
+        if not isinstance(result, Mapping):
+            raise EnrichmentValidationError("Enrichment completion must return one JSON object")
+        return result
+
+    if max_workers == 1:
+        completed = [enrich(window) for window in windows]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            completed = list(executor.map(enrich, windows))
+    for index, result in enumerate(completed, 1):
+        state_rows.extend(result.get("turnStates", []))
+        range_rows.extend(result.get("rangeDecorators", []))
+        report(
+            5 + index / max(len(windows), 1) * 90, f"Enriched window {index} of {len(windows)}"
+        )
     return {"turnStates": state_rows, "rangeDecorators": range_rows}
 
 
@@ -227,6 +260,7 @@ def create_app_v2(
     chapter_renderer: Callable[..., list[dict[str, Any]]] | None = None,
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
+    enricher: Callable[..., dict[str, Any]] | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
@@ -246,6 +280,7 @@ def create_app_v2(
     chapter_renderer = chapter_renderer or render_plan_audio
     cast_proposer = cast_proposer or propose_cast
     voice_profiler = voice_profiler or suggest_voice_settings
+    enricher = enricher or _run_enrichment_qwen
     voice_languages = voice_languages or supported_voice_languages
     voice_models = voice_models or voice_model_capabilities
     default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
@@ -646,7 +681,7 @@ def create_app_v2(
             )
             plan = plan_enrichment(turns, options)
             report(2, f"Enrichment will run {len(plan['windows'])} bounded windows")
-            output = _run_enrichment_qwen(repo_root, turns, plan, report)
+            output = enricher(repo_root, turns, plan, report)
             result = validate_enrichment_output(
                 turns,
                 plan,
@@ -882,7 +917,7 @@ def create_app_v2(
         if active_jobs:
             raise HTTPException(
                 status_code=409,
-                detail="Wait for this book's local processing to finish or cancel it before deleting.",
+                detail="Wait for this book's processing to finish or cancel it before deleting.",
             )
         package = package_for(book_id)
         try:
@@ -891,7 +926,7 @@ def create_app_v2(
         except OSError as error:
             raise HTTPException(
                 status_code=500,
-                detail="Could not remove this book's local working files.",
+                detail="Could not remove this book's working files.",
             ) from error
         jobs.delete_where(lambda row: row.payload.get("book_id") == book_id)
         books.delete(book_id)

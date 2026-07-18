@@ -1,5 +1,6 @@
 import pytest
 
+from meowdiobooks.backend.app_v2 import run_enrichment_with_completion
 from meowdiobooks.backend.decorators import (
     STATE_VALUES,
     EnrichmentOptions,
@@ -95,6 +96,40 @@ def test_plan_is_bounded_and_every_turn_has_one_owner():
     assert plan["workload"]["totalTurns"] == 7
     assert plan["workload"]["expectedTurnRows"] == 7
     assert plan["workload"]["estimatedSeconds"] > 0
+
+
+def test_provider_neutral_enrichment_completion_preserves_bounded_windows():
+    source = turns(4)
+    plan = plan_enrichment(
+        source,
+        EnrichmentOptions(max_output_rows=2, overlap_turns=1),
+    )
+    prompts = []
+
+    def complete(_system, prompt, max_tokens):
+        import json
+
+        prompts.append((prompt, max_tokens))
+        payload = json.loads(prompt)
+        return {
+            "turnStates": [
+                {"turnId": turn_id, "state": "neutral"}
+                for turn_id in payload["ownerTurnIds"]
+            ],
+            "rangeDecorators": [],
+        }
+
+    output = run_enrichment_with_completion(
+        source,
+        plan,
+        complete,
+        lambda *_args: None,
+        max_workers=2,
+    )
+
+    assert [row["turnId"] for row in output["turnStates"]] == ["t1", "t2", "t3", "t4"]
+    assert len(prompts) == len(plan["windows"])
+    assert all(max_tokens == 5000 for _prompt, max_tokens in prompts)
 
 
 def test_windows_never_cross_chapters():

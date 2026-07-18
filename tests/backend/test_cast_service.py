@@ -18,7 +18,9 @@ from meowdiobooks.backend.cast_service import (
     default_voice_settings,
     _validate_decision,
     propose_cast,
+    propose_cast_with_completion,
     suggest_voice_settings,
+    suggest_voice_settings_with_completion,
     validate_voice_settings,
 )
 
@@ -465,6 +467,67 @@ def test_propose_cast_calls_qwen_once_per_label_without_reconciliation(monkeypat
     assert "reconciliationPasses" not in result["processing"]
     assert progress[0] == (2, "Reviewing 2 character labels with AI")
     assert not any("Checking identity relationships" in (message or "") for _, message in progress)
+
+
+def test_provider_neutral_cast_completion_preserves_shared_merge_contract():
+    turns = [
+        {
+            "id": "s1",
+            "sourceSpeakerLabel": "Subaru",
+            "speakerStatus": "explicit",
+            "source": "Subaru: Run!",
+            "page": 1,
+        },
+        {
+            "id": "s2",
+            "sourceSpeakerLabel": "Subaro",
+            "speakerStatus": "explicit",
+            "source": "Subaro: Wait!",
+            "page": 2,
+        },
+    ]
+
+    def complete(_system, prompt, _max_tokens):
+        target = "Subaru" if "TARGET LABEL\nSubaru\n" in prompt else "Subaro"
+        return {
+            "speakerType": "one-person",
+            "sameIdentityAs": ["Subaro" if target == "Subaru" else "Subaru"],
+            "possiblySameIdentityAs": [],
+        }
+
+    result = propose_cast_with_completion(
+        turns,
+        complete,
+        model_name="Test remote model",
+        max_workers=2,
+    )
+
+    assert result["processing"]["model"] == "Test remote model"
+    assert {row["canonicalName"] for row in result["proposals"]} == {"Subaru"}
+
+
+def test_provider_neutral_voice_completion_preserves_shared_validation():
+    def complete(_system, _prompt, _max_tokens):
+        return {
+            "presentation": "unspecified",
+            "age": "unspecified",
+            "tone": "gentle",
+            "pitch": "unspecified",
+            "pace": "natural",
+            "energy": "balanced",
+            "accent": "unspecified",
+            "description": "Quiet and precise.",
+        }
+
+    profiles = suggest_voice_settings_with_completion(
+        [],
+        [],
+        [],
+        complete,
+        max_workers=2,
+    )
+
+    assert profiles["narrator"]["tone"] == "gentle"
 
 
 def test_cast_retries_relationship_outside_the_supplied_shortlist(monkeypatch):

@@ -436,7 +436,9 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
 .source-context-toggle:hover,.source-context-toggle[aria-expanded="true"] { border-color:#c9ab8f; background:#fff; color:var(--ink-soft); }
 .source-context-toggle span { font-size:13px; line-height:1; }
 .ai-source-evidence { margin-top:8px; font:13px/1.55 Georgia,serif; }.ai-source-evidence p { margin:0; color:var(--muted); white-space:pre-line; }.ai-source-evidence mark { display:inline; color:var(--ink); font-weight:700; white-space:pre-wrap; }.ai-source-evidence.expanded { padding:9px 10px; border-radius:8px; background:rgba(255,255,255,.56); }
-.dialogue-focused-outcome .ai-source-evidence:not(.expanded) p { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:4; }
+/* The compact evidence payload is already bounded. Never hide its edge beside the
+   highlighted source: clipping here creates a false, gap-free-looking adjacency. */
+.dialogue-focused-outcome .ai-source-evidence:not(.expanded) p { display:block; overflow:visible; }
 .ai-spoken-text { margin-top:8px; color:var(--muted); }
 .dialogue-change-choices { display:grid; gap:7px; margin-top:12px; padding-top:11px; border-top:1px solid rgba(171,126,41,.22); }.dialogue-change-choices > small { color:#8b651c; font-size:9px; font-weight:850; text-transform:uppercase; }.dialogue-change-choices > div { display:flex; flex-wrap:wrap; gap:7px; }.dialogue-change-choices button { display:inline-flex; align-items:center; gap:5px; padding:7px 10px; border:1px solid #c9add9; border-radius:99px; background:#fff; color:var(--plum); font-size:10px; font-weight:800; cursor:pointer; box-shadow:0 2px 8px rgba(85,55,98,.06); }.dialogue-change-choices button > span { color:#c9942f; font-size:12px; line-height:1; }.dialogue-change-choices button:hover { border-color:var(--plum); background:#f8f0fb; transform:translateY(-1px); }
 .dialogue-change-choices button[aria-pressed="true"] { border:2px solid var(--plum); padding:6px 9px; background:#f8f0fb; }

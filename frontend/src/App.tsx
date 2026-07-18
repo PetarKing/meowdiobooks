@@ -107,6 +107,7 @@ import {
   formatFileSize,
   formatLibraryChapters,
   formatLibraryDate,
+  localizeErrorMessage,
   localizeProcessMessage,
   message,
   monogram,
@@ -133,7 +134,21 @@ export interface AppProps {
   journey?: JourneyDefinition;
   stepOverrides?: Readonly<Record<JourneyStepId, ComponentType<WorkflowStepOverrideProps>>>;
   renderHeader?: (context: WorkflowHeaderContext) => ReactNode;
+  renderLibraryActions?: (item: LibraryExport) => ReactNode;
+  capabilities?: Partial<WorkflowCapabilities>;
 }
+
+export interface WorkflowCapabilities {
+  localDialogueAttribution: boolean;
+  showExecutionBadge: boolean;
+  showProviderCostReceipts: boolean;
+}
+
+const publicWorkflowCapabilities: WorkflowCapabilities = {
+  localDialogueAttribution: true,
+  showExecutionBadge: true,
+  showProviderCostReceipts: true,
+};
 
 export interface WorkflowStepOverrideProps {
   step: JourneyStep;
@@ -167,7 +182,10 @@ export default function App({
   journey = publicJourney,
   stepOverrides = {},
   renderHeader,
+  renderLibraryActions,
+  capabilities: capabilityOverrides = {},
 }: AppProps) {
+  const capabilities = { ...publicWorkflowCapabilities, ...capabilityOverrides };
   const wizardApi = gateway;
   const stages = journey.steps;
   const stageIndex = (stageId: JourneyStepId) => journey.indexOf(stageId);
@@ -464,7 +482,7 @@ export default function App({
     localStorage.setItem("meowdiobooks.activeJob", current.id);
     while (["queued", "running"].includes(current.status)) {
       setProgress(current.progress ?? 0);
-      setProcessMessage(current.message ?? "Working locally");
+      setProcessMessage(current.message ?? "");
       current = await gateway.getJob(current.id);
       setActiveJob(current);
       if (["queued", "running"].includes(current.status)) {
@@ -680,8 +698,13 @@ export default function App({
       setError("Speaker-check choices could not be loaded. Try again.");
       return;
     }
-    if (dialogueStrategy === "fill-gaps" && routing?.shouldPrompt && routing.remote) {
+    if (dialogueStrategy === "fill-gaps" && routing?.shouldPrompt && routing.remote && capabilities.localDialogueAttribution) {
       setDialogueRouteChoiceOpen(true);
+      return;
+    }
+    if (dialogueStrategy === "fill-gaps" && !capabilities.localDialogueAttribution) {
+      if (routing?.remote?.credentialConfigured) runDialogueTranscript("remote");
+      else setError("Speaker-check choices could not be loaded. Try again.");
       return;
     }
     const preferred = routing?.defaultRoute === "remote" && routing.remote?.credentialConfigured
@@ -750,7 +773,7 @@ export default function App({
         </nav>
         <div className="topbar-actions">
           <LanguageToggle />
-          <div className="local-pill"><i /> {t("Local-first")}</div>
+          {capabilities.showExecutionBadge && <div className="local-pill"><i /> {t("header.executionBadge", { ns: "edition" })}</div>}
         </div>
       </div>
     </header>}
@@ -764,13 +787,13 @@ export default function App({
         </figure>
       </aside>}
       <main className={!showWizard ? "home-main" : stage <= stageIndex("review") ? "review-wide" : ""}>
-        {error && <div className="error-note" role="alert">{t(error, { defaultValue: error })}</div>}
+        {error && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}</div>}
         {view}
       </main>
     </div>
     {dialogueRouteChoiceOpen && dialogue.routing && <DialogueRoutingChoice routing={dialogue.routing} onChoose={runDialogueTranscript} onClose={() => setDialogueRouteChoiceOpen(false)} />}
-    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition || enrichmentTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "Remote processing" : "Local processing")} aria-modal="true"><div className={`process-modal ${enrichmentTransition ? "enrichment-transition-modal" : ""} ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "Using remote API" : "Working locally")}</span><h2>{localizeProcessMessage(processMessage || "Preparing", t)}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition || enrichmentTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : enrichmentTransition ? t("Keeping your approved work intact and opening Generate…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{activeJob?.status === "queued" && !enrichmentTransition && !dialogueProcessing && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}</div></div>}
-    {uploadingCharacterId && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-clone-progress-title"><div className="process-modal"><span className="eyebrow">{t("Working locally")}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("Qwen is learning the speaker from your sample and performing the audition line. Keep Meowdiobooks open while it works.")}</p></div></div>}
+    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition || enrichmentTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} aria-modal="true"><div className={`process-modal ${enrichmentTransition ? "enrichment-transition-modal" : ""} ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition || enrichmentTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : enrichmentTransition ? t("Keeping your approved work intact and opening Generate…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{activeJob?.status === "queued" && !enrichmentTransition && !dialogueProcessing && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}</div></div>}
+    {uploadingCharacterId && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-clone-progress-title"><div className="process-modal"><span className="eyebrow">{t("processing.contextLabel", { ns: "edition" })}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("voiceClone.progressDescription", { ns: "edition" })}</p></div></div>}
     {generationInProgress && <div className="process-overlay generation-overlay" role="dialog" aria-modal="true" aria-labelledby="generation-progress-title">
       <div ref={generationModalRef} className="process-modal generation-modal" tabIndex={-1}>
         <span className="eyebrow">{t("Making your audiobook")}</span>
@@ -780,11 +803,11 @@ export default function App({
           <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} ready", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
           <div><dt>{t("Remaining")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
         </dl>
-        <p className="generation-modal-note">{t("Keep Meowdiobooks open while it works.")}</p>
+        <p className="generation-modal-note">{t("processing.keepOpenNotice", { ns: "edition" })}</p>
         {activeJob?.status === "queued" && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}
       </div>
     </div>}
-    {bookPendingDeletion && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-book-title"><div className="process-modal delete-book-modal"><span className="eyebrow">{t("Delete local working book")}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("This removes the imported PDF, extracted text, dialogue and cast decisions, generated chapter audio, and all processing checkpoints for this book. To work on it again, you’ll need to import the PDF and start processing from scratch.")}</p><p className="library-safe-note"><b>{t("Finished M4B audiobooks in Library stay exactly where they are.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></div></div>}
+    {bookPendingDeletion && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-book-title"><div className="process-modal delete-book-modal"><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished M4B audiobooks in Library stay exactly where they are.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></div></div>}
   </div>;
 
   function Home() {
@@ -794,10 +817,10 @@ export default function App({
       <section className="welcome-hero"><img src={heroArtwork} alt={t("A cozy cat sound engineer narrating an enchanted open book")} /><div className="welcome-copy"><span className="eyebrow">{t("Your audiobook studio")}</span><h1>{t("Every book has")}<br />{t("a voice inside.")}</h1><p>{t("Turn a PDF into an audiobook, with control at every step.")}</p></div></section>
       <div className="home-flow">
         <section className={`quick-import ${file ? "has-file" : ""}`} aria-labelledby="quick-import-title">
-          <div className="quick-import-copy"><span className="eyebrow">{t("New audiobook")}</span><h2 id="quick-import-title">{t(file ? "Ready to begin" : "Start another book")}</h2><p>{t(file ? "This PDF will stay local throughout processing." : "Add a PDF now; make the creative decisions step by step.")}</p></div>
+          <div className="quick-import-copy"><span className="eyebrow">{t("New audiobook")}</span><h2 id="quick-import-title">{t(file ? "Ready to begin" : "Start another book")}</h2><p>{file ? t("books.importStorageNotice", { ns: "edition" }) : t("Add a PDF now; make the creative decisions step by step.")}</p></div>
           {file ? <div className="quick-import-ready"><div className="file-receipt"><span className="recent-cover">PDF</span><span><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></span><button className="text-button" onClick={() => setFile(undefined)}>{t("Choose another")}</button></div><button className="primary" disabled={busy} onClick={() => void importBook()}>{t("Import PDF")} →</button></div> : <label className="quick-upload"><input type="file" accept=".pdf,application/pdf" onChange={(event) => setFile(event.target.files?.[0])} /><span className="quick-upload-icon" aria-hidden="true">↑</span><span><strong>{t("Choose PDF")}</strong><small>{t("PDF · up to 500 MB")}</small></span></label>}
         </section>
-        {localBooks.length > 0 && <section className="wip-shelf"><Panel eyebrow={t("Work in progress")} title={t("Your local books")} actions={<div className="local-assets-summary"><b>{localBooks.length === 1 ? t("1 book") : t("{{count}} books", { count: localBooks.length })}</b><span>{t("{{size}} used", { size: formatFileSize(totalAssetBytes) })}</span></div>}><div className="recent-books">{localBooks.map((row) => { const opening = openingBookId === row.id; return <article key={row.id}><button className="recent-book-open" disabled={Boolean(openingBookId) || Boolean(deletingBookId)} aria-busy={opening} onClick={() => void openBook(row)}><span className="recent-cover">{monogram(row.title)}</span><span><strong>{row.title}</strong><small>{t("{{count}} pages · {{size}}", { count: row.page_count ?? "?", size: formatFileSize(row.asset_size_bytes ?? 0) })}</small></span><b className={opening ? "book-loading" : undefined}>{opening && <i aria-hidden="true" />} {t(opening ? "Opening…" : "Continue")} {!opening && "→"}</b></button><button className="recent-book-delete" aria-label={t("Delete {{title}}", { title: row.title })} disabled={Boolean(openingBookId) || Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(row)}>{t("Delete")}</button></article>; })}</div></Panel></section>}
+        {localBooks.length > 0 && <section className="wip-shelf"><Panel eyebrow={t("Work in progress")} title={t("books.workingTitle", { ns: "edition" })} actions={<div className="local-assets-summary"><b>{localBooks.length === 1 ? t("1 book") : t("{{count}} books", { count: localBooks.length })}</b><span>{t("{{size}} used", { size: formatFileSize(totalAssetBytes) })}</span></div>}><div className="recent-books">{localBooks.map((row) => { const opening = openingBookId === row.id; return <article key={row.id}><button className="recent-book-open" disabled={Boolean(openingBookId) || Boolean(deletingBookId)} aria-busy={opening} onClick={() => void openBook(row)}><span className="recent-cover">{monogram(row.title)}</span><span><strong>{row.title}</strong><small>{t("{{count}} pages · {{size}}", { count: row.page_count ?? "?", size: formatFileSize(row.asset_size_bytes ?? 0) })}</small></span><b className={opening ? "book-loading" : undefined}>{opening && <i aria-hidden="true" />} {t(opening ? "Opening…" : "Continue")} {!opening && "→"}</b></button><button className="recent-book-delete" aria-label={t("Delete {{title}}", { title: row.title })} disabled={Boolean(openingBookId) || Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(row)}>{t("Delete")}</button></article>; })}</div></Panel></section>}
       </div>
     </>;
   }
@@ -805,14 +828,14 @@ export default function App({
   function LibraryView() {
     return <section className="library-page">
       <header className="library-head">
-        <div className="library-head-copy"><span className="eyebrow">{t("The story made it")}</span><h1>{t("Your audiobooks")}</h1><p>{t("Finished, chaptered, and tucked safely into your Music folder.")}</p></div>
+        <div className="library-head-copy"><span className="eyebrow">{t("The story made it")}</span><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
         <div className="library-finale" aria-hidden="true"><span className="library-finale-disc">♪</span><span className="library-finale-mark"><img src={brandMark} alt="" /></span></div>
         <span className="library-count">{!libraryReady ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>
       </header>
       {!libraryReady ? <LibrarySkeleton /> : libraryExports.length ? <div className="library-grid">{libraryExports.map((item) => <article key={item.id} className="library-book">
         <div className="library-cover"><span>{monogram(item.title)}</span><img src={`/api/library/${item.id}/cover`} alt={t("Cover of {{title}}", { title: item.title })} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /></div>
         <div className="library-book-copy"><h2>{item.title}</h2><p>{item.author}</p><div className="library-chapters"><b>{formatLibraryChapters(item, t)}</b></div><div className="library-meta"><span>{formatFileSize(item.sizeBytes)}</span><span>{formatLibraryDate(item.createdAt, uiLocale)}</span></div></div>
-        <div className="library-actions"><button className="primary" onClick={() => void openLibraryItem(item.id)}>{t("Open audiobook")}</button><button className="ghost" onClick={() => void revealLibraryItem(item.id)}>{t("Show in Finder")}</button></div>
+        <div className="library-actions">{renderLibraryActions ? renderLibraryActions(item) : <><button className="primary" onClick={() => void openLibraryItem(item.id)}>{t("library.openAction", { ns: "edition" })}</button><button className="ghost" onClick={() => void revealLibraryItem(item.id)}>{t("library.revealAction", { ns: "edition" })}</button></>}</div>
       </article>)}</div> : <div className="library-empty"><span aria-hidden="true">♪</span><h2>{t("No audiobooks yet.")}</h2><p>{t("Create an M4B in Export and it will appear here automatically.")}</p><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></div>}
     </section>;
   }
@@ -827,9 +850,9 @@ export default function App({
       <div className="coming-soon-copy">
         <span className="eyebrow">{t("Coming soon")}</span>
         <h1>{t("Your audiobook, ready to listen.")}</h1>
-        <p>{t("The Player will bring chapter playback, progress, and a focused listening view into Meowdiobooks—with a future path to open it securely on another device.")}</p>
+        <p>{t("player.description", { ns: "edition" })}</p>
         <div className="coming-soon-points">
-          {["A dedicated listening page", "Chapter navigation and progress", "Remote-device access after a secure connection design"].map((point) => <span key={point}>✓ {t(point)}</span>)}
+          <span>✓ {t("A dedicated listening page")}</span><span>✓ {t("Chapter navigation and progress")}</span><span>✓ {t("player.remoteAccessPoint", { ns: "edition" })}</span>
         </div>
         <button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button>
       </div>
@@ -860,7 +883,7 @@ export default function App({
     const resolvedConflictGroups = groupDialogueConflicts(dialogue.resolvedConflicts ?? []);
     const allConflictGroups = groupDialogueConflicts([...(dialogue.conflicts ?? []), ...(dialogue.resolvedConflicts ?? [])]);
     const result = dialogueCandidate ? candidateDialogue(dialogueCandidate, dialogue, dialogueStrategy) : undefined;
-    const remoteCostReceipt = dialogue.remoteUsage
+    const remoteCostReceipt = capabilities.showProviderCostReceipts && dialogue.remoteUsage
       ? `${dialogue.remoteUsage.modelDisplayName} · ≈${formatApiCost(dialogue.remoteUsage.estimatedCostUsd)} API`
       : undefined;
     const hasPreflightIssues = unresolvedStructuralIssues.length > 0 || unresolvedConflictGroups.length > 0;

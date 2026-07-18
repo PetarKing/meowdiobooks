@@ -1,5 +1,9 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
+import {
+  publicEditionTranslations,
+  type EditionTranslationResources,
+} from "./locales/edition";
 import zhCN from "./locales/zh-CN";
 
 export const localePreferenceKey = "meowdiobooks.locale";
@@ -34,9 +38,11 @@ void i18n
   .use(initReactI18next)
   .init({
     resources: {
-      en: { translation: {} },
-      "zh-CN": { translation: zhCN },
+      en: { translation: {}, edition: publicEditionTranslations.en },
+      "zh-CN": { translation: zhCN, edition: publicEditionTranslations["zh-CN"] },
     },
+    ns: ["translation", "edition"],
+    defaultNS: "translation",
     lng: preferredLocale(),
     fallbackLng: "en",
     supportedLngs: [...supportedLocales],
@@ -61,5 +67,18 @@ export async function changeAppLocale(locale: AppLocale) {
   await i18n.changeLanguage(locale);
 }
 
+export function registerEditionTranslations(resources: EditionTranslationResources) {
+  for (const locale of supportedLocales) {
+    i18n.addResourceBundle(locale, "edition", resources[locale], true, true);
+  }
+}
+
+export {
+  editionCopyKeys,
+  publicEditionTranslations,
+  type EditionCopyKey,
+  type EditionTranslationBundle,
+  type EditionTranslationResources,
+} from "./locales/edition";
 export { zhCN };
 export default i18n;
