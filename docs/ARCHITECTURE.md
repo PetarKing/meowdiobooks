@@ -38,6 +38,11 @@ it cannot publish artifacts or infer that a stage is accepted.
 - Invalidation never deletes history or the last successfully generated audio.
 - A failed or canceled job publishes nothing.
 
+Cast voice profiling may use a package-private checkpoint to avoid repeating paid or remote work after
+a failed attempt. Its key binds the exact accepted inputs, finalized identities, language, and
+profiler contract revision. The checkpoint is neither a candidate nor accepted workflow state; it may
+only be reused for an identical retry, and publication still remains atomic.
+
 The detailed artifact rules remain canonical in [PACKAGE_CONTRACT_V2.md](PACKAGE_CONTRACT_V2.md).
 
 ## Public extension boundary
