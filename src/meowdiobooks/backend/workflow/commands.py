@@ -21,7 +21,7 @@ class RegexProfile(CommandModel):
     id: str | None = None
     label: str | None = None
     pattern: str
-    flags: str = ""
+    flags: str = "m"
     priority: int | None = None
     enabled: bool | None = None
     builtIn: bool | None = None

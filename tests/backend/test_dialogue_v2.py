@@ -106,6 +106,113 @@ def test_builtin_label_recipes_reject_prose_and_screenplay_is_opt_in():
     assert result["summary"]["conflicts"] == 0
 
 
+def test_uppercase_speaker_colon_lines_are_detected_without_claiming_stage_directions():
+    source = (
+        "THE PLAY\n"
+        "SMITH: Miss Caroline, I'm here.\n"
+        "me after school.\n"
+        "LIGHTS TURN OFF LOUDLY.\n"
+        "SMITH: (shocked) I can't see a thing.\n"
+        "THE SOUND OF IPHONE BUTTONS.\n"
+        "SMITH: (footsteps) I'll check the dressing rooms.\n"
+        "SMITH: Ms Caroline, are you here?\n"
+        "LITTLE PEEVES: She's not here.\n"
+        "SMITH: Who are you?\n"
+        "LITTLE PEEVES: I am Peeves.\n"
+        "SMITH: Do you know where Miss Caroline is?\n"
+        "LITTLE PEEVES: Yes.\n"
+        "SMITH: Where is your voice coming from?\n"
+        "LITTLE PEEVES: I don't know anymore.\n"
+        "SMITH: What do you mean?\n"
+        "LITTLE PEEVES: Like the one behind you.\n"
+        "SMITH: What?\n"
+        "SMITH: Get up!\n"
+        "LITTLE PEEVES: She's dead.\n"
+        "SMITH: I'm out.\n"
+        "SMITH RUNS AWAY."
+    )
+
+    result = scan_dialogue([{"page": 1, "text": source}])
+    profiles = {row["id"]: row for row in result["profiles"]}
+
+    assert profiles["label-colon-line"]["matchCount"] == 17
+    assert result["summary"]["explicitTurns"] == 17
+    assert result["summary"]["conflicts"] == 0
+    assert {row["sourceSpeakerLabel"] for row in result["acceptedMatches"]} == {
+        "SMITH",
+        "LITTLE PEEVES",
+    }
+    narration = "".join(
+        row["text"] for row in result["partition"] if row["renderRole"] == "narration"
+    )
+    assert "LIGHTS TURN OFF LOUDLY." in narration
+    assert "SMITH RUNS AWAY." in narration
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_speaker_colon_rule_does_not_overlap_existing_delimited_label_rules():
+    source = (
+        "SMITH: [Bracketed.]\n\n"
+        "SMITH: “Curly quoted.”\n\n"
+        'SMITH: "Straight quoted."\n\n'
+        "SMITH: He repeated “embedded words” calmly."
+    )
+
+    result = scan_dialogue([{"page": 1, "text": source}])
+    profiles = {row["id"]: row for row in result["profiles"]}
+
+    assert profiles["label-colon-line"]["matchCount"] == 1
+    assert profiles["label-brackets"]["matchCount"] == 1
+    assert profiles["label-curly-quotes"]["matchCount"] == 1
+    assert profiles["label-straight-quotes"]["matchCount"] == 1
+    assert result["summary"]["explicitTurns"] == 4
+    assert result["summary"]["conflicts"] == 0
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_equivalent_custom_speaker_colon_rule_coalesces_without_a_conflict():
+    source = "SMITH: Run now."
+    custom = [
+        {
+            "id": "custom-speaker-colon",
+            "pattern": r"^(?P<speaker>[A-Z][A-Z ]+):\s*(?P<text>[^\n]+)",
+        }
+    ]
+
+    result = scan_dialogue([{"page": 1, "text": source}], custom_profiles=custom)
+
+    assert result["summary"]["conflicts"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["matchedProfileIds"] == [
+        "custom-speaker-colon",
+        "label-colon-line",
+    ]
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_different_custom_speaker_colon_claim_uses_explicit_conflict_review():
+    source = "SMITH: Run now."
+    custom = [
+        {
+            "id": "custom-partial-speaker-colon",
+            "pattern": r"^(?P<speaker>[A-Z][A-Z ]+):\s*(?P<text>Run)",
+        }
+    ]
+
+    result = scan_dialogue([{"page": 1, "text": source}], custom_profiles=custom)
+
+    assert result["summary"]["conflicts"] == 1
+    assert result["acceptedMatches"] == []
+    assert result["conflicts"][0]["profileIds"] == [
+        "custom-partial-speaker-colon",
+        "label-colon-line",
+    ]
+    assert dialogue_progression_blockers(result) == [
+        "Resolve 1 overlapping regex claim(s) before acceptance"
+    ]
+    assert reconstruct_partition(result)[1] == source
+
+
 def test_pages_become_stable_page_relative_blocks_without_losing_separators():
     pages = [{"page": 3, "text": "First.\n\nSecond.\n\nThird."}]
 
@@ -178,6 +285,30 @@ def test_ordered_custom_regexes_support_toggles_and_examples():
     # showing the toggle and its consequence.
     assert disabled_stats["paren-label"]["matchCount"] == 1
     assert {row["sourceSpeakerLabel"] for row in paren_disabled["acceptedMatches"]} == {"Alice"}
+
+
+def test_custom_regex_flags_are_validated_and_applied():
+    profile = {
+        "id": "multiline-dotall",
+        "pattern": r"\ABEGIN\[(?P<text>.+)\]END\Z",
+        "flags": "ms",
+    }
+
+    result = scan_dialogue(
+        [{"page": 1, "text": "BEGIN[first\nsecond]END"}],
+        custom_profiles=[profile],
+    )
+    custom = next(row for row in result["profiles"] if row["id"] == profile["id"])
+
+    assert custom["matchCount"] == 1
+    assert custom["flags"] == "ms"
+    assert result["acceptedMatches"][0]["text"] == "first\nsecond"
+
+    with pytest.raises(DialogueContractError, match="Unsupported regex flags"):
+        scan_dialogue(
+            [{"page": 1, "text": "BEGIN[first]END"}],
+            custom_profiles=[{**profile, "flags": "mi"}],
+        )
 
 
 @pytest.mark.parametrize(
