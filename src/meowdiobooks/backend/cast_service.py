@@ -564,6 +564,52 @@ def compile_voice_direction(settings: Mapping[str, Any], *, language: str = "eng
     return direction
 
 
+def _compact_generated_voice_direction(settings: Mapping[str, str]) -> dict[str, str]:
+    """Fit model-authored free text without dropping deterministic voice handles."""
+
+    result = dict(settings)
+    description = normalize_label(result.get("description", "")).rstrip(".")
+    fixed = compile_voice_direction({**result, "description": ""})
+    available = VOICE_DIRECTION_MAX_CHARACTERS - len(fixed) - 2
+    if not description or available < 1:
+        raise CastContractError(
+            "Fixed voice traits exceed the provider direction budget; edit the profile"
+        )
+    description = _truncate_voice_text(description, available)
+    if not description:
+        raise CastContractError(
+            "Voice description cannot be compacted within the provider direction budget"
+        )
+    result["description"] = description + "."
+    compile_voice_direction(result)
+    return result
+
+
+def _compact_generated_voice_profile(raw: object) -> dict[str, str]:
+    """Mechanically bound only model-authored description text after retries fail."""
+
+    if not isinstance(raw, Mapping):
+        raise CastContractError("Voice settings must be one JSON object")
+    candidate = dict(raw)
+    description = normalize_label(candidate.get("description", ""))
+    candidate["description"] = _truncate_voice_text(description, 180)
+    settings = validate_voice_settings(candidate)
+    try:
+        compile_voice_direction(settings)
+    except CastContractError as error:
+        if not str(error).startswith("Voice direction exceeds"):
+            raise
+        return _compact_generated_voice_direction(settings)
+    return settings
+
+
+def _truncate_voice_text(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    boundary = value.rfind(" ", 0, limit + 1)
+    return value[: boundary if boundary > 0 else limit].rstrip(" ,;:-")
+
+
 def _voice_profile_prompt(
     target: Mapping[str, Any], *, evidence_policy: VoiceEvidencePolicy | None = None
 ) -> str:
@@ -671,12 +717,17 @@ def _complete_voice_settings_with(
     retry_prompt = prompt
     for _attempt in range(2):
         raw = complete(VOICE_PROFILE_SYSTEM, retry_prompt, 384)
+        settings: dict[str, str] | None = None
         try:
             settings = validate_voice_settings(raw)
             compile_voice_direction(settings)
             return settings
         except CastContractError as error:
             failures.append(str(error))
+            if _attempt == 1 and str(error).startswith(
+                ("Voice direction exceeds", "Voice description must contain")
+            ):
+                return _compact_generated_voice_profile(raw)
             retry_prompt = _bounded_voice_prompt(
                 "Please try once more. Use only the exact allowed values and all eight fields.\n"
                 f"Your previous answer violated the contract: {error}\n"
