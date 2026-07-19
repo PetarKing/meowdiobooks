@@ -379,6 +379,51 @@ def test_voice_profile_retries_when_combined_direction_exceeds_provider_budget(m
     assert len(compile_voice_direction(result)) <= 250
 
 
+def test_voice_profile_mechanically_compacts_only_free_text_after_failed_retry(monkeypatch):
+    prompts = []
+    raw = {
+        "presentation": "masculine",
+        "age": "older-adult",
+        "tone": "gravelly",
+        "pitch": "low",
+        "pace": "measured",
+        "energy": "restrained",
+        "accent": "careful regional English",
+        "description": ("Keep every audible performance cue " * 5).strip(),
+    }
+
+    def fake_complete(_base, _system, prompt, **_kwargs):
+        prompts.append(prompt)
+        return raw
+
+    monkeypatch.setattr("meowdiobooks.backend.cast_service.complete_json", fake_complete)
+    result = _complete_voice_settings("http://qwen", "voice evidence")
+
+    assert len(prompts) == 2
+    for field in ("presentation", "age", "tone", "pitch", "pace", "energy", "accent"):
+        assert result[field] == raw[field]
+    assert raw["description"].startswith(result["description"].rstrip("."))
+    assert len(result["description"]) < len(raw["description"])
+    assert len(compile_voice_direction(result)) <= 250
+
+
+def test_voice_profile_mechanically_bounds_overlong_description_after_failed_retry(monkeypatch):
+    raw = {
+        **default_voice_settings(),
+        "description": ("Preserve this audible cue " * 12).strip(),
+    }
+
+    monkeypatch.setattr(
+        "meowdiobooks.backend.cast_service.complete_json",
+        lambda _base, _system, _prompt, **_kwargs: raw,
+    )
+    result = _complete_voice_settings("http://qwen", "voice evidence")
+
+    assert raw["description"].startswith(result["description"].rstrip("."))
+    assert len(result["description"]) <= 180
+    assert len(compile_voice_direction(result)) <= 250
+
+
 def test_voice_settings_validate_fixed_handles_and_compile_one_direction():
     settings = validate_voice_settings(
         {
