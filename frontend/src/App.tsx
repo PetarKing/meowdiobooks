@@ -1581,7 +1581,7 @@ export default function App({
               {coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}
               <span><b>{t("Cover")}</b><small>{exportCover?.name ?? t("Page {{page}}", { page: exportCoverPage })}</small></span>
               <div className="export-cover-actions">
-                {!exportCover && <label className="export-cover-page">{t("PDF page")}<input aria-label={t("PDF cover page")} type="number" min={1} max={pageCount} value={exportCoverPage} onChange={(event) => setExportCoverPage(Math.min(pageCount, Math.max(1, Number(event.target.value) || 1)))} /></label>}
+                {!exportCover && <label className="export-cover-page">{t("PDF page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /></label>}
                 <label className="export-cover-button"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setExportCover(event.target.files?.[0])} /><span>{t(exportCover ? "Change image" : "Choose image")}</span></label>
                 {exportCover && <button type="button" className="text-button" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
               </div>
@@ -1690,6 +1690,38 @@ export default function App({
     }
   }
 
+}
+
+function PdfCoverPageInput({ label, value, max, onChange }: { label: string; value: number; max: number; onChange: (page: number) => void }) {
+  const [draft, setDraft] = useState(String(value));
+
+  useEffect(() => setDraft(String(value)), [value]);
+
+  function commit() {
+    const parsed = Number(draft);
+    const page = Number.isInteger(parsed) ? Math.min(max, Math.max(1, parsed)) : value;
+    setDraft(String(page));
+    onChange(page);
+  }
+
+  return <input
+    aria-label={label}
+    type="number"
+    inputMode="numeric"
+    min={1}
+    max={max}
+    step={1}
+    value={draft}
+    onFocus={(event) => event.currentTarget.select()}
+    onChange={(event) => {
+      const next = event.target.value;
+      setDraft(next);
+      const parsed = Number(next);
+      if (next !== "" && Number.isInteger(parsed) && parsed >= 1 && parsed <= max) onChange(parsed);
+    }}
+    onBlur={commit}
+    onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }}
+  />;
 }
 
 function StepEyebrow({ stage, children }: { stage: WizardStep; children: ReactNode }) {

@@ -205,7 +205,10 @@ describe("CastIdentityReview", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
     expect(within(screen.getByRole("list", { name: "Source label search results" })).queryAllByRole("listitem")).toHaveLength(0);
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search source labels" }), { target: { value: "careful" } });
+    const search = screen.getByRole("searchbox", { name: "Search source labels" });
+    fireEvent.change(search, { target: { value: "missing" } });
+    expect(within(screen.getByRole("list", { name: "Source label search results" })).queryAllByRole("listitem")).toHaveLength(0);
+    fireEvent.change(search, { target: { value: "careful emilia" } });
 
     const results = screen.getByRole("list", { name: "Source label search results" });
     expect(results).toHaveTextContent("Emilia: Be careful.");

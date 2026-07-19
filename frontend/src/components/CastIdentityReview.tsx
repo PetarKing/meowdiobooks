@@ -54,6 +54,10 @@ function comparisonKey(value: string) {
   return value.trim().toLocaleLowerCase();
 }
 
+function searchTokens(value: string) {
+  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
 function fallbackDecision(proposal: CastProposal): IdentityDecision {
   return {
     label: proposal.label,
@@ -457,10 +461,11 @@ export function CastIdentityReview({
     ? cast.proposals.filter((proposal) => !active.labels.includes(proposal.label)
       && decisions[proposal.label]?.category !== NARRATOR_KEY)
     : [];
-  const query = comparisonKey(labelSearch);
-  const searchResults = query ? outsideLabels.filter((proposal) => {
+  const query = searchTokens(labelSearch);
+  const searchResults = query.length ? outsideLabels.filter((proposal) => {
     const owner = groups.find((group) => group.labels.includes(proposal.label));
-    return comparisonKey(`${proposal.label} ${owner?.name ?? ""} ${exampleLine(dossierByLabel.get(proposal.label))}`).includes(query);
+    const searchable = searchTokens(`${proposal.label} ${owner?.name ?? ""} ${exampleLine(dossierByLabel.get(proposal.label))}`);
+    return query.every((token) => searchable.some((word) => word.includes(token)));
   }).slice(0, 8) : [];
   const suggestedLabels = active ? [...new Set(active.labels.flatMap((label) => {
     const proposal = cast.proposals.find((row) => row.label === label);
@@ -547,7 +552,7 @@ export function CastIdentityReview({
       <div className="cast-inspector-grid">
         <aside className="cast-member-controls">
           <section><h3>{t("Cast identity")}</h3><label>{t("Category")}<select aria-label={t("Cast member category")} value={active.category} onChange={(event) => changeCategory(event.target.value)}><option value="character">{t("Character")}</option><option value="group">{t("Group")}</option><option value="editorial">{t("Editorial")}</option><option value="unresolved-marker">{t("Open marker")}</option></select></label>{!(["editorial", "unresolved-marker"].includes(active.category)) && <form aria-label={t("Rename cast member")} onSubmit={(event) => { event.preventDefault(); renameActive(); }}><label>{t("Rename cast member")}<div className="joined-control"><input aria-label={t("New cast member name")} value={renameDraft} placeholder={active.name} onChange={(event) => setRenameDraft(event.target.value)} /><button type="submit" disabled={!renameDraft.trim() || renameDraft.trim() === active.name}>{t("Rename")}</button></div><small>{t("Changes the cast member name without rewriting the book’s labels.")}</small></label></form>}</section>
-          <section><h3>{t("Attach a source label")}</h3><label>{t("Search")}<input type="search" aria-label={t("Search source labels")} value={labelSearch} placeholder={t("Name or spoken line…")} onChange={(event) => setLabelSearch(event.target.value)} /></label>{!query && <small>{t("Search {{count}} available labels by name or spoken line.", { count: outsideLabels.length })}</small>}<div className="cast-label-results" role="list" aria-label={t("Source label search results")}>{searchResults.map((proposal) => { const owner = groups.find((group) => group.labels.includes(proposal.label)); return <article key={proposal.label} role="listitem"><div><b>{proposal.label}</b><small>{t("Currently {{owner}}", { owner: owner?.name ?? t("unassigned") })}</small><q>{exampleLine(dossierByLabel.get(proposal.label))}</q></div><button type="button" onClick={() => attachLabel(proposal.label)}>{owner?.primaryLabel === proposal.label && owner.labels.length > 1 ? t("Merge {{name}}", { name: owner.name }) : t("Attach")}</button></article>; })}</div>{query && outsideLabels.length > searchResults.length && <small>{t("Showing the first {{count}} matches.", { count: searchResults.length })}</small>}</section>
+          <section><h3>{t("Attach a source label")}</h3><label>{t("Search")}<input type="search" aria-label={t("Search source labels")} value={labelSearch} placeholder={t("Name or spoken line…")} onChange={(event) => setLabelSearch(event.target.value)} /></label>{!query.length && <small>{t("Search {{count}} available labels by name or spoken line.", { count: outsideLabels.length })}</small>}<div className="cast-label-results" role="list" aria-label={t("Source label search results")}>{searchResults.map((proposal) => { const owner = groups.find((group) => group.labels.includes(proposal.label)); return <article key={proposal.label} role="listitem"><div><b>{proposal.label}</b><small>{t("Currently {{owner}}", { owner: owner?.name ?? t("unassigned") })}</small><q>{exampleLine(dossierByLabel.get(proposal.label))}</q></div><button type="button" onClick={() => attachLabel(proposal.label)}>{owner?.primaryLabel === proposal.label && owner.labels.length > 1 ? t("Merge {{name}}", { name: owner.name }) : t("Attach")}</button></article>; })}</div>{query.length > 0 && outsideLabels.length > searchResults.length && <small>{t("Showing the first {{count}} matches.", { count: searchResults.length })}</small>}</section>
         </aside>
         <div className="cast-aliases-and-lines">
           <div className="cast-section-heading"><div><small>{t("Source evidence")}</small><h3>{t("Source labels")}</h3></div><span>{t("{{count}} attached", { count: active.labels.length })}</span></div>

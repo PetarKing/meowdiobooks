@@ -66,14 +66,19 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
   const [checkedSpanIds, setCheckedSpanIds] = useState<Record<string, boolean>>({});
   const [editingSpanId, setEditingSpanId] = useState<string>();
   const [draftSpeaker, setDraftSpeaker] = useState("");
+  const [activeSpeakerOption, setActiveSpeakerOption] = useState(0);
   const [corrections, setCorrections] = useState<Record<string, DialogueCorrectionDecision>>(() => correctionRecord(initialDecisions));
   const [expandedContext, setExpandedContext] = useState<Record<string, boolean>>({});
   const speakerFieldId = useId();
   const speakerOptionsId = useId();
   const speakerOptions = useMemo(
-    () => (result.speakerOptions ?? []).map((label) => label.trim()).filter((label) => label && !/^\?+$/.test(label)),
+    () => [...new Set((result.speakerOptions ?? []).map((label) => label.trim()).filter((label) => label && !/^\?+$/.test(label)))],
     [result.speakerOptions],
   );
+  const visibleSpeakerOptions = useMemo(() => {
+    const query = searchTokens(draftSpeaker);
+    return speakerOptions.filter((label) => query.every((token) => searchKey(label).includes(token))).slice(0, 8);
+  }, [draftSpeaker, speakerOptions]);
 
   const rows = useMemo(() => result.examples.map((row) => ({ row, category: originalCategory(row) })), [result.examples]);
   const reviewRows = useMemo(
@@ -133,6 +138,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
 
   function beginCharacterCorrection(row: DialogueExample, speakerLabel = "") {
     setDraftSpeaker(usableSpeakerLabel(speakerLabel));
+    setActiveSpeakerOption(0);
     setEditingSpanId(row.spanId);
   }
 
@@ -229,13 +235,32 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
           <label htmlFor={speakerFieldId}>{t("Character name")}</label>
           <input
             id={speakerFieldId}
-            list={speakerOptions.length ? speakerOptionsId : undefined}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-controls={speakerOptions.length ? speakerOptionsId : undefined}
+            aria-expanded={visibleSpeakerOptions.length > 0}
+            aria-activedescendant={visibleSpeakerOptions[activeSpeakerOption] ? `${speakerOptionsId}-${activeSpeakerOption}` : undefined}
             value={draftSpeaker}
-            onChange={(event) => setDraftSpeaker(event.target.value)}
+            onChange={(event) => { setDraftSpeaker(event.target.value); setActiveSpeakerOption(0); }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowDown" && visibleSpeakerOptions.length) {
+                event.preventDefault();
+                setActiveSpeakerOption((current) => Math.min(current + 1, visibleSpeakerOptions.length - 1));
+              } else if (event.key === "ArrowUp" && visibleSpeakerOptions.length) {
+                event.preventDefault();
+                setActiveSpeakerOption((current) => Math.max(current - 1, 0));
+              } else if (event.key === "Enter" && visibleSpeakerOptions[activeSpeakerOption]) {
+                event.preventDefault();
+                setDraftSpeaker(visibleSpeakerOptions[activeSpeakerOption]);
+                setActiveSpeakerOption(0);
+              } else if (event.key === "Escape") {
+                setEditingSpanId(undefined);
+              }
+            }}
             placeholder={t("Search or type a character name")}
             autoFocus
           />
-          {speakerOptions.length > 0 && <datalist id={speakerOptionsId}>{speakerOptions.map((label) => <option value={label} key={label} />)}</datalist>}
+          {visibleSpeakerOptions.length > 0 && <ul id={speakerOptionsId} className="dialogue-character-options" role="listbox" aria-label={t("Character options")}>{visibleSpeakerOptions.map((label, index) => <li role="none" key={label}><button id={`${speakerOptionsId}-${index}`} role="option" aria-selected={index === activeSpeakerOption} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => { setDraftSpeaker(label); setActiveSpeakerOption(0); }}>{label}</button></li>)}</ul>}
           <small>{t("Pick an existing character or type a new name.")}</small>
           <div>
             <button type="button" className="ghost compact" onClick={() => setEditingSpanId(undefined)}>{t("Cancel")}</button>
@@ -336,6 +361,14 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
 
     <div className="phase-action dialogue-floating-action" role="group" aria-label={`${t("Change strategy")} / ${t("Accept dialogue result")}`}><button className="ghost" onClick={onChangeStrategy}>{t("Change strategy")}</button><button className="primary" disabled={busy || requireChanges && !decisionsChanged} onClick={() => onAccept(orderedDecisions)}>{t("Accept dialogue result")} →</button></div>
   </section>;
+}
+
+function searchKey(value: string) {
+  return value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+}
+
+function searchTokens(value: string) {
+  return searchKey(value).split(/\s+/).filter(Boolean);
 }
 
 function correctionRecord(decisions: DialogueCorrectionDecision[]) {

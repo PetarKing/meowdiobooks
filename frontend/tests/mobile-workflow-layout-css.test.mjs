@@ -11,6 +11,10 @@ function rule(selector) {
 }
 
 describe('mobile workflow layout', () => {
+  it('keeps form controls large enough to avoid iOS focus zoom', () => {
+    expect(rule('input,select,textarea')).toMatch(/font-size\s*:\s*16px\s*!important/)
+  })
+
   it('bounds cast audio settings and keeps language choices readable on mobile', () => {
     expect(rule('.cast-audio-settings')).toMatch(/right\s*:\s*0/)
     expect(rule('.cast-audio-settings')).toMatch(/left\s*:\s*0/)
