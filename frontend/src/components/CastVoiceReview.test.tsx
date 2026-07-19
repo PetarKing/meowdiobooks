@@ -142,7 +142,12 @@ describe("CastVoiceReview", () => {
     };
     const route: Record<string, VoiceRoute> = { "subaru-cecilus": { kind: "layered", characterIds: ["subaru", "cecilus"] } };
     const view = render(<CastVoiceReview bookId="book-1" cast={groupCast} selections={{ subaru: "subaru-1", cecilus: "cecilus-1" }} routes={route} confirmedRoutes={{ "subaru-cecilus": false }} onRouteChange={() => undefined} onConfirmRoute={onConfirmRoute} onApprove={() => undefined} onRegenerate={() => undefined} />);
-    fireEvent.click(screen.getByRole("button", { name: "Open Subaru & Cecilus voice" }));
+    const groupTile = screen.getByRole("button", { name: "Open Subaru & Cecilus voice" });
+    expect(groupTile).toHaveClass("voice-required", "needs-review");
+    expect(groupTile).toHaveTextContent("Required");
+    expect(screen.getByText("1 group voice requires review")).toBeInTheDocument();
+    expect(screen.getByText("Red cards marked Required must be reviewed before you can continue.")).toBeInTheDocument();
+    fireEvent.click(groupTile);
 
     expect(screen.getByText("Subaru + Cecilus")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Confirm layered voices" }));
@@ -164,6 +169,9 @@ describe("CastVoiceReview", () => {
       "Open Narrator voice", "Open Many voice", "Open Few voice",
     ]);
     expect(tiles[1]).toHaveTextContent("20 lines");
+    expect(tiles[1]).toHaveClass("voice-default-ready");
+    expect(tiles[1]).toHaveTextContent("default ready");
+    expect(screen.getByText("3 voices can be approved when you continue")).toBeInTheDocument();
   });
 
   it("marks reused auditions as informative shared voices with matching initials colors", () => {

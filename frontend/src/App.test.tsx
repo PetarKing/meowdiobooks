@@ -2022,7 +2022,7 @@ describe('v2 wizard', () => {
 
     expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-draft')
-    expect(screen.getByText('2 of 2 approved')).toBeInTheDocument()
+    expect(screen.getByText('All 2 voices approved')).toBeInTheDocument()
   })
 
   it('reclassifies a reused cast only from its review view and preserves the accepted flow', async () => {
@@ -2561,12 +2561,12 @@ describe('v2 wizard', () => {
     fireEvent.animationEnd(narratorDialog)
 
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
-    const warning = screen.getByRole('dialog', { name: '1 voice will use default audition' })
-    expect(warning).toHaveTextContent('Alice has no approved audition')
+    const warning = screen.getByRole('dialog', { name: 'Approve 1 remaining voice?' })
+    expect(warning).toHaveTextContent('Continuing approves the latest audition for Alice and accepts the full cast.')
     expect(warning).toHaveTextContent('Your 1 approved choice stays exactly as selected.')
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
 
-    fireEvent.click(within(warning).getByRole('button', { name: 'Use defaults and accept →' }))
+    fireEvent.click(within(warning).getByRole('button', { name: 'Approve remaining & accept →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'auditions-2', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
       { characterId: 'alice', voiceRevision: 'av2' },
@@ -2667,7 +2667,11 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.getByRole('button', { name: 'Accept cast & voices →' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: 'Open Subaru & Cecilus voice' }))
+    const groupVoice = screen.getByRole('button', { name: 'Open Subaru & Cecilus voice' })
+    expect(groupVoice).toHaveClass('voice-required', 'needs-review')
+    expect(groupVoice).toHaveTextContent('Required')
+    expect(screen.getByText('1 voice still requires review')).toBeInTheDocument()
+    fireEvent.click(groupVoice)
     expect(screen.getByRole('radio', { name: /Layer existing cast voices/ })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(screen.getByRole('button', { name: 'Confirm layered voices' }))
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))

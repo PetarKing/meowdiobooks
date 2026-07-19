@@ -1329,7 +1329,11 @@ export default function App({
         }}
       />
       <div className="phase-action">
-        <span>{t("{{approved}} of {{total}} approved", { approved: approvedCount, total: voices.length })}</span>
+        <span>{unavailableVoices.length > 0
+          ? unavailableVoices.length === 1 ? t("1 voice still requires review") : t("{{count}} voices still require review", { count: unavailableVoices.length })
+          : unapprovedVoices.length > 0
+            ? t("{{approved}} approved individually · {{remaining}} ready for approval", { approved: approvedCount, remaining: unapprovedVoices.length })
+            : t("All {{count}} voices approved", { count: voices.length })}</span>
         <div className="phase-action-buttons" role="group" aria-label={t("Cast voice actions")}>
           <button className="ghost" onClick={() => setEditingCast(true)}>← {t(current.reusedFromRevision ? "Review cast" : "Edit cast")}</button>
           <button className="primary" disabled={busy || unavailableVoices.length > 0} onClick={requestCastAcceptance}>{t("Accept cast & voices")} →</button>
@@ -1337,13 +1341,15 @@ export default function App({
       </div>
       {confirmDefaultVoices && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="default-voices-title">
         <div className="process-modal cast-default-modal">
-          <span className="eyebrow">{t("Unapproved voices")}</span>
-          <h2 id="default-voices-title">{unapprovedVoices.length === 1 ? t("1 voice will use default audition") : t("{{count}} voices will use default auditions", { count: unapprovedVoices.length })}</h2>
-          <p>{unapprovedVoices.length === 1 ? t("{{name}} has no approved audition. Its latest audition will be selected.", { name: summarizedVoiceNames(unapprovedVoices) }) : t("{{names}} have no approved audition. The latest audition for each will be selected.", { names: summarizedVoiceNames(unapprovedVoices) })}</p>
+          <span className="eyebrow">{t("Approval confirmation")}</span>
+          <h2 id="default-voices-title">{unapprovedVoices.length === 1 ? t("Approve 1 remaining voice?") : t("Approve {{count}} remaining voices?", { count: unapprovedVoices.length })}</h2>
+          <p>{unapprovedVoices.length === 1
+            ? t("Continuing approves the latest audition for {{name}} and accepts the full cast.", { name: summarizedVoiceNames(unapprovedVoices) })
+            : t("Continuing approves the latest audition for each of these voices and accepts the full cast: {{names}}.", { names: summarizedVoiceNames(unapprovedVoices) })}</p>
           {approvedCount > 0 && <p>{approvedCount === 1 ? t("Your 1 approved choice stays exactly as selected.") : t("Your {{count}} approved choices stay exactly as selected.", { count: approvedCount })}</p>}
           <div className="cast-default-actions">
             <button className="ghost" autoFocus onClick={() => setConfirmDefaultVoices(false)}>{t("Keep reviewing")}</button>
-            <button className="primary" onClick={submitCastVoices}>{t("Use defaults and accept")} →</button>
+            <button className="primary" onClick={submitCastVoices}>{t("Approve remaining & accept")} →</button>
           </div>
         </div>
       </div>}

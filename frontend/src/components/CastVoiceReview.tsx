@@ -190,6 +190,10 @@ export function CastVoiceReview({
         && route.characterIds.every((id) => voiceById[id]?.category === "character" && Boolean(tilePreviewFor(voiceById[id], selections)))
       : Boolean(approvedRevisionFor(voice, selections));
   };
+  const requiresReview = (voice: CastVoice) => routeFor(voice, routes).kind === "layered" && !routeReady(voice);
+  const selectedCount = voices.filter(routeReady).length;
+  const requiredCount = voices.filter(requiresReview).length;
+  const defaultReadyCount = voices.length - selectedCount - requiredCount;
   const [inspectedId, setInspectedId] = useState<string>();
   const inspected = voices.find((voice) => voice.characterId === inspectedId);
   const [settings, setSettings] = useState<VoiceSettings>();
@@ -357,6 +361,7 @@ export function CastVoiceReview({
   const inspectedSharedGroup = inspected ? sharedGroupFor(inspected, selections) : undefined;
   const inspectedRoute = inspected ? routeFor(inspected, routes) : { kind: "dedicated" } as VoiceRoute;
   const inspectedReady = inspected ? routeReady(inspected) : false;
+  const inspectedRequired = inspected ? requiresReview(inspected) : false;
   const inspectedPreviewUrl = inspected ? previewUrlFor(inspected) : undefined;
   const memberVoices = (cast.identities ?? []).filter((voice) => voice.category === "character");
   const suggestedIds = inspected?.category === "group" ? suggestedMemberIds(inspected, memberVoices) : [];
@@ -368,7 +373,15 @@ export function CastVoiceReview({
   return <div className="cast-workbench voice-cast-workbench">
     <div className="cast-toolbar voice-cast-toolbar">
       <div>
-        <b>{t("{{selected}} of {{count}} voices selected", { selected: voices.filter(routeReady).length, count: voices.length })}</b>
+        <b>{requiredCount > 0
+          ? requiredCount === 1 ? t("1 group voice requires review") : t("{{count}} group voices require review", { count: requiredCount })
+          : defaultReadyCount > 0
+            ? defaultReadyCount === 1 ? t("1 voice can be approved when you continue") : t("{{count}} voices can be approved when you continue", { count: defaultReadyCount })
+            : t("All voices approved")}</b>
+        {requiredCount > 0 && <small className="cast-required-help">{t("Red cards marked Required must be reviewed before you can continue.")}</small>}
+        {defaultReadyCount > 0 && <small>{defaultReadyCount === 1
+          ? t("1 default audition is ready. Review it individually, or continue to approve it.")
+          : t("{{count}} default auditions are ready. Review them individually, or continue to approve them together.", { count: defaultReadyCount })}</small>}
         <small>{t("Open a cast member to preview and tune their voice.")}</small>
         {sharedGroupColors.size > 0 && <small className="shared-voice-help">{t("Brief roles may share a voice to reduce generation time and cost. Open any character to generate or choose a different audition.")}</small>}
       </div>
@@ -380,6 +393,7 @@ export function CastVoiceReview({
     <section className="cast-board voice-cast-board" aria-label={t("Cast voice auditions")}>
       {voices.map((voice, index) => {
         const selected = routeReady(voice);
+        const required = requiresReview(voice);
         const isNarrator = voice.characterId === "narrator";
         const lineCount = lineCountFor(voice, cast);
         const previewUrl = previewUrlFor(voice);
@@ -391,14 +405,16 @@ export function CastVoiceReview({
             type="button"
             ref={(element) => { tileRefs.current[voice.characterId] = element; }}
             aria-label={t("Open {{name}} voice", { name: voice.name })}
-            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : "voice-unselected"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
+            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
             onClick={() => openInspector(voice.characterId)}
           >
             <span className="cast-atomic-number">{isNarrator ? "N" : String(index).padStart(2, "0")}</span>
-            <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>
+            {required
+              ? <span className="cast-tile-required">{t("Required")}</span>
+              : <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>}
             <strong>{isNarrator ? "♬" : initials(voice.name)}</strong>
             <b>{voice.name}</b>
-            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : "choose voice")}</small>
+            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready")}</small>
           </button>
           <button
             type="button"
@@ -416,8 +432,8 @@ export function CastVoiceReview({
       <section role="dialog" aria-modal="true" className={`cast-inspector voice-inspector ${inspectorClosing ? "closing" : ""}`} aria-label={t("{{name}} voice", { name: inspected.name })} onAnimationEnd={(event) => { if (event.target === event.currentTarget && inspectorClosing) finishInspectorClose(); }}>
         <header className="cast-inspector-head">
           <div>
-            <span className={`cast-status-dot ${inspectedReady ? "ready" : "needs-review"}`} />
-            <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : inspectedSharedGroup ? "Shared voice selected" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : "Needs a voice")}</small>
+            <span className={`cast-status-dot ${inspectedReady ? "ready" : inspectedRequired ? "needs-review" : "default-ready"}`} />
+            <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : inspectedSharedGroup ? "Shared voice selected" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : inspectedRequired ? "Audition required" : "Default audition ready")}</small>
             <h2>{inspected.name}</h2>
             <p>{t(inspected.category ?? (inspected.characterId === "narrator" ? "Narrator" : "Character"))} · {t(lineCountLabel(lineCountFor(inspected, cast)))} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
           </div>
