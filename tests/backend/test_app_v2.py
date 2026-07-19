@@ -633,6 +633,29 @@ def test_snapshot_exposes_installed_voice_model_languages(tmp_path):
 
         assert snapshot["voiceModels"][0]["id"] == "qwen-voice-design-1.7b"
         assert "english" in snapshot["voiceModels"][0]["supportedLanguages"]
+        assert snapshot["voiceSelection"]["modelId"] == "qwen-voice-design-1.7b"
+
+
+def test_snapshot_selects_configured_voice_default_instead_of_first_model(tmp_path):
+    models = [
+        {"id": "older", "label": "Older", "supportedLanguages": ["english"]},
+        {"id": "preferred", "label": "Preferred", "supportedLanguages": ["english"]},
+    ]
+    with TestClient(
+        create_app_v2(
+            tmp_path,
+            voice_models=lambda _root: models,
+            default_voice_model="preferred",
+        )
+    ) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+
+        snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+
+        assert [row["id"] for row in snapshot["voiceModels"]] == ["older", "preferred"]
+        assert snapshot["voiceSelection"]["modelId"] == "preferred"
 
 
 def test_generated_chapter_can_open_in_the_default_mac_audio_app(tmp_path, monkeypatch):

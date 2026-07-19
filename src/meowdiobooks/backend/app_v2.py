@@ -1289,7 +1289,7 @@ def create_app_v2(
             "cast": visible_cast,
             "voiceModels": voice_models(repo_root),
             "voiceSelection": {
-                "modelId": visible_cast.get("voiceModel"),
+                "modelId": visible_cast.get("voiceModel") or default_voice_id,
                 "language": visible_cast.get("language"),
             },
             "recoverableStages": recoverable_stages,
