@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 8
+DIALOGUE_SCAN_VERSION = 9
 
 
 class DialogueContractError(ValueError):
@@ -265,7 +265,13 @@ def _raw_scan(
                     )
                 speaker = match.groupdict().get("speaker")
                 speaker = " ".join(speaker.split()) if speaker is not None else None
-                if speaker is not None and not _plausible_builtin_label(profile, speaker):
+                text = match.group("text")
+                if speaker is not None and not _plausible_builtin_match(
+                    profile,
+                    speaker,
+                    text,
+                    source[match.end("speaker") : text_start],
+                ):
                     continue
                 candidate = {
                     "matchId": f"match:{profile.id}:{block['id']}:{match.start()}-{match.end()}",
@@ -279,7 +285,7 @@ def _raw_scan(
                     "spokenStart": text_start,
                     "spokenEnd": text_end,
                     "source": match.group(0),
-                    "text": match.group("text"),
+                    "text": text,
                     "sourceSpeakerLabel": speaker,
                     "speakerStatus": (
                         "unlabelled"
@@ -793,6 +799,25 @@ def _plausible_builtin_label(profile: RegexProfile, speaker: str) -> bool:
     return True
 
 
+def _plausible_builtin_match(
+    profile: RegexProfile, speaker: str, text: str, separator: str
+) -> bool:
+    """Reject colon-shaped prose without narrowing user-authored custom recipes."""
+    if not _plausible_builtin_label(profile, speaker):
+        return False
+    if profile.custom or profile.id != "label-colon-line":
+        return True
+
+    spoken = text.lstrip()
+    if spoken.startswith("//"):
+        return False
+    colon = separator.find(":")
+    after_colon = separator[colon + 1 :] if colon >= 0 else separator
+    return not (
+        speaker[-1:].isdigit() and spoken[:1].isdigit() and not after_colon
+    )
+
+
 def _coalesce(candidates: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """Collapse a quote-only match under an otherwise identical labelled match."""
 
@@ -836,9 +861,9 @@ def _overlaps(left: Mapping[str, Any], right: Mapping[str, Any]) -> bool:
 def _nested_unlabelled_claim(
     left: Mapping[str, Any], right: Mapping[str, Any]
 ) -> Mapping[str, Any] | None:
-    """Return an unlabelled quote already owned by a containing explicit turn."""
+    """Return an unlabelled quote already owned by a containing labelled turn."""
 
-    explicit_profiles = {
+    labelled_profiles = {
         "label-brackets",
         "label-curly-quotes",
         "label-straight-quotes",
@@ -847,10 +872,14 @@ def _nested_unlabelled_claim(
         "screenplay",
     }
     for outer, inner in ((left, right), (right, left)):
+        outer_profiles = {
+            str(profile_id)
+            for profile_id in outer.get("matchedProfileIds", [outer["profileId"]])
+        }
         if (
-            outer["profileId"] in explicit_profiles
+            outer_profiles & labelled_profiles
             and str(inner["profileId"]).startswith("unlabeled-")
-            and outer["speakerStatus"] == "explicit"
+            and outer["speakerStatus"] in {"explicit", "unresolved"}
             and inner["speakerStatus"] == "unlabelled"
             and outer["sourceStart"] <= inner["sourceStart"]
             and outer["sourceEnd"] >= inner["sourceEnd"]

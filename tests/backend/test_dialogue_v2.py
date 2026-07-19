@@ -179,6 +179,76 @@ def test_speaker_colon_rule_does_not_overlap_existing_delimited_label_rules():
     assert reconstruct_partition(result)[1] == source
 
 
+@pytest.mark.parametrize(
+    "source",
+    [
+        "HTTP://CREATIVECOMMONS.ORG/",
+        "HTTPS://EXAMPLE.COM/LICENSE",
+        "IT WAS 9:30 ON a Thursday morning.\nThe buses waited.",
+    ],
+)
+def test_speaker_colon_rule_rejects_url_and_clock_shaped_prose(source):
+    result = scan_dialogue([{"page": 1, "text": source}])
+    profiles = {row["id"]: row for row in result["profiles"]}
+
+    assert profiles["label-colon-line"]["matchCount"] == 0
+    assert result["summary"]["explicitTurns"] == 0
+    assert result["summary"]["conflicts"] == 0
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_speaker_colon_rule_keeps_numeric_speaker_labels_when_text_is_not_clock_prose():
+    source = "GUARD 1: 30 seconds remaining.\n\nR2D2: 2 units left."
+
+    result = scan_dialogue([{"page": 1, "text": source}])
+    profiles = {row["id"]: row for row in result["profiles"]}
+
+    assert profiles["label-colon-line"]["matchCount"] == 2
+    assert result["summary"]["explicitTurns"] == 2
+    assert result["summary"]["conflicts"] == 0
+    assert {row["sourceSpeakerLabel"] for row in result["acceptedMatches"]} == {
+        "GUARD 1",
+        "R2D2",
+    }
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_nested_quote_inside_unresolved_labelled_turn_is_not_a_conflict():
+    source = '???: [Because "The Blue Lightning" is a name worthy of a weirdo.]'
+
+    result = scan_dialogue([{"page": 1, "text": source}])
+
+    assert result["summary"]["openSpeakerTurns"] == 1
+    assert result["summary"]["conflicts"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["profileId"] == "label-brackets"
+    assert result["acceptedMatches"][0]["speakerStatus"] == "unresolved"
+    assert reconstruct_partition(result)[1] == source
+
+
+def test_equivalent_custom_label_keeps_builtin_nested_quote_ownership():
+    source = '???: [Because "Blue" matters.]'
+    custom = [
+        {
+            "id": "custom-brackets",
+            "pattern": r"^(?P<speaker>[^\n:\[\]]{1,80}?)\s*:\s*\[(?P<text>[\s\S]*?)\]",
+            "priority": 1,
+        }
+    ]
+
+    result = scan_dialogue([{"page": 1, "text": source}], custom_profiles=custom)
+
+    assert result["summary"]["openSpeakerTurns"] == 1
+    assert result["summary"]["conflicts"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["profileId"] == "custom-brackets"
+    assert result["acceptedMatches"][0]["matchedProfileIds"] == [
+        "custom-brackets",
+        "label-brackets",
+    ]
+    assert reconstruct_partition(result)[1] == source
+
+
 def test_equivalent_custom_speaker_colon_rule_coalesces_without_a_conflict():
     source = "SMITH: Run now."
     custom = [
