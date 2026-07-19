@@ -205,14 +205,18 @@ def _shared_audition_identity(
     candidates = []
     for raw in generated.get("voiceCandidates", []):
         candidate = deepcopy(raw)
-        if str(candidate.get("revision", "")) == revision:
-            candidate.update(
-                {
-                    "source": "shared",
-                    "sharedVoiceGroupId": group_id,
-                    "referenceAudio": reference_audio,
-                }
-            )
+        candidate_revision = str(candidate.get("revision", ""))
+        candidate.update(
+            {
+                "source": "shared",
+                "sharedVoiceGroupId": group_id,
+                "referenceAudio": (
+                    str(Path("voices") / anchor_id / f"{candidate_revision}.wav")
+                    if candidate_revision
+                    else None
+                ),
+            }
+        )
         candidates.append(candidate)
     shared.update(
         {

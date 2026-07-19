@@ -31,6 +31,11 @@ def test_default_registry_preserves_current_models_and_all_supported_languages()
     assert remote.max_concurrent_batches == 6
     assert voice.audition_path == "models/qwen_1_7b_voice_design"
     assert voice.renderer_path == "models/qwen_1_7b_base_4bit"
+    assert registry.voice_candidate_policy.enabled is True
+    assert registry.voice_candidate_policy.coverage_fraction == 0.8
+    assert registry.voice_candidate_policy.min_voices == 2
+    assert registry.voice_candidate_policy.max_voices == 4
+    assert registry.voice_candidate_policy.extra_candidates == 1
     assert speech.engine == "mlx_audio"
     assert speech.model_path == "models/qwen3_asr_0_6b_4bit"
     assert speech.revision == "313d850181767edf09f00a9c289becca70e58cd0"
