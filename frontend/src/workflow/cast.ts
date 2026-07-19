@@ -66,6 +66,17 @@ export function acceptedVoiceSelections(cast?: CastArtifact) {
   ));
 }
 
+export function automaticSharedVoiceSelections(cast?: CastArtifact) {
+  const voices = [cast?.narrator, ...(cast?.identities ?? [])].filter(Boolean) as CastVoice[];
+  return Object.fromEntries(voices.flatMap((voice) => {
+    const revision = voice.voicePreviewRevision;
+    const candidate = voice.voiceCandidates?.find((row) => row.revision === revision);
+    return revision && candidate?.source === "shared"
+      ? [[voice.characterId, revision]]
+      : [];
+  }));
+}
+
 export function routeForVoice(voice: CastVoice, routes: Record<string, VoiceRoute>): VoiceRoute {
   return voice.category === "group"
     ? routes[voice.characterId] ?? voice.voiceRoute ?? { kind: "dedicated" }

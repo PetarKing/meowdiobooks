@@ -284,7 +284,8 @@ export interface VoiceCandidate {
   referenceAudio?: string;
   direction: string;
   voiceSettings?: VoiceSettings;
-  source?: "generated" | "upload";
+  source?: "generated" | "upload" | "shared";
+  sharedVoiceGroupId?: string;
   referenceMode?: "transcript-conditioned" | "speaker-embedding";
   durationSeconds?: number;
 }

@@ -59,6 +59,7 @@ from .cast_runtime import (
     _expand_cast_label_mapping,
     _rebase_accepted_cast,
     _reuse_unchanged_cast_voices,
+    _shared_audition_identity,
 )
 from .cast_service import (
     compile_voice_direction,
@@ -110,11 +111,13 @@ from .local_llm import complete_json, qwen_server
 from .languages import (
     infer_language,
     normalize_language,
+    shared_audition_line,
     supported_voice_languages,
     voice_model_capabilities,
 )
 from .queue import JobQueue
 from .resources import SleepInhibitor, require_free_disk
+from .voice_sharing import VoiceSharingPolicy, plan_shared_voices
 from .review import (
     ReviewContractError,
     accept_review_revision,
@@ -271,6 +274,7 @@ def create_app_v2(
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
+    voice_sharing_policy: VoiceSharingPolicy | None = None,
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
@@ -299,6 +303,7 @@ def create_app_v2(
         lambda _book_id, _chapter_id, _revision, expected: nullcontext(expected)
     )
     default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
+    voice_sharing_policy = voice_sharing_policy or VoiceSharingPolicy()
     books = cast(
         ModelStore[Book],
         store_factory("books", Book) if store_factory else JsonStore(root / "books.json", Book),
@@ -648,12 +653,31 @@ def create_app_v2(
                 if profile_targets or not reuse_existing
                 else {}
             )
-            characters = [
-                _audition_character(
-                    row, profiles.get(str(row["characterId"])), language=language
+            sharing_plan = plan_shared_voices(
+                profile_targets,
+                profiles,
+                _dialogue_with_chapters(dialogue, review).get("spans", []),
+                finalized.get("labelToCharacterId", {}),
+                voice_sharing_policy,
+            )
+            shared_group_by_id = sharing_plan.group_by_character_id
+            characters = []
+            for row in profile_targets:
+                character_id = str(row["characterId"])
+                group = shared_group_by_id.get(character_id)
+                if group is not None and character_id != group.character_ids[0]:
+                    continue
+                character = _audition_character(
+                    row, profiles.get(character_id), language=language
                 )
-                for row in profile_targets
-            ]
+                if group is not None:
+                    character.update(
+                        {
+                            "name": f"Supporting voice {group.id.rsplit('-', 1)[-1]}",
+                            "previewLine": shared_audition_line(language),
+                        }
+                    )
+                characters.append(character)
             if not reuse_existing:
                 narrator_settings = profiles.get(
                     "narrator", default_voice_settings("narrator")
@@ -710,7 +734,18 @@ def create_app_v2(
                 "narrator": narrator,
                 "identities": [
                     reused.get(str(row["characterId"]))
-                    or _audition_identity(by_id[str(row["characterId"])], package, base=row)
+                    or (
+                        _shared_audition_identity(
+                            by_id[shared_group_by_id[str(row["characterId"])].character_ids[0]],
+                            row,
+                            shared_group_by_id[str(row["characterId"])].id,
+                            package,
+                        )
+                        if str(row["characterId"]) in shared_group_by_id
+                        else _audition_identity(
+                            by_id[str(row["characterId"])], package, base=row
+                        )
+                    )
                     for row in finalized["identities"]
                 ],
                 "identityDecisions": raw_decisions,

@@ -166,6 +166,36 @@ describe("CastVoiceReview", () => {
     expect(tiles[1]).toHaveTextContent("20 lines");
   });
 
+  it("marks reused auditions as informative shared voices with matching initials colors", () => {
+    const sharedCandidate = {
+      revision: "shared-1",
+      previewUrl: "/shared.wav",
+      referenceText: "A neutral supporting cast line.",
+      direction: "Adult masculine supporting voice.",
+      source: "shared" as const,
+      sharedVoiceGroupId: "shared-voice-01",
+    };
+    const sharedCast: CastArtifact = {
+      ...cast,
+      identities: [
+        { characterId: "guard", name: "Guard", lineCount: 1, voicePreviewRevision: "shared-1", voiceCandidates: [sharedCandidate] },
+        { characterId: "rebel", name: "Rebel", lineCount: 2, voicePreviewRevision: "shared-1", voiceCandidates: [sharedCandidate] },
+      ],
+    };
+
+    render(<CastVoiceReview bookId="book-1" cast={sharedCast} selections={{ guard: "shared-1", rebel: "shared-1" }} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
+
+    const guard = screen.getByRole("button", { name: "Open Guard voice" });
+    const rebel = screen.getByRole("button", { name: "Open Rebel voice" });
+    expect(guard).toHaveClass("shared-voice-0");
+    expect(rebel).toHaveClass("shared-voice-0");
+    expect(guard).toHaveTextContent("shared voice");
+    expect(screen.getByText(/Brief roles may share a voice to reduce generation time and cost/)).toBeInTheDocument();
+
+    fireEvent.click(guard);
+    expect(within(screen.getByRole("dialog", { name: "Guard voice" })).getByText("Shared voice")).toBeInTheDocument();
+  });
+
   it("plays the current preview from a tile without opening the inspector", () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
     const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);

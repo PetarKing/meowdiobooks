@@ -63,6 +63,19 @@ AUDITION_TEMPLATES = {
     ),
 }
 
+SHARED_AUDITION_TEMPLATES = {
+    "chinese": "明亮的清晨，轻柔的微风吹过宁静的村庄。",
+    "english": "The bright morning carried a gentle breeze across the quiet village.",
+    "french": "Ce matin lumineux, une brise légère traversait le village paisible.",
+    "german": "Am hellen Morgen wehte eine sanfte Brise durch das ruhige Dorf.",
+    "italian": "Nel mattino luminoso, una brezza leggera attraversava il tranquillo villaggio.",
+    "japanese": "明るい朝、穏やかな風が静かな村を吹き抜けました。",
+    "korean": "밝은 아침, 부드러운 바람이 고요한 마을을 스쳐 갔습니다.",
+    "portuguese": "Na manhã luminosa, uma brisa suave atravessou a vila tranquila.",
+    "russian": "Ясным утром лёгкий ветерок прошёл по тихой деревне.",
+    "spanish": "En la mañana luminosa, una brisa suave recorrió el tranquilo pueblo.",
+}
+
 def normalize_language(value: object) -> str:
     """Return the Qwen language code for a model-proposed name/code, if known."""
     return LANGUAGE_ALIASES.get(str(value or "").strip().casefold(), "")
@@ -75,6 +88,16 @@ def audition_line(name: str, language: object) -> str:
     if template is None:
         raise ValueError(f"Unsupported audition language: {language}")
     return template.format(name=name)
+
+
+def shared_audition_line(language: object) -> str:
+    """Return a neutral comparison line that can be shown for several cast identities."""
+
+    normalized = normalize_language(language)
+    template = SHARED_AUDITION_TEMPLATES.get(normalized)
+    if template is None:
+        raise ValueError(f"Unsupported audition language: {language}")
+    return template
 
 
 def supported_voice_languages(

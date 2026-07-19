@@ -930,3 +930,12 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
   .transcript-span { grid-template-columns:1fr; gap:4px; padding:9px; }
   .transcript-final-action > span { margin-left:0; }
 }
+
+.shared-voice-help { max-width:560px; opacity:.82; }
+.voice-cast-tile.shared-voice-0 > strong { color:#9a5f55; }
+.voice-cast-tile.shared-voice-1 > strong { color:#467067; }
+.voice-cast-tile.shared-voice-2 > strong { color:#755e9a; }
+.voice-cast-tile.shared-voice-3 > strong { color:#9a722f; }
+.voice-cast-tile.shared-voice-4 > strong { color:#4d6f9a; }
+.voice-cast-tile.shared-voice-5 > strong { color:#8f5278; }
+.voice-candidate-tile.shared-derived { border-color:#b8c8b9; background:linear-gradient(145deg,#fffdf8,#eef6f0); box-shadow:inset 3px 0 0 #789b84; }

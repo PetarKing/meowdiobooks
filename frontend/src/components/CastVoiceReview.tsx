@@ -48,6 +48,10 @@ function tilePreviewFor(voice: CastVoice, selections: Record<string, string>) {
     ?? candidatesFor(voice).at(-1);
 }
 
+function sharedGroupFor(voice: CastVoice, selections: Record<string, string>) {
+  return tilePreviewFor(voice, selections)?.sharedVoiceGroupId;
+}
+
 function routeFor(voice: CastVoice, routes: Record<string, VoiceRoute>): VoiceRoute {
   return voice.category === "group"
     ? routes[voice.characterId] ?? voice.voiceRoute ?? { kind: "dedicated" }
@@ -169,6 +173,11 @@ export function CastVoiceReview({
     () => Object.fromEntries(voices.map((voice) => [voice.characterId, voice])),
     [voices],
   );
+  const sharedGroupColors = useMemo(() => new Map(
+    [...new Set(voices.map((voice) => sharedGroupFor(voice, selections)).filter(Boolean) as string[])]
+      .sort()
+      .map((groupId, index) => [groupId, index % 6]),
+  ), [voices, selections]);
   const previewUrlFor = (voice: CastVoice) => routeFor(voice, routes).kind === "layered"
     ? layeredPreviewUrl(bookId, voice, voices, routes, selections)
     : tilePreviewFor(voice, selections)?.previewUrl;
@@ -345,6 +354,7 @@ export function CastVoiceReview({
 
   const inspectedCandidates = inspected ? candidatesFor(inspected) : [];
   const approvedRevision = inspected ? approvedRevisionFor(inspected, selections) : undefined;
+  const inspectedSharedGroup = inspected ? sharedGroupFor(inspected, selections) : undefined;
   const inspectedRoute = inspected ? routeFor(inspected, routes) : { kind: "dedicated" } as VoiceRoute;
   const inspectedReady = inspected ? routeReady(inspected) : false;
   const inspectedPreviewUrl = inspected ? previewUrlFor(inspected) : undefined;
@@ -360,6 +370,7 @@ export function CastVoiceReview({
       <div>
         <b>{t("{{selected}} of {{count}} voices selected", { selected: voices.filter(routeReady).length, count: voices.length })}</b>
         <small>{t("Open a cast member to preview and tune their voice.")}</small>
+        {sharedGroupColors.size > 0 && <small className="shared-voice-help">{t("Brief roles may share a voice to reduce generation time and cost. Open any character to generate or choose a different audition.")}</small>}
       </div>
       <div className="voice-cast-toolbar-meta">
         <span>{cast.language ? t(cast.language) : "—"}</span>
@@ -373,19 +384,21 @@ export function CastVoiceReview({
         const lineCount = lineCountFor(voice, cast);
         const previewUrl = previewUrlFor(voice);
         const playing = playingTileId === voice.characterId;
+        const sharedGroupId = sharedGroupFor(voice, selections);
+        const sharedColor = sharedGroupId == null ? undefined : sharedGroupColors.get(sharedGroupId);
         return <div className="cast-tile-shell" key={voice.characterId}>
           <button
             type="button"
             ref={(element) => { tileRefs.current[voice.characterId] = element; }}
             aria-label={t("Open {{name}} voice", { name: voice.name })}
-            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : "voice-unselected"}`}
+            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : "voice-unselected"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
             onClick={() => openInspector(voice.characterId)}
           >
             <span className="cast-atomic-number">{isNarrator ? "N" : String(index).padStart(2, "0")}</span>
             <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>
             <strong>{isNarrator ? "♬" : initials(voice.name)}</strong>
             <b>{voice.name}</b>
-            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : selected ? "voice selected" : "choose voice")}</small>
+            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : "choose voice")}</small>
           </button>
           <button
             type="button"
@@ -404,7 +417,7 @@ export function CastVoiceReview({
         <header className="cast-inspector-head">
           <div>
             <span className={`cast-status-dot ${inspectedReady ? "ready" : "needs-review"}`} />
-            <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : "Needs a voice")}</small>
+            <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : inspectedSharedGroup ? "Shared voice selected" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : "Needs a voice")}</small>
             <h2>{inspected.name}</h2>
             <p>{t(inspected.category ?? (inspected.characterId === "narrator" ? "Narrator" : "Character"))} · {t(lineCountLabel(lineCountFor(inspected, cast)))} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
           </div>
@@ -524,11 +537,11 @@ export function CastVoiceReview({
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
               const applied = candidate.revision === approvedRevision;
               const selected = candidate.revision === pendingRevision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
                 <div className="voice-candidate-actions">
                   <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
                     <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
-                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
+                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
                     {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
                   </button>
                   {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}

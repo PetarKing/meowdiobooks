@@ -25,6 +25,7 @@ from meowdiobooks.backend.tts_v2 import (
     render_plan_audio,
 )
 from meowdiobooks.backend.transcription import TranscriptionDraft
+from meowdiobooks.backend.voice_sharing import VoiceSharingPolicy
 
 
 def _pdf() -> bytes:
@@ -669,6 +670,185 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             == candidate["identities"][0]["voicePreviewRevision"]
         )
         assert render_calls[0]["sourceCoverage"] == {"status": "exact", "sourceSpanCount": 1}
+
+
+def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_path):
+    labels = ["Guard", "Rebel", *(["Major"] * 98)]
+    spans = [
+        {
+            "id": f"span-{index}",
+            "blockId": f"block-{index}",
+            "sourceStart": 0,
+            "sourceEnd": 5,
+            "source": "Line.",
+            "text": "Line.",
+            "renderRole": "dialogue",
+            "sourceSpeakerLabel": label,
+            "speakerStatus": "explicit",
+        }
+        for index, label in enumerate(labels)
+    ]
+    proposal = {
+        "status": "ready",
+        "dossiers": [
+            {"label": "Guard", "occurrenceCount": 1, "examples": []},
+            {"label": "Rebel", "occurrenceCount": 1, "examples": []},
+            {"label": "Major", "occurrenceCount": 98, "examples": []},
+        ],
+        "proposals": [
+            {
+                "label": label,
+                "category": "character",
+                "canonicalName": label,
+                "aliases": [],
+                "competingLabels": [],
+                "reason": "Explicit label.",
+                "reviewRequired": False,
+            }
+            for label in ("Guard", "Rebel", "Major")
+        ],
+        "fuzzyCandidates": [],
+        "globalLabelLedger": "",
+        "reconciliationConflicts": [],
+        "processing": {"labels": 3, "batches": 1, "model": "test"},
+    }
+    settings = {
+        "presentation": "masculine",
+        "age": "adult",
+        "tone": "neutral",
+        "pitch": "medium",
+        "pace": "natural",
+        "energy": "balanced",
+        "accent": "unspecified",
+        "description": "Natural adult voice.",
+    }
+    audition_batches: list[list[str]] = []
+
+    def auditions(_repo, package, _book_id, characters, report, _language, _model_id):
+        audition_batches.append([str(row["id"]) for row in characters])
+        for row in characters:
+            revision = f"voice-{row['id']}"
+            path = package / "voices" / row["id"] / f"{revision}.wav"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"RIFF-test")
+            row.update(
+                {
+                    "voicePreviewRevision": revision,
+                    "previewUrl": f"/voice/{revision}",
+                    "referenceText": row["previewLine"],
+                    "voice": row["voiceDirection"],
+                    "voiceCandidates": [
+                        {
+                            "revision": revision,
+                            "previewUrl": f"/voice/{revision}",
+                            "referenceText": row["previewLine"],
+                            "direction": row["voiceDirection"],
+                            "voiceSettings": row["voiceSettings"],
+                        }
+                    ],
+                }
+            )
+        report(100, "done")
+        return characters
+
+    with TestClient(
+        create_app_v2(
+            tmp_path,
+            cast_proposer=lambda *_args: proposal,
+            voice_profiler=lambda _repo, identities, *_args: {
+                row["characterId"]: settings for row in identities
+            },
+            voice_auditioner=auditions,
+            voice_sharing_policy=VoiceSharingPolicy(
+                max_lines=6,
+                max_dialogue_fraction=0.02,
+                collision_window_turns=8,
+                compatibility_fields=("age", "presentation"),
+            ),
+        )
+    ) as client:
+        imported = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()
+        book_id = imported["book"]["id"]
+        package = tmp_path / "packages" / book_id
+        _, extraction = write_artifact(
+            package,
+            "extraction",
+            {"revision": "extract-1", "blocks": [], "pages": [], "boundaryCandidates": []},
+        )
+        _, dialogue = write_artifact(
+            package,
+            "dialogue",
+            {
+                "revision": "dialogue-1",
+                "extractionRevision": extraction["revision"],
+                "spans": spans,
+            },
+        )
+        chapter_ids = {
+            row["id"]: "guard-scene"
+            if row["sourceSpeakerLabel"] == "Guard"
+            else "rebel-scene"
+            if row["sourceSpeakerLabel"] == "Rebel"
+            else "main-scene"
+            for row in spans
+        }
+        write_artifact(
+            package,
+            "review",
+            {
+                "revision": "review-1",
+                "dialogueRevision": dialogue["revision"],
+                "canStartCast": True,
+                "blockers": [],
+                "spanChapterIds": chapter_ids,
+            },
+        )
+
+        identity = _process(client, book_id, "cast", {})
+        audition = _process(
+            client,
+            book_id,
+            "cast",
+            {"proposalRevision": identity["revision"], "language": "english"},
+        )
+        candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{audition['revision']}"
+        ).json()
+        decisions = [
+            {
+                "characterId": row["characterId"],
+                "voiceRevision": row["voicePreviewRevision"],
+            }
+            for row in [candidate["narrator"], *candidate["identities"]]
+        ]
+        accepted_response = _accept(
+            client, book_id, "cast", audition["revision"], decisions
+        )
+        assert accepted_response.status_code == 200, accepted_response.text
+        accepted = read_artifact(package, "cast")
+
+    assert len(audition_batches) == 1
+    assert audition_batches[0][0] == "narrator"
+    assert len(audition_batches[0]) == 3
+    by_name = {row["name"]: row for row in candidate["identities"]}
+    assert by_name["Guard"]["voicePreviewRevision"] == by_name["Rebel"][
+        "voicePreviewRevision"
+    ]
+    assert by_name["Guard"]["voiceCandidates"][0]["source"] == "shared"
+    assert by_name["Rebel"]["voiceCandidates"][0]["source"] == "shared"
+    assert (
+        by_name["Guard"]["voiceCandidates"][0]["sharedVoiceGroupId"]
+        == "shared-voice-01"
+    )
+    assert by_name["Guard"]["referenceAudio"] == by_name["Rebel"]["referenceAudio"]
+    assert by_name["Major"]["voicePreviewRevision"].startswith("voice-character-")
+    accepted_by_name = {row["name"]: row for row in accepted["identities"]}
+    assert accepted_by_name["Guard"]["voiceAccepted"] is True
+    assert accepted_by_name["Guard"]["referenceAudio"] == accepted_by_name["Rebel"][
+        "referenceAudio"
+    ]
 
 
 def test_tts_v2_atomically_publishes_metadata_from_compiled_segment(tmp_path, monkeypatch):

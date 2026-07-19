@@ -179,7 +179,8 @@ def _audition_identity(
             "previewUrl": generated.get("previewUrl"),
             "referenceText": generated.get("referenceText"),
             "referenceAudio": (
-                str((Path("voices") / character_id / f"{revision}.wav")) if revision else None
+                generated.get("referenceAudio")
+                or (str(Path("voices") / character_id / f"{revision}.wav") if revision else None)
             ),
             "voiceCandidates": generated.get("voiceCandidates", []),
             "voicePreviewError": generated.get("voicePreviewError"),
@@ -187,3 +188,40 @@ def _audition_identity(
         }
     )
     return identity
+
+
+def _shared_audition_identity(
+    generated: dict[str, Any],
+    base: dict[str, Any],
+    group_id: str,
+    package: Path,
+) -> dict[str, Any]:
+    """Project one generated audition onto another identity without copying audio."""
+
+    shared = deepcopy(generated)
+    anchor_id = str(generated["id"])
+    revision = str(generated.get("voicePreviewRevision", ""))
+    reference_audio = str(Path("voices") / anchor_id / f"{revision}.wav") if revision else None
+    candidates = []
+    for raw in generated.get("voiceCandidates", []):
+        candidate = deepcopy(raw)
+        if str(candidate.get("revision", "")) == revision:
+            candidate.update(
+                {
+                    "source": "shared",
+                    "sharedVoiceGroupId": group_id,
+                    "referenceAudio": reference_audio,
+                }
+            )
+        candidates.append(candidate)
+    shared.update(
+        {
+            "id": str(base["characterId"]),
+            "name": str(base["name"]),
+            "category": str(base.get("category", "character")),
+            "lineCount": int(base.get("lineCount", 0)),
+            "referenceAudio": reference_audio,
+            "voiceCandidates": candidates,
+        }
+    )
+    return _audition_identity(shared, package, base=base)
