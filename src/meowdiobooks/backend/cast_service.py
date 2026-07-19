@@ -132,6 +132,8 @@ vocal evidence contradicts them. If narration explicitly describes the cast memb
 low in any source language, pitch MUST match that register.
 Use target speech mainly for tone, pace and energy. The description must contain audible performance
 direction only, not biography or plot summary.
+Keep the accent and description concise enough that the complete compiled direction stays within 250
+characters. Preserve useful audible cues, but phrase them compactly.
 Do not infer an accent from a name. Do not explain your choices. Return JSON only."""
 
 VOICE_PROFILE_OPTIONS = {
@@ -670,11 +672,15 @@ def _complete_voice_settings_with(
     for _attempt in range(2):
         raw = complete(VOICE_PROFILE_SYSTEM, retry_prompt, 384)
         try:
-            return validate_voice_settings(raw)
+            settings = validate_voice_settings(raw)
+            compile_voice_direction(settings)
+            return settings
         except CastContractError as error:
             failures.append(str(error))
             retry_prompt = _bounded_voice_prompt(
-                "Please try once more. Use only the exact allowed values and all eight fields.\n\n"
+                "Please try once more. Use only the exact allowed values and all eight fields.\n"
+                f"Your previous answer violated the contract: {error}\n"
+                "Keep every useful audible cue, but phrase accent and description compactly.\n\n"
                 + prompt,
                 max_characters=max_prompt_characters,
             )

@@ -358,6 +358,27 @@ def test_voice_profile_retry_keeps_the_correction_inside_the_prompt_ceiling(monk
     assert prompts[1].startswith("Please try once more.")
 
 
+def test_voice_profile_retries_when_combined_direction_exceeds_provider_budget(monkeypatch):
+    prompts = []
+
+    def fake_complete(_base, _system, prompt, **_kwargs):
+        prompts.append(prompt)
+        return {
+            **default_voice_settings(),
+            "accent": "a" * 48 if len(prompts) == 1 else "unspecified",
+            "description": "b" * 180 if len(prompts) == 1 else "Compact audible cues.",
+        }
+
+    monkeypatch.setattr("meowdiobooks.backend.cast_service.complete_json", fake_complete)
+    result = _complete_voice_settings("http://qwen", "voice evidence")
+
+    assert result["description"] == "Compact audible cues."
+    assert len(prompts) == 2
+    assert "Voice direction exceeds 250 characters" in prompts[1]
+    assert "Keep every useful audible cue" in prompts[1]
+    assert len(compile_voice_direction(result)) <= 250
+
+
 def test_voice_settings_validate_fixed_handles_and_compile_one_direction():
     settings = validate_voice_settings(
         {
