@@ -7,6 +7,16 @@ export const targetChapterPartSeconds = 30 * 60;
 // One comparable concurrent run can consume half of the shared synthesis capacity.
 const generationHistoryHeadroom = 2;
 
+export interface GenerationEstimatePolicy {
+  fallbackLowerMultiplier: number;
+  fallbackUpperMultiplier: number;
+}
+
+export const publicGenerationEstimatePolicy: GenerationEstimatePolicy = {
+  fallbackLowerMultiplier: 0.5,
+  fallbackUpperMultiplier: 2,
+};
+
 export interface GenerationRun {
   chapterIds: string[];
   estimatedAudioSeconds: number;
@@ -39,10 +49,16 @@ export function chapterDuration(seconds?: number, estimated = true) {
   return appI18n.t(estimated ? "≈ {{count}} hr" : "{{count}} hr", { count: hours });
 }
 
-export function generationDuration(seconds?: number, historicalMultiplier?: number) {
+export function generationDuration(
+  seconds?: number,
+  historicalMultiplier?: number,
+  policy: GenerationEstimatePolicy = publicGenerationEstimatePolicy,
+) {
   if (!seconds) return "Estimate pending";
-  const lowerMultiplier = historicalMultiplier ?? 0.5;
-  const upperMultiplier = historicalMultiplier ? historicalMultiplier * generationHistoryHeadroom : 2;
+  const lowerMultiplier = historicalMultiplier ?? policy.fallbackLowerMultiplier;
+  const upperMultiplier = historicalMultiplier
+    ? historicalMultiplier * generationHistoryHeadroom
+    : policy.fallbackUpperMultiplier;
   const lowerMinutes = Math.max(1, Math.ceil(seconds * lowerMultiplier / 60));
   const upperMinutes = Math.max(lowerMinutes, Math.ceil(seconds * upperMultiplier / 60));
   const display = (minutes: number) => minutes < 60
@@ -87,7 +103,12 @@ export function readyChapterCount(run: GenerationRun | undefined, job: Job | und
   return completed.length;
 }
 
-export function remainingGenerationTime(run: GenerationRun | undefined, job: Job | undefined, progress: number) {
+export function remainingGenerationTime(
+  run: GenerationRun | undefined,
+  job: Job | undefined,
+  progress: number,
+  policy: GenerationEstimatePolicy = publicGenerationEstimatePolicy,
+) {
   if (!run) return "Estimating…";
   const parsedStartedAt = job?.started_at ? Date.parse(job.started_at) : Number.NaN;
   const startedAt = Number.isFinite(parsedStartedAt) ? parsedStartedAt : run.startedAtMs;
@@ -96,5 +117,5 @@ export function remainingGenerationTime(run: GenerationRun | undefined, job: Job
     return chapterDuration(elapsedSeconds * (100 - progress) / progress);
   }
   if (progress >= 100) return "Almost done";
-  return generationDuration(run.estimatedAudioSeconds, run.historicalMultiplier);
+  return generationDuration(run.estimatedAudioSeconds, run.historicalMultiplier, policy);
 }

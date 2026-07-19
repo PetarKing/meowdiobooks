@@ -523,6 +523,39 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 5 min–20 min')
   })
 
+  it('accepts an edition-specific fallback range before successful history exists', async () => {
+    const estimatedSeconds = 3917
+    const snapshot: WizardSnapshot = {
+      ...base,
+      recordingScript: { ...base.recordingScript!, summary: {
+        ...faithfulSummary,
+        estimatedSeconds,
+        chapters: [{ ...faithfulSummary.chapters[0], retainedCharacters: 58_755, estimatedSeconds }],
+      } },
+      generatedChapters: [],
+    }
+    let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued' })
+    vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
+
+    await open(snapshot, undefined, undefined, undefined, {
+      generationEstimatePolicy: {
+        fallbackLowerMultiplier: 0.072,
+        fallbackUpperMultiplier: 0.144,
+      },
+    })
+
+    expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 5 min–10 min')
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(within(dialog).getByText('≈ 5 min–10 min')).toBeInTheDocument()
+
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
+    finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
+  })
+
   it('uses recent successful generation jobs as the lower bound with 2x headroom', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
