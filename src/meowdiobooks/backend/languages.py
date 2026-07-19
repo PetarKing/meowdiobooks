@@ -33,47 +33,111 @@ LANGUAGE_ALIASES = {
 }
 
 AUDITION_TEMPLATES = {
-    "chinese": "这是{name}的声音。明亮的清晨，轻柔的微风吹过宁静的村庄。",
+    "chinese": (
+        "这是{name}的声音。明亮的清晨，轻柔的微风吹过宁静的村庄。"
+        "广场后方的一扇门打开了，急促的脚步声穿过石板路。"
+        "随后，一个清晰的声音喊道：‘等等——有件事你必须听。’"
+    ),
     "english": (
         "This is the voice of {name}. "
-        "The bright morning carried a gentle breeze across the quiet village."
+        "The bright morning carried a gentle breeze across the quiet village. "
+        "A door opened somewhere behind the square, and hurried footsteps crossed the stones. "
+        "Then a clear voice called, ‘Wait—there is something you need to hear.’"
     ),
     "french": (
         "Voici la voix de {name}. "
-        "Ce matin lumineux, une brise légère traversait le village paisible."
+        "Ce matin lumineux, une brise légère traversait le village paisible. "
+        "Une porte s’ouvrit derrière la place, et des pas pressés résonnèrent sur les pavés. "
+        "Puis une voix claire appela : « Attendez — il faut que vous entendiez quelque chose. »"
     ),
     "german": (
         "Dies ist die Stimme von {name}. "
-        "Am hellen Morgen wehte eine sanfte Brise durch das ruhige Dorf."
+        "Am hellen Morgen wehte eine sanfte Brise durch das ruhige Dorf. "
+        "Hinter dem Platz öffnete sich eine Tür, und eilige Schritte hallten über das Pflaster. "
+        "Dann rief eine klare Stimme: ‚Warte — du musst etwas hören.‘"
     ),
     "italian": (
         "Questa è la voce di {name}. "
-        "Nel mattino luminoso, una brezza leggera attraversava il tranquillo villaggio."
+        "Nel mattino luminoso, una brezza leggera attraversava il tranquillo villaggio. "
+        "Una porta si aprì dietro la piazza e passi frettolosi attraversarono le pietre. "
+        "Poi una voce limpida chiamò: «Aspetta — c’è qualcosa che devi sentire.»"
     ),
-    "japanese": "これは{name}の声です。明るい朝、穏やかな風が静かな村を吹き抜けました。",
-    "korean": "이것은 {name}의 목소리입니다. 밝은 아침, 부드러운 바람이 고요한 마을을 스쳐 갔습니다.",
+    "japanese": (
+        "これは{name}の声です。明るい朝、穏やかな風が静かな村を吹き抜けました。"
+        "広場の向こうで扉が開き、急ぐ足音が石畳を渡ってきました。"
+        "そして澄んだ声が呼びかけました。『待って――聞いてほしいことがあります。』"
+    ),
+    "korean": (
+        "이것은 {name}의 목소리입니다. 밝은 아침, 부드러운 바람이 고요한 마을을 스쳐 갔습니다. "
+        "광장 뒤편에서 문이 열리고 다급한 발걸음이 돌길을 가로질렀습니다. "
+        "그때 또렷한 목소리가 외쳤습니다. ‘잠깐만요—꼭 들어야 할 이야기가 있어요.’"
+    ),
     "portuguese": (
         "Esta é a voz de {name}. "
-        "Na manhã luminosa, uma brisa suave atravessou a vila tranquila."
+        "Na manhã luminosa, uma brisa suave atravessou a vila tranquila. "
+        "Uma porta se abriu atrás da praça, e passos apressados cruzaram as pedras. "
+        "Então uma voz clara chamou: «Espere — há algo que você precisa ouvir.»"
     ),
-    "russian": "Говорит {name}. Ясным утром лёгкий ветерок прошёл по тихой деревне.",
+    "russian": (
+        "Говорит {name}. Ясным утром лёгкий ветерок прошёл по тихой деревне. "
+        "За площадью открылась дверь, и торопливые шаги застучали по камням. "
+        "Затем ясный голос позвал: «Подожди — тебе нужно кое-что услышать»."
+    ),
     "spanish": (
         "Esta es la voz de {name}. "
-        "En la mañana luminosa, una brisa suave recorrió el tranquilo pueblo."
+        "En la mañana luminosa, una brisa suave recorrió el tranquilo pueblo. "
+        "Una puerta se abrió detrás de la plaza y unos pasos apresurados cruzaron las piedras. "
+        "Entonces una voz clara llamó: «Espera — hay algo que necesitas oír.»"
     ),
 }
 
 SHARED_AUDITION_TEMPLATES = {
-    "chinese": "明亮的清晨，轻柔的微风吹过宁静的村庄。",
-    "english": "The bright morning carried a gentle breeze across the quiet village.",
-    "french": "Ce matin lumineux, une brise légère traversait le village paisible.",
-    "german": "Am hellen Morgen wehte eine sanfte Brise durch das ruhige Dorf.",
-    "italian": "Nel mattino luminoso, una brezza leggera attraversava il tranquillo villaggio.",
-    "japanese": "明るい朝、穏やかな風が静かな村を吹き抜けました。",
-    "korean": "밝은 아침, 부드러운 바람이 고요한 마을을 스쳐 갔습니다.",
-    "portuguese": "Na manhã luminosa, uma brisa suave atravessou a vila tranquila.",
-    "russian": "Ясным утром лёгкий ветерок прошёл по тихой деревне.",
-    "spanish": "En la mañana luminosa, una brisa suave recorrió el tranquilo pueblo.",
+    "chinese": "明亮的清晨，轻柔的微风吹过宁静的村庄。广场后方的一扇门打开了，急促的脚步声穿过石板路。随后，一个清晰的声音喊道：‘等等——有件事你必须听。’",
+    "english": (
+        "The bright morning carried a gentle breeze across the quiet village. "
+        "A door opened somewhere behind the square, and hurried footsteps crossed the stones. "
+        "Then a clear voice called, ‘Wait—there is something you need to hear.’"
+    ),
+    "french": (
+        "Ce matin lumineux, une brise légère traversait le village paisible. "
+        "Une porte s’ouvrit derrière la place, et des pas pressés résonnèrent sur les pavés. "
+        "Puis une voix claire appela : « Attendez — il faut que vous entendiez quelque chose. »"
+    ),
+    "german": (
+        "Am hellen Morgen wehte eine sanfte Brise durch das ruhige Dorf. "
+        "Hinter dem Platz öffnete sich eine Tür, und eilige Schritte hallten über das Pflaster. "
+        "Dann rief eine klare Stimme: ‚Warte — du musst etwas hören.‘"
+    ),
+    "italian": (
+        "Nel mattino luminoso, una brezza leggera attraversava il tranquillo villaggio. "
+        "Una porta si aprì dietro la piazza e passi frettolosi attraversarono le pietre. "
+        "Poi una voce limpida chiamò: «Aspetta — c’è qualcosa che devi sentire.»"
+    ),
+    "japanese": (
+        "明るい朝、穏やかな風が静かな村を吹き抜けました。"
+        "広場の向こうで扉が開き、急ぐ足音が石畳を渡ってきました。"
+        "そして澄んだ声が呼びかけました。『待って――聞いてほしいことがあります。』"
+    ),
+    "korean": (
+        "밝은 아침, 부드러운 바람이 고요한 마을을 스쳐 갔습니다. "
+        "광장 뒤편에서 문이 열리고 다급한 발걸음이 돌길을 가로질렀습니다. "
+        "그때 또렷한 목소리가 외쳤습니다. ‘잠깐만요—꼭 들어야 할 이야기가 있어요.’"
+    ),
+    "portuguese": (
+        "Na manhã luminosa, uma brisa suave atravessou a vila tranquila. "
+        "Uma porta se abriu atrás da praça, e passos apressados cruzaram as pedras. "
+        "Então uma voz clara chamou: «Espere — há algo que você precisa ouvir.»"
+    ),
+    "russian": (
+        "Ясным утром лёгкий ветерок прошёл по тихой деревне. "
+        "За площадью открылась дверь, и торопливые шаги застучали по камням. "
+        "Затем ясный голос позвал: «Подожди — тебе нужно кое-что услышать»."
+    ),
+    "spanish": (
+        "En la mañana luminosa, una brisa suave recorrió el tranquilo pueblo. "
+        "Una puerta se abrió detrás de la plaza y unos pasos apresurados cruzaron las piedras. "
+        "Entonces una voz clara llamó: «Espera — hay algo que necesitas oír.»"
+    ),
 }
 
 def normalize_language(value: object) -> str:

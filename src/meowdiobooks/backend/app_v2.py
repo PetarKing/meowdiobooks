@@ -98,6 +98,7 @@ from .documents import (
 from .generation_status import chapter_audio_stale_reasons, generated_chapters
 from .models import Book, Job, JobStatus, LibraryExport, StageRevision, WizardStage, utc_now
 from .model_config import dialogue_routing_preview, load_model_registry
+from .voice_candidates import VoiceCandidatePolicy
 from .remote_llm import RemoteUsageObserver
 from .m4b import (
     FFmpegUnavailableError,
@@ -258,6 +259,66 @@ _MAX_VOICE_SAMPLE_BYTES = 25_000_000
 ChapterAudioSource = Callable[[str, str, str, Path], AbstractContextManager[Path]]
 
 
+def _generate_voice_candidates(
+    *,
+    voice_auditioner: Callable[..., list[dict[str, Any]]],
+    repo_root: Path,
+    package: Path,
+    book_id: str,
+    characters: list[dict[str, Any]],
+    report: Callable[[float, str | None], None],
+    language: str,
+    model_id: str,
+    policy: VoiceCandidatePolicy,
+) -> list[dict[str, Any]]:
+    """Generate the baseline cast, then reroll only the configured high-volume voices."""
+
+    selected_ids = set(policy.selected_ids(characters))
+    passes = 1 + (policy.extra_candidates if selected_ids else 0)
+
+    def pass_report(index: int) -> Callable[[float, str | None], None]:
+        return lambda progress, message=None: report(
+            (index + max(0.0, min(100.0, progress)) / 100) / passes * 100,
+            message,
+        )
+
+    generated = voice_auditioner(
+        repo_root,
+        package,
+        book_id,
+        characters,
+        pass_report(0),
+        language,
+        model_id,
+    )
+    for index in range(policy.extra_candidates):
+        reroll = [
+            row
+            for row in generated
+            if str(row.get("id") or row.get("characterId") or "") in selected_ids
+        ]
+        if not reroll:
+            break
+        updated = voice_auditioner(
+            repo_root,
+            package,
+            book_id,
+            reroll,
+            pass_report(index + 1),
+            language,
+            model_id,
+        )
+        by_id = {
+            str(row.get("id") or row.get("characterId") or ""): row
+            for row in updated
+        }
+        generated = [
+            by_id.get(str(row.get("id") or row.get("characterId") or ""), row)
+            for row in generated
+        ]
+    return generated
+
+
 def create_app_v2(
     data_dir: Path | str = Path(".meowdiobooks"),
     frontend_dist: Path | str | None = None,
@@ -275,6 +336,7 @@ def create_app_v2(
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
     voice_sharing_policy: VoiceSharingPolicy | None = None,
+    voice_candidate_policy: Mapping[str, Any] | VoiceCandidatePolicy | None = None,
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
@@ -302,8 +364,15 @@ def create_app_v2(
     chapter_audio_source = chapter_audio_source or (
         lambda _book_id, _chapter_id, _revision, expected: nullcontext(expected)
     )
-    default_voice_id = default_voice_model or load_model_registry(repo_root).default_voice_id
+    registry = load_model_registry(repo_root)
+    default_voice_id = default_voice_model or registry.default_voice_id
     voice_sharing_policy = voice_sharing_policy or VoiceSharingPolicy()
+    if isinstance(voice_candidate_policy, VoiceCandidatePolicy):
+        resolved_voice_candidate_policy = voice_candidate_policy
+    else:
+        resolved_voice_candidate_policy = VoiceCandidatePolicy.from_mapping(
+            voice_candidate_policy
+        ) if voice_candidate_policy is not None else registry.voice_candidate_policy
     books = cast(
         ModelStore[Book],
         store_factory("books", Book) if store_factory else JsonStore(root / "books.json", Book),
@@ -662,6 +731,9 @@ def create_app_v2(
             )
             shared_group_by_id = sharing_plan.group_by_character_id
             characters = []
+            profile_by_id = {
+                str(row["characterId"]): row for row in profile_targets
+            }
             for row in profile_targets:
                 character_id = str(row["characterId"])
                 group = shared_group_by_id.get(character_id)
@@ -675,6 +747,11 @@ def create_app_v2(
                         {
                             "name": f"Supporting voice {group.id.rsplit('-', 1)[-1]}",
                             "previewLine": shared_audition_line(language),
+                            "lineCount": sum(
+                                int(profile_by_id[member_id].get("lineCount", 0))
+                                for member_id in group.character_ids
+                                if member_id in profile_by_id
+                            ),
                         }
                     )
                 characters.append(character)
@@ -698,14 +775,18 @@ def create_app_v2(
                 )
             if characters:
                 report(2, f"Generating {len(characters)} affected voice auditions")
-                generated = voice_auditioner(
-                    repo_root,
-                    package,
-                    book.id,
-                    characters,
-                    lambda progress, message=None: report(30 + progress * 0.70, message),
-                    language,
-                    model_id,
+                generated = _generate_voice_candidates(
+                    voice_auditioner=voice_auditioner,
+                    repo_root=repo_root,
+                    package=package,
+                    book_id=book.id,
+                    characters=characters,
+                    report=lambda progress, message=None: report(
+                        30 + progress * 0.70, message
+                    ),
+                    language=language,
+                    model_id=model_id,
+                    policy=resolved_voice_candidate_policy,
                 )
             else:
                 report(90, "Cast labels updated; all existing auditions remain valid")

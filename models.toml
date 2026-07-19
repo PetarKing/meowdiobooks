@@ -5,6 +5,14 @@ text = "qwen-3.5-9b-q4"
 voice = "qwen-voice-design-1.7b"
 transcription = "qwen3-asr-0.6b-4bit"
 
+[voice_candidates]
+# Generate one additional take for the smallest high-volume subset that covers 80% of lines.
+enabled = true
+coverage_fraction = 0.8
+min_voices = 2
+max_voices = 4
+extra_candidates = 1
+
 [dialogue_attribution]
 default_route = "local"
 large_review_threshold = 100

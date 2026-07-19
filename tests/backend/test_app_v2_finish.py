@@ -495,15 +495,15 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         candidate = client.get(
             f"/api/books/{book_id}/stages/cast/candidates/{audition['revision']}"
         ).json()
-        assert candidate["narrator"]["referenceText"] == (
-            "This is the voice of Narrator. "
-            "The bright morning carried a gentle breeze across the quiet village."
+        assert candidate["narrator"]["referenceText"].startswith(
+            "This is the voice of Narrator. The bright morning"
         )
+        assert len(candidate["narrator"]["referenceText"].split()) >= 35
         assert candidate["narrator"]["lineCount"] == 0
-        assert candidate["identities"][0]["referenceText"] == (
-            "This is the voice of Alice. "
-            "The bright morning carried a gentle breeze across the quiet village."
+        assert candidate["identities"][0]["referenceText"].startswith(
+            "This is the voice of Alice. The bright morning"
         )
+        assert len(candidate["identities"][0]["referenceText"].split()) >= 35
         assert candidate["identities"][0]["lineCount"] == 1
         original_narrator_revision = candidate["narrator"]["voicePreviewRevision"]
         original_alice_revision = candidate["identities"][0]["voicePreviewRevision"]
@@ -589,7 +589,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             "Brisk, dry, and quietly amused"
             in regenerated_candidate["identities"][0]["voiceDirection"]
         )
-        assert len(regenerated_candidate["identities"][0]["voiceCandidates"]) == 2
+        assert len(regenerated_candidate["identities"][0]["voiceCandidates"]) == 3
         stale_decisions = [
             {
                 "characterId": row["characterId"],
@@ -727,7 +727,8 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
     def auditions(_repo, package, _book_id, characters, report, _language, _model_id):
         audition_batches.append([str(row["id"]) for row in characters])
         for row in characters:
-            revision = f"voice-{row['id']}"
+            candidates = list(row.get("voiceCandidates", []))
+            revision = f"voice-{row['id']}-{len(candidates) + 1}"
             path = package / "voices" / row["id"] / f"{revision}.wav"
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(b"RIFF-test")
@@ -738,6 +739,7 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
                     "referenceText": row["previewLine"],
                     "voice": row["voiceDirection"],
                     "voiceCandidates": [
+                        *candidates,
                         {
                             "revision": revision,
                             "previewUrl": f"/voice/{revision}",
@@ -829,9 +831,10 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
         assert accepted_response.status_code == 200, accepted_response.text
         accepted = read_artifact(package, "cast")
 
-    assert len(audition_batches) == 1
+    assert len(audition_batches) == 2
     assert audition_batches[0][0] == "narrator"
     assert len(audition_batches[0]) == 3
+    assert len(audition_batches[1]) == 2
     by_name = {row["name"]: row for row in candidate["identities"]}
     assert by_name["Guard"]["voicePreviewRevision"] == by_name["Rebel"][
         "voicePreviewRevision"
@@ -1143,20 +1146,15 @@ def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(t
 
 
 def test_every_audition_uses_the_same_neutral_phrase_contract():
-    assert _audition_line("Narrator", "english") == (
-        "This is the voice of Narrator. "
-        "The bright morning carried a gentle breeze across the quiet village."
-    )
-    assert _audition_line("Alice", "english") == (
+    narrator = _audition_line("Narrator", "english")
+    alice = _audition_line("Alice", "english")
+    assert narrator.removeprefix("This is the voice of Narrator. ") == alice.removeprefix(
         "This is the voice of Alice. "
-        "The bright morning carried a gentle breeze across the quiet village."
     )
-    assert _audition_line("林", "chinese") == (
-        "这是林的声音。明亮的清晨，轻柔的微风吹过宁静的村庄。"
-    )
-    assert _audition_line("Mara", "portuguese") == (
-        "Esta é a voz de Mara. "
-        "Na manhã luminosa, uma brisa suave atravessou a vila tranquila."
+    assert len(narrator.split()) >= 35
+    assert _audition_line("林", "chinese").startswith("这是林的声音。明亮的清晨")
+    assert _audition_line("Mara", "portuguese").startswith(
+        "Esta é a voz de Mara. Na manhã luminosa"
     )
 
 

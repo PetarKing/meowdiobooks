@@ -10,6 +10,8 @@ from urllib.parse import urlparse
 
 from meowdiobooks.assets import model_registry_path
 
+from .voice_candidates import VoiceCandidatePolicy
+
 
 class ModelConfigError(ValueError):
     """Raised when ``models.toml`` cannot provide a safe runtime contract."""
@@ -104,6 +106,7 @@ class ModelRegistry:
     speech_models: dict[str, SpeechModelConfig]
     remote_text_models: dict[str, RemoteTextModelConfig]
     dialogue_attribution: DialogueAttributionConfig
+    voice_candidate_policy: VoiceCandidatePolicy
 
     def active_text_model(self) -> TextModelConfig:
         return self.text_models[self.default_text_id]
@@ -165,6 +168,12 @@ def load_model_registry(repo_root: Path) -> ModelRegistry:
         for model_id, value in _optional_table(raw, "remote_text_models").items()
     }
     dialogue_attribution = _dialogue_attribution(raw.get("dialogue_attribution"))
+    try:
+        voice_candidate_policy = VoiceCandidatePolicy.from_mapping(
+            _optional_table(raw, "voice_candidates")
+        )
+    except ValueError as error:
+        raise ModelConfigError(str(error)) from error
     default_text = _string(defaults, "text")
     default_voice = _string(defaults, "voice")
     default_transcription = _optional_string(defaults, "transcription")
@@ -192,6 +201,7 @@ def load_model_registry(repo_root: Path) -> ModelRegistry:
         speech_models,
         remote_text_models,
         dialogue_attribution,
+        voice_candidate_policy,
     )
 
 
