@@ -370,6 +370,29 @@ describe('HttpWizardApi', () => {
     expect(body.get('coverPage')).toBe('7')
   })
 
+  it('creates a Library export without downloading the M4B body', async () => {
+    const exported = {
+      id: 'export-1', bookId: 'book-1', title: 'A Cat', author: 'Maou', filename: 'A Cat.m4b',
+      location: '/library/A Cat.m4b', chapterCount: 1, partial: false, sizeBytes: 52_098_007,
+      createdAt: '2026-07-19T19:01:26Z',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(exported), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await new HttpWizardApi('/api').createM4bExport('book-1', [
+      { chapterId: 'chapter-1', revision: 'render-1' },
+    ])
+
+    expect(result).toEqual(exported)
+    expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/exports/m4b', expect.objectContaining({
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    }))
+  })
+
   it('turns structured export failures into a useful message', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       detail: { invalidChapterIds: ['chapter-stale'] },

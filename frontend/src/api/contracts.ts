@@ -632,6 +632,7 @@ export interface WorkflowGateway {
   listBookJobs(bookId: string): Promise<Job[]>;
   cancelJob(jobId: string): Promise<Job>;
   openChapterAudio(bookId: string, chapterId: string, revision: string): Promise<void>;
+  createM4bExport?(bookId: string, chapters: M4BExportChapter[], options?: M4BExportOptions): Promise<LibraryExport>;
   exportM4b(bookId: string, chapters: M4BExportChapter[], options?: M4BExportOptions): Promise<M4BDownload>;
   listLibrary(): Promise<LibraryExport[]>;
   openLibraryExport(exportId: string): Promise<void>;

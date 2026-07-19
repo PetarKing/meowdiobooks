@@ -286,7 +286,12 @@ export class HttpWizardApi implements WorkflowGateway {
     });
   }
 
-  async exportM4b(bookId: string, chapters: M4BExportChapter[], options: M4BExportOptions = {}): Promise<M4BDownload> {
+  private async submitM4bExport(
+    bookId: string,
+    chapters: M4BExportChapter[],
+    options: M4BExportOptions,
+    headers?: HeadersInit,
+  ): Promise<Response> {
     const body = new FormData();
     body.append("chapters", JSON.stringify(chapters));
     if (options.title) body.append("title", options.title);
@@ -296,11 +301,31 @@ export class HttpWizardApi implements WorkflowGateway {
     const response = await this.fetcher(`${this.baseUrl}/books/${bookId}/exports/m4b`, {
       method: "POST",
       body,
+      headers,
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => null) as { detail?: unknown } | null;
       throw new ApiError(apiErrorMessage(payload?.detail) || `API ${response.status}: ${response.statusText}`, response.status);
     }
+    return response;
+  }
+
+  async createM4bExport(
+    bookId: string,
+    chapters: M4BExportChapter[],
+    options: M4BExportOptions = {},
+  ): Promise<LibraryExport> {
+    const response = await this.submitM4bExport(
+      bookId,
+      chapters,
+      options,
+      { Accept: "application/json" },
+    );
+    return response.json() as Promise<LibraryExport>;
+  }
+
+  async exportM4b(bookId: string, chapters: M4BExportChapter[], options: M4BExportOptions = {}): Promise<M4BDownload> {
+    const response = await this.submitM4bExport(bookId, chapters, options);
     const disposition = response.headers.get("Content-Disposition") ?? "";
     const encoded = disposition.match(/filename\*=utf-8''([^;]+)/i)?.[1];
     const quoted = disposition.match(/filename="([^"]+)"/i)?.[1];
