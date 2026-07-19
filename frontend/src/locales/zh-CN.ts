@@ -29,6 +29,8 @@ const zhCN: Record<string, string> = {
   "A cat wizard guiding a manuscript into dialogue and sound": "一只猫咪向导正把书稿变成对话和声音",
   "Preparing": "正在准备",
   "Reconnecting to processing status…": "正在重新连接处理状态…",
+  "Continue voice generation": "继续生成声音",
+  "Completed voices are saved; continue from the interrupted voice": "已完成的声音已保存；请从中断的声音继续",
   "Processing progress": "处理进度",
   "Saving your choices and opening Cast & voices…": "正在保存你的选择并打开“角色与声音”…",
   "Keeping your approved work intact and opening Generate…": "正在保留已批准的内容并打开“生成”…",

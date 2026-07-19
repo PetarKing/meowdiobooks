@@ -1,5 +1,6 @@
 import json
 import time
+from datetime import timedelta
 from io import BytesIO
 from pathlib import Path
 
@@ -15,6 +16,8 @@ from meowdiobooks.backend.app_v2 import (
     _accept_voice_revisions,
     _generated_chapters,
     _rebase_accepted_cast,
+    _matching_failed_job,
+    _recoverable_stages,
     create_app_v2,
 )
 from meowdiobooks.backend.artifacts import active_artifacts, read_artifact, write_artifact
@@ -26,6 +29,7 @@ from meowdiobooks.backend.tts_v2 import (
 )
 from meowdiobooks.backend.transcription import TranscriptionDraft
 from meowdiobooks.backend.voice_sharing import VoiceSharingPolicy
+from meowdiobooks.backend.models import Job, JobStatus
 
 
 def _pdf() -> bytes:
@@ -111,6 +115,45 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
         },
     )
     return package, dialogue, review
+
+
+def test_failed_cast_with_identical_inputs_is_resumable_and_exposed_safely():
+    payload = {
+        "book_id": "book-1",
+        "settings": {
+            "proposalRevision": "cast-proposal-1",
+            "voiceModel": "qwen-audio",
+            "language": "english",
+        },
+        "workflow_version": "2",
+    }
+    failed = Job(
+        kind="v2:cast",
+        payload=payload,
+        status=JobStatus.FAILED,
+        attempt=3,
+        error="PrivateProviderError: secret diagnostics",
+    )
+
+    assert _matching_failed_job([failed], "v2:cast", payload) is failed
+    assert _recoverable_stages([failed], "book-1") == {
+        "cast": {
+            "attempt": 3,
+            "message": "Completed work is saved. Continue this step to resume.",
+            "modelId": "qwen-audio",
+            "language": "english",
+            "proposalRevision": "cast-proposal-1",
+        }
+    }
+
+    succeeded = Job(
+        kind="v2:cast",
+        payload=payload,
+        status=JobStatus.SUCCEEDED,
+        attempt=4,
+    )
+    succeeded.created_at = failed.created_at + timedelta(seconds=1)
+    assert _recoverable_stages([failed, succeeded], "book-1") == {}
 
 
 @pytest.mark.uses_audio_decoder

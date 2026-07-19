@@ -1,4 +1,4 @@
-from meowdiobooks.backend.app_v2 import _matching_failed_generation_job
+from meowdiobooks.backend.app_v2 import _matching_failed_job
 from meowdiobooks.backend.models import Job, JobStatus
 
 
@@ -32,7 +32,7 @@ def test_success_after_same_input_failure_starts_regeneration() -> None:
     )
 
     assert (
-        _matching_failed_generation_job(
+        _matching_failed_job(
             [different_inputs, succeeded, resumable], "v2:generate", payload
         )
         is None
@@ -53,7 +53,7 @@ def test_latest_same_input_failure_is_resumable() -> None:
         status=JobStatus.FAILED,
     )
 
-    assert _matching_failed_generation_job([failed], "v2:generate", payload) == failed
+    assert _matching_failed_job([failed], "v2:generate", payload) == failed
 
 
 def test_changed_generate_inputs_create_a_new_attempt() -> None:
@@ -70,7 +70,7 @@ def test_changed_generate_inputs_create_a_new_attempt() -> None:
     )
 
     assert (
-        _matching_failed_generation_job(
+        _matching_failed_job(
             [failed],
             "v2:generate",
             {
