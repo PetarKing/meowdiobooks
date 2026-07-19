@@ -427,6 +427,13 @@ export interface WizardSnapshot {
   cast?: CastArtifact;
   voiceModels: Array<{ id: string; label: string; supportedLanguages: string[] }>;
   voiceSelection: { modelId?: string; language?: string };
+  recoverableStages?: Partial<Record<ProcessableStage, {
+    attempt: number;
+    message: string;
+    modelId?: string;
+    language?: string;
+    proposalRevision?: string;
+  }>>;
   enrichment?: EnrichmentArtifact;
   recordingScript?: RecordingScriptArtifact;
   chapters: Chapter[];

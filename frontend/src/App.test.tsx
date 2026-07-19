@@ -1879,6 +1879,71 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Ready when you are')).not.toBeInTheDocument()
   })
 
+  it('restores a failed cast model and offers to continue saved voice generation', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1' },
+      cast: {
+        revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
+        detectedLanguage: 'english',
+      },
+      voiceModels: [
+        { id: 'qwen3', label: 'Qwen3', supportedLanguages: ['english'] },
+        { id: 'qwen-audio', label: 'Qwen Audio', supportedLanguages: ['english'] },
+      ],
+      voiceSelection: { modelId: 'qwen3', language: 'english' },
+      recoverableStages: {
+        cast: {
+          attempt: 2,
+          message: 'Completed work is saved. Continue this step to resume.',
+          modelId: 'qwen-audio',
+          language: 'english',
+          proposalRevision: 'cast-proposal-1',
+        },
+      },
+      enrichment: undefined,
+      recordingScript: undefined,
+      generatedChapters: [],
+    }
+
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+
+    expect(screen.getByLabelText('Voice model')).toHaveValue('qwen-audio')
+    expect(screen.getByText('Completed voices are saved; continue from the interrupted voice')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
+  })
+
+  it('keeps a recoverable cast failure actionable instead of replacing it generically', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1' },
+      cast: {
+        revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
+        detectedLanguage: 'english',
+      },
+      enrichment: undefined,
+      recordingScript: undefined,
+      generatedChapters: [],
+    }
+    const publicError = (
+      'Oops—voice generation paused at Alice. 12 of 61 completed voices are safely saved. '
+      + 'Choose Continue voice generation below to resume from this voice.'
+    )
+    vi.mocked(wizardApi.processStage).mockResolvedValue({
+      id: 'cast-job', status: 'failed', error: publicError,
+    })
+
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate required auditions →' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(publicError)
+    expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
+  })
+
   it('reopens an accepted cast as recovery work without flashing the processing overlay', async () => {
     const editable = {
       ...base.cast!, revision: 'cast-editable', phase: 'audition-review' as const,

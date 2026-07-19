@@ -1189,6 +1189,7 @@ def create_app_v2(
             None,
         )
         visible_cast = _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue)
+        recoverable_stages = _recoverable_stages(jobs.all(), book.id)
         return {
             "book": book.model_dump(mode="json"),
             "activeArtifacts": {kind: row.get("revision") for kind, row in current.items()},
@@ -1222,6 +1223,7 @@ def create_app_v2(
                 "modelId": visible_cast.get("voiceModel"),
                 "language": visible_cast.get("language"),
             },
+            "recoverableStages": recoverable_stages,
             "enrichment": current.get("enrichment", {}),
             "recordingScript": current.get("script", {}),
             "chapters": current.get("script", {}).get("chapters")
@@ -1665,8 +1667,8 @@ def create_app_v2(
             "workflow_version": PUBLIC_WORKFLOW.version,
         }
         resumable = (
-            _matching_failed_generation_job(jobs.all(), kind, payload)
-            if parsed == WizardStage.GENERATE
+            _matching_failed_job(jobs.all(), kind, payload)
+            if parsed in {WizardStage.CAST, WizardStage.GENERATE}
             else None
         )
         job = queue.enqueue(
@@ -2461,10 +2463,10 @@ def _chapter_display_title(chapter_id: str) -> str:
     return " ".join(word if word.isdigit() else word.capitalize() for word in words) or "Chapter"
 
 
-def _matching_failed_generation_job(
+def _matching_failed_job(
     rows: list[Job], kind: str, payload: dict[str, object]
 ) -> Job | None:
-    """Return the latest failed Generate job with exactly the same immutable inputs."""
+    """Return the latest failed resumable job with exactly the same immutable inputs."""
 
     expected = {key: value for key, value in payload.items() if key != "_job_id"}
     candidates = [
@@ -2476,3 +2478,28 @@ def _matching_failed_generation_job(
     ]
     latest = max(candidates, key=lambda row: row.created_at, default=None)
     return latest if latest and latest.status == JobStatus.FAILED else None
+
+
+def _recoverable_stages(rows: list[Job], book_id: str) -> dict[str, dict[str, object]]:
+    """Expose only the latest failed resumable stage; never leak provider diagnostics."""
+
+    recoverable: dict[str, dict[str, object]] = {}
+    for stage in (WizardStage.CAST, WizardStage.GENERATE):
+        candidates = [
+            row
+            for row in rows
+            if row.kind == f"v2:{stage.value}"
+            and row.payload.get("book_id") == book_id
+        ]
+        latest = max(candidates, key=lambda row: row.created_at, default=None)
+        if latest is not None and latest.status == JobStatus.FAILED:
+            settings = latest.payload.get("settings")
+            settings = settings if isinstance(settings, dict) else {}
+            recoverable[stage.value] = {
+                "attempt": latest.attempt,
+                "message": "Completed work is saved. Continue this step to resume.",
+                "modelId": settings.get("voiceModel"),
+                "language": settings.get("language"),
+                "proposalRevision": settings.get("proposalRevision"),
+            }
+    return recoverable

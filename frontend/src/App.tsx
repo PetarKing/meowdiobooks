@@ -265,6 +265,7 @@ export default function App({
   const [language, setLanguage] = useState("");
   const [narratorDirection, setNarratorDirection] = useState(defaultNarratorDirection);
   const [editingCast, setEditingCast] = useState(false);
+  const [castGenerationPaused, setCastGenerationPaused] = useState(false);
   const [regeneratingCharacterId, setRegeneratingCharacterId] = useState<string>();
   const [uploadingCharacterId, setUploadingCharacterId] = useState<string>();
   const [deletingVoiceRevision, setDeletingVoiceRevision] = useState<string>();
@@ -475,13 +476,20 @@ export default function App({
       setResolvedLabels(resolvedLabelsForCast(restoredCast));
     }
     setNarratorDirection(restoredCast?.narrator?.voiceDirection ?? defaultNarratorDirection);
+    const recoverableCast = next.recoverableStages?.cast;
+    const resumeMatchesProposal = Boolean(
+      recoverableCast && recoverableCast.proposalRevision === restoredCast?.revision
+    );
+    setCastGenerationPaused(resumeMatchesProposal);
     setEnrichmentCandidate(next.enrichment);
     setListeningChapterId(undefined);
-    setVoiceModel(restoredCast?.voiceModel ?? next.voiceSelection.modelId ?? next.voiceModels[0]?.id ?? "");
-    const model = restoredCast?.voiceModel ?? next.voiceSelection.modelId ?? next.voiceModels[0]?.id;
+    const model = (
+      resumeMatchesProposal ? recoverableCast?.modelId : undefined
+    ) ?? restoredCast?.voiceModel ?? next.voiceSelection.modelId ?? next.voiceModels[0]?.id;
+    setVoiceModel(model ?? "");
     const supported = next.voiceModels.find((row) => row.id === model)?.supportedLanguages ?? [];
     const detected = restoredCast?.detectedLanguage;
-    setLanguage(restoredCast?.language ?? next.voiceSelection.language ?? (detected && supported.includes(detected) ? detected : supported.includes("english") ? "english" : supported[0] ?? ""));
+    setLanguage((resumeMatchesProposal ? recoverableCast?.language : undefined) ?? restoredCast?.language ?? next.voiceSelection.language ?? (detected && supported.includes(detected) ? detected : supported.includes("english") ? "english" : supported[0] ?? ""));
     setSelectedChapters((current) => {
       const unavailable = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
       const available = next.chapters.map((row) => row.id).filter((id) => !unavailable.has(id));
@@ -546,7 +554,12 @@ export default function App({
       const job = await runJob(await gateway.processStage(book.id, stageId, settings));
       const revision = String(job.result?.revision ?? "");
       if (!revision) throw new Error(`${stageId} did not return a candidate revision`);
-      return await gateway.getStageCandidate(book.id, stageId, revision);
+      const candidate = await gateway.getStageCandidate(book.id, stageId, revision);
+      if (stageId === "cast") setCastGenerationPaused(false);
+      return candidate;
+    } catch (reason) {
+      if (stageId === "cast") setCastGenerationPaused(true);
+      throw reason;
     } finally {
       setBusy(false);
       setProcessingOverlaySuppressed(false);
@@ -1199,8 +1212,8 @@ export default function App({
         || voiceModel !== (current.voiceModel ?? voiceModel)
         || language !== (current.language ?? language);
       return <><PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t(editingCast ? "Review the cast." : "Build the cast.")} copy={t("Drag cast members together to merge, or onto Narrator to use its voice.")} />
-        <CastIdentityReview cast={current} decisions={identityDecisions} setDecisions={setIdentityDecisions} resolvedLabels={resolvedLabels} setResolvedLabels={setResolvedLabels} voiceModels={snapshot?.voiceModels ?? []} voiceModel={voiceModel} language={language} onVoiceModelChange={(id) => { setVoiceModel(id); const supported = snapshot?.voiceModels.find((row) => row.id === id)?.supportedLanguages ?? []; if (!supported.includes(language)) setLanguage(supported.includes("english") ? "english" : supported[0] ?? ""); }} onLanguageChange={setLanguage} onReclassify={editingCast ? reclassifyCast : undefined} />
-        <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t("{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "Cast structure is ready for auditions")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={pendingConfirmations.length > 0 || !voiceModel || !language || (editingCast && !castEditsDirty)} onClick={() => void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); }).catch((reason) => setError(message(reason)))}>{t(editingCast ? "Apply cast edits" : "Generate required auditions")} →</button></div></div></>;
+        <CastIdentityReview cast={current} decisions={identityDecisions} setDecisions={setIdentityDecisions} resolvedLabels={resolvedLabels} setResolvedLabels={setResolvedLabels} voiceModels={snapshot?.voiceModels ?? []} voiceModel={voiceModel} language={language} onVoiceModelChange={(id) => { setCastGenerationPaused(false); setVoiceModel(id); const supported = snapshot?.voiceModels.find((row) => row.id === id)?.supportedLanguages ?? []; if (!supported.includes(language)) setLanguage(supported.includes("english") ? "english" : supported[0] ?? ""); }} onLanguageChange={(id) => { setCastGenerationPaused(false); setLanguage(id); }} onReclassify={editingCast ? reclassifyCast : undefined} />
+        <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t("{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(castGenerationPaused ? "Completed voices are saved; continue from the interrupted voice" : editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "Cast structure is ready for auditions")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={pendingConfirmations.length > 0 || !voiceModel || !language || (editingCast && !castEditsDirty)} onClick={() => void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); }).catch((reason) => setError(message(reason)))}>{t(castGenerationPaused ? "Continue voice generation" : editingCast ? "Apply cast edits" : "Generate required auditions")} →</button></div></div></>;
     }
     const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean) as CastVoice[];
     const voiceById = Object.fromEntries(voices.map((voice) => [voice.characterId, voice]));
