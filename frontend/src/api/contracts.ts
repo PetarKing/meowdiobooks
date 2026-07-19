@@ -438,6 +438,7 @@ export interface Job {
   id: string;
   kind?: string;
   status: "queued" | "running" | "canceled" | "succeeded" | "failed";
+  payload?: Record<string, unknown>;
   error?: string | null;
   progress?: number;
   message?: string | null;
