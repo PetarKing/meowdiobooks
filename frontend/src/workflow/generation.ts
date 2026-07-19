@@ -4,6 +4,8 @@ import appI18n from "../i18n";
 
 export const longChapterSplitSeconds = 2 * 60 * 60;
 export const targetChapterPartSeconds = 30 * 60;
+// One comparable concurrent run can consume half of the shared synthesis capacity.
+const generationHistoryHeadroom = 2;
 
 export interface GenerationRun {
   chapterIds: string[];
@@ -39,9 +41,10 @@ export function chapterDuration(seconds?: number, estimated = true) {
 
 export function generationDuration(seconds?: number, historicalMultiplier?: number) {
   if (!seconds) return "Estimate pending";
-  if (historicalMultiplier) return chapterDuration(seconds * historicalMultiplier);
-  const lowerMinutes = Math.max(1, Math.ceil(seconds * 0.5 / 60));
-  const upperMinutes = Math.max(lowerMinutes, Math.ceil(seconds * 2 / 60));
+  const lowerMultiplier = historicalMultiplier ?? 0.5;
+  const upperMultiplier = historicalMultiplier ? historicalMultiplier * generationHistoryHeadroom : 2;
+  const lowerMinutes = Math.max(1, Math.ceil(seconds * lowerMultiplier / 60));
+  const upperMinutes = Math.max(lowerMinutes, Math.ceil(seconds * upperMultiplier / 60));
   const display = (minutes: number) => minutes < 60
     ? appI18n.t("{{count}} min", { count: minutes })
     : minutes % 60
@@ -93,6 +96,5 @@ export function remainingGenerationTime(run: GenerationRun | undefined, job: Job
     return chapterDuration(elapsedSeconds * (100 - progress) / progress);
   }
   if (progress >= 100) return "Almost done";
-  if (run.historicalMultiplier) return chapterDuration(run.estimatedAudioSeconds * run.historicalMultiplier);
-  return generationDuration(run.estimatedAudioSeconds);
+  return generationDuration(run.estimatedAudioSeconds, run.historicalMultiplier);
 }

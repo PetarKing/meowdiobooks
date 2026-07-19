@@ -523,7 +523,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 5 min–20 min')
   })
 
-  it('starts an estimate from recent successful generation jobs', async () => {
+  it('uses recent successful generation jobs as the lower bound with 2x headroom', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       recordingScript: { ...base.recordingScript!, summary: {
@@ -544,11 +544,11 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledWith('book-1'))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 40 min'))
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 40 min–1 hr 20 min'))
     fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(within(dialog).getByText('≈ 40 min')).toBeInTheDocument()
+    expect(within(dialog).getByText('≈ 40 min–1 hr 20 min')).toBeInTheDocument()
 
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
     finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
