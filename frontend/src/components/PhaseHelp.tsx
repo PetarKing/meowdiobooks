@@ -84,12 +84,12 @@ const guides: Record<GuideStage, PhaseGuide> = {
   },
   export: {
     number: "07", label: "Export", title: "Bundle the chapters you want to share.",
-    intro: "Export takes current chapter WAVs and packages the selected set into one chaptered M4B. You can override its title, author, and cover without changing the PDF or generated audio.",
-    route: ["Choose finished chapters", "Confirm the book details", "Create one M4B in your Library"],
+    intro: "Export takes current chapter WAVs and packages the selected set as a high-quality M4B, a smaller M4B, or ordered MP3 chapters. You can override the title, author, and cover without changing the PDF or generated audio.",
+    route: ["Choose finished chapters", "Confirm the book details", "Choose a format and create it in your Library"],
     moves: [
       { cue: "☑", title: "Your chapter set", detail: "A partial export is fine. Only the selected current WAVs are included, in book order." },
-      { cue: "Aa", title: "Export-only metadata", detail: "Title, author, and cover edits apply to the M4B file, not the source book." },
-      { cue: "M4B", title: "One portable audiobook", detail: "The result preserves chapter navigation and uses AAC audio for a practical file size." },
+      { cue: "Aa", title: "Export-only metadata", detail: "Title, author, and cover edits apply only to this export, not the source book." },
+      { cue: "M4B", title: "Audiobook-ready choices", detail: "Both M4Bs preserve chapter navigation; MP3 export provides one widely compatible file per chapter in a ZIP." },
     ],
   },
 };

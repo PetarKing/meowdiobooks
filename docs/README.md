@@ -21,7 +21,7 @@ change; proposed plans are clearly marked as unimplemented.
 - [Package and artifact contract](PACKAGE_CONTRACT_V2.md)
 - [Architecture and release boundary](ARCHITECTURE.md)
 - [Local Qwen runtime contract](QWEN_RUNTIME_CONTRACT.md)
-- [M4B export contract](M4B_EXPORT.md)
+- [Audiobook export contract](M4B_EXPORT.md)
 - [Frontend development reference](../frontend/README.md)
 - [Design system](../frontend/DESIGN_SYSTEM.md)
 

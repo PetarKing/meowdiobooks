@@ -53,8 +53,8 @@ Before the wizard, **PDF intake** stores the exact PDF bytes and hash. **No AI.*
    implemented for future evaluation but is not enabled in the product UI.
 6. **Generate** prepares or reuses one cached final recording script, deterministically resolves its
    accepted text and voices, then Qwen Base synthesizes selected chapter audio.
-7. **Export** bundles selected current chapter WAVs into one M4B with export-only title, author and
-   cover settings. **No AI.**
+7. **Export** packages selected current chapter WAVs as a high-quality M4B, smaller M4B, or ordered
+   MP3 chapter ZIP with export-only title, author and cover settings. **No AI.**
 
 At no point can a model silently change the PDF, source ranges, durable character IDs or accepted
 voice revisions. Detailed prompt/input/output examples live in each linked phase specification.

@@ -42,4 +42,12 @@ describe('mobile workflow layout', () => {
     expect(rule('.generation-selection-actions .primary,.generation-selection-actions .ghost')).toMatch(/min-width\s*:\s*0/)
     expect(rule('.generation-selection-actions .primary,.generation-selection-actions .ghost')).toMatch(/white-space\s*:\s*normal/)
   })
+
+  it('stacks export details and keeps format estimates readable on mobile', () => {
+    expect(rule('.export-layout,.export-sidebar')).toMatch(/gap\s*:\s*14px/)
+    expect(rule('.export-format-options label')).toMatch(/grid-template-columns\s*:\s*18px minmax\(0,1fr\)/)
+    expect(rule('.export-format-options strong')).toMatch(/grid-column\s*:\s*2/)
+    expect(rule('.export-format-options strong')).toMatch(/justify-self\s*:\s*start/)
+    expect(rule('.export-summary')).toMatch(/flex-direction\s*:\s*column/)
+  })
 })

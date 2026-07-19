@@ -1,4 +1,5 @@
 import type {
+  AudioExportOptions,
   DialogueArtifact,
   DialogueExample,
   DialogueSettings,
@@ -286,10 +287,11 @@ export class HttpWizardApi implements WorkflowGateway {
     });
   }
 
-  private async submitM4bExport(
+  private async submitAudioExport(
     bookId: string,
     chapters: M4BExportChapter[],
     options: M4BExportOptions,
+    endpoint: "audio" | "m4b",
     headers?: HeadersInit,
   ): Promise<Response> {
     const body = new FormData();
@@ -298,7 +300,8 @@ export class HttpWizardApi implements WorkflowGateway {
     if (options.author) body.append("author", options.author);
     if (options.cover) body.append("cover", options.cover);
     if (options.coverPage) body.append("coverPage", String(options.coverPage));
-    const response = await this.fetcher(`${this.baseUrl}/books/${bookId}/exports/m4b`, {
+    if ("preset" in options) body.append("preset", (options as AudioExportOptions).preset);
+    const response = await this.fetcher(`${this.baseUrl}/books/${bookId}/exports/${endpoint}`, {
       method: "POST",
       body,
       headers,
@@ -315,17 +318,33 @@ export class HttpWizardApi implements WorkflowGateway {
     chapters: M4BExportChapter[],
     options: M4BExportOptions = {},
   ): Promise<LibraryExport> {
-    const response = await this.submitM4bExport(
+    const response = await this.submitAudioExport(
       bookId,
       chapters,
       options,
+      "m4b",
+      { Accept: "application/json" },
+    );
+    return response.json() as Promise<LibraryExport>;
+  }
+
+  async createAudioExport(
+    bookId: string,
+    chapters: M4BExportChapter[],
+    options: AudioExportOptions,
+  ): Promise<LibraryExport> {
+    const response = await this.submitAudioExport(
+      bookId,
+      chapters,
+      options,
+      "audio",
       { Accept: "application/json" },
     );
     return response.json() as Promise<LibraryExport>;
   }
 
   async exportM4b(bookId: string, chapters: M4BExportChapter[], options: M4BExportOptions = {}): Promise<M4BDownload> {
-    const response = await this.submitM4bExport(bookId, chapters, options);
+    const response = await this.submitAudioExport(bookId, chapters, options, "m4b");
     const disposition = response.headers.get("Content-Disposition") ?? "";
     const encoded = disposition.match(/filename\*=utf-8''([^;]+)/i)?.[1];
     const quoted = disposition.match(/filename="([^"]+)"/i)?.[1];

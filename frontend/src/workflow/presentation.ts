@@ -1,5 +1,5 @@
 import type { TFunction } from "i18next";
-import type { LibraryExport } from "../api/contracts";
+import type { AudioExportPreset, LibraryExport } from "../api/contracts";
 
 export async function decodeImage(url: string) {
   if (!url || typeof Image === "undefined") return;
@@ -64,6 +64,23 @@ export function formatFileSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
   if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
   return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+}
+
+const audioExportBitrates: Record<AudioExportPreset, number> = {
+  "m4b-high": 128,
+  "m4b-compact": 64,
+  "mp3-chapters": 96,
+};
+
+export function estimatedAudioExportBytes(seconds: number, preset: AudioExportPreset) {
+  return Math.max(0, Math.round(seconds * audioExportBitrates[preset] * 1000 / 8));
+}
+
+export function formatLibraryExport(item: LibraryExport, t: TFunction) {
+  const preset = item.preset ?? (item.filename.toLowerCase().endsWith(".zip") ? "mp3-chapters" : "m4b-high");
+  if (preset === "m4b-compact") return t("Smaller M4B");
+  if (preset === "mp3-chapters") return t("MP3 chapters");
+  return t("High-quality M4B");
 }
 
 export function formatLibraryDate(value: string, locale: string) {

@@ -45,7 +45,7 @@ text is not silently removed to create a cleaner transcript.
 | Language selection | Detection proposes a language and the user accepts a language supported by the selected voice model. | One synthesis language is selected for the book. Code-switching and per-line language changes are not modeled. |
 | Chapter and peripheral-matter detection | Chapter headings, repeated headers, page numbers, explicit web addresses, footnotes, and peripheral matter produce source-linked review evidence. | Ornamental or implicit boundaries, bare or line-wrapped web addresses, and unmarked peripheral text can be missed or over-detected. |
 | Generation and replacement | Chapters publish atomically; failed or interrupted replacements keep the last playable revision. Stale inputs remain explicit. | Generation is serialized, chapter-scoped, and can take substantially longer than playback. An interrupted chapter restarts rather than resuming mid-chapter. |
-| Output quality | Exact accepted voice and input revisions make routing reproducible; WAV chapters and current M4B exports remain source-linked. | Synthesis quality is stochastic and model-, language-, and hardware-dependent. Listening review remains required. |
+| Output quality | Exact accepted voice and input revisions make routing reproducible; WAV chapters and current audiobook exports remain source-linked. | Synthesis quality is stochastic and model-, language-, and hardware-dependent. Listening review remains required. |
 
 ## Review remains part of the product contract
 

@@ -21,6 +21,12 @@ class WizardStage(StrEnum):
     GENERATE = "generate"
 
 
+class AudioExportPreset(StrEnum):
+    M4B_HIGH = "m4b-high"
+    M4B_COMPACT = "m4b-compact"
+    MP3_CHAPTERS = "mp3-chapters"
+
+
 class StageRevision(BaseModel):
     stage: WizardStage
     revision: int = Field(ge=1)
@@ -59,6 +65,8 @@ class LibraryExport(BaseModel):
     chapter_positions: list[int] = Field(default_factory=list)
     partial: bool = False
     size_bytes: int = Field(ge=1)
+    preset: AudioExportPreset = AudioExportPreset.M4B_HIGH
+    media_type: str = "audio/mp4"
     cover_path: str | None = None
     created_at: datetime = Field(default_factory=utc_now)
 
