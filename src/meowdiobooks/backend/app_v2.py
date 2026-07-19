@@ -16,7 +16,7 @@ from typing import Any, Callable, Mapping, cast
 from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response
 from meowdiobooks.assets import application_root, frontend_dist_path
 from meowdiobooks.util import atomic_write
 
@@ -1380,7 +1380,7 @@ def create_app_v2(
         }
 
     @app.post("/api/books/{book_id}/exports/m4b")
-    async def export_book_m4b(book_id: str, request: Request) -> FileResponse:
+    async def export_book_m4b(book_id: str, request: Request) -> Response:
         custom_cover: tuple[bytes, str] | None = None
         try:
             if "application/json" in request.headers.get("content-type", ""):
@@ -1595,6 +1595,11 @@ def create_app_v2(
                 detail="The M4B was created but could not be saved to your Library",
             ) from error
         shutil.rmtree(work, ignore_errors=True)
+        if "application/json" in request.headers.get("accept", ""):
+            return JSONResponse(
+                _library_export_payload(item, package=package),
+                status_code=status.HTTP_201_CREATED,
+            )
         return FileResponse(
             destination,
             media_type="audio/mp4",

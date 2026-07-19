@@ -11,7 +11,7 @@ vi.mock('./api/client', () => ({ wizardApi: {
   previewReviewBulk: vi.fn(), previewReviewTranscript: vi.fn(),
   getRepresentativePages: vi.fn(), listBooks: vi.fn(), deleteBook: vi.fn(), acceptStage: vi.fn(), processStage: vi.fn(),
   prepareRecordingScript: vi.fn(), splitRecordingScriptChapter: vi.fn(),
-  getJob: vi.fn(), listBookJobs: vi.fn(), cancelJob: vi.fn(), openChapterAudio: vi.fn(), exportM4b: vi.fn(), getStageCandidate: vi.fn(), transcribeVoiceSample: vi.fn(), uploadVoiceSample: vi.fn(), deleteVoiceAudition: vi.fn(),
+  getJob: vi.fn(), listBookJobs: vi.fn(), cancelJob: vi.fn(), openChapterAudio: vi.fn(), createM4bExport: vi.fn(), exportM4b: vi.fn(), getStageCandidate: vi.fn(), transcribeVoiceSample: vi.fn(), uploadVoiceSample: vi.fn(), deleteVoiceAudition: vi.fn(),
   listLibrary: vi.fn(), openLibraryExport: vi.fn(), revealLibraryExport: vi.fn(),
 }, normalizeDialogueArtifact: vi.fn() }))
 
@@ -567,7 +567,11 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Down the Rabbit-Hole')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create M4B →' })).toBeEnabled()
 
-    vi.mocked(wizardApi.exportM4b).mockResolvedValue({ blob: new Blob(['m4b']), filename: 'Alice.m4b' })
+    vi.mocked(wizardApi.createM4bExport).mockResolvedValue({
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll',
+      filename: 'Alice.m4b', location: '/library/Alice.m4b', chapterCount: 1,
+      partial: false, sizeBytes: 3, createdAt: '2026-07-19T19:01:26Z',
+    })
     const title = screen.getByLabelText('Title')
     title.focus()
     fireEvent.change(title, { target: { value: 'Alice — Audiobook' } })
@@ -579,9 +583,10 @@ describe('v2 wizard', () => {
     fireEvent.change(coverPage, { target: { value: '7' } })
     expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/7/image')
     fireEvent.click(screen.getByRole('button', { name: 'Create M4B →' }))
-    await waitFor(() => expect(wizardApi.exportM4b).toHaveBeenCalledWith('book-1', [
+    await waitFor(() => expect(wizardApi.createM4bExport).toHaveBeenCalledWith('book-1', [
       { chapterId: 'chapter-1', revision: 'audio-1' },
     ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', cover: undefined, coverPage: 7 }))
+    expect(wizardApi.exportM4b).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
   })
 

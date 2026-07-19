@@ -829,6 +829,7 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
 
         overridden = client.post(
             f"/api/books/{book_id}/exports/m4b",
+            headers={"Accept": "application/json"},
             data={
                 "chapters": json.dumps([{"chapterId": "opening-matter", "revision": "render-1"}]),
                 "title": "A Custom Audiobook",
@@ -836,7 +837,10 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             },
             files={"cover": ("cover.png", b"custom-cover", "image/png")},
         )
-        assert overridden.status_code == 200, overridden.text
+        assert overridden.status_code == 201, overridden.text
+        assert overridden.headers["content-type"].startswith("application/json")
+        assert overridden.json()["filename"] == "A Custom Audiobook.m4b"
+        assert overridden.json()["sizeBytes"] == len(b"packaged-m4b")
         assert captured["metadata"]["title"] == "A Custom Audiobook"
         assert captured["metadata"]["author"] == "A Different Author"
         assert captured["metadata"]["cover"].suffix == ".png"

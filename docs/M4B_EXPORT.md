@@ -17,9 +17,11 @@ Wizard Step 7, **Export**, unlocks after at least one chapter finishes successfu
   Export fails rather than silently mixing stale audio or different render settings.
 - The result uses AAC audio in an M4B container with one seekable chapter marker per chapter.
 
-The browser downloads the finished file and Meowdiobooks keeps the same completed M4B in its local
-Library. The default macOS location is `~/Music/Meowdiobooks`; `meowdiobooks serve --library` can
-override it. Meowdiobooks does not upload, sync, or share the file automatically.
+The default UI saves the finished file to the Library and returns only its metadata before opening the
+Library. It does not copy the complete M4B into browser memory merely to confirm that export succeeded.
+Explicit API clients can still request the binary response. The default macOS Library location is
+`~/Music/Meowdiobooks`; `meowdiobooks serve --library` can override it. Meowdiobooks does not upload,
+sync, or share the file automatically.
 
 ## Metadata and cover precedence
 

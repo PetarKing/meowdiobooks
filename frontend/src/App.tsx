@@ -1660,7 +1660,9 @@ export default function App({
     if (!chapters.length) return;
     setExporting(true);
     try {
-      await gateway.exportM4b(book.id, chapters, { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage });
+      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage };
+      if (gateway.createM4bExport) await gateway.createM4bExport(book.id, chapters, options);
+      else await gateway.exportM4b(book.id, chapters, options);
       await loadLibrary();
       navigateProduct("library");
     } catch (reason) { setError(message(reason)); }
