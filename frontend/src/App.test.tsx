@@ -463,6 +463,50 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
   })
 
+  it('retries a transient job poll failure when the browser returns to focus', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({
+      id: 'generate-job', status: 'running', progress: 59,
+    })
+    vi.mocked(wizardApi.getJob)
+      .mockRejectedValueOnce(new TypeError('Network connection was lost'))
+      .mockResolvedValueOnce({ id: 'generate-job', status: 'succeeded', result: {} })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(await within(dialog).findByText('Reconnecting to processing status…')).toBeInTheDocument()
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBe('generate-job')
+
+    fireEvent(window, new Event('focus'))
+
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+  })
+
+  it('starts a fresh job poll on pageshow when the suspended request is still pending', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({
+      id: 'generate-job', status: 'running', progress: 59,
+    })
+    vi.mocked(wizardApi.getJob)
+      .mockImplementationOnce(() => new Promise<Job>(() => undefined))
+      .mockResolvedValueOnce({ id: 'generate-job', status: 'succeeded', result: {} })
+
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(1))
+
+    fireEvent(window, new Event('pageshow'))
+
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
+  })
+
   it('uses a 0.5–2x generation range before successful job history exists', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
@@ -2704,9 +2748,14 @@ describe('v2 wizard', () => {
 
   it('reattaches to a persisted local job', async () => {
     localStorage.setItem('meowdiobooks.activeJob', 'job-1')
-    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'job-1', status: 'succeeded', result: {} })
+    vi.mocked(wizardApi.getJob).mockResolvedValue({
+      id: 'job-1', status: 'succeeded', payload: { book_id: 'book-1' }, result: {},
+    })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    vi.mocked(wizardApi.prepareRecordingScript).mockResolvedValue(base.recordingScript!)
     render(<App />)
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('job-1'))
+    await waitFor(() => expect(wizardApi.getBookSnapshot).toHaveBeenCalledWith('book-1'))
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
   })
 })

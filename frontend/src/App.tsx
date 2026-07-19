@@ -96,6 +96,14 @@ import {
   toggleTarget,
 } from "./workflow/dialogue";
 import {
+  isRetryableJobPollError,
+  jobPollIntervalMs,
+  maximumJobPollBackoffMs,
+  pollJobWithForegroundRefresh,
+  reconnectingJobMessage,
+  waitForNextJobPoll,
+} from "./workflow/jobPolling";
+import {
   normalizeCandidateWarnings,
   reviewActionTitle,
   reviewConsequence,
@@ -375,9 +383,13 @@ export default function App({
     const id = localStorage.getItem("meowdiobooks.activeJob");
     if (!id) return;
     setBusy(true);
-    void gateway.getJob(id)
-      .then(runJob)
-      .then((job) => typeof job.result?.bookId === "string" ? hydrate(job.result.bookId) : undefined)
+    void runJob({ id, status: "running" })
+      .then((job) => {
+        const bookId = typeof job.result?.bookId === "string"
+          ? job.result.bookId
+          : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
+        return bookId ? hydrate(bookId) : undefined;
+      })
       .catch((reason) => setError(message(reason)))
       .finally(() => setBusy(false));
   // Reattach once per gateway; hydrate and runJob intentionally consume the current app state.
@@ -488,15 +500,34 @@ export default function App({
 
   async function runJob(initial: Job): Promise<Job> {
     let current = initial;
+    let consecutivePollFailures = 0;
     setActiveJob(current);
     localStorage.setItem("meowdiobooks.activeJob", current.id);
     while (["queued", "running"].includes(current.status)) {
       setProgress(current.progress ?? 0);
       setProcessMessage(current.message ?? "");
-      current = await gateway.getJob(current.id);
+      try {
+        current = await pollJobWithForegroundRefresh(gateway, current.id);
+        consecutivePollFailures = 0;
+      } catch (reason) {
+        if (!isRetryableJobPollError(reason)) {
+          localStorage.removeItem("meowdiobooks.activeJob");
+          setActiveJob(undefined);
+          throw reason;
+        }
+        consecutivePollFailures += 1;
+        setProcessMessage(reconnectingJobMessage);
+        await waitForNextJobPoll(Math.min(
+          jobPollIntervalMs * 2 ** (consecutivePollFailures - 1),
+          maximumJobPollBackoffMs,
+        ));
+        continue;
+      }
       setActiveJob(current);
+      setProgress(current.progress ?? 0);
+      setProcessMessage(current.message ?? "");
       if (["queued", "running"].includes(current.status)) {
-        await new Promise((resolve) => window.setTimeout(resolve, 750));
+        await waitForNextJobPoll(jobPollIntervalMs);
       }
     }
     localStorage.removeItem("meowdiobooks.activeJob");
@@ -833,7 +864,7 @@ export default function App({
     {generationInProgress && <div className="process-overlay generation-overlay" role="dialog" aria-modal="true" aria-labelledby="generation-progress-title">
       <div ref={generationModalRef} className="process-modal generation-modal" tabIndex={-1}>
         <span className="eyebrow">{t("Making your audiobook")}</span>
-        <h2 id="generation-progress-title">{t(progress >= 100 ? "Finishing your chapter audio…" : "Making your selected chapters…")}</h2>
+        <h2 id="generation-progress-title">{t(processMessage === reconnectingJobMessage ? reconnectingJobMessage : progress >= 100 ? "Finishing your chapter audio…" : "Making your selected chapters…")}</h2>
         <div className={`processing-track determinate ${activeJob?.status === "running" ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Chapter generation progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div>
         <dl className="generation-progress-facts">
           <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} ready", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
