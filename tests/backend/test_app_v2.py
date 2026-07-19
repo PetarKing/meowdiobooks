@@ -712,7 +712,7 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
         return cover
 
     monkeypatch.setattr("meowdiobooks.backend.app_v2.render_pdf_page", fake_render_pdf_page)
-    monkeypatch.setattr("meowdiobooks.backend.app_v2.package_m4b", fake_package)
+    monkeypatch.setattr("meowdiobooks.backend.app_v2.package_audio_export", fake_package)
     with TestClient(create_app_v2(tmp_path, chapter_audio_source=materialize_audio)) as client:
         imported = client.post(
             "/api/books/import",
@@ -799,6 +799,7 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             "title": "A Cat Finds a Voice",
             "author": "Maou",
             "cover": cover,
+            "preset": "m4b-high",
         }
         assert rendered_pages == [1]
         library_items = client.get("/api/library").json()
@@ -882,6 +883,60 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
         )
         assert invalid_page.status_code == 422
         assert invalid_page.json()["detail"] == "Cover page is outside this PDF"
+
+        for preset, filename, media_type in (
+            ("m4b-compact", "A Cat Finds a Voice - smaller.m4b", "audio/mp4"),
+            ("mp3-chapters", "A Cat Finds a Voice - MP3 chapters.zip", "application/zip"),
+        ):
+            formatted = client.post(
+                f"/api/books/{book_id}/exports/audio",
+                headers={"Accept": "application/json"},
+                json={
+                    "chapters": [
+                        {"chapterId": "opening-matter", "revision": "render-1"}
+                    ],
+                    "preset": preset,
+                },
+            )
+            assert formatted.status_code == 201, formatted.text
+            assert formatted.json()["filename"] == filename
+            assert formatted.json()["preset"] == preset
+            assert formatted.json()["mediaType"] == media_type
+            assert captured["metadata"]["preset"] == preset
+
+        binary_zip = client.post(
+            f"/api/books/{book_id}/exports/audio",
+            json={
+                "chapters": [{"chapterId": "opening-matter", "revision": "render-1"}],
+                "preset": "mp3-chapters",
+            },
+        )
+        assert binary_zip.status_code == 200
+        assert binary_zip.content == b"packaged-m4b"
+        assert binary_zip.headers["content-type"].startswith("application/zip")
+        assert "MP3%20chapters" in binary_zip.headers["content-disposition"]
+        assert binary_zip.headers["content-disposition"].endswith(".zip")
+
+        unsupported_legacy_preset = client.post(
+            f"/api/books/{book_id}/exports/m4b",
+            json={
+                "chapters": [{"chapterId": "opening-matter", "revision": "render-1"}],
+                "preset": "m4b-compact",
+            },
+        )
+        assert unsupported_legacy_preset.status_code == 422
+        assert unsupported_legacy_preset.json()["detail"] == (
+            "Use the audio export endpoint for non-default formats"
+        )
+
+        invalid_preset = client.post(
+            f"/api/books/{book_id}/exports/audio",
+            json={
+                "chapters": [{"chapterId": "opening-matter", "revision": "render-1"}],
+                "preset": "studio-master",
+            },
+        )
+        assert invalid_preset.status_code == 422
 
         stale = client.post(
             f"/api/books/{book_id}/exports/m4b",

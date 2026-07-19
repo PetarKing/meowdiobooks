@@ -28,9 +28,9 @@ from .artifacts import (
     write_artifact,
 )
 from .api.schemas import (
+    AudioExportRequest,
     DialoguePreviewRequest,
     ExtractionPreviewRequest,
-    M4BExportRequest,
     ReviewBulkPreviewRequest,
     ReviewTranscriptPreviewRequest,
     StageAcceptRequest,
@@ -97,7 +97,16 @@ from .documents import (
     source_path,
 )
 from .generation_status import chapter_audio_stale_reasons, generated_chapters
-from .models import Book, Job, JobStatus, LibraryExport, StageRevision, WizardStage, utc_now
+from .models import (
+    AudioExportPreset,
+    Book,
+    Job,
+    JobStatus,
+    LibraryExport,
+    StageRevision,
+    WizardStage,
+    utc_now,
+)
 from .model_config import dialogue_routing_preview, load_model_registry
 from .voice_candidates import VoiceCandidatePolicy
 from .remote_llm import RemoteUsageObserver
@@ -105,9 +114,10 @@ from .m4b import (
     FFmpegUnavailableError,
     M4BChapter,
     M4BExportError,
+    audio_export_profile,
     embedded_chapter_titles,
     export_filename,
-    package_m4b,
+    package_audio_export,
 )
 from .local_llm import complete_json, qwen_server
 from .languages import (
@@ -1380,22 +1390,24 @@ def create_app_v2(
         }
 
     @app.post("/api/books/{book_id}/exports/m4b")
-    async def export_book_m4b(book_id: str, request: Request) -> Response:
+    @app.post("/api/books/{book_id}/exports/audio")
+    async def export_book_audio(book_id: str, request: Request) -> Response:
         custom_cover: tuple[bytes, str] | None = None
         try:
             if "application/json" in request.headers.get("content-type", ""):
-                body = M4BExportRequest.model_validate(await request.json())
+                body = AudioExportRequest.model_validate(await request.json())
             else:
                 form = await request.form()
                 raw_chapters = form.get("chapters")
                 if not isinstance(raw_chapters, str):
                     raise ValueError("Export chapters are required")
-                body = M4BExportRequest.model_validate(
+                body = AudioExportRequest.model_validate(
                     {
                         "chapters": json.loads(raw_chapters),
                         "title": form.get("title"),
                         "author": form.get("author"),
                         "coverPage": form.get("coverPage") or 1,
+                        "preset": form.get("preset") or AudioExportPreset.M4B_HIGH,
                     }
                 )
                 cover_upload = form.get("cover")
@@ -1416,6 +1428,11 @@ def create_app_v2(
                     custom_cover = (cover_bytes, suffixes[content_type])
         except (TypeError, ValueError, json.JSONDecodeError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
+        if request.url.path.endswith("/exports/m4b") and body.preset != AudioExportPreset.M4B_HIGH:
+            raise HTTPException(
+                status_code=422,
+                detail="Use the audio export endpoint for non-default formats",
+            )
 
         try:
             book = require_book(book_id)
@@ -1510,7 +1527,8 @@ def create_app_v2(
                     repo_root / "frontend" / "src" / "assets" / "brand" / "meowdiobooks-mark.png"
                 )
         partial = len(export_chapters) != len(chapter_order)
-        filename = export_filename(title, partial=partial)
+        profile = audio_export_profile(body.preset)
+        filename = export_filename(title, partial=partial, preset=body.preset)
         output = work / filename
         try:
             with ExitStack() as audio_sources:
@@ -1533,12 +1551,13 @@ def create_app_v2(
                     materialized_chapters.append(
                         M4BChapter(chapter.chapter_id, chapter.title, materialized_path)
                     )
-                package_m4b(
+                package_audio_export(
                     materialized_chapters,
                     output,
                     title=title,
                     author=author,
                     cover=cover,
+                    preset=body.preset,
                 )
         except FFmpegUnavailableError as error:
             shutil.rmtree(work, ignore_errors=True)
@@ -1569,6 +1588,8 @@ def create_app_v2(
             chapter_positions=chapter_positions,
             partial=partial,
             size_bytes=output.stat().st_size,
+            preset=body.preset,
+            media_type=profile.media_type,
         )
         library_cover_root.mkdir(parents=True, exist_ok=True)
         cover_destination = library_cover_root / f"{item.id}{cover.suffix.lower() or '.jpg'}"
@@ -1592,7 +1613,7 @@ def create_app_v2(
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(
                 status_code=500,
-                detail="The M4B was created but could not be saved to your Library",
+                detail="The audiobook was created but could not be saved to your Library",
             ) from error
         shutil.rmtree(work, ignore_errors=True)
         if "application/json" in request.headers.get("accept", ""):
@@ -1602,7 +1623,7 @@ def create_app_v2(
             )
         return FileResponse(
             destination,
-            media_type="audio/mp4",
+            media_type=item.media_type,
             filename=destination.name,
         )
 
@@ -2328,6 +2349,8 @@ def _library_export_payload(item: LibraryExport, *, package: Path | None = None)
         "chapterPositions": chapter_positions,
         "partial": item.partial,
         "sizeBytes": item.size_bytes,
+        "preset": item.preset,
+        "mediaType": item.media_type,
         "createdAt": item.created_at.isoformat(),
     }
 

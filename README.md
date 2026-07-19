@@ -11,7 +11,7 @@ English | [简体中文](README.zh-CN.md)
 **Transform a raw PDF into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
 
 Meowdiobooks handles the production work between source and sound: extraction, dialogue attribution,
-character reconciliation, voice design or local cloning, chapter rendering and M4B export. It is built for books that
+character reconciliation, voice design or local cloning, chapter rendering and audiobook export. It is built for books that
 do not behave like clean scripts, and uses focused AI where interpretation helps without hiding the
 source or making every decision on the user's behalf.
 
@@ -77,7 +77,7 @@ is not speech, and narrator prose. The walkthrough shows the reviewed artifacts 
 the linked audio was generated from that accepted cast and render plan by the production renderer:
 
 ```text
-PDF → extracted text → dialogue attribution → character reconciliation → voice casting → WAV / M4B
+PDF → extracted text → dialogue attribution → character reconciliation → voice casting → WAV → M4B / MP3
 ```
 
 | Source evidence | Accepted result | Audio behavior |
@@ -96,7 +96,7 @@ PDF → extracted text → dialogue attribution → character reconciliation →
 - Supports local voice cloning from an uploaded sample, with automatic language detection, an
   editable transcript draft, and a generated audition of the same line used to compare designed voices.
 - Prepares one faithful final recording script from the accepted upstream revisions when Generate first needs it.
-- Publishes complete versioned WAV chapters atomically, packages current chapters as M4B, and keeps completed exports in a local Library.
+- Publishes complete versioned WAV chapters atomically, packages current chapters as M4B or MP3, and keeps completed exports in a local Library.
 - Keeps the book and model inference on the Mac by default; optional remote Dialogue sends only the
   selected passages to the provider configured by the user.
 
@@ -107,7 +107,7 @@ Enrichment (currently pass-through) → Generate → Export**. See the
 ## Alpha scope
 
 Today, Meowdiobooks supports local PDFs up to 500 MB on Apple Silicon Macs. PDF extraction,
-attribution, identity reconciliation, voice design and cloning, chapter generation, and M4B export
+attribution, identity reconciliation, voice design and cloning, chapter generation, and audiobook export
 work. The alpha is intended for testing and refinement, not unattended production: results are probabilistic,
 persisted alpha data may break between versions, and there is no supported model installer yet.
 
@@ -146,7 +146,7 @@ npm install --global @llamaindex/liteparse
 ```
 
 Poppler renders PDF page previews; LiteParse is one of the available extraction methods. FFmpeg
-packages generated chapters as M4B.
+packages generated chapters as M4B or MP3.
 
 ```bash
 # Clone or download this repository, then:
@@ -191,7 +191,7 @@ See [current coverage and review boundaries](docs/KNOWN_GENERALIZATION_RISKS.md)
 
 Meowdiobooks specializes in the complete transformation of dialogue-heavy PDFs into reviewable cast
 productions: page-aware extraction, source-anchored attribution, explicit uncertainty, identity and
-group reconciliation, voice auditions, chapter generation and M4B export in one guided workflow. Its
+group reconciliation, voice auditions, chapter generation and audiobook export in one guided workflow. Its
 current input and hardware support are intentionally focused on PDFs and Apple Silicon.
 
 Related open-source projects explore a broader audiobook-generation space:
@@ -231,7 +231,7 @@ dependencies require maintainer approval before implementation. See the [contrib
 - [Local models and configuration](docs/MODELS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Workflow guide](docs/wizard/README.md)
-- [M4B export](docs/M4B_EXPORT.md)
+- [Audiobook export](docs/M4B_EXPORT.md)
 
 ## License
 

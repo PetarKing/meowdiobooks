@@ -19,7 +19,7 @@ def _add_server_arguments(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--library",
         default=str(Path.home() / "Music" / "Meowdiobooks"),
-        help="Directory for completed M4B audiobooks",
+        help="Directory for completed audiobook exports",
     )
 
 

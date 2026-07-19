@@ -393,6 +393,33 @@ describe('HttpWizardApi', () => {
     }))
   })
 
+  it('creates the selected audio export without downloading its body', async () => {
+    const exported = {
+      id: 'export-zip', bookId: 'book-1', title: 'A Cat', author: 'Maou',
+      filename: 'A Cat - MP3 chapters.zip', location: '/library/A Cat - MP3 chapters.zip',
+      chapterCount: 1, partial: false, sizeBytes: 39_073_505, preset: 'mp3-chapters',
+      mediaType: 'application/zip', createdAt: '2026-07-19T19:01:26Z',
+    }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(exported), {
+      status: 201,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    const result = await new HttpWizardApi('/api').createAudioExport('book-1', [
+      { chapterId: 'chapter-1', revision: 'render-1' },
+    ], { preset: 'mp3-chapters', title: 'A Cat' })
+
+    expect(result).toEqual(exported)
+    expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/exports/audio', expect.objectContaining({
+      method: 'POST',
+      headers: { Accept: 'application/json' },
+    }))
+    const request = fetchMock.mock.calls[0][1] as RequestInit
+    const body = request.body as FormData
+    expect(body.get('preset')).toBe('mp3-chapters')
+  })
+
   it('turns structured export failures into a useful message', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       detail: { invalidChapterIds: ['chapter-stale'] },

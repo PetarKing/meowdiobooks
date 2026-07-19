@@ -11,7 +11,7 @@ vi.mock('./api/client', () => ({ wizardApi: {
   previewReviewBulk: vi.fn(), previewReviewTranscript: vi.fn(),
   getRepresentativePages: vi.fn(), listBooks: vi.fn(), deleteBook: vi.fn(), acceptStage: vi.fn(), processStage: vi.fn(),
   prepareRecordingScript: vi.fn(), splitRecordingScriptChapter: vi.fn(),
-  getJob: vi.fn(), listBookJobs: vi.fn(), cancelJob: vi.fn(), openChapterAudio: vi.fn(), createM4bExport: vi.fn(), exportM4b: vi.fn(), getStageCandidate: vi.fn(), transcribeVoiceSample: vi.fn(), uploadVoiceSample: vi.fn(), deleteVoiceAudition: vi.fn(),
+  getJob: vi.fn(), listBookJobs: vi.fn(), cancelJob: vi.fn(), openChapterAudio: vi.fn(), createM4bExport: vi.fn(), createAudioExport: vi.fn(), exportM4b: vi.fn(), getStageCandidate: vi.fn(), transcribeVoiceSample: vi.fn(), uploadVoiceSample: vi.fn(), deleteVoiceAudition: vi.fn(),
   listLibrary: vi.fn(), openLibraryExport: vi.fn(), revealLibraryExport: vi.fn(),
 }, normalizeDialogueArtifact: vi.fn() }))
 
@@ -133,6 +133,7 @@ describe('v2 wizard', () => {
     expect(screen.getByText('12 chapters')).toBeInTheDocument()
     expect(screen.queryByText('Down the Rabbit-Hole · The Pool of Tears')).not.toBeInTheDocument()
     expect(screen.getByText('12.0 MB')).toBeInTheDocument()
+    expect(screen.getByText('High-quality M4B')).toBeInTheDocument()
     expect(screen.getByAltText('Cover of Alice')).toHaveAttribute('src', '/api/library/export-1/cover')
 
     fireEvent.click(screen.getByRole('button', { name: 'Show in Finder' }))
@@ -588,7 +589,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
   })
 
-  it('keeps M4B chapter selection and metadata overrides in a genuine Export step', async () => {
+  it('keeps chapter selection, metadata, and a responsive format choice in Export', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
     fireEvent.click(within(nav).getByText('Export').closest('button')!)
@@ -598,12 +599,19 @@ describe('v2 wizard', () => {
     expect(screen.getByLabelText('Author')).toHaveValue('Lewis Carroll')
     expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
     expect(screen.queryByText('Down the Rabbit-Hole')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Create M4B →' })).toBeEnabled()
+    expect(screen.getByRole('radio', { name: /High-quality M4B/ })).toBeChecked()
+    expect(screen.getByRole('radio', { name: /Smaller M4B/ })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: /MP3 chapters.*ZIP download/ })).not.toBeChecked()
+    expect(screen.getByText('≈ 172 KB')).toBeInTheDocument()
+    expect(screen.getByText('≈ 86 KB')).toBeInTheDocument()
+    expect(screen.getByText('≈ 129 KB')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create high-quality M4B →' })).toBeEnabled()
 
-    vi.mocked(wizardApi.createM4bExport).mockResolvedValue({
+    vi.mocked(wizardApi.createAudioExport).mockResolvedValue({
       id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll',
-      filename: 'Alice.m4b', location: '/library/Alice.m4b', chapterCount: 1,
-      partial: false, sizeBytes: 3, createdAt: '2026-07-19T19:01:26Z',
+      filename: 'Alice - smaller.m4b', location: '/library/Alice - smaller.m4b', chapterCount: 1,
+      partial: false, sizeBytes: 3, preset: 'm4b-compact', mediaType: 'audio/mp4',
+      createdAt: '2026-07-19T19:01:26Z',
     })
     const title = screen.getByLabelText('Title')
     title.focus()
@@ -615,10 +623,13 @@ describe('v2 wizard', () => {
     expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')
     fireEvent.change(coverPage, { target: { value: '7' } })
     expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/7/image')
-    fireEvent.click(screen.getByRole('button', { name: 'Create M4B →' }))
-    await waitFor(() => expect(wizardApi.createM4bExport).toHaveBeenCalledWith('book-1', [
+    fireEvent.click(screen.getByRole('radio', { name: /Smaller M4B/ }))
+    expect(screen.getByRole('button', { name: 'Create smaller M4B →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Create smaller M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [
       { chapterId: 'chapter-1', revision: 'audio-1' },
-    ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', cover: undefined, coverPage: 7 }))
+    ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', cover: undefined, coverPage: 7, preset: 'm4b-compact' }))
+    expect(wizardApi.createM4bExport).not.toHaveBeenCalled()
     expect(wizardApi.exportM4b).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
   })
@@ -1865,7 +1876,7 @@ describe('v2 wizard', () => {
     expect(screen.getByText('120 pages · 12.0 MB')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete Alice' }))
     expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('imported PDF')
-    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('Finished M4B audiobooks in Library stay exactly where they are.')
+    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('Finished audiobook exports in Library stay exactly where they are.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete working files' }))
     await waitFor(() => expect(wizardApi.deleteBook).toHaveBeenCalledWith('book-1'))

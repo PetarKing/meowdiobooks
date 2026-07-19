@@ -1,4 +1,4 @@
-"""Validated, request-scoped M4B packaging for generated chapter WAV revisions."""
+"""Validated, request-scoped audiobook packaging for generated chapter WAV revisions."""
 
 from __future__ import annotations
 
@@ -6,10 +6,13 @@ import json
 import re
 import shutil
 import subprocess
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 
 from scipy.io import wavfile
+
+from .models import AudioExportPreset
 
 
 class FFmpegUnavailableError(RuntimeError):
@@ -27,6 +30,64 @@ class M4BChapter:
     audio_path: Path
 
 
+@dataclass(frozen=True)
+class AudioExportProfile:
+    preset: AudioExportPreset
+    extension: str
+    media_type: str
+    bitrate: str
+
+
+_AUDIO_EXPORT_PROFILES = {
+    AudioExportPreset.M4B_HIGH: AudioExportProfile(
+        AudioExportPreset.M4B_HIGH, ".m4b", "audio/mp4", "128k"
+    ),
+    AudioExportPreset.M4B_COMPACT: AudioExportProfile(
+        AudioExportPreset.M4B_COMPACT, ".m4b", "audio/mp4", "64k"
+    ),
+    AudioExportPreset.MP3_CHAPTERS: AudioExportProfile(
+        AudioExportPreset.MP3_CHAPTERS, ".zip", "application/zip", "96k"
+    ),
+}
+
+
+def audio_export_profile(preset: AudioExportPreset) -> AudioExportProfile:
+    return _AUDIO_EXPORT_PROFILES[preset]
+
+
+def package_audio_export(
+    chapters: list[M4BChapter],
+    output: Path,
+    *,
+    title: str,
+    author: str,
+    cover: Path,
+    preset: AudioExportPreset,
+    ffmpeg: str | None = None,
+) -> Path:
+    """Package selected WAV revisions using one allowlisted audiobook preset."""
+    profile = audio_export_profile(preset)
+    if preset == AudioExportPreset.MP3_CHAPTERS:
+        return package_mp3_chapters(
+            chapters,
+            output,
+            title=title,
+            author=author,
+            cover=cover,
+            bitrate=profile.bitrate,
+            ffmpeg=ffmpeg,
+        )
+    return package_m4b(
+        chapters,
+        output,
+        title=title,
+        author=author,
+        cover=cover,
+        bitrate=profile.bitrate,
+        ffmpeg=ffmpeg,
+    )
+
+
 def package_m4b(
     chapters: list[M4BChapter],
     output: Path,
@@ -34,6 +95,7 @@ def package_m4b(
     title: str,
     author: str,
     cover: Path,
+    bitrate: str = "128k",
     ffmpeg: str | None = None,
 ) -> Path:
     """Create one chaptered AAC/M4B without modifying the source WAV revisions."""
@@ -92,7 +154,7 @@ def package_m4b(
         "-c:a",
         "aac",
         "-b:a",
-        "128k",
+        bitrate,
         "-c:v",
         "mjpeg",
         "-disposition:v:0",
@@ -123,6 +185,107 @@ def package_m4b(
     if not output.is_file() or output.stat().st_size == 0:
         output.unlink(missing_ok=True)
         raise M4BExportError("FFmpeg reported success but produced no M4B data")
+    return output
+
+
+def package_mp3_chapters(
+    chapters: list[M4BChapter],
+    output: Path,
+    *,
+    title: str,
+    author: str,
+    cover: Path,
+    bitrate: str = "96k",
+    ffmpeg: str | None = None,
+) -> Path:
+    """Create a ZIP containing one ordered, tagged MP3 per selected chapter."""
+    executable = ffmpeg or shutil.which("ffmpeg")
+    if not executable:
+        raise FFmpegUnavailableError(
+            "MP3 export requires FFmpeg. Install it with `brew install ffmpeg`, then retry."
+        )
+    if not chapters:
+        raise M4BExportError("Select at least one generated chapter to export")
+    if not cover.is_file():
+        raise M4BExportError("No export cover image is available")
+
+    output.parent.mkdir(parents=True, exist_ok=True)
+    chapter_root = output.parent / "mp3-chapters"
+    shutil.rmtree(chapter_root, ignore_errors=True)
+    chapter_root.mkdir()
+    width = max(2, len(str(len(chapters))))
+    try:
+        packaged: list[Path] = []
+        for index, chapter in enumerate(chapters, start=1):
+            _wav_duration_ms(chapter.audio_path)
+            filename = f"{index:0{width}d} - {_safe_filename_stem(chapter.title)}.mp3"
+            destination = chapter_root / filename
+            command = [
+                executable,
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(chapter.audio_path),
+                "-i",
+                str(cover),
+                "-map",
+                "0:a:0",
+                "-map",
+                "1:v:0",
+                "-ac",
+                "1",
+                "-c:a",
+                "libmp3lame",
+                "-b:a",
+                bitrate,
+                "-c:v",
+                "mjpeg",
+                "-disposition:v:0",
+                "attached_pic",
+                "-id3v2_version",
+                "3",
+                "-metadata",
+                f"title={chapter.title}",
+                "-metadata",
+                f"artist={author}",
+                "-metadata",
+                f"album={title}",
+                "-metadata",
+                "genre=Audiobook",
+                "-metadata",
+                f"track={index}/{len(chapters)}",
+                "-metadata:s:v:0",
+                "title=Cover",
+                "-metadata:s:v:0",
+                "comment=Cover (front)",
+                str(destination),
+            ]
+            subprocess.run(command, check=True, capture_output=True, timeout=3600)
+            if not destination.is_file() or destination.stat().st_size == 0:
+                raise M4BExportError(f"FFmpeg produced no MP3 for {chapter.title}")
+            packaged.append(destination)
+        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_STORED) as archive:
+            for chapter in packaged:
+                archive.write(chapter, arcname=chapter.name)
+    except subprocess.TimeoutExpired as error:
+        output.unlink(missing_ok=True)
+        raise M4BExportError("FFmpeg did not finish an MP3 chapter within one hour") from error
+    except subprocess.CalledProcessError as error:
+        output.unlink(missing_ok=True)
+        detail = error.stderr.decode("utf-8", errors="replace").strip()
+        raise M4BExportError(
+            f"FFmpeg could not create the MP3 chapters: {detail or 'unknown error'}"
+        ) from error
+    except (OSError, zipfile.BadZipFile) as error:
+        output.unlink(missing_ok=True)
+        raise M4BExportError("The MP3 chapter ZIP could not be created") from error
+    finally:
+        shutil.rmtree(chapter_root, ignore_errors=True)
+    if not output.is_file() or output.stat().st_size == 0:
+        output.unlink(missing_ok=True)
+        raise M4BExportError("The MP3 chapter ZIP is empty")
     return output
 
 
@@ -195,11 +358,25 @@ def embedded_chapter_titles(source: Path, *, ffprobe: str | None = None) -> list
     ]
 
 
-def export_filename(title: str, *, partial: bool) -> str:
-    base = re.sub(r"[^\w. -]+", "", title, flags=re.UNICODE).strip(" .-") or "Meowdiobooks"
-    base = re.sub(r"\s+", " ", base)[:120].rstrip()
-    suffix = " - selected chapters" if partial else ""
-    return f"{base}{suffix}.m4b"
+def export_filename(
+    title: str,
+    *,
+    partial: bool,
+    preset: AudioExportPreset = AudioExportPreset.M4B_HIGH,
+) -> str:
+    base = _safe_filename_stem(title)
+    if preset == AudioExportPreset.MP3_CHAPTERS:
+        suffix = " - selected MP3 chapters" if partial else " - MP3 chapters"
+        return f"{base}{suffix}.zip"
+    selected = " - selected chapters" if partial else ""
+    compact = " - smaller" if preset == AudioExportPreset.M4B_COMPACT else ""
+    return f"{base}{selected}{compact}.m4b"
+
+
+def _safe_filename_stem(value: str) -> str:
+    base = re.sub(r"[^\w. -]+", "", value, flags=re.UNICODE).strip(" .-")
+    base = re.sub(r"\s+", " ", base or "Meowdiobooks")[:120].rstrip(" .-")
+    return base or "Meowdiobooks"
 
 
 def _wav_duration_ms(path: Path) -> int:

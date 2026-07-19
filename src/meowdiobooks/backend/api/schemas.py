@@ -6,6 +6,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..models import AudioExportPreset
 from ..workflow.commands import RegexProfile
 
 
@@ -32,11 +33,15 @@ class M4BChapterRequest(ApiRequest):
     revision: str = Field(min_length=1)
 
 
-class M4BExportRequest(ApiRequest):
+class AudioExportRequest(ApiRequest):
     chapters: list[M4BChapterRequest] = Field(min_length=1)
     title: str | None = Field(default=None, max_length=500)
     author: str | None = Field(default=None, max_length=500)
     coverPage: int = Field(default=1, ge=1)
+    preset: AudioExportPreset = AudioExportPreset.M4B_HIGH
+
+
+M4BExportRequest = AudioExportRequest
 
 
 class DialoguePreviewRequest(ApiRequest):

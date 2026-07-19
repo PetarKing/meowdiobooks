@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { normalizeDialogueArtifact, wizardApi as defaultWorkflowGateway } from "./api/client";
 import { buildReviewWarningDecisions } from "./reviewDecisions";
 import type {
+  AudioExportPreset,
   Book,
   CastArtifact,
   CastVoice,
@@ -116,7 +117,9 @@ import {
 } from "./workflow/review";
 import {
   decodeImage,
+  estimatedAudioExportBytes,
   formatFileSize,
+  formatLibraryExport,
   formatLibraryChapters,
   formatLibraryDate,
   localizeErrorMessage,
@@ -289,6 +292,7 @@ export default function App({
   const [exportAuthor, setExportAuthor] = useState("");
   const [exportCover, setExportCover] = useState<File>();
   const [exportCoverPage, setExportCoverPage] = useState(1);
+  const [exportPreset, setExportPreset] = useState<AudioExportPreset>("m4b-high");
   const [exportCoverPreviewUrl, setExportCoverPreviewUrl] = useState<string>();
   const [exporting, setExporting] = useState(false);
   const [revisingStages, setRevisingStages] = useState<string[]>([]);
@@ -900,7 +904,7 @@ export default function App({
         {activeJob?.status === "queued" && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}
       </div>
     </div>}
-    {bookPendingDeletion && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-book-title"><div className="process-modal delete-book-modal"><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished M4B audiobooks in Library stay exactly where they are.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></div></div>}
+    {bookPendingDeletion && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-book-title"><div className="process-modal delete-book-modal"><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished audiobook exports in Library stay exactly where they are.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></div></div>}
   </div>;
 
   function Home() {
@@ -927,9 +931,9 @@ export default function App({
       </header>
       {!libraryReady ? <LibrarySkeleton /> : libraryExports.length ? <div className="library-grid">{libraryExports.map((item) => <article key={item.id} className="library-book">
         <div className="library-cover"><span>{monogram(item.title)}</span><img src={`/api/library/${item.id}/cover`} alt={t("Cover of {{title}}", { title: item.title })} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /></div>
-        <div className="library-book-copy"><h2>{item.title}</h2><p>{item.author}</p><div className="library-chapters"><b>{formatLibraryChapters(item, t)}</b></div><div className="library-meta"><span>{formatFileSize(item.sizeBytes)}</span><span>{formatLibraryDate(item.createdAt, uiLocale)}</span></div></div>
+        <div className="library-book-copy"><span className="library-format">{formatLibraryExport(item, t)}</span><h2>{item.title}</h2><p>{item.author}</p><div className="library-chapters"><b>{formatLibraryChapters(item, t)}</b></div><div className="library-meta"><span>{formatFileSize(item.sizeBytes)}</span><span>{formatLibraryDate(item.createdAt, uiLocale)}</span></div></div>
         <div className="library-actions">{renderLibraryActions ? renderLibraryActions(item) : <><button className="primary" onClick={() => void openLibraryItem(item.id)}>{t("library.openAction", { ns: "edition" })}</button><button className="ghost" onClick={() => void revealLibraryItem(item.id)}>{t("library.revealAction", { ns: "edition" })}</button></>}</div>
-      </article>)}</div> : <div className="library-empty"><span aria-hidden="true">♪</span><h2>{t("No audiobooks yet.")}</h2><p>{t("Create an M4B in Export and it will appear here automatically.")}</p><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></div>}
+      </article>)}</div> : <div className="library-empty"><span aria-hidden="true">♪</span><h2>{t("No audiobooks yet.")}</h2><p>{t("Create an audiobook in Export and it will appear here automatically.")}</p><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></div>}
     </section>;
   }
 
@@ -1560,13 +1564,21 @@ export default function App({
     const playableChapters = (snapshot?.chapters ?? []).filter((row) => generatedByChapter.has(row.id));
     const selectedPlayable = playableChapters.filter((row) => exportChapterIds.includes(row.id));
     const selectedSeconds = selectedPlayable.reduce((total, row) => total + (generatedByChapter.get(row.id)?.audioSeconds ?? 0), 0);
+    const exportChoices: Array<{ preset: AudioExportPreset; title: string; technical: string; description: string }> = [
+      { preset: "m4b-high", title: t("High-quality M4B"), technical: t("128 kbps AAC · Chapters and cover"), description: t("Best listening quality. Recommended.") },
+      { preset: "m4b-compact", title: t("Smaller M4B"), technical: t("64 kbps AAC · Chapters and cover"), description: t("Half the size, still optimized for spoken audio.") },
+      { preset: "mp3-chapters", title: t("MP3 chapters"), technical: t("96 kbps MP3 · ZIP download"), description: t("One widely compatible MP3 per chapter.") },
+    ];
+    const exportAction = exportPreset === "m4b-high" ? t("Create high-quality M4B") : exportPreset === "m4b-compact" ? t("Create smaller M4B") : t("Create MP3 ZIP");
+    const exportProgress = exportPreset === "mp3-chapters" ? t("Saving MP3 ZIP…") : t("Saving M4B…");
+    const exportSummary = exportPreset === "m4b-high" ? t("A chaptered, high-quality M4B with the details shown above.") : exportPreset === "m4b-compact" ? t("A chaptered M4B at half the usual size, with the details shown above.") : t("A ZIP with one ordered, tagged MP3 file per selected chapter.");
     const pdfCoverUrl = book ? `/api/books/${book.id}/pages/${exportCoverPage}/image` : undefined;
     const coverUrl = exportCoverPreviewUrl ?? pdfCoverUrl;
     const pageCount = book?.pageCount ?? 1;
     return <>
       <section className="export-hero">
         <div className="export-hero-art" aria-hidden="true"><span className="export-vinyl">♪</span>{coverUrl && <img src={coverUrl} alt="" />}</div>
-        <div><StepEyebrow stage="export">{t("Step 7 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose the finished chapter audio, confirm the book details, and create one shareable M4B.")}</p></div>
+        <div><StepEyebrow stage="export">{t("Step 7 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose the finished chapter audio, confirm the book details, and select the file that suits you.")}</p></div>
       </section>
 
       {!playableChapters.length ? <section className="export-empty"><span aria-hidden="true">♪</span><h2>{t("Generate a chapter first.")}</h2><p>{t("Export includes only the latest playable chapter audio. Nothing is ready yet.")}</p><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></section> : <>
@@ -1588,6 +1600,7 @@ export default function App({
             })}</div>
           </div>
 
+          <div className="export-sidebar">
           <div className="export-metadata">
             <header><span className="eyebrow">{t("Book details")}</span><h2>{t("How it appears in your library")}</h2></header>
             <div className="export-cover-preview">
@@ -1603,11 +1616,26 @@ export default function App({
             <label>{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
             <button type="button" className="text-button export-reset" onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportCover(undefined); setExportCoverPage(1); }}>{t("Reset book details")}</button>
           </div>
+          <section className="export-format" aria-labelledby="export-format-title">
+            <header><span className="eyebrow">{t("Output format")}</span><h2 id="export-format-title">{t("Choose your file")}</h2></header>
+            <div className="export-format-options" role="radiogroup" aria-label={t("Output format")}>
+              {exportChoices.map((choice) => {
+                const selected = exportPreset === choice.preset;
+                const estimate = selectedSeconds ? formatFileSize(estimatedAudioExportBytes(selectedSeconds, choice.preset)) : "—";
+                return <label key={choice.preset} className={selected ? "selected" : ""}>
+                  <input type="radio" name="audio-export-preset" value={choice.preset} checked={selected} onChange={() => setExportPreset(choice.preset)} />
+                  <span className="export-format-copy"><b>{choice.title}</b><small>{choice.technical}</small><em>{choice.description}</em></span>
+                  <strong aria-label={t("Approximately {{size}}", { size: estimate })}>≈ {estimate}</strong>
+                </label>;
+              })}
+            </div>
+          </section>
+          </div>
         </section>
 
         <section className="export-summary" aria-label={t("Export summary")}>
-          <div><span className="eyebrow">{t("Ready to create")}</span><h2>{selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}</h2><p>{t("One chaptered M4B, in book order, with the title, author, and cover shown above.")}</p></div>
-          <button className="primary" disabled={exporting || !selectedPlayable.length || !exportTitle.trim()} onClick={() => void exportCurrent()}>{exporting ? t("Saving M4B…") : `${t("Create M4B")} →`}</button>
+          <div><span className="eyebrow">{t("Ready to create")}</span><h2>{selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}</h2><p>{exportSummary}</p></div>
+          <button className="primary" disabled={exporting || !selectedPlayable.length || !exportTitle.trim()} onClick={() => void exportCurrent()}>{exporting ? exportProgress : `${exportAction} →`}</button>
         </section>
       </>}
     </>;
@@ -1673,9 +1701,11 @@ export default function App({
     if (!chapters.length) return;
     setExporting(true);
     try {
-      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage };
-      if (gateway.createM4bExport) await gateway.createM4bExport(book.id, chapters, options);
-      else await gateway.exportM4b(book.id, chapters, options);
+      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage, preset: exportPreset };
+      if (gateway.createAudioExport) await gateway.createAudioExport(book.id, chapters, options);
+      else if (exportPreset === "m4b-high" && gateway.createM4bExport) await gateway.createM4bExport(book.id, chapters, options);
+      else if (exportPreset === "m4b-high") await gateway.exportM4b(book.id, chapters, options);
+      else throw new Error("This export format is not supported by the current edition.");
       await loadLibrary();
       navigateProduct("library");
     } catch (reason) { setError(message(reason)); }

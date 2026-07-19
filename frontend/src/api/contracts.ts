@@ -456,6 +456,8 @@ export interface Job {
 
 export interface M4BExportChapter { chapterId: string; revision: string }
 export interface M4BExportOptions { title?: string; author?: string; cover?: File; coverPage?: number }
+export type AudioExportPreset = "m4b-high" | "m4b-compact" | "mp3-chapters";
+export interface AudioExportOptions extends M4BExportOptions { preset: AudioExportPreset }
 export interface M4BDownload { blob: Blob; filename: string }
 export interface LibraryExport {
   id: string;
@@ -469,6 +471,8 @@ export interface LibraryExport {
   chapterPositions?: number[];
   partial: boolean;
   sizeBytes: number;
+  preset?: AudioExportPreset;
+  mediaType?: string;
   createdAt: string;
 }
 
@@ -633,6 +637,7 @@ export interface WorkflowGateway {
   cancelJob(jobId: string): Promise<Job>;
   openChapterAudio(bookId: string, chapterId: string, revision: string): Promise<void>;
   createM4bExport?(bookId: string, chapters: M4BExportChapter[], options?: M4BExportOptions): Promise<LibraryExport>;
+  createAudioExport?(bookId: string, chapters: M4BExportChapter[], options: AudioExportOptions): Promise<LibraryExport>;
   exportM4b(bookId: string, chapters: M4BExportChapter[], options?: M4BExportOptions): Promise<M4BDownload>;
   listLibrary(): Promise<LibraryExport[]>;
   openLibraryExport(exportId: string): Promise<void>;

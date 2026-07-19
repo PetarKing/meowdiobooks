@@ -8,7 +8,7 @@ Meowdiobooks alpha currently supports macOS on Apple Silicon (`arm64`) only.
 - Node.js and npm
 - Poppler (`pdftoppm`) for PDF page previews
 - LiteParse for the LiteParse extraction option
-- FFmpeg for M4B export
+- FFmpeg for audiobook export
 - At least 18 GB unified memory and roughly 30 GB free storage recommended
 - Approximately 14 GB for the pinned local language, voice and speech-recognition models
 
