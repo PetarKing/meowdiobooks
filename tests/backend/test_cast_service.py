@@ -2,7 +2,11 @@ from contextlib import contextmanager
 
 import pytest
 
-from meowdiobooks.backend.cast import CastContractError, build_label_dossiers
+from meowdiobooks.backend.cast import (
+    CastContractError,
+    build_label_dossiers,
+    label_comparison_key,
+)
 from meowdiobooks.backend.cast_service import (
     DISCOVERY_SYSTEM,
     MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
@@ -30,7 +34,10 @@ from meowdiobooks.backend.cast_service import (
     suggest_voice_settings_with_completion,
     validate_voice_settings,
 )
-from scripts.benchmark_cast_reconciliation import _benchmark_label_key
+
+
+def _benchmark_label_key(value: object) -> str:
+    return label_comparison_key(value).translate(str.maketrans({"’": "'", "‘": "'"}))
 
 
 def test_ai_resolved_open_marker_builds_dossier_for_resolved_label():
