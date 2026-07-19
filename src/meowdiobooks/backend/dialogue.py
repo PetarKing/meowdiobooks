@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 6
+DIALOGUE_SCAN_VERSION = 7
 
 
 class DialogueContractError(ValueError):
@@ -72,6 +72,13 @@ BUILTIN_PROFILES: tuple[RegexProfile, ...] = (
         "Label + dash",
         r"^(?P<speaker>[^\n,:;\[\]—–]{1,50}?\S)\s+[—–]\s+(?P<text>[^\n]+)",
         30,
+    ),
+    RegexProfile(
+        "label-colon-line",
+        "Uppercase label + colon line",
+        r"^[ \t]*(?P<speaker>[A-Z][A-Z0-9 .'’\-]{1,50})\s*:\s*"
+        r"(?![\[“\"])(?P<text>\S[^\n]*)",
+        31,
     ),
     RegexProfile(
         "screenplay",
@@ -178,8 +185,26 @@ def _custom_profile(raw: Mapping[str, Any], order: int) -> RegexProfile:
         raise DialogueContractError("A custom regex needs a stable ID")
     if not pattern:
         raise DialogueContractError(f"Custom regex {profile_id!r} is empty")
-    flags = re.MULTILINE
-    if raw.get("dotAll"):
+    raw_flags = raw.get("flags")
+    # ``dotAll`` was accepted by the pure scanner before flags became part of the
+    # typed API contract. Keep direct callers compatible while all HTTP/UI traffic
+    # uses the explicit ``flags`` field.
+    flag_names = (
+        str(raw_flags)
+        if raw_flags is not None
+        else "ms"
+        if raw.get("dotAll")
+        else "m"
+    )
+    unsupported = sorted(set(flag_names) - {"m", "s"})
+    if unsupported:
+        raise DialogueContractError(
+            f"Unsupported regex flags for {profile_id!r}: {''.join(unsupported)}"
+        )
+    flags = 0
+    if "m" in flag_names:
+        flags |= re.MULTILINE
+    if "s" in flag_names:
         flags |= re.DOTALL
     return RegexProfile(
         id=profile_id,
@@ -817,6 +842,7 @@ def _nested_unlabelled_claim(
         "label-curly-quotes",
         "label-straight-quotes",
         "label-dash",
+        "label-colon-line",
         "screenplay",
     }
     for outer, inner in ((left, right), (right, left)):
@@ -1041,7 +1067,10 @@ def scan_dialogue(
                 "custom": profile.custom,
                 "builtIn": not profile.custom,
                 "pattern": profile.pattern,
-                "flags": "ms" if profile.flags & re.DOTALL else "m",
+                "flags": (
+                    ("m" if profile.flags & re.MULTILINE else "")
+                    + ("s" if profile.flags & re.DOTALL else "")
+                ),
                 "matchCount": len(logical_matches),
                 "examples": logical_matches[:example_limit],
             }

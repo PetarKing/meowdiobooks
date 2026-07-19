@@ -606,7 +606,7 @@ function serializeDialogueSettings(settings: DialogueSettings, includeStrategy =
       pattern: row.pattern,
       priority: row.priority,
       enabled: row.enabled,
-      dotAll: row.flags?.includes("s") ?? false,
+      flags: row.flags ?? "m",
     })),
     openSpeakerPatterns: settings.openSpeakerPatterns,
     attributionTargets: settings.attributionTargets,

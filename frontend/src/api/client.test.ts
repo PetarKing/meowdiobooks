@@ -66,6 +66,31 @@ describe('HttpWizardApi', () => {
     }))
   })
 
+  it('serializes supported custom regex flags using the backend contract', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ profiles: [] }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await new HttpWizardApi('/api').previewDialogue('book-1', {
+      regexes: [{
+        id: 'custom-radio-play', label: 'Radio play', pattern: '(?P<text>.+)', flags: 'ms',
+        priority: 100, enabled: true, builtIn: false,
+      }],
+      openSpeakerPatterns: [], strategy: 'narrate', attributionTargets: [],
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/dialogue/preview', expect.objectContaining({
+      body: JSON.stringify({
+        customRegexes: [{
+          id: 'custom-radio-play', label: 'Radio play', pattern: '(?P<text>.+)',
+          priority: 100, enabled: true, flags: 'ms',
+        }],
+        openSpeakerPatterns: [], attributionTargets: [], enabledRegexIds: ['custom-radio-play'],
+      }),
+    }))
+  })
+
   it('sends the explicitly chosen remote attribution route with the Dialogue job', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       id: 'job-remote', status: 'queued',

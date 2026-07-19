@@ -25,6 +25,7 @@ All enabled built-in and user regexes run over bounded accepted extraction block
 - `Name: [dialogue]`;
 - `Name: “dialogue”` and straight-quote equivalents;
 - `Name — dialogue`;
+- conservative uppercase `NAME: dialogue` on one extracted line;
 - opt-in screenplay speaker line followed by dialogue block;
 - unlabeled curly, straight, guillemet and CJK quotation candidates.
 
@@ -35,6 +36,11 @@ regex with at least one match, representative matches and the delta from enablin
 Conflicting/overlapping matches are never silently selected. Priority resolves only non-conflicting
 ordered application; actual source-ownership conflicts remain visible. The user may choose either
 interpretation, leave the overlapping source as narration, or change the enabled rules.
+
+The uppercase colon rule deliberately excludes bracketed and quoted text immediately after the colon,
+because those formats belong to the more specific labelled rules above. Equivalent built-in/custom
+claims over the same speaker and spoken range coalesce into one turn; genuinely different overlapping
+claims continue through the explicit conflict-review contract.
 
 ### Structural preflight
 
@@ -75,7 +81,8 @@ The UI reports detected counts, never an unprovable percentage of all dialogue i
 
 ## Raw regex editing
 
-The user can add, edit, order, toggle and remove multiple regexes. Each change reruns the deterministic
+The user can add, edit, order, toggle and remove multiple regexes. Custom rules accept the explicit
+`m` (multiline) and `s` (dot-all) flags. Each change reruns the deterministic
 preview and shows added, removed and changed matches. Regexes operate locally on bounded blocks. The
 application validates compilation, required captures, zero-width matches and source ownership. Any two
 custom or built-in rules that claim overlapping source use the same overlap review. A custom regex is
