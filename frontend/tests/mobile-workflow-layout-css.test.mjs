@@ -11,11 +11,13 @@ function rule(selector) {
 }
 
 describe('mobile workflow layout', () => {
-  it('bounds cast audio settings to the full-width mobile trigger', () => {
+  it('bounds cast audio settings and keeps language choices readable on mobile', () => {
     expect(rule('.cast-audio-settings')).toMatch(/right\s*:\s*0/)
     expect(rule('.cast-audio-settings')).toMatch(/left\s*:\s*0/)
     expect(rule('.cast-audio-settings')).toMatch(/width\s*:\s*auto/)
-    expect(rule('.language-flags')).toMatch(/grid-template-columns\s*:\s*repeat\(3,minmax\(0,1fr\)\)/)
+    expect(rule('.language-flags')).toMatch(/grid-template-columns\s*:\s*repeat\(auto-fit,minmax\(min\(120px,100%\),1fr\)\)/)
+    expect(rule('.language-flags button small')).toMatch(/overflow-wrap\s*:\s*normal/)
+    expect(rule('.language-flags button small')).toMatch(/word-break\s*:\s*normal/)
     expect(mobileStyles).not.toMatch(/\.cast-audio-settings\s*\{[^}]*88vw/)
   })
 

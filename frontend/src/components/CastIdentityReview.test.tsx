@@ -103,6 +103,29 @@ describe("CastIdentityReview", () => {
     expect(reclassify).toHaveBeenCalledOnce();
   });
 
+  it("keeps every hosted-model language available from the compact audio settings", () => {
+    const supportedLanguages = ["chinese", "english", "french", "german", "italian", "japanese", "korean", "portuguese", "russian", "spanish"];
+    const { rerender } = render(<Harness />);
+    rerender(<CastIdentityReview
+      cast={cast}
+      decisions={{}}
+      setDecisions={() => undefined}
+      resolvedLabels={[]}
+      setResolvedLabels={() => undefined}
+      voiceModels={[{ id: "qwen-audio-3", label: "Alibaba Qwen Audio 3.0", supportedLanguages }]}
+      voiceModel="qwen-audio-3"
+      language="english"
+      onVoiceModelChange={() => undefined}
+      onLanguageChange={() => undefined}
+    />);
+
+    expect(screen.getByText("🇬🇧 english · Alibaba Qwen Audio 3.0")).toBeInTheDocument();
+    expect(screen.getByLabelText("Voice model")).toHaveValue("qwen-audio-3");
+    const languageGroup = screen.getByRole("group", { name: "Book language" });
+    expect(within(languageGroup).getAllByRole("button")).toHaveLength(supportedLanguages.length);
+    expect(within(languageGroup).getByRole("button", { name: "🇵🇹 portuguese" })).toBeInTheDocument();
+  });
+
   it("blocks only material grouping decisions and keeps possible matches informational", () => {
     render(<ReviewSignalsHarness />);
 
