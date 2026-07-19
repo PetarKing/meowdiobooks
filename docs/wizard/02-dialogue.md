@@ -25,7 +25,7 @@ All enabled built-in and user regexes run over bounded accepted extraction block
 - `Name: [dialogue]`;
 - `Name: “dialogue”` and straight-quote equivalents;
 - `Name — dialogue`;
-- conservative uppercase `NAME: dialogue` on one extracted line;
+- conservative uppercase `NAME: dialogue` within one extracted paragraph;
 - opt-in screenplay speaker line followed by dialogue block;
 - unlabeled curly, straight, guillemet and CJK quotation candidates.
 
@@ -38,7 +38,8 @@ ordered application; actual source-ownership conflicts remain visible. The user 
 interpretation, leave the overlapping source as narration, or change the enabled rules.
 
 The uppercase colon rule deliberately excludes bracketed and quoted text immediately after the colon,
-because those formats belong to the more specific labelled rules above. Equivalent built-in/custom
+because those formats belong to the more specific labelled rules above. Wrapped visual lines remain in
+the same turn when extraction geometry proves they belong to one paragraph. Equivalent built-in/custom
 claims over the same speaker and spoken range coalesce into one turn; genuinely different overlapping
 claims continue through the explicit conflict-review contract.
 

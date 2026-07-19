@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 7
+DIALOGUE_SCAN_VERSION = 8
 
 
 class DialogueContractError(ValueError):
@@ -77,7 +77,8 @@ BUILTIN_PROFILES: tuple[RegexProfile, ...] = (
         "label-colon-line",
         "Uppercase label + colon line",
         r"^[ \t]*(?P<speaker>[A-Z][A-Z0-9 .'’\-]{1,50})\s*:\s*"
-        r"(?![\[“\"])(?P<text>\S[^\n]*)",
+        r"(?![\[“\"])(?P<text>\S[^\n]*"
+        r"(?:\n(?![ \t]*(?:\n|[A-Z][A-Z0-9 .'’\-]{1,50}\s*:))[^\n]+)*)",
         31,
     ),
     RegexProfile(

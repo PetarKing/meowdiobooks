@@ -84,6 +84,7 @@ from .dialogue import (
 from .dialogue_ai import apply_dialogue_corrections, run_dialogue_qwen
 from .dialogue_remote import run_dialogue_remote
 from .documents import (
+    EXTRACTION_METHOD_VERSION,
     extract_full_document,
     extract_pdf_page,
     imported_book_id,
@@ -384,7 +385,7 @@ def create_app_v2(
             {
                 "revision": revision,
                 "method": method,
-                "methodVersion": "documents-v2",
+                "methodVersion": EXTRACTION_METHOD_VERSION,
                 "pageCount": len(pages),
                 "pages": pages,
                 "blocks": blocks,

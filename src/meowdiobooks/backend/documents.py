@@ -6,7 +6,7 @@ import json
 import re
 import subprocess
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -16,6 +16,8 @@ from pypdf import PdfReader
 from meowdiobooks.util import sha256_bytes
 
 SUPPORTED_SUFFIXES = {".pdf"}
+EXTRACTION_METHOD_VERSION = "documents-v3"
+_LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
 
 
 def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
@@ -99,9 +101,57 @@ def render_pdf_page(source: Path, cache_root: Path, page: int) -> Path:
     return output
 
 
+def _normalise_liteparse_page_text(page: Mapping[str, Any]) -> str:
+    """Restore paragraph gaps LiteParse exposes only through item geometry.
+
+    LiteParse's plain text preserves visual line wraps but can flatten larger
+    vertical paragraph gaps to the same single newline. We insert only missing
+    blank separators. If text rows and geometric rows cannot be aligned exactly,
+    the parser text remains untouched rather than risking source reordering.
+    """
+
+    source = str(page.get("text", ""))
+    lines = source.splitlines()
+    items = page.get("textItems")
+    if not source or not isinstance(items, list) or not items:
+        return source
+    if not lines or any(not line.strip() for line in lines):
+        return source
+
+    rows: list[tuple[float, float]] = []
+    for item in items:
+        if not isinstance(item, Mapping):
+            return source
+        try:
+            y = float(item["y"])
+            height = float(item["height"])
+            rotation = float(item.get("rotation", 0))
+        except (KeyError, TypeError, ValueError):
+            return source
+        if height <= 0 or rotation != 0:
+            return source
+        if rows and abs(y - rows[-1][0]) <= max(height, rows[-1][1]) * 0.35:
+            rows[-1] = (rows[-1][0], max(rows[-1][1], height))
+        else:
+            rows.append((y, height))
+
+    if len(rows) != len(lines):
+        return source
+
+    output = [lines[0]]
+    for index, line in enumerate(lines[1:], 1):
+        previous_y, previous_height = rows[index - 1]
+        y, height = rows[index]
+        if y - previous_y > max(previous_height, height) * 1.55:
+            output.append("")
+        output.append(line)
+    return "\n".join(output)
+
+
 def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> dict[str, Any]:
     started = time.perf_counter()
-    cache = cache_root / "extraction" / method / f"page-{page:04d}.json"
+    cache_method = _LITEPARSE_CACHE_KEY if method == "liteparse" else method
+    cache = cache_root / "extraction" / cache_method / f"page-{page:04d}.json"
     if cache.is_file():
         result = json.loads(cache.read_text(encoding="utf-8"))
         result["cached"] = True
@@ -128,7 +178,7 @@ def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> 
             timeout=90,
         )
         parsed = json.loads(raw.read_text(encoding="utf-8"))
-        text = parsed["pages"][0]["text"] if parsed.get("pages") else ""
+        text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
         raw.unlink(missing_ok=True)
     elif method == "native":
         pdf_page = PdfReader(source).pages[page - 1]
@@ -155,7 +205,7 @@ def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> 
 
 
 def extract_full_liteparse(source: Path, cache_root: Path) -> list[dict[str, Any]]:
-    cache = cache_root / "extraction" / "liteparse" / "full.json"
+    cache = cache_root / "extraction" / _LITEPARSE_CACHE_KEY / "full.json"
     if not cache.is_file():
         cache.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
@@ -188,16 +238,16 @@ def extract_full_document(
     if method == "liteparse":
         notify(10, "Running LiteParse over the complete document")
         raw_pages = extract_full_liteparse(source, cache_root)
-        pages = [
-            {
+        pages: list[dict[str, Any]] = []
+        for index, page in enumerate(raw_pages, 1):
+            text = _normalise_liteparse_page_text(page)
+            pages.append({
                 **page,
                 "page": int(page.get("page", index)),
-                "text": str(page.get("text", "")),
-                "warnings": list(page.get("warnings") or _warnings(str(page.get("text", "")))),
+                "text": text,
+                "warnings": list(page.get("warnings") or _warnings(text)),
                 "method": "liteparse",
-            }
-            for index, page in enumerate(raw_pages, 1)
-        ]
+            })
         notify(90, f"Extracted {len(pages)} pages")
         return pages
 

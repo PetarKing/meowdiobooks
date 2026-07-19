@@ -108,27 +108,29 @@ def test_builtin_label_recipes_reject_prose_and_screenplay_is_opt_in():
 
 def test_uppercase_speaker_colon_lines_are_detected_without_claiming_stage_directions():
     source = (
-        "THE PLAY\n"
+        "THE PLAY\n\n"
         "SMITH: Miss Caroline, I'm here.\n"
-        "me after school.\n"
-        "LIGHTS TURN OFF LOUDLY.\n"
-        "SMITH: (shocked) I can't see a thing.\n"
-        "THE SOUND OF IPHONE BUTTONS.\n"
-        "SMITH: (footsteps) I'll check the dressing rooms.\n"
-        "SMITH: Ms Caroline, are you here?\n"
-        "LITTLE PEEVES: She's not here.\n"
-        "SMITH: Who are you?\n"
-        "LITTLE PEEVES: I am Peeves.\n"
-        "SMITH: Do you know where Miss Caroline is?\n"
-        "LITTLE PEEVES: Yes.\n"
-        "SMITH: Where is your voice coming from?\n"
+        "me after school.\n\n"
+        "LIGHTS TURN OFF LOUDLY.\n\n"
+        "SMITH: (shocked) I can't see a thing.\n\n"
+        "THE SOUND OF IPHONE BUTTONS.\n\n"
+        "SMITH: (footsteps) I'll check the dressing rooms.\n\n"
+        "SMITH: Ms Caroline, are you here?\n\n"
+        "LITTLE PEEVES: She's not here.\n\n"
+        "SMITH: Who are you?\n\n"
+        "LITTLE PEEVES: I am Peeves.\n\n"
+        "SMITH: Do you know where Miss Caroline is?\n\n"
+        "LITTLE PEEVES: Yes.\n\n"
+        "SMITH: Where is your voice coming from?\n\n"
         "LITTLE PEEVES: I don't know anymore.\n"
-        "SMITH: What do you mean?\n"
+        "in a body.\n\n"
+        "SMITH: What do you mean?\n\n"
         "LITTLE PEEVES: Like the one behind you.\n"
-        "SMITH: What?\n"
-        "SMITH: Get up!\n"
-        "LITTLE PEEVES: She's dead.\n"
-        "SMITH: I'm out.\n"
+        "violin)\n\n"
+        "SMITH: What?\n\n"
+        "SMITH: Get up!\n\n"
+        "LITTLE PEEVES: She's dead.\n\n"
+        "SMITH: I'm out.\n\n"
         "SMITH RUNS AWAY."
     )
 
@@ -147,6 +149,13 @@ def test_uppercase_speaker_colon_lines_are_detected_without_claiming_stage_direc
     )
     assert "LIGHTS TURN OFF LOUDLY." in narration
     assert "SMITH RUNS AWAY." in narration
+    turns = {row["source"]: row["text"] for row in result["acceptedMatches"]}
+    assert turns["LITTLE PEEVES: I don't know anymore.\nin a body."] == (
+        "I don't know anymore.\nin a body."
+    )
+    assert turns["LITTLE PEEVES: Like the one behind you.\nviolin)"] == (
+        "Like the one behind you.\nviolin)"
+    )
     assert reconstruct_partition(result)[1] == source
 
 

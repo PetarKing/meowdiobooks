@@ -1,4 +1,8 @@
-from meowdiobooks.backend.documents import extract_full_document, representative_pages
+from meowdiobooks.backend.documents import (
+    _normalise_liteparse_page_text,
+    extract_full_document,
+    representative_pages,
+)
 
 
 def test_representative_pages_are_in_range_and_unique():
@@ -23,3 +27,37 @@ def test_full_extraction_retains_per_page_method_and_detector_evidence(tmp_path,
             "method": "liteparse",
         }
     ]
+
+
+def test_liteparse_geometry_restores_paragraph_gaps_without_losing_line_wraps():
+    page = {
+        "text": (
+            "    LITTLE PEEVES: I don't know anymore. It was ages since I was\n"
+            "    in a body.\n"
+            "    LIGHTS TURN OFF LOUDLY.\n"
+            "    SMITH: What do you mean?"
+        ),
+        "textItems": [
+            {"text": "LITTLE PEEVES", "y": 100, "height": 10, "rotation": 0},
+            {"text": "I don't know", "y": 100, "height": 10, "rotation": 0},
+            {"text": "in a body.", "y": 110, "height": 10, "rotation": 0},
+            {"text": "LIGHTS", "y": 130, "height": 10, "rotation": 0},
+            {"text": "SMITH", "y": 150, "height": 10, "rotation": 0},
+        ],
+    }
+
+    assert _normalise_liteparse_page_text(page) == (
+        "    LITTLE PEEVES: I don't know anymore. It was ages since I was\n"
+        "    in a body.\n\n"
+        "    LIGHTS TURN OFF LOUDLY.\n\n"
+        "    SMITH: What do you mean?"
+    )
+
+
+def test_liteparse_geometry_mismatch_preserves_parser_text_unchanged():
+    page = {
+        "text": "First line\nSecond line",
+        "textItems": [{"text": "First line", "y": 100, "height": 10, "rotation": 0}],
+    }
+
+    assert _normalise_liteparse_page_text(page) == page["text"]
