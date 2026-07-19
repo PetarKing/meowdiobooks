@@ -4,13 +4,19 @@ import pytest
 
 from meowdiobooks.backend.cast import CastContractError, build_label_dossiers
 from meowdiobooks.backend.cast_service import (
+    DISCOVERY_SYSTEM,
     MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
+    PAIR_SYSTEM,
     SYSTEM,
     VoiceEvidencePolicy,
     VOICE_PROFILE_SYSTEM,
     _combine_confirmed_relationships,
+    _apply_pair_decisions,
+    _complete_discovery_batch_with,
+    _complete_pair_decision_with,
     _complete_voice_settings,
     _label_prompt,
+    _union_identity_candidates,
     _proposal_from_decision,
     _surrounding_story_context,
     _voice_target,
@@ -24,6 +30,7 @@ from meowdiobooks.backend.cast_service import (
     suggest_voice_settings_with_completion,
     validate_voice_settings,
 )
+from scripts.benchmark_cast_reconciliation import _benchmark_label_key
 
 
 def test_ai_resolved_open_marker_builds_dossier_for_resolved_label():
@@ -41,6 +48,10 @@ def test_ai_resolved_open_marker_builds_dossier_for_resolved_label():
     )
 
     assert [row["label"] for row in dossiers] == ["Louis"]
+
+
+def test_benchmark_expected_pair_keys_normalize_straight_and_curly_apostrophes():
+    assert _benchmark_label_key("Flop O'Connell") == _benchmark_label_key("Flop O’Connell")
 
 
 def test_cast_prompt_is_focused_and_uses_exact_labels():
@@ -592,7 +603,7 @@ def test_one_sided_identity_claim_stays_a_suggestion():
     assert proposals[1]["aliases"] == []
 
 
-def test_propose_cast_calls_qwen_once_per_label_without_reconciliation(monkeypatch):
+def test_propose_cast_classifies_discovers_and_adjudicates_once_per_pair(monkeypatch):
     turns = [
         {
             "id": "s1",
@@ -616,15 +627,25 @@ def test_propose_cast_calls_qwen_once_per_label_without_reconciliation(monkeypat
     def fake_server(_repo):
         yield "http://qwen"
 
-    def fake_complete(_base, _system, prompt, **_kwargs):
-        calls.append(prompt)
-        target = "Subaru" if "TARGET LABEL\nSubaru\n" in prompt else "Subaro"
-        other = "Subaro" if target == "Subaru" else "Subaru"
-        return {
-            "speakerType": "one-person",
-            "sameIdentityAs": [other],
-            "possiblySameIdentityAs": [],
-        }
+    def fake_complete(_base, system, prompt, **_kwargs):
+        calls.append((system, prompt))
+        if system == DISCOVERY_SYSTEM:
+            return {
+                "classifications": [
+                    {"label": "Subaru", "speakerType": "one-person"},
+                    {"label": "Subaro", "speakerType": "one-person"},
+                ],
+                "candidatePairs": [
+                    {
+                        "leftLabel": "Subaru",
+                        "rightLabel": "Subaro",
+                        "reason": "Likely spelling variant.",
+                    }
+                ]
+            }
+        if system == PAIR_SYSTEM:
+            return {"relationship": "same", "reason": "Both dossiers identify Subaru."}
+        raise AssertionError("No standalone classification call is expected")
 
     monkeypatch.setattr("meowdiobooks.backend.cast_service.qwen_server", fake_server)
     monkeypatch.setattr("meowdiobooks.backend.cast_service.complete_json", fake_complete)
@@ -638,14 +659,22 @@ def test_propose_cast_calls_qwen_once_per_label_without_reconciliation(monkeypat
     assert len(calls) == 2
     assert result["processing"] == {
         "labels": 2,
-        "batches": 2,
+        "batches": 1,
+        "classificationDiscoveryCalls": 1,
+        "adjudicationCalls": 1,
         "modelCalls": 2,
+        "reconciliationPasses": 1,
+        "candidatePairs": 1,
+        "modelNominations": 1,
+        "candidateSourceMemberships": {
+            "deterministic-lexical": 1,
+            "global-discovery": 1,
+        },
         "model": "Qwen 3.5 9B local",
     }
     assert {row["canonicalName"] for row in result["proposals"]} == {"Subaru"}
-    assert "reconciliationPasses" not in result["processing"]
-    assert progress[0] == (2, "Reviewing 2 character labels with AI")
-    assert not any("Checking identity relationships" in (message or "") for _, message in progress)
+    assert progress[0] == (2, "Classifying and discovering 2 character labels with AI")
+    assert all(row["reviewRequired"] for row in result["proposals"])
 
 
 def test_provider_neutral_cast_completion_preserves_shared_merge_contract():
@@ -666,13 +695,24 @@ def test_provider_neutral_cast_completion_preserves_shared_merge_contract():
         },
     ]
 
-    def complete(_system, prompt, _max_tokens):
-        target = "Subaru" if "TARGET LABEL\nSubaru\n" in prompt else "Subaro"
-        return {
-            "speakerType": "one-person",
-            "sameIdentityAs": ["Subaro" if target == "Subaru" else "Subaru"],
-            "possiblySameIdentityAs": [],
-        }
+    def complete(system, _prompt, _max_tokens):
+        if system == DISCOVERY_SYSTEM:
+            return {
+                "classifications": [
+                    {"label": "Subaru", "speakerType": "one-person"},
+                    {"label": "Subaro", "speakerType": "one-person"},
+                ],
+                "candidatePairs": [
+                    {
+                        "leftLabel": "Subaru",
+                        "rightLabel": "Subaro",
+                        "reason": "Likely spelling variant.",
+                    }
+                ]
+            }
+        if system == PAIR_SYSTEM:
+            return {"relationship": "same", "reason": "The names and evidence agree."}
+        raise AssertionError("No standalone classification call is expected")
 
     result = propose_cast_with_completion(
         turns,
@@ -683,6 +723,237 @@ def test_provider_neutral_cast_completion_preserves_shared_merge_contract():
 
     assert result["processing"]["model"] == "Test remote model"
     assert {row["canonicalName"] for row in result["proposals"]} == {"Subaru"}
+
+
+def test_global_discovery_batches_include_the_complete_ledger_and_allow_cross_batch_pairs():
+    turns = [
+        {
+            "id": f"s{index}",
+            "sourceSpeakerLabel": f"Person {index}",
+            "speakerStatus": "explicit",
+            "source": f"Person {index}: Hello.",
+            "page": index,
+        }
+        for index in range(25)
+    ]
+    discovery_prompts = []
+
+    def complete(system, prompt, _max_tokens):
+        if system == DISCOVERY_SYSTEM:
+            discovery_prompts.append(prompt)
+            owned = [
+                line.removeprefix("LABEL: ")
+                for line in prompt.splitlines()
+                if line.startswith("LABEL: ")
+            ]
+            candidates = []
+            if "LABEL: Person 24" in prompt:
+                candidates.append(
+                    {
+                        "leftLabel": "Person 24",
+                        "rightLabel": "Person 0",
+                        "reason": "The final dossier explicitly resolves to the first label.",
+                    }
+                )
+            return {
+                "classifications": [
+                    {"label": label, "speakerType": "one-person"} for label in owned
+                ],
+                "candidatePairs": candidates,
+            }
+        if system == PAIR_SYSTEM:
+            return {"relationship": "possible", "reason": "Evidence remains ambiguous."}
+        raise AssertionError("No standalone classification call is expected")
+
+    result = propose_cast_with_completion(turns, complete, model_name="Test Luna")
+
+    assert len(discovery_prompts) == 2
+    assert all("Person 0\t1\tfirst:0" in prompt for prompt in discovery_prompts)
+    assert all("Person 24\t1\tfirst:24" in prompt for prompt in discovery_prompts)
+    assert result["processing"]["classificationDiscoveryCalls"] == 2
+    by_label = {row["label"]: row for row in result["proposals"]}
+    assert "Person 24" in by_label["Person 0"]["competingLabels"]
+    assert "Person 0" in by_label["Person 24"]["competingLabels"]
+    assert by_label["Person 0"]["reviewRequired"] is True
+    assert by_label["Person 24"]["reviewRequired"] is True
+
+
+def test_deterministic_union_finds_short_name_and_explicit_full_name_mentions():
+    dossiers = [
+        {
+            "label": "Ceci",
+            "examples": [
+                {
+                    "sourceText": "Ceci: I am Cecilus Segmunt.",
+                    "contextBefore": "The blue-haired swordsman bowed.",
+                }
+            ],
+        },
+        {"label": "Cecilus", "examples": [{"sourceText": "Cecilus: Yes."}]},
+        {
+            "label": "Cecilus Segmunt",
+            "examples": [{"sourceText": "Cecilus Segmunt: Indeed."}],
+        },
+    ]
+
+    candidates = _union_identity_candidates(dossiers, [], [])
+    pairs = {
+        frozenset((row["leftLabel"], row["rightLabel"])): row for row in candidates
+    }
+
+    assert frozenset(("Ceci", "Cecilus")) in pairs
+    assert frozenset(("Ceci", "Cecilus Segmunt")) in pairs
+    full_name = pairs[frozenset(("Ceci", "Cecilus Segmunt"))]
+    assert "deterministic-context" in full_name["sources"]
+
+
+def test_deterministic_union_nominates_all_known_missed_short_full_name_pairs():
+    known_pairs = (
+        ("Ceci", "Cecilus"),
+        ("Berstetz", "Berstetz Fondalfon"),
+        ("Goz", "Goz Ralfon"),
+        ("Frederica", "Frederica Baumann"),
+        ("Gudda", "Gudda Dialmo"),
+        ("Madelyn", "Madelyn Eschart"),
+        ("Flop", "Flop O’Connell"),
+    )
+    dossiers = [
+        {"label": label, "examples": []} for pair in known_pairs for label in pair
+    ]
+
+    candidates = _union_identity_candidates(dossiers, [], [])
+    nominated = {
+        frozenset((row["leftLabel"], row["rightLabel"])) for row in candidates
+    }
+
+    assert nominated == {frozenset(pair) for pair in known_pairs}
+
+
+def test_deterministic_union_rejects_joint_names_and_plain_scene_cooccurrence():
+    dossiers = [
+        {
+            "label": "Flop",
+            "examples": [
+                {
+                    "sourceText": "Flop: We should leave.",
+                    "contextAfter": (
+                        "Katya turned to Flop while Rem stood beside Flop O'Connell."
+                    ),
+                }
+            ],
+        },
+        {"label": "Flop O'Connell", "examples": []},
+        {"label": "Flop & Rem", "examples": []},
+        {"label": "Rem & Flop", "examples": []},
+        {"label": "Katya", "examples": []},
+        {"label": "Rem", "examples": []},
+    ]
+
+    candidates = _union_identity_candidates(dossiers, [], [])
+    nominated = {
+        frozenset((row["leftLabel"], row["rightLabel"])) for row in candidates
+    }
+
+    assert nominated == {frozenset(("Flop", "Flop O'Connell"))}
+
+
+def test_deterministic_context_requires_explicit_self_id_or_descriptive_apposition():
+    dossiers = [
+        {
+            "label": "Masked Speaker",
+            "examples": [{"sourceText": "Masked Speaker: My name is Aldebaran."}],
+        },
+        {"label": "Aldebaran", "examples": []},
+        {
+            "label": "Blue-Haired Boy",
+            "examples": [
+                {"contextBefore": "The Blue-Haired Boy, Cecilus, bowed deeply."}
+            ],
+        },
+        {"label": "Cecilus", "examples": []},
+    ]
+
+    candidates = _union_identity_candidates(dossiers, [], [])
+    nominated = {
+        frozenset((row["leftLabel"], row["rightLabel"])) for row in candidates
+    }
+
+    assert frozenset(("Masked Speaker", "Aldebaran")) in nominated
+    assert frozenset(("Blue-Haired Boy", "Cecilus")) in nominated
+
+
+def test_discovery_and_pair_contracts_reject_unknown_or_asymmetric_shapes():
+    discovery_answers = iter(
+        [
+            {
+                "classifications": [{"label": "Emilia", "speakerType": "one-person"}],
+                "candidatePairs": [
+                    {"leftLabel": "Unknown", "rightLabel": "Emilia", "reason": "No."}
+                ]
+            },
+            {
+                "classifications": [{"label": "Emilia", "speakerType": "one-person"}],
+                "candidatePairs": [
+                    {
+                        "leftLabel": "Lady Emilia",
+                        "rightLabel": "Emilia",
+                        "reason": "Title variant.",
+                    }
+                ]
+            },
+        ]
+    )
+    discovered = _complete_discovery_batch_with(
+        lambda *_args: next(discovery_answers),
+        "prompt",
+        ["Emilia"],
+        ["Emilia", "Lady Emilia"],
+    )
+    assert discovered["candidatePairs"] == [
+        {
+            "leftLabel": "Emilia",
+            "rightLabel": "Lady Emilia",
+            "reason": "Title variant.",
+            "source": "global-discovery",
+        }
+    ]
+
+    pair_answers = iter(
+        [
+            {"leftRelationship": "same", "rightRelationship": "possible"},
+            {"relationship": "same", "reason": "Both dossiers identify Emilia."},
+        ]
+    )
+    assert _complete_pair_decision_with(lambda *_args: next(pair_answers), "prompt") == {
+        "relationship": "same",
+        "decisionReason": "Both dossiers identify Emilia.",
+    }
+
+
+def test_contradictory_pair_evidence_prevents_transitive_automatic_merge():
+    proposals = [
+        {
+            "label": label,
+            "category": "character",
+            "canonicalName": label,
+            "aliases": [],
+            "competingLabels": [],
+            "reviewRequired": False,
+        }
+        for label in ("A-name", "B-name", "C-name")
+    ]
+    decisions = [
+        {"leftLabel": "A-name", "rightLabel": "B-name", "relationship": "same"},
+        {"leftLabel": "B-name", "rightLabel": "C-name", "relationship": "same"},
+        {"leftLabel": "A-name", "rightLabel": "C-name", "relationship": "different"},
+    ]
+
+    resolved = _apply_pair_decisions(proposals, decisions)
+
+    assert {row["canonicalName"] for row in resolved} == {"A-name", "B-name", "C-name"}
+    assert all(row["reviewRequired"] for row in resolved)
+    assert decisions[0]["automaticMerge"] is False
+    assert decisions[1]["automaticMerge"] is False
 
 
 def test_provider_neutral_voice_completion_preserves_shared_validation():
@@ -709,7 +980,43 @@ def test_provider_neutral_voice_completion_preserves_shared_validation():
     assert profiles["narrator"]["tone"] == "gentle"
 
 
-def test_cast_retries_relationship_outside_the_supplied_shortlist(monkeypatch):
+def test_selective_voice_completion_does_not_reprofile_an_unchanged_narrator():
+    prompts = []
+
+    def complete(_system, prompt, _max_tokens):
+        prompts.append(prompt)
+        return {
+            "presentation": "feminine",
+            "age": "adult",
+            "tone": "bright",
+            "pitch": "medium",
+            "pace": "natural",
+            "energy": "balanced",
+            "accent": "unspecified",
+            "description": "Clear and direct.",
+        }
+
+    profiles = suggest_voice_settings_with_completion(
+        [
+            {
+                "characterId": "character-alice",
+                "name": "Alice",
+                "category": "character",
+                "literalLabels": ["Alice"],
+            }
+        ],
+        [],
+        [],
+        complete,
+        include_narrator=False,
+    )
+
+    assert set(profiles) == {"character-alice"}
+    assert len(prompts) == 1
+    assert "Narrator" not in prompts[0]
+
+
+def test_global_discovery_can_nominate_any_known_label_and_retries_invented_labels(monkeypatch):
     turns = [
         {
             "id": "s1",
@@ -734,25 +1041,35 @@ def test_cast_retries_relationship_outside_the_supplied_shortlist(monkeypatch):
         },
     ]
     prompts = []
+    discovery_attempts = 0
 
     @contextmanager
     def fake_server(_repo):
         yield "http://qwen"
 
-    def fake_complete(_base, _system, prompt, **_kwargs):
+    def fake_complete(_base, system, prompt, **_kwargs):
+        nonlocal discovery_attempts
         prompts.append(prompt)
-        target = prompt.split("TARGET LABEL\n", 1)[1].split("\n", 1)[0]
-        if target != "Cecilus":
+        if system == DISCOVERY_SYSTEM:
+            discovery_attempts += 1
+            right = "Invented" if discovery_attempts == 1 else "Cecilus Segmunt"
             return {
-                "speakerType": "one-person",
-                "sameIdentityAs": ["Cecilus"] if target == "Cecilus Segmunt" else [],
-                "possiblySameIdentityAs": [],
+                "classifications": [
+                    {"label": "Cecilus", "speakerType": "one-person"},
+                    {"label": "Cecilus Segmunt", "speakerType": "one-person"},
+                    {"label": "Todd", "speakerType": "one-person"},
+                ],
+                "candidatePairs": [
+                    {
+                        "leftLabel": "Cecilus",
+                        "rightLabel": right,
+                        "reason": "The short label gives the full name.",
+                    }
+                ]
             }
-        return {
-            "speakerType": "one-person",
-            "sameIdentityAs": ["Todd"] if len(prompts) == 1 else ["Cecilus Segmunt"],
-            "possiblySameIdentityAs": [],
-        }
+        if system == PAIR_SYSTEM:
+            return {"relationship": "same", "reason": "Explicit self-identification."}
+        raise AssertionError("No standalone classification call is expected")
 
     monkeypatch.setattr("meowdiobooks.backend.cast_service.qwen_server", fake_server)
     monkeypatch.setattr("meowdiobooks.backend.cast_service.complete_json", fake_complete)
@@ -763,8 +1080,10 @@ def test_cast_retries_relationship_outside_the_supplied_shortlist(monkeypatch):
     assert by_label["Cecilus"]["canonicalName"] == "Cecilus Segmunt"
     assert by_label["Cecilus Segmunt"]["canonicalName"] == "Cecilus Segmunt"
     assert by_label["Todd"]["canonicalName"] == "Todd"
-    assert "Todd" not in next(prompt for prompt in prompts if "TARGET LABEL\nCecilus\n" in prompt)
-    assert any("sameIdentityAs references unknown label: Todd" in prompt for prompt in prompts)
+    discovery_prompts = [prompt for prompt in prompts if "GLOBAL LABEL LEDGER" in prompt]
+    assert discovery_attempts == 2
+    assert all("Todd" in prompt for prompt in discovery_prompts)
+    assert any("label outside the ledger" in prompt for prompt in discovery_prompts)
 
 
 def test_decision_contract_rejects_removed_inferred_full_name_field():

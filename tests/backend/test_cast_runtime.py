@@ -1,5 +1,8 @@
 from meowdiobooks.backend.cast import stable_character_id
-from meowdiobooks.backend.cast_runtime import _reuse_unchanged_cast_voices
+from meowdiobooks.backend.cast_runtime import (
+    _reuse_unchanged_cast_voices,
+    _shared_audition_identity,
+)
 
 
 def _voice(character_id, name, labels, revision):
@@ -72,3 +75,41 @@ def test_merge_invalidates_only_the_resulting_identity():
 
     assert reused == {}
     assert [row["name"] for row in affected] == ["Alice"]
+
+
+def test_shared_audition_preserves_each_identity_desired_settings(tmp_path):
+    anchor_settings = {"age": "adult", "tone": "dark"}
+    member_settings = {"age": "young-adult", "tone": "bright"}
+    generated = {
+        "id": "guard",
+        "name": "Supporting voice",
+        "category": "character",
+        "voicePreviewRevision": "voice-1",
+        "voice": "Dark adult voice",
+        "voiceSettings": anchor_settings,
+        "voiceCandidates": [
+            {
+                "revision": "voice-1",
+                "direction": "Dark adult voice",
+                "voiceSettings": anchor_settings,
+            }
+        ],
+    }
+    base = {
+        "characterId": "rebel",
+        "name": "Rebel",
+        "category": "character",
+        "voiceDirection": "Bright young-adult voice",
+        "voiceSettings": member_settings,
+    }
+
+    shared = _shared_audition_identity(
+        generated, base, "shared-voice-group", tmp_path
+    )
+
+    assert shared["voiceSettings"] == member_settings
+    assert shared["voiceDirection"] == "Bright young-adult voice"
+    assert shared["voiceCandidates"][0]["voiceSettings"] == member_settings
+    assert shared["voiceCandidates"][0]["direction"] == "Bright young-adult voice"
+    assert shared["voiceCandidates"][0]["source"] == "shared"
+    assert shared["referenceAudio"] == "voices/guard/voice-1.wav"

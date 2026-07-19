@@ -49,6 +49,42 @@ def test_dossiers_preserve_spellings_counts_first_appearance_and_context():
     assert label_comparison_key("  Ｓｕｂａｒｕ  ") == "subaru"
 
 
+def test_dossiers_clean_hidden_markers_and_fill_missing_context_from_adjacent_narration():
+    dossiers = build_label_dossiers(
+        [
+            {
+                "spanId": "n1",
+                "renderRole": "narration",
+                "sourceText": "The blue-haired boy stepped forward.",
+                "page": 7,
+            },
+            {
+                "spanId": "d1",
+                "sourceSpeakerLabel": "???",
+                "resolvedSpeakerLabel": "Cecilus",
+                "speakerStatus": "ai",
+                "sourceText": "???: I am Cecilus Segmunt.",
+                "page": 7,
+            },
+            {
+                "spanId": "n2",
+                "renderRole": "narration",
+                "sourceText": "Cecilus smiled as he drew his sword.",
+                "page": 7,
+            },
+        ],
+        min_examples=1,
+        max_examples=1,
+    )
+
+    example = dossiers[0]["examples"][0]
+    assert dossiers[0]["label"] == "Cecilus"
+    assert example["sourceText"] == "I am Cecilus Segmunt."
+    assert example["contextBefore"] == "The blue-haired boy stepped forward."
+    assert example["contextAfter"] == "Cecilus smiled as he drew his sword."
+    assert "???" not in " ".join(map(str, example.values()))
+
+
 def test_fuzzy_candidates_are_conservative_and_never_merge():
     dossiers = [
         {"label": "Subaru", "occurrenceCount": 10, "firstAppearance": {"sourceOrder": 0}},

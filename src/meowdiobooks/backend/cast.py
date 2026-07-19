@@ -85,7 +85,9 @@ def build_label_dossiers(
                 "sourceSpellings": spellings[key],
                 "occurrenceCount": len(occurrences),
                 "firstAppearance": _appearance(first, first_order),
-                "examples": [_context_example(turn, order) for order, turn in selected],
+                "examples": [
+                    _context_example(turn, order, turns) for order, turn in selected
+                ],
             }
         )
     dossiers.sort(
@@ -452,18 +454,76 @@ def _appearance(turn: Mapping[str, Any], order: int) -> dict[str, Any]:
     return appearance
 
 
-def _context_example(turn: Mapping[str, Any], order: int) -> dict[str, Any]:
+def _context_example(
+    turn: Mapping[str, Any],
+    order: int,
+    turns: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
     example = _appearance(turn, order)
+    context_before = _clean_identity_evidence(turn.get("contextBefore"))
+    context_after = _clean_identity_evidence(turn.get("contextAfter"))
+    if not context_before:
+        context_before = _adjacent_narration(turns, order, step=-1)
+    if not context_after:
+        context_after = _adjacent_narration(turns, order, step=1)
     example.update(
         {
-            "sourceText": str(
-                turn.get("sourceText") or turn.get("source") or turn.get("text") or ""
+            "sourceText": _clean_identity_evidence(
+                turn.get("sourceText") or turn.get("source") or turn.get("text")
             ),
-            "contextBefore": str(turn.get("contextBefore") or ""),
-            "contextAfter": str(turn.get("contextAfter") or ""),
+            "contextBefore": context_before,
+            "contextAfter": context_after,
         }
     )
     return example
+
+
+def _adjacent_narration(
+    turns: Sequence[Mapping[str, Any]], order: int, *, step: int
+) -> str:
+    """Return the nearest local narration span without borrowing another speaker's line."""
+
+    origin = turns[order]
+    origin_chapter = origin.get("chapterId") or origin.get("chapter")
+    origin_page = origin.get("page")
+    index = order + step
+    inspected = 0
+    while 0 <= index < len(turns) and inspected < 3:
+        candidate = turns[index]
+        inspected += 1
+        candidate_chapter = candidate.get("chapterId") or candidate.get("chapter")
+        candidate_page = candidate.get("page")
+        if origin_chapter is not None and candidate_chapter not in {None, origin_chapter}:
+            break
+        if not _pages_are_adjacent(origin_page, candidate_page):
+            break
+        role = str(candidate.get("renderRole", "")).strip().casefold()
+        if role == "narration" or (not role and _literal_label(candidate) is None):
+            text = _clean_identity_evidence(
+                candidate.get("sourceText") or candidate.get("source") or candidate.get("text")
+            )
+            if text:
+                return text
+        index += step
+    return ""
+
+
+def _pages_are_adjacent(left: object, right: object) -> bool:
+    if left is None or right is None:
+        return True
+    try:
+        return abs(int(str(left)) - int(str(right))) <= 1
+    except ValueError:
+        return left == right
+
+
+def _clean_identity_evidence(value: object) -> str:
+    """Remove unresolved-label placeholders while preserving the source's useful words."""
+
+    text = normalize_label(value)
+    text = re.sub(r"^\?{3,}\s*[:：-]?\s*", "", text)
+    text = re.sub(r"\?{3,}", "", text)
+    return normalize_label(text)
 
 
 def _representative_occurrences(

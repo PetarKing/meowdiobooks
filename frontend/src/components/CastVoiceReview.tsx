@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
 import type { CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
 import { suggestedMemberIds } from "../voiceRoutes";
@@ -50,6 +50,33 @@ function tilePreviewFor(voice: CastVoice, selections: Record<string, string>) {
 
 function sharedGroupFor(voice: CastVoice, selections: Record<string, string>) {
   return tilePreviewFor(voice, selections)?.sharedVoiceGroupId;
+}
+
+function stableHue(value: string) {
+  let hash = 2166136261;
+  for (const character of value) {
+    hash ^= character.codePointAt(0) ?? 0;
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0) % 360;
+}
+
+function sharedGroupStyles(groupIds: string[]) {
+  const used: number[] = [];
+  return new Map(groupIds.slice().sort().map((groupId) => {
+    let hue = stableHue(groupId);
+    let attempts = 0;
+    while (attempts < 24 && used.some((candidate) => Math.min(Math.abs(candidate - hue), 360 - Math.abs(candidate - hue)) < 14)) {
+      hue = (hue + 137) % 360;
+      attempts += 1;
+    }
+    while (used.includes(hue)) hue = (hue + 137) % 360;
+    used.push(hue);
+    return [groupId, {
+      "--shared-voice-accent": `hsl(${hue} 31% 45%)`,
+      "--shared-voice-wash": `hsl(${hue} 38% 94%)`,
+    } as CSSProperties];
+  }));
 }
 
 function routeFor(voice: CastVoice, routes: Record<string, VoiceRoute>): VoiceRoute {
@@ -176,8 +203,12 @@ export function CastVoiceReview({
   const sharedGroupColors = useMemo(() => new Map(
     [...new Set(voices.map((voice) => sharedGroupFor(voice, selections)).filter(Boolean) as string[])]
       .sort()
-      .map((groupId, index) => [groupId, index % 6]),
+      .map((groupId, index) => [groupId, index]),
   ), [voices, selections]);
+  const sharedVoiceStyles = useMemo(
+    () => sharedGroupStyles([...sharedGroupColors.keys()]),
+    [sharedGroupColors],
+  );
   const previewUrlFor = (voice: CastVoice) => routeFor(voice, routes).kind === "layered"
     ? layeredPreviewUrl(bookId, voice, voices, routes, selections)
     : tilePreviewFor(voice, selections)?.previewUrl;
@@ -405,6 +436,8 @@ export function CastVoiceReview({
             type="button"
             ref={(element) => { tileRefs.current[voice.characterId] = element; }}
             aria-label={t("Open {{name}} voice", { name: voice.name })}
+            data-shared-voice-group={sharedGroupId}
+            style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
             className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
             onClick={() => openInspector(voice.characterId)}
           >

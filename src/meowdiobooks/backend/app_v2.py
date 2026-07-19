@@ -10,6 +10,7 @@ import subprocess
 import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, nullcontext
+from copy import deepcopy
 from pathlib import Path
 from typing import Any, Callable, Mapping, cast
 from uuid import uuid4
@@ -119,6 +120,11 @@ from .languages import (
 from .queue import JobQueue
 from .resources import SleepInhibitor, require_free_disk
 from .voice_sharing import VoiceSharingPolicy, plan_shared_voices
+from .voice_profile_checkpoint import (
+    profile_checkpoint_key,
+    read_profile_checkpoint,
+    write_profile_checkpoint,
+)
 from .review import (
     ReviewContractError,
     accept_review_revision,
@@ -330,6 +336,7 @@ def create_app_v2(
     chapter_renderer: Callable[..., list[dict[str, Any]]] | None = None,
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
+    voice_profiler_revision: str = "meowdiobooks.voice-profile.v2",
     enricher: Callable[..., dict[str, Any]] | None = None,
     remote_usage_observer: RemoteUsageObserver | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
@@ -358,6 +365,8 @@ def create_app_v2(
     chapter_renderer = chapter_renderer or render_plan_audio
     cast_proposer = cast_proposer or propose_cast
     voice_profiler = voice_profiler or suggest_voice_settings
+    if not voice_profiler_revision.strip():
+        raise ValueError("Voice-profiler revision must not be blank")
     enricher = enricher or _run_enrichment_qwen
     voice_languages = voice_languages or supported_voice_languages
     voice_models = voice_models or voice_model_capabilities
@@ -711,23 +720,83 @@ def create_app_v2(
                 if str(row["characterId"]) not in reused
             ]
             profile_targets = affected if reuse_existing else finalized["identities"]
-            profiles = (
-                voice_profiler(
-                    repo_root,
-                    profile_targets,
-                    proposal.get("dossiers", []),
-                    dialogue.get("spans", []),
-                    lambda progress, message=None: report(2 + progress * 0.28, message),
+            include_narrator_profile = not reuse_existing
+            profiles: dict[str, dict[str, str]] = {}
+            if profile_targets or include_narrator_profile:
+                checkpoint_key = profile_checkpoint_key(
+                    proposal_revision=proposal_revision,
+                    dialogue_revision=str(dialogue.get("revision", "")),
+                    review_revision=str(review.get("revision", "")),
+                    identities=profile_targets,
+                    language=language,
+                    profiler_revision=voice_profiler_revision,
+                    include_narrator=include_narrator_profile,
                 )
-                if profile_targets or not reuse_existing
-                else {}
+                expected_profile_ids = {
+                    str(row["characterId"]) for row in profile_targets
+                }
+                if include_narrator_profile:
+                    expected_profile_ids.add("narrator")
+                restored_profiles = read_profile_checkpoint(
+                    package,
+                    checkpoint_key,
+                    expected_character_ids=expected_profile_ids,
+                )
+                if restored_profiles is not None:
+                    profiles = restored_profiles
+                    report(28, "Reusing unchanged voice suggestions")
+                else:
+                    profiles = voice_profiler(
+                        repo_root,
+                        profile_targets,
+                        proposal.get("dossiers", []),
+                        dialogue.get("spans", []),
+                        lambda progress, message=None: report(
+                            2 + progress * 0.28, message
+                        ),
+                        include_narrator=include_narrator_profile,
+                    )
+                    for row in profile_targets:
+                        character_id = str(row["characterId"])
+                        profiles.setdefault(
+                            character_id,
+                            default_voice_settings(
+                                str(row.get("category", "character"))
+                            ),
+                        )
+                    if include_narrator_profile:
+                        profiles.setdefault(
+                            "narrator", default_voice_settings("narrator")
+                        )
+                    write_profile_checkpoint(package, checkpoint_key, profiles)
+            for row in profile_targets:
+                character_id = str(row["characterId"])
+                desired_settings = profiles.get(character_id) or default_voice_settings(
+                    str(row.get("category", "character"))
+                )
+                row["voiceSettings"] = deepcopy(desired_settings)
+                row["voiceDirection"] = compile_voice_direction(
+                    desired_settings, language=language
+                )
+            desired_settings_by_id = {
+                str(row["characterId"]): row.get("voiceSettings", {})
+                for row in finalized["identities"]
+            }
+            desired_settings_by_id.update(
+                {
+                    character_id: row.get("voiceSettings", {})
+                    for character_id, row in reused.items()
+                }
             )
             sharing_plan = plan_shared_voices(
-                profile_targets,
-                profiles,
+                finalized["identities"],
+                desired_settings_by_id,
                 _dialogue_with_chapters(dialogue, review).get("spans", []),
                 finalized.get("labelToCharacterId", {}),
                 voice_sharing_policy,
+                shareable_character_ids={
+                    str(row["characterId"]) for row in profile_targets
+                },
             )
             shared_group_by_id = sharing_plan.group_by_character_id
             characters = []
@@ -740,7 +809,7 @@ def create_app_v2(
                 if group is not None and character_id != group.character_ids[0]:
                     continue
                 character = _audition_character(
-                    row, profiles.get(character_id), language=language
+                    row, desired_settings_by_id[character_id], language=language
                 )
                 if group is not None:
                     character.update(
@@ -2110,7 +2179,10 @@ def create_app_v2(
             StageRevision(
                 stage=parsed,
                 revision=(prior[-1].revision if prior else 0) + 1,
-                data={"artifactRevision": published_revision},
+                data={
+                    "artifactRevision": published_revision,
+                    "sourceCandidateRevision": body.revision,
+                },
             )
         )
         book.stage = parsed

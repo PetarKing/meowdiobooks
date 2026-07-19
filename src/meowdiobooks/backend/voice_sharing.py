@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from math import floor
+from hashlib import sha256
+from math import ceil, floor
 from typing import Any
 
 
@@ -22,12 +23,20 @@ class VoiceSharingPolicy:
     deliberately excluded because exact prose matching would be unstable and provider-specific.
     """
 
+    dedicated_dialogue_coverage: float | None = None
+    # Retained for one release as a compatibility bridge for hosted compositions. New
+    # deployments should set ``dedicated_dialogue_coverage`` and omit both thresholds.
     max_lines: int = 0
     max_dialogue_fraction: float = 0.0
     collision_window_turns: int = 8
     compatibility_fields: tuple[str, ...] = ("age", "presentation")
 
     def __post_init__(self) -> None:
+        if (
+            self.dedicated_dialogue_coverage is not None
+            and not 0 <= self.dedicated_dialogue_coverage <= 1
+        ):
+            raise ValueError("Dedicated dialogue coverage must be between zero and one")
         if self.max_lines < 0:
             raise ValueError("Voice-sharing max_lines cannot be negative")
         if not 0 <= self.max_dialogue_fraction <= 1:
@@ -52,6 +61,7 @@ class VoiceSharingPlan:
     groups: tuple[SharedVoiceGroup, ...]
     total_dialogue_lines: int
     effective_line_limit: int
+    dedicated_character_ids: tuple[str, ...] = ()
 
     @property
     def group_by_character_id(self) -> dict[str, SharedVoiceGroup]:
@@ -68,30 +78,35 @@ def plan_shared_voices(
     spans: Sequence[Mapping[str, Any]],
     label_to_character_id: Mapping[str, Any],
     policy: VoiceSharingPolicy,
+    *,
+    shareable_character_ids: set[str] | frozenset[str] | None = None,
 ) -> VoiceSharingPlan:
-    """Assign eligible characters to deterministic first-fit voice groups.
+    """Assign the low-dialogue tail to deterministic first-fit voice groups.
 
-    Only groups containing at least two identities are returned. A deployment can therefore pass a
-    policy unconditionally without changing artifacts for casts that cannot safely reuse a voice.
+    With ``dedicated_dialogue_coverage`` configured, narrator/non-character roles remain dedicated,
+    then the highest-dialogue characters remain dedicated until the configured share of mapped
+    dialogue is covered. Only the compatible remainder may share. The old absolute thresholds are
+    supported temporarily when no coverage policy is configured.
     """
 
     occurrences, total_dialogue_lines = _dialogue_occurrences(spans, label_to_character_id)
-    proportional_limit = (
-        max(1, floor(total_dialogue_lines * policy.max_dialogue_fraction))
-        if total_dialogue_lines and policy.max_dialogue_fraction
-        else 0
-    )
-    effective_line_limit = min(policy.max_lines, proportional_limit)
-    if effective_line_limit <= 0:
-        return VoiceSharingPlan((), total_dialogue_lines, effective_line_limit)
-
-    eligible = [
-        row
-        for row in identities
-        if row.get("category") == "character"
-        and 0 < len(occurrences.get(str(row.get("characterId", "")), ()))
-        <= effective_line_limit
-    ]
+    if policy.dedicated_dialogue_coverage is None:
+        eligible, effective_line_limit, dedicated_character_ids = _legacy_eligible_characters(
+            identities, occurrences, total_dialogue_lines, policy
+        )
+    else:
+        eligible, dedicated_character_ids = _coverage_tail_characters(
+            identities,
+            occurrences,
+            policy.dedicated_dialogue_coverage,
+        )
+        effective_line_limit = 0
+    if shareable_character_ids is not None:
+        eligible = [
+            row
+            for row in eligible
+            if str(row.get("characterId", "")) in shareable_character_ids
+        ]
     eligible.sort(
         key=lambda row: (
             -len(occurrences[str(row["characterId"])]),
@@ -130,12 +145,83 @@ def plan_shared_voices(
             destination.append(character_id)
 
     groups = tuple(
-        SharedVoiceGroup(f"shared-voice-{index:02d}", tuple(character_ids))
-        for index, character_ids in enumerate(
-            (group for group in allocated if len(group) >= 2), start=1
-        )
+        SharedVoiceGroup(_shared_group_id(character_ids), tuple(character_ids))
+        for character_ids in (group for group in allocated if len(group) >= 2)
     )
-    return VoiceSharingPlan(groups, total_dialogue_lines, effective_line_limit)
+    return VoiceSharingPlan(
+        groups,
+        total_dialogue_lines,
+        effective_line_limit,
+        tuple(dedicated_character_ids),
+    )
+
+
+def _legacy_eligible_characters(
+    identities: Sequence[Mapping[str, Any]],
+    occurrences: Mapping[str, Sequence[tuple[str, int]]],
+    total_dialogue_lines: int,
+    policy: VoiceSharingPolicy,
+) -> tuple[list[Mapping[str, Any]], int, list[str]]:
+    proportional_limit = (
+        max(1, floor(total_dialogue_lines * policy.max_dialogue_fraction))
+        if total_dialogue_lines and policy.max_dialogue_fraction
+        else 0
+    )
+    effective_line_limit = min(policy.max_lines, proportional_limit)
+    eligible = [
+        row
+        for row in identities
+        if row.get("category") == "character"
+        and 0 < len(occurrences.get(str(row.get("characterId", "")), ()))
+        <= effective_line_limit
+    ]
+    eligible_ids = {str(row.get("characterId", "")) for row in eligible}
+    dedicated = [
+        str(row.get("characterId", ""))
+        for row in identities
+        if row.get("category") == "character"
+        and str(row.get("characterId", "")) not in eligible_ids
+    ]
+    return eligible, effective_line_limit, dedicated
+
+
+def _coverage_tail_characters(
+    identities: Sequence[Mapping[str, Any]],
+    occurrences: Mapping[str, Sequence[tuple[str, int]]],
+    coverage: float,
+) -> tuple[list[Mapping[str, Any]], list[str]]:
+    characters = [row for row in identities if row.get("category") == "character"]
+    character_ids = {str(row.get("characterId", "")) for row in characters}
+    total_mapped_dialogue = sum(len(rows) for rows in occurrences.values())
+    covered_dialogue = sum(
+        len(rows) for character_id, rows in occurrences.items() if character_id not in character_ids
+    )
+    target = ceil(total_mapped_dialogue * coverage)
+    ordered = sorted(
+        characters,
+        key=lambda row: (
+            -len(occurrences.get(str(row.get("characterId", "")), ())),
+            occurrences.get(str(row.get("characterId", "")), (("", 2**63 - 1),))[0],
+            str(row.get("characterId", "")),
+        ),
+    )
+    dedicated: list[str] = []
+    tail: list[Mapping[str, Any]] = []
+    for row in ordered:
+        character_id = str(row.get("characterId", ""))
+        count = len(occurrences.get(character_id, ()))
+        if count <= 0 or covered_dialogue < target:
+            dedicated.append(character_id)
+            covered_dialogue += count
+        else:
+            tail.append(row)
+    return tail, dedicated
+
+
+def _shared_group_id(character_ids: Sequence[str]) -> str:
+    stable_members = "\x1f".join(sorted(character_ids))
+    digest = sha256(stable_members.encode("utf-8")).hexdigest()[:10]
+    return f"shared-voice-{digest}"
 
 
 def _dialogue_occurrences(

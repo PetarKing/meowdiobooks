@@ -512,7 +512,7 @@ export function CastIdentityReview({
         onDrop={(event) => dropOn(event, group)}
       >
         <span className="cast-atomic-number">{String(index + 1).padStart(2, "0")}</span>
-        {group.needsReview && <span className="cast-tile-required">{t(suspicious ? "Required · Check this merge" : "Required")}</span>}
+        {group.needsReview && <span className="cast-tile-required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required")}</span>}
         <strong>{suspicious ? "!" : tileSymbol(group)}</strong><b>{group.name}</b>
         <small>{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</small>
       </button>; })}

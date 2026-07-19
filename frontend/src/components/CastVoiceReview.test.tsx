@@ -183,20 +183,37 @@ describe("CastVoiceReview", () => {
       source: "shared" as const,
       sharedVoiceGroupId: "shared-voice-01",
     };
+    const secondSharedCandidate = {
+      ...sharedCandidate,
+      revision: "shared-2",
+      previewUrl: "/shared-2.wav",
+      sharedVoiceGroupId: "shared-voice-02",
+    };
     const sharedCast: CastArtifact = {
       ...cast,
       identities: [
         { characterId: "guard", name: "Guard", lineCount: 1, voicePreviewRevision: "shared-1", voiceCandidates: [sharedCandidate] },
         { characterId: "rebel", name: "Rebel", lineCount: 2, voicePreviewRevision: "shared-1", voiceCandidates: [sharedCandidate] },
+        { characterId: "merchant", name: "Merchant", lineCount: 3, voicePreviewRevision: "shared-2", voiceCandidates: [secondSharedCandidate] },
+        { characterId: "porter", name: "Porter", lineCount: 4, voicePreviewRevision: "shared-2", voiceCandidates: [secondSharedCandidate] },
       ],
     };
 
-    render(<CastVoiceReview bookId="book-1" cast={sharedCast} selections={{ guard: "shared-1", rebel: "shared-1" }} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
+    render(<CastVoiceReview bookId="book-1" cast={sharedCast} selections={{ guard: "shared-1", rebel: "shared-1", merchant: "shared-2", porter: "shared-2" }} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
 
     const guard = screen.getByRole("button", { name: "Open Guard voice" });
     const rebel = screen.getByRole("button", { name: "Open Rebel voice" });
+    const merchant = screen.getByRole("button", { name: "Open Merchant voice" });
     expect(guard).toHaveClass("shared-voice-0");
     expect(rebel).toHaveClass("shared-voice-0");
+    expect(merchant).toHaveClass("shared-voice-1");
+    expect(guard).toHaveAttribute("data-shared-voice-group", "shared-voice-01");
+    expect(guard.style.getPropertyValue("--shared-voice-accent")).toBe(
+      rebel.style.getPropertyValue("--shared-voice-accent"),
+    );
+    expect(guard.style.getPropertyValue("--shared-voice-accent")).not.toBe(
+      merchant.style.getPropertyValue("--shared-voice-accent"),
+    );
     expect(guard).toHaveTextContent("shared voice");
     expect(screen.getByText(/Brief roles may share a voice to reduce generation time and cost/)).toBeInTheDocument();
 
