@@ -166,10 +166,13 @@ The only valid values are:
 
 Extra lines or malformed answers are invalid. The base check and any required verifier independently
 retry malformed responses up to three times; an exhausted mechanical retry fails the complete job and
-publishes nothing. A character is retained only when both checks return the same normalized name and
-both names have literal context support. Disagreement or unsupported evidence becomes `?`; supported
-names from a disagreement may be shown as human-review suggestions but are never assigned
-automatically. A valid `?` is not a mechanical failure and publishes narrator fallback for that turn. The application maps the
+publishes nothing. A character is retained only when both names have literal context support and are
+either the same normalized name or a conservative name variant: whole-token containment with at least
+one five-character token, one edit across names of at least five characters, or a strict fuzzy match
+across longer names. Containment selects the longer answer; other equivalent variants retain the first
+answer. Other disagreement or unsupported evidence becomes `?`; supported names from a disagreement
+may be shown as human-review suggestions but are never assigned automatically. A valid `?` is not a
+mechanical failure and publishes narrator fallback for that turn. The application maps the
 answer to its internally owned target; the model cannot author IDs, ranges, source text or explicit
 speaker labels.
 
