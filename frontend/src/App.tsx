@@ -80,10 +80,12 @@ import {
   generationDuration,
   generationSample,
   longChapterSplitSeconds,
+  publicGenerationEstimatePolicy,
   readyChapterCount,
   recentGenerationSamples,
   remainingGenerationTime,
   targetChapterPartSeconds,
+  type GenerationEstimatePolicy,
   type GenerationRun,
   type GenerationSample,
 } from "./workflow/generation";
@@ -146,6 +148,7 @@ export interface AppProps {
   renderHeader?: (context: WorkflowHeaderContext) => ReactNode;
   renderLibraryActions?: (item: LibraryExport) => ReactNode;
   capabilities?: Partial<WorkflowCapabilities>;
+  generationEstimatePolicy?: Partial<GenerationEstimatePolicy>;
 }
 
 export interface WorkflowCapabilities {
@@ -194,8 +197,13 @@ export default function App({
   renderHeader,
   renderLibraryActions,
   capabilities: capabilityOverrides = {},
+  generationEstimatePolicy: generationEstimateOverrides = {},
 }: AppProps) {
   const capabilities = { ...publicWorkflowCapabilities, ...capabilityOverrides };
+  const generationEstimatePolicy = {
+    ...publicGenerationEstimatePolicy,
+    ...generationEstimateOverrides,
+  };
   const wizardApi = gateway;
   const stages = journey.steps;
   const stageIndex = (stageId: JourneyStepId) => journey.indexOf(stageId);
@@ -825,7 +833,12 @@ export default function App({
   const showWizard = productView === "create" && !home;
   const dialogueProcessing = dialogueLaunchPending || activeJob?.kind === "v2:dialogue";
   const generationReady = readyChapterCount(generationRun, activeJob, progress);
-  const generationRemaining = remainingGenerationTime(generationRun, activeJob, progress);
+  const generationRemaining = remainingGenerationTime(
+    generationRun,
+    activeJob,
+    progress,
+    generationEstimatePolicy,
+  );
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -1505,13 +1518,13 @@ export default function App({
               <h3>{row.title || t("Chapter {{number}}", { number: chapterNumber })}</h3>
               <div className="chapter-card-meta">{pageRange && <small>{pageRange}</small>}{playable && !playable.current && <span className="chapter-stale-label">{t("Stale")}</span>}</div>
             </div>
-            <dl className="chapter-estimates"><div><dt>{t("Audio")}</dt><dd>{unavailable ? t("No audio") : chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div><div><dt>{t("Make")}</dt><dd>{unavailable ? t("Not needed") : generationDuration(estimatedSeconds, historicalMultiplier)}</dd></div></dl>
+            <dl className="chapter-estimates"><div><dt>{t("Audio")}</dt><dd>{unavailable ? t("No audio") : chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div><div><dt>{t("Make")}</dt><dd>{unavailable ? t("Not needed") : generationDuration(estimatedSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>
           </article>;
         })}</div>
         {!visibleChapters.length && <div className="chapter-filter-empty"><span aria-hidden="true">♪</span><b>{t("No chapters in this view.")}</b><small>{t("Choose another filter to see the rest of the book.")}</small></div>}
         {(availableChapters.length > 0 || currentGenerated.length > 0) && <section className="generation-selection" aria-label={t("Generation action")}>
           <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
-          {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier)}</dd></div></dl>}
+          {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
           <div className="generation-selection-actions">
             {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">💣</span></button>}
             {selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" onClick={() => setStage(stageIndex("export"))}>{t("Continue to Export")}</button>}
