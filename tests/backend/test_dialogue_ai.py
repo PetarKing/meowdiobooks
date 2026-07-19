@@ -440,6 +440,40 @@ def test_local_double_check_uses_identical_frozen_prompt_and_exact_normalized_ag
     assert progress[-2][1] == "Using AI to identify speakers from nearby text"
 
 
+def test_local_double_check_collates_supported_short_and_full_names(monkeypatch):
+    from meowdiobooks.backend import dialogue_ai
+
+    scan = scan_dialogue([{"page": 1, "text": "Lady Emilia waited. “Hello?”"}])
+    outputs = iter(["Emilia", "Lady Emilia"])
+
+    @contextlib.contextmanager
+    def server(_repo):
+        yield "http://local"
+
+    monkeypatch.setattr(dialogue_ai, "qwen_server", server)
+    monkeypatch.setattr(
+        dialogue_ai,
+        "complete_text",
+        lambda *_args, **_kwargs: next(outputs),
+    )
+
+    result = dialogue_ai.run_dialogue_qwen(None, scan, "fill-gaps")
+
+    dialogue = next(row for row in result["partition"] if row["renderRole"] == "dialogue")
+    assert dialogue["resolvedSpeakerLabel"] == "Lady Emilia"
+    assert dialogue["speakerStatus"] == "ai"
+    assert result["attributionChecks"] == [
+        {
+            "spanId": dialogue["id"],
+            "firstPass": "Emilia",
+            "secondPass": "Lady Emilia",
+            "final": "Lady Emilia",
+            "outcome": "agreed",
+            "suggestedSpeakers": [],
+        }
+    ]
+
+
 def test_local_double_check_skips_verifier_for_question_marker_and_configured_unknown(
     monkeypatch,
 ):

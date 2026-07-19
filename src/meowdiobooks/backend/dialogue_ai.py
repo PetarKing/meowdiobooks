@@ -11,7 +11,7 @@ from .dialogue import DialogueContractError
 from .dialogue_attribution import (
     attribution_check,
     attribution_summary,
-    exact_supported_consensus,
+    supported_consensus,
     validate_speaker_evidence as _validate_speaker_evidence,
 )
 from .local_llm import complete_text, qwen_server
@@ -352,13 +352,12 @@ def run_dialogue_qwen(
                 normalized_verifier, verifier_status = _normalise_open_result(
                     verifier_answer, scan
                 )
-                final = exact_supported_consensus(
+                final = supported_consensus(
                     normalized_base, normalized_verifier, prompt, owner
                 )
                 if final == "/":
                     outcome = "agreed"
                 elif final != "?" and verifier_status == "ai":
-                    final = base_answer
                     outcome = "agreed"
                 else:
                     final = "?"

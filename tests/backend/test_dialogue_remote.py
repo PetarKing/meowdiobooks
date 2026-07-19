@@ -160,7 +160,7 @@ def test_remote_dialogue_keeps_one_supported_name_as_review_only_suggestion(monk
     assert result["attributionChecks"][0]["suggestedSpeakers"] == ["Alice"]
 
 
-def test_remote_dialogue_does_not_identity_map_short_and_full_names(monkeypatch):
+def test_remote_dialogue_collates_supported_short_and_full_names(monkeypatch):
     scan = scan_dialogue(
         [
             {
@@ -185,11 +185,16 @@ def test_remote_dialogue_does_not_identity_map_short_and_full_names(monkeypatch)
     )
 
     attributed = next(span for span in result["partition"] if span.get("renderRole") == "dialogue")
-    assert attributed["speakerStatus"] == "unresolved"
-    assert result["attributionChecks"][0]["suggestedSpeakers"] == [
-        "Alice",
-        "Alice Smith",
-    ]
+    assert attributed["speakerStatus"] == "ai"
+    assert attributed["resolvedSpeakerLabel"] == "Alice Smith"
+    assert result["attributionChecks"][0] == {
+        "spanId": attributed["id"],
+        "firstPass": "Alice",
+        "secondPass": "Alice Smith",
+        "final": "Alice Smith",
+        "outcome": "agreed",
+        "suggestedSpeakers": [],
+    }
 
 
 def test_remote_dialogue_does_not_offer_unsupported_disagreement_name(monkeypatch):

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from difflib import SequenceMatcher
+import re
 from typing import Any
 
 from .dialogue import DialogueContractError
@@ -25,26 +27,88 @@ def validate_speaker_evidence(speaker: str, context: str, span_id: str) -> None:
         )
 
 
-def exact_supported_consensus(
+def supported_consensus(
     first: str,
     second: str,
     context: str,
     span_id: str,
 ) -> str:
-    """Keep a Character only when two checks agree and both have literal evidence."""
+    """Keep a Character when two supported checks name the same likely reader."""
 
     if first == second == "/":
         return "/"
     if first in {"?", "/"} or second in {"?", "/"}:
         return "?"
-    if normalised_answer(first) != normalised_answer(second):
+    selected = _collated_name(first, second)
+    if selected is None:
         return "?"
     try:
         validate_speaker_evidence(first, context, span_id)
         validate_speaker_evidence(second, context, span_id)
     except DialogueContractError:
         return "?"
-    return first
+    return selected
+
+
+def _collated_name(first: str, second: str) -> str | None:
+    """Choose one answer when presentation, containment or strict fuzziness is sufficient."""
+
+    left = normalised_answer(first)
+    right = normalised_answer(second)
+    if left == right:
+        return first
+
+    left_tokens = _name_tokens(left)
+    right_tokens = _name_tokens(right)
+    if not left_tokens or not right_tokens:
+        return None
+
+    left_set = set(left_tokens)
+    right_set = set(right_tokens)
+    smaller = left_set if len(left_set) <= len(right_set) else right_set
+    if (
+        (left_set < right_set or right_set < left_set)
+        and max(map(len, smaller)) >= 5
+    ):
+        return max(
+            (first, second),
+            key=lambda value: (len(_name_tokens(normalised_answer(value))), len(value)),
+        )
+
+    left_compact = "".join(left_tokens)
+    right_compact = "".join(right_tokens)
+    if min(len(left_compact), len(right_compact)) < 5:
+        return None
+    if _edit_distance_at_most_one(left_compact, right_compact):
+        return first
+    if (
+        min(len(left_compact), len(right_compact)) >= 8
+        and SequenceMatcher(None, left_compact, right_compact).ratio() >= 0.9
+    ):
+        return first
+    return None
+
+
+def _name_tokens(value: str) -> list[str]:
+    return re.findall(r"\w+", value, flags=re.UNICODE)
+
+
+def _edit_distance_at_most_one(left: str, right: str) -> bool:
+    if abs(len(left) - len(right)) > 1:
+        return False
+    if len(left) == len(right):
+        return sum(a != b for a, b in zip(left, right, strict=True)) <= 1
+    shorter, longer = (left, right) if len(left) < len(right) else (right, left)
+    short_index = 0
+    mismatches = 0
+    for character in longer:
+        if short_index < len(shorter) and shorter[short_index] == character:
+            short_index += 1
+        else:
+            mismatches += 1
+            if mismatches > 1:
+                return False
+    return True
 
 
 def supported_review_suggestions(

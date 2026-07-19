@@ -11,7 +11,7 @@ from .dialogue import DialogueContractError
 from .dialogue_attribution import (
     attribution_check,
     attribution_summary,
-    exact_supported_consensus,
+    supported_consensus,
 )
 from .dialogue_ai import (
     _selected_attribution_statuses,
@@ -254,7 +254,7 @@ def run_dialogue_remote(
     attribution_targets: Sequence[str] = ("open-speakers", "unlabelled-candidates"),
     usage_observer: RemoteUsageObserver | None = None,
 ) -> dict[str, Any]:
-    """Run two independent ordered-passage passes and retain only exact agreement."""
+    """Run two independent ordered-passage passes and retain supported name consensus."""
 
     if strategy != "fill-gaps":
         raise DialogueContractError("Remote attribution only supports fill-gaps")
@@ -332,7 +332,7 @@ def run_dialogue_remote(
                 for target_id, owner in base_ids.items():
                     first = base_rows[target_id]
                     second = ledger_rows[target_id]
-                    final = exact_supported_consensus(first, second, passage, owner)
+                    final = supported_consensus(first, second, passage, owner)
                     decisions[owner] = final
                     checks.append(
                         attribution_check(
