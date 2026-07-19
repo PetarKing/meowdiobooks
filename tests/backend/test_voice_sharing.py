@@ -126,3 +126,78 @@ def test_plan_uses_only_configured_voice_fields() -> None:
 def test_policy_rejects_unknown_compatibility_fields() -> None:
     with pytest.raises(ValueError, match="Unsupported voice-sharing compatibility fields"):
         VoiceSharingPolicy(compatibility_fields=("description",))
+
+
+def test_coverage_policy_dedicates_the_voices_covering_eighty_percent() -> None:
+    identities = [_identity(name) for name in ("lead", "second", "third", "tail-a", "tail-b")]
+    counts = {"lead": 50, "second": 20, "third": 10, "tail-a": 8, "tail-b": 12}
+    spans = [
+        _span(f"{name}-{index}", name, f"chapter-{name}")
+        for name, count in counts.items()
+        for index in range(count)
+    ]
+    plan = plan_shared_voices(
+        identities,
+        {row["characterId"]: _settings(pitch="medium") for row in identities},
+        spans,
+        {name: name for name in counts},
+        VoiceSharingPolicy(
+            dedicated_dialogue_coverage=0.8,
+            compatibility_fields=("age", "presentation", "pitch"),
+        ),
+    )
+
+    assert plan.dedicated_character_ids == ("lead", "second", "tail-b")
+    assert [set(group.character_ids) for group in plan.groups] == [{"third", "tail-a"}]
+    assert plan.groups[0].id.startswith("shared-voice-")
+
+
+def test_coverage_policy_counts_non_character_dialogue_as_already_dedicated() -> None:
+    identities = [
+        {**_identity("crowd"), "category": "group"},
+        *[_identity(name) for name in ("lead", "tail-a", "tail-b")],
+    ]
+    counts = {"crowd": 30, "lead": 50, "tail-a": 10, "tail-b": 10}
+    spans = [
+        _span(f"{name}-{index}", name, f"chapter-{name}")
+        for name, count in counts.items()
+        for index in range(count)
+    ]
+    plan = plan_shared_voices(
+        identities,
+        {row["characterId"]: _settings() for row in identities},
+        spans,
+        {name: name for name in counts},
+        VoiceSharingPolicy(dedicated_dialogue_coverage=0.8),
+    )
+
+    assert plan.dedicated_character_ids == ("lead",)
+    assert [set(group.character_ids) for group in plan.groups] == [{"tail-a", "tail-b"}]
+
+
+def test_coverage_group_id_is_stable_and_planning_can_limit_newly_shareable_characters() -> None:
+    identities = [_identity(name) for name in ("lead", "tail-a", "tail-b", "tail-c")]
+    spans = [
+        *[_span(f"lead-{index}", "lead", "chapter-lead") for index in range(80)],
+        *[_span(f"a-{index}", "tail-a", "chapter-a") for index in range(8)],
+        *[_span(f"b-{index}", "tail-b", "chapter-b") for index in range(7)],
+        *[_span(f"c-{index}", "tail-c", "chapter-c") for index in range(5)],
+    ]
+    settings = {row["characterId"]: _settings() for row in identities}
+    mapping = {name: name for name in ("lead", "tail-a", "tail-b", "tail-c")}
+    policy = VoiceSharingPolicy(dedicated_dialogue_coverage=0.8)
+
+    complete = plan_shared_voices(identities, settings, spans, mapping, policy)
+    reversed_plan = plan_shared_voices(list(reversed(identities)), settings, spans, mapping, policy)
+    limited = plan_shared_voices(
+        identities,
+        settings,
+        spans,
+        mapping,
+        policy,
+        shareable_character_ids={"tail-a", "tail-b"},
+    )
+
+    assert complete.groups[0].id == reversed_plan.groups[0].id
+    assert limited.groups[0].character_ids == ("tail-a", "tail-b")
+    assert limited.groups[0].id != complete.groups[0].id

@@ -452,7 +452,12 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
     }
     monkeypatch.setattr("meowdiobooks.backend.app_v2.propose_cast", lambda *_args: proposal)
 
-    def fake_voice_settings(_repo, identities, _dossiers, _spans, _report):
+    profile_batches: list[list[str]] = []
+
+    def fake_voice_settings(
+        _repo, identities, _dossiers, _spans, _report, **_kwargs
+    ):
+        profile_batches.append([str(row["characterId"]) for row in identities])
         narrator = {
             "presentation": "unspecified",
             "age": "adult",
@@ -478,8 +483,13 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
     monkeypatch.setattr("meowdiobooks.backend.app_v2.suggest_voice_settings", fake_voice_settings)
 
     audition_batches = []
+    fail_audition_once = True
 
     def fake_auditions(_repo, package, _book_id, characters, report, _language, _model_id):
+        nonlocal fail_audition_once
+        if fail_audition_once:
+            fail_audition_once = False
+            raise RuntimeError("simulated provider failure after Luna profiling")
         audition_batches.append([row["id"] for row in characters])
         for row in characters:
             candidates = list(row.get("voiceCandidates", []))
@@ -529,12 +539,30 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         assert blocked.status_code == 409
         assert "generate auditions" in blocked.json()["detail"]
 
+        failed_response = client.post(
+            f"/api/books/{book_id}/stages/cast/process",
+            json={
+                "settings": {
+                    "proposalRevision": identity["revision"],
+                    "language": "english",
+                }
+            },
+        )
+        failed = _wait(client, failed_response.json()["id"])
+        assert failed["status"] == "failed"
+        assert len(profile_batches) == 1
+        assert len(list((package / ".checkpoints" / "cast-voice-profiles").glob("*.json"))) == 1
+        assert client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"][
+            "cast"
+        ]["revision"] == identity["revision"]
+
         audition = _process(
             client,
             book_id,
             "cast",
             {"proposalRevision": identity["revision"], "language": "english"},
         )
+        assert len(profile_batches) == 1
         candidate = client.get(
             f"/api/books/{book_id}/stages/cast/candidates/{audition['revision']}"
         ).json()
@@ -574,6 +602,8 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         assert narrated_candidate["identities"] == []
         assert narrated_candidate["labelToCharacterId"] == {"Alice": None}
         batches_before_label_edit = len(audition_batches)
+        profiles_before_label_edit = len(profile_batches)
+        alice_settings_before_edit = candidate["identities"][0]["voiceSettings"]
         edited = _process(
             client,
             book_id,
@@ -597,6 +627,8 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         ).json()
         assert candidate["identities"][0]["name"] == "Alicia"
         assert len(audition_batches) == batches_before_label_edit
+        assert len(profile_batches) == profiles_before_label_edit
+        assert candidate["identities"][0]["voiceSettings"] == alice_settings_before_edit
         assert candidate["narrator"]["voicePreviewRevision"] == original_narrator_revision
         assert candidate["identities"][0]["voicePreviewRevision"] == original_alice_revision
         missing = _accept(client, book_id, "cast", edited["revision"], [])
@@ -800,13 +832,17 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
         create_app_v2(
             tmp_path,
             cast_proposer=lambda *_args: proposal,
-            voice_profiler=lambda _repo, identities, *_args: {
-                row["characterId"]: settings for row in identities
+            voice_profiler=lambda _repo, identities, *_args, **_kwargs: {
+                row["characterId"]: {
+                    **settings,
+                    "tone": "dark" if row["name"] == "Guard" else "bright",
+                    "description": f"Profile designed for {row['name']}.",
+                }
+                for row in identities
             },
             voice_auditioner=auditions,
             voice_sharing_policy=VoiceSharingPolicy(
-                max_lines=6,
-                max_dialogue_fraction=0.02,
+                dedicated_dialogue_coverage=0.8,
                 collision_window_turns=8,
                 compatibility_fields=("age", "presentation"),
             ),
@@ -872,6 +908,11 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
             client, book_id, "cast", audition["revision"], decisions
         )
         assert accepted_response.status_code == 200, accepted_response.text
+        acceptance = accepted_response.json()["accepted_stage_revisions"][-1]
+        assert acceptance["data"] == {
+            "artifactRevision": read_artifact(package, "cast")["revision"],
+            "sourceCandidateRevision": audition["revision"],
+        }
         accepted = read_artifact(package, "cast")
 
     assert len(audition_batches) == 2
@@ -884,14 +925,18 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
     ]
     assert by_name["Guard"]["voiceCandidates"][0]["source"] == "shared"
     assert by_name["Rebel"]["voiceCandidates"][0]["source"] == "shared"
-    assert (
-        by_name["Guard"]["voiceCandidates"][0]["sharedVoiceGroupId"]
-        == "shared-voice-01"
+    assert by_name["Guard"]["voiceCandidates"][0]["sharedVoiceGroupId"].startswith(
+        "shared-voice-"
     )
+    assert by_name["Guard"]["voiceSettings"]["tone"] == "dark"
+    assert by_name["Rebel"]["voiceSettings"]["tone"] == "bright"
+    assert by_name["Guard"]["voiceCandidates"][0]["voiceSettings"]["tone"] == "dark"
+    assert by_name["Rebel"]["voiceCandidates"][0]["voiceSettings"]["tone"] == "bright"
     assert by_name["Guard"]["referenceAudio"] == by_name["Rebel"]["referenceAudio"]
     assert by_name["Major"]["voicePreviewRevision"].startswith("voice-character-")
     accepted_by_name = {row["name"]: row for row in accepted["identities"]}
     assert accepted_by_name["Guard"]["voiceAccepted"] is True
+    assert accepted_by_name["Rebel"]["voiceSettings"]["tone"] == "bright"
     assert accepted_by_name["Guard"]["referenceAudio"] == accepted_by_name["Rebel"][
         "referenceAudio"
     ]

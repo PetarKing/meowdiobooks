@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import re
 from typing import Any
 
 from .cast import (
@@ -31,6 +32,9 @@ SPEAKER_TYPES = {
 
 RELATIONSHIP_CANDIDATE_THRESHOLD = 0.72
 MAX_RELATIONSHIP_CANDIDATES = 8
+DISCOVERY_BATCH_SIZE = 24
+MAX_DISCOVERY_PAIRS_PER_BATCH = 96
+MAX_GLOBAL_CANDIDATES_PER_OWNED_LABEL = 8
 VOICE_PROFILE_TRUNCATION_MARKER = "[…truncated to voice-profile prompt budget]"
 
 
@@ -104,6 +108,39 @@ Rules:
 8. When there are no RELATIONSHIP CANDIDATES, both relationship lists must be empty.
 9. Do not invent labels or facts. Return JSON only."""
 
+DISCOVERY_SYSTEM = """Discover plausible identity relationships in an audiobook cast ledger.
+
+Return exactly one JSON object:
+{"classifications":[{"label":"exact owned label",
+ "speakerType":"one-person | multiple-people | not-a-speaker | identity-hidden"}],
+ "candidatePairs":[{"leftLabel":"exact owned label","rightLabel":"exact known label",
+ "reason":"brief evidence-grounded reason"}]}
+
+Rules:
+1. Classify every OWNED LABEL exactly once. Consider each against every label in GLOBAL LABEL LEDGER,
+   including labels outside this batch. leftLabel must be owned; rightLabel may be any other label.
+2. Nominate a pair when spelling, short/full-name usage, explicit self-identification, nearby name
+   mentions, titles, or scene evidence makes same-identity plausible.
+3. Discovery is intentionally recall-oriented: nominate uncertain plausible pairs for adjudication.
+4. Similar context alone is insufficient. Do not pair two people merely because they share a scene.
+5. Return at most eight strongest candidates for each owned label. This is a safety ceiling, not a
+   target; return every genuinely plausible candidate below it and no filler.
+6. Copy labels exactly from the ledger. Do not decide or merge identities here. Return JSON only."""
+
+PAIR_SYSTEM = """Adjudicate one possible audiobook identity pair using both dossiers.
+
+Return exactly one JSON object:
+{"relationship":"same | possible | different","reason":"brief evidence-grounded reason"}
+
+Definitions:
+- same: both literal labels clearly identify one person or one group.
+- possible: evidence supports the relationship but remains genuinely ambiguous.
+- different: evidence identifies distinct speakers or does not support a relationship.
+
+Treat spelling and discovery reasons as leads, not proof. Weigh explicit self-identification, names,
+titles, pronouns, physical descriptions, chapter/page location, and surrounding narration from both
+sides. Make one symmetric decision for the pair. Do not invent facts. Return JSON only."""
+
 VOICE_PROFILE_SYSTEM = """Suggest one editable audiobook voice profile for one finalized cast member.
 
 Return exactly one JSON object:
@@ -117,7 +154,11 @@ Return exactly one JSON object:
  "description":"one short, natural voice-direction sentence"}
 
 This is a casting suggestion, not a claim about the person's identity.
-Use only the supplied evidence. When evidence does not support a detail, use unspecified.
+Use only the supplied evidence. Make the best evidence-grounded age inference available from physical
+life-stage descriptions, social role and surrounding narration. Reserve age=unspecified for cases
+where age is genuinely absent or materially contradictory; do not default to unspecified merely
+because an exact number is absent.
+Use unspecified for any non-age field that the evidence does not support.
 The prompt separates representative target speech from target-scoped surrounding story context.
 Use surrounding narration only when it clearly describes the cast member. Other characters' speech is
 not supplied, so never borrow another speaker's vocal qualities.
@@ -174,7 +215,7 @@ def propose_cast_with_completion(
     report: Report | None = None,
     max_workers: int = 1,
 ) -> dict[str, Any]:
-    """Run provider-neutral Cast classification through the shared validation contract."""
+    """Classify labels, discover globally, then adjudicate each nominated pair once."""
 
     if max_workers < 1:
         raise CastContractError("Cast completion concurrency must be positive")
@@ -183,46 +224,90 @@ def propose_cast_with_completion(
     dossiers = build_label_dossiers(turns)
     fuzzy = suggest_fuzzy_candidates(dossiers, threshold=RELATIONSHIP_CANDIDATE_THRESHOLD)
     dossier_by_label = {str(row["label"]): row for row in dossiers}
-    fuzzy_by_label = _fuzzy_by_label(fuzzy)
-    notify(2, f"Reviewing {len(dossiers)} character labels with AI")
+    ledger = build_compact_label_ledger(dossiers)
+    notify(2, f"Classifying and discovering {len(dossiers)} character labels with AI")
 
-    def classify(dossier: Mapping[str, Any]) -> dict[str, Any]:
-        label = str(dossier["label"])
-        candidate_labels = fuzzy_by_label.get(label_comparison_key(label), [])
-        decision = _complete_validated_decision_with(
+    batches = [
+        dossiers[index : index + DISCOVERY_BATCH_SIZE]
+        for index in range(0, len(dossiers), DISCOVERY_BATCH_SIZE)
+    ]
+
+    def discover(batch: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
+        return _complete_discovery_batch_with(
             complete,
-            _label_prompt(dossier, dossier_by_label, candidate_labels),
-            label,
-            [label, *candidate_labels],
+            _discovery_prompt(batch, ledger),
+            [str(row["label"]) for row in batch],
+            list(dossier_by_label),
         )
-        return _proposal_from_decision(dossier, decision)
 
     if max_workers == 1:
-        proposals = [classify(dossier) for dossier in dossiers]
+        discovered_batches = [discover(batch) for batch in batches]
     else:
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            proposals = list(executor.map(classify, dossiers))
-    for index, dossier in enumerate(dossiers, 1):
-        label = str(dossier["label"])
-        notify(
-            5 + index / max(len(dossiers), 1) * 90,
-            f"Classified cast label {index} of {len(dossiers)}: {label}",
+            discovered_batches = list(executor.map(discover, batches))
+    discovered = [
+        row for batch_result in discovered_batches for row in batch_result["candidatePairs"]
+    ]
+    classifications = {
+        label_comparison_key(row["label"]): row
+        for batch_result in discovered_batches
+        for row in batch_result["classifications"]
+    }
+    proposals = [
+        _proposal_from_decision(
+            dossier,
+            {
+                "speakerType": classifications[label_comparison_key(dossier["label"])][
+                    "speakerType"
+                ],
+                "sameIdentityAs": [],
+                "possiblySameIdentityAs": [],
+            },
         )
-    proposals = _combine_confirmed_relationships(proposals)
+        for dossier in dossiers
+    ]
+    candidates = _union_identity_candidates(dossiers, fuzzy, discovered)
+    notify(58, f"Adjudicating {len(candidates)} possible identity pairs")
+
+    def adjudicate(candidate: Mapping[str, Any]) -> dict[str, Any]:
+        left = str(candidate["leftLabel"])
+        right = str(candidate["rightLabel"])
+        decision = _complete_pair_decision_with(
+            complete,
+            _pair_prompt(
+                dossier_by_label[left],
+                dossier_by_label[right],
+                str(candidate.get("reason", "")),
+            ),
+        )
+        return {**dict(candidate), **decision, "automaticMerge": decision["relationship"] == "same"}
+
+    if max_workers == 1:
+        adjudicated = [adjudicate(candidate) for candidate in candidates]
+    else:
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            adjudicated = list(executor.map(adjudicate, candidates))
+    proposals = _apply_pair_decisions(proposals, adjudicated)
     summary = build_relationship_summary([proposals], dossiers)
     notify(100, "Cast proposals are ready for identity review")
     return {
         "status": "needs-review" if any(row["reviewRequired"] for row in proposals) else "ready",
         "dossiers": dossiers,
-        "fuzzyCandidates": fuzzy,
-        "globalLabelLedger": build_compact_label_ledger(dossiers),
+        # Retain the established artifact field while expanding it beyond lexical-only candidates.
+        "fuzzyCandidates": adjudicated,
+        "globalLabelLedger": ledger,
         "proposals": proposals,
-        # Retained artifact field; conflicts are detected in code, not by another model pass.
         "reconciliationConflicts": summary["conflicts"],
         "processing": {
             "labels": len(dossiers),
-            "batches": len(dossiers),
-            "modelCalls": len(dossiers),
+            "batches": len(batches),
+            "classificationDiscoveryCalls": len(batches),
+            "adjudicationCalls": len(adjudicated),
+            "modelCalls": len(batches) + len(adjudicated),
+            "reconciliationPasses": len(adjudicated),
+            "candidatePairs": len(candidates),
+            "modelNominations": len(discovered),
+            "candidateSourceMemberships": _candidate_source_memberships(candidates),
             "model": model_name,
         },
     }
@@ -234,6 +319,8 @@ def suggest_voice_settings(
     dossiers: Sequence[Mapping[str, Any]],
     story_spans: Sequence[Mapping[str, Any]],
     report: Report | None = None,
+    *,
+    include_narrator: bool = True,
 ) -> dict[str, dict[str, str]]:
     """Suggest one scene-grounded voice profile per identity with one model call each."""
 
@@ -246,6 +333,7 @@ def suggest_voice_settings(
                 base, system, prompt, max_tokens=max_tokens
             ),
             report=report,
+            include_narrator=include_narrator,
         )
 
 
@@ -258,6 +346,7 @@ def suggest_voice_settings_with_completion(
     report: Report | None = None,
     max_workers: int = 1,
     evidence_policy: VoiceEvidencePolicy | None = None,
+    include_narrator: bool = True,
 ) -> dict[str, dict[str, str]]:
     """Run provider-neutral voice profiling through the shared validation contract."""
 
@@ -267,20 +356,23 @@ def suggest_voice_settings_with_completion(
     policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
     notify = report or (lambda _progress, _message=None: None)
     dossiers_by_label = {label_comparison_key(row.get("label", "")): row for row in dossiers}
-    targets = [
-        {
-            "characterId": "narrator",
-            "name": "Narrator",
-            "category": "narrator",
-            "evidence": [
-                normalize_label(row.get("text", ""))
-                for row in story_spans
-                if row.get("renderRole") == "narration" and normalize_label(row.get("text", ""))
-            ][: min(3, policy.max_examples)],
-            "labels": [],
-            "storyContext": [],
-        }
-    ]
+    targets = []
+    if include_narrator:
+        targets.append(
+            {
+                "characterId": "narrator",
+                "name": "Narrator",
+                "category": "narrator",
+                "evidence": [
+                    normalize_label(row.get("text", ""))
+                    for row in story_spans
+                    if row.get("renderRole") == "narration"
+                    and normalize_label(row.get("text", ""))
+                ][: min(3, policy.max_examples)],
+                "labels": [],
+                "storyContext": [],
+            }
+        )
     for identity in identities:
         targets.append(
             _voice_target(
@@ -846,6 +938,466 @@ def _relationship_labels(
     return result
 
 
+def _complete_discovery_batch_with(
+    complete: JsonCompletion,
+    prompt: str,
+    owned_labels: Sequence[str],
+    known_labels: Sequence[str],
+) -> dict[str, Any]:
+    failures: list[str] = []
+    retry_prompt = prompt
+    for _attempt in range(3):
+        raw = complete(DISCOVERY_SYSTEM, retry_prompt, 4_096)
+        try:
+            return _validate_discovery_batch(raw, owned_labels, known_labels)
+        except CastContractError as error:
+            failures.append(str(error))
+            retry_prompt = (
+                prompt
+                + "\n\nTRY AGAIN\nYour previous answer violated the contract: "
+                + str(error)
+                + "\nReturn classifications and candidatePairs using exact ledger labels."
+            )
+    raise CastContractError(
+        "Text model failed global Cast discovery after 3 attempts: " + " | ".join(failures)
+    )
+
+
+def _validate_discovery_batch(
+    raw: object,
+    owned_labels: Sequence[str],
+    known_labels: Sequence[str],
+) -> dict[str, Any]:
+    if not isinstance(raw, Mapping) or set(raw) != {"classifications", "candidatePairs"}:
+        raise CastContractError(
+            "Cast discovery must contain exactly classifications and candidatePairs"
+        )
+    raw_classifications = raw.get("classifications")
+    if not isinstance(raw_classifications, list):
+        raise CastContractError("classifications must be a list")
+    known = {label_comparison_key(label): normalize_label(label) for label in known_labels}
+    owned = {label_comparison_key(label): normalize_label(label) for label in owned_labels}
+    classifications: list[dict[str, str]] = []
+    classified: set[str] = set()
+    for row in raw_classifications:
+        if not isinstance(row, Mapping) or set(row) != {"label", "speakerType"}:
+            raise CastContractError("Each classification must contain label and speakerType")
+        key = label_comparison_key(row.get("label"))
+        speaker_type = str(row.get("speakerType", "")).strip()
+        if key not in owned:
+            raise CastContractError("Classification references a label outside the owned batch")
+        if key in classified:
+            raise CastContractError("Classification repeats an owned label")
+        if speaker_type not in SPEAKER_TYPES:
+            raise CastContractError(f"Unsupported speakerType: {speaker_type or '<empty>'}")
+        classified.add(key)
+        classifications.append({"label": owned[key], "speakerType": speaker_type})
+    missing = [owned[key] for key in owned.keys() - classified]
+    if missing:
+        raise CastContractError(f"Missing owned label classifications: {sorted(missing)}")
+
+    pairs = raw.get("candidatePairs")
+    if not isinstance(pairs, list):
+        raise CastContractError("candidatePairs must be a list")
+    if len(pairs) > MAX_DISCOVERY_PAIRS_PER_BATCH:
+        raise CastContractError(
+            f"candidatePairs exceeds the per-batch maximum of {MAX_DISCOVERY_PAIRS_PER_BATCH}"
+        )
+    result: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    owned_counts: dict[str, int] = {}
+    for raw_pair in pairs:
+        if not isinstance(raw_pair, Mapping) or set(raw_pair) != {
+            "leftLabel",
+            "rightLabel",
+            "reason",
+        }:
+            raise CastContractError(
+                "Each discovery candidate must contain leftLabel, rightLabel and reason"
+            )
+        left_key = label_comparison_key(raw_pair.get("leftLabel"))
+        right_key = label_comparison_key(raw_pair.get("rightLabel"))
+        if left_key not in known or right_key not in known:
+            raise CastContractError("Discovery candidate references a label outside the ledger")
+        if left_key == right_key:
+            raise CastContractError("Discovery candidate cannot pair a label with itself")
+        if left_key not in owned:
+            if right_key in owned:
+                left_key, right_key = right_key, left_key
+            else:
+                raise CastContractError("Discovery candidate must include one owned label")
+        owned_counts[left_key] = owned_counts.get(left_key, 0) + 1
+        if owned_counts[left_key] > MAX_GLOBAL_CANDIDATES_PER_OWNED_LABEL:
+            raise CastContractError(
+                "Discovery candidate count exceeds the per-owned-label maximum of "
+                f"{MAX_GLOBAL_CANDIDATES_PER_OWNED_LABEL}"
+            )
+        reason = normalize_label(raw_pair.get("reason"))
+        if not reason:
+            raise CastContractError("Discovery candidate requires a reason")
+        edge = tuple(sorted((left_key, right_key)))
+        if edge in seen:
+            continue
+        seen.add(edge)
+        result.append(
+            {
+                "leftLabel": known[left_key],
+                "rightLabel": known[right_key],
+                "reason": reason,
+                "source": "global-discovery",
+            }
+        )
+    classifications.sort(key=lambda row: label_comparison_key(row["label"]))
+    return {"classifications": classifications, "candidatePairs": result}
+
+
+def _complete_pair_decision_with(
+    complete: JsonCompletion,
+    prompt: str,
+) -> dict[str, str]:
+    failures: list[str] = []
+    retry_prompt = prompt
+    for _attempt in range(3):
+        raw = complete(PAIR_SYSTEM, retry_prompt, 384)
+        try:
+            return _validate_pair_decision(raw)
+        except CastContractError as error:
+            failures.append(str(error))
+            retry_prompt = (
+                prompt
+                + "\n\nTRY AGAIN\nYour previous answer violated the contract: "
+                + str(error)
+                + "\nReturn only relationship and reason."
+            )
+    raise CastContractError(
+        "Text model failed Cast pair adjudication after 3 attempts: " + " | ".join(failures)
+    )
+
+
+def _validate_pair_decision(raw: object) -> dict[str, str]:
+    if not isinstance(raw, Mapping) or set(raw) != {"relationship", "reason"}:
+        raise CastContractError("Cast pair decision must contain exactly relationship and reason")
+    relationship = str(raw.get("relationship", "")).strip()
+    if relationship not in {"same", "possible", "different"}:
+        raise CastContractError(f"Unsupported pair relationship: {relationship or '<empty>'}")
+    reason = normalize_label(raw.get("reason"))
+    if not reason:
+        raise CastContractError("Cast pair decision requires an evidence-grounded reason")
+    return {"relationship": relationship, "decisionReason": reason}
+
+
+def _discovery_prompt(batch: Sequence[Mapping[str, Any]], ledger: str) -> str:
+    sections = ["GLOBAL LABEL LEDGER", ledger or "(empty)", "", "OWNED LABEL DOSSIERS"]
+    for dossier in batch:
+        sections.extend(
+            [
+                "",
+                f"LABEL: {dossier['label']}",
+                *_evidence_lines(dossier, max_examples=2, max_text_characters=360),
+            ]
+        )
+    return "\n".join(sections)
+
+
+def _pair_prompt(
+    left: Mapping[str, Any],
+    right: Mapping[str, Any],
+    nomination_reason: str,
+) -> str:
+    return "\n".join(
+        [
+            "NOMINATION LEAD (not proof)",
+            nomination_reason or "Candidate discovered from the global cast ledger.",
+            "",
+            f"LEFT DOSSIER: {left['label']}",
+            *_evidence_lines(left),
+            "",
+            f"RIGHT DOSSIER: {right['label']}",
+            *_evidence_lines(right),
+        ]
+    )
+
+
+def _union_identity_candidates(
+    dossiers: Sequence[Mapping[str, Any]],
+    fuzzy: Sequence[Mapping[str, Any]],
+    discovered: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Union lexical, contextual and global-model nominations into unique undirected edges."""
+
+    labels = {label_comparison_key(row.get("label")): str(row["label"]) for row in dossiers}
+    by_label = {str(row["label"]): row for row in dossiers}
+    edges: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def add(left: str, right: str, reason: str, source: str) -> None:
+        left_key = label_comparison_key(left)
+        right_key = label_comparison_key(right)
+        if left_key == right_key or left_key not in labels or right_key not in labels:
+            return
+        key = tuple(sorted((left_key, right_key)))
+        row = edges.setdefault(
+            key,
+            {
+                "leftLabel": labels[key[0]],
+                "rightLabel": labels[key[1]],
+                "reasons": [],
+                "sources": [],
+            },
+        )
+        if reason and reason not in row["reasons"]:
+            row["reasons"].append(reason)
+        if source and source not in row["sources"]:
+            row["sources"].append(source)
+
+    for row in fuzzy:
+        add(
+            str(row.get("leftLabel", "")),
+            str(row.get("rightLabel", "")),
+            str(row.get("reason", "lexical similarity")),
+            "deterministic-lexical",
+        )
+
+    ordered = list(by_label)
+    for index, left in enumerate(ordered):
+        for right in ordered[index + 1 :]:
+            if _short_full_name_candidate(left, right):
+                add(left, right, "short/full-name or close stem", "deterministic-name")
+    for owner, dossier in by_label.items():
+        for mentioned in ordered:
+            if mentioned == owner or not _identity_link_evidence(dossier, owner, mentioned):
+                continue
+            add(
+                owner,
+                mentioned,
+                f"{owner}'s evidence explicitly mentions {mentioned}",
+                "deterministic-context",
+            )
+
+    for row in discovered:
+        add(
+            str(row.get("leftLabel", "")),
+            str(row.get("rightLabel", "")),
+            str(row.get("reason", "global discovery")),
+            str(row.get("source", "global-discovery")),
+        )
+
+    result = []
+    for key in sorted(edges):
+        row = edges[key]
+        result.append(
+            {
+                "leftLabel": row["leftLabel"],
+                "rightLabel": row["rightLabel"],
+                "reason": "; ".join(row["reasons"]),
+                "sources": row["sources"],
+            }
+        )
+    return result
+
+
+def _short_full_name_candidate(left: str, right: str) -> bool:
+    if looks_joint_label(left) or looks_joint_label(right):
+        return False
+
+    generic_tokens = {
+        "boy",
+        "captain",
+        "child",
+        "emperor",
+        "girl",
+        "guard",
+        "lady",
+        "lord",
+        "man",
+        "mister",
+        "mr",
+        "mrs",
+        "soldier",
+        "the",
+        "voice",
+        "woman",
+    }
+    left_words = re.findall(r"\w+", label_comparison_key(left), flags=re.UNICODE)
+    right_words = re.findall(r"\w+", label_comparison_key(right), flags=re.UNICODE)
+    if len(left_words) == 1 and len(right_words) > 1:
+        short, full = left_words[0], right_words
+    elif len(right_words) == 1 and len(left_words) > 1:
+        short, full = right_words[0], left_words
+    else:
+        short, full = "", []
+    if (
+        len(short) >= 3
+        and short not in generic_tokens
+        and short in {full[0], full[-1]}
+    ):
+        return True
+
+    def compact(value: str) -> str:
+        return "".join(character for character in label_comparison_key(value) if character.isalnum())
+
+    left_compact = compact(left)
+    right_compact = compact(right)
+    shortest, longest = sorted((left_compact, right_compact), key=len)
+    return (
+        len(shortest) >= 4
+        and len(longest) - len(shortest) <= 4
+        and shortest not in generic_tokens
+        and not any(character.isdigit() for character in shortest + longest)
+        and longest.startswith(shortest)
+    )
+
+
+def _identity_link_evidence(
+    dossier: Mapping[str, Any], owner: str, mentioned: str
+) -> bool:
+    """Require self-identification or apposition, not mere scene co-occurrence."""
+
+    for example in dossier.get("examples", []):
+        if not isinstance(example, Mapping):
+            continue
+        speech = str(example.get("sourceText", ""))
+        if _mentions_exact_label(speech, mentioned):
+            escaped = re.escape(mentioned)
+            if re.search(
+                rf"\b(?:i\s+am|i['’]m|my\s+name\s+is|call\s+me)\s+{escaped}(?!\w)",
+                speech,
+                flags=re.IGNORECASE,
+            ):
+                return True
+        for field in ("contextBefore", "contextAfter"):
+            context = str(example.get(field, ""))
+            if not _mentions_exact_label(context, owner) or not _mentions_exact_label(
+                context, mentioned
+            ):
+                continue
+            owner_pattern = re.escape(owner)
+            mentioned_pattern = re.escape(mentioned)
+            explicit_identity = re.search(
+                rf"(?<!\w){owner_pattern}(?!\w).{{0,40}}\b(?:called|named|known\s+as|"
+                rf"real\s+name\s+(?:is|was))\s+{mentioned_pattern}(?!\w)",
+                context,
+                flags=re.IGNORECASE,
+            )
+            parenthetical = re.search(
+                rf"(?<!\w){owner_pattern}(?!\w)\s*\(\s*{mentioned_pattern}(?!\w)\s*\)",
+                context,
+                flags=re.IGNORECASE,
+            )
+            descriptive_apposition = _looks_descriptive_identity_label(owner) and re.search(
+                rf"(?<!\w)(?:the\s+)?{owner_pattern}(?!\w)\s*[,—–]\s*"
+                rf"{mentioned_pattern}(?!\w)",
+                context,
+                flags=re.IGNORECASE,
+            )
+            if explicit_identity or parenthetical or descriptive_apposition:
+                return True
+    return False
+
+
+def _looks_descriptive_identity_label(label: str) -> bool:
+    tokens = set(re.findall(r"\w+", label_comparison_key(label), flags=re.UNICODE))
+    return bool(
+        tokens
+        & {
+            "boy",
+            "child",
+            "girl",
+            "guard",
+            "man",
+            "soldier",
+            "voice",
+            "woman",
+        }
+    )
+
+
+def _candidate_source_memberships(
+    candidates: Sequence[Mapping[str, Any]],
+) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for candidate in candidates:
+        for source in candidate.get("sources", []):
+            value = str(source)
+            counts[value] = counts.get(value, 0) + 1
+    return dict(sorted(counts.items()))
+
+
+def _mentions_exact_label(evidence: str, label: str) -> bool:
+    if not evidence or not label:
+        return False
+    pattern = rf"(?<!\w){re.escape(label)}(?!\w)"
+    return re.search(pattern, evidence, flags=re.IGNORECASE) is not None
+
+
+def _apply_pair_decisions(
+    proposals: Sequence[Mapping[str, Any]],
+    decisions: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    rows = [dict(row) for row in proposals]
+    by_key = {label_comparison_key(row["label"]): row for row in rows}
+    parent = {key: key for key in by_key}
+
+    def find(key: str) -> str:
+        while parent[key] != key:
+            parent[key] = parent[parent[key]]
+            key = parent[key]
+        return key
+
+    def union(left_key: str, right_key: str) -> None:
+        left_root = find(left_key)
+        right_root = find(right_key)
+        if left_root != right_root:
+            parent[right_root] = left_root
+
+    for decision in decisions:
+        left_key = label_comparison_key(decision["leftLabel"])
+        right_key = label_comparison_key(decision["rightLabel"])
+        left = by_key[left_key]
+        right = by_key[right_key]
+        if (
+            decision["relationship"] == "same"
+            and left.get("category") == right.get("category")
+            and left.get("category") in {"character", "group"}
+        ):
+            union(left_key, right_key)
+    contradictory_components = {
+        find(label_comparison_key(decision["leftLabel"]))
+        for decision in decisions
+        if decision["relationship"] == "different"
+        and find(label_comparison_key(decision["leftLabel"]))
+        == find(label_comparison_key(decision["rightLabel"]))
+    }
+
+    for decision in decisions:
+        left_key = label_comparison_key(decision["leftLabel"])
+        right_key = label_comparison_key(decision["rightLabel"])
+        left = by_key[left_key]
+        right = by_key[right_key]
+        relationship = str(decision["relationship"])
+        compatible = (
+            left.get("category") == right.get("category")
+            and left.get("category") in {"character", "group"}
+        )
+        safe_same = (
+            relationship == "same"
+            and compatible
+            and find(left_key) not in contradictory_components
+        )
+        if isinstance(decision, dict):
+            decision["automaticMerge"] = safe_same
+        if safe_same:
+            left.setdefault("aliases", []).append(str(right["label"]))
+            right.setdefault("aliases", []).append(str(left["label"]))
+            left["reviewRequired"] = True
+            right["reviewRequired"] = True
+        elif relationship in {"same", "possible"}:
+            left.setdefault("competingLabels", []).append(str(right["label"]))
+            right.setdefault("competingLabels", []).append(str(left["label"]))
+            left["reviewRequired"] = True
+            right["reviewRequired"] = True
+    return _combine_confirmed_relationships(rows)
+
+
 def _label_prompt(
     dossier: Mapping[str, Any],
     dossier_by_label: Mapping[str, Mapping[str, Any]],
@@ -872,13 +1424,39 @@ def _label_prompt(
     return "\n".join(sections)
 
 
-def _evidence_lines(dossier: Mapping[str, Any]) -> list[str]:
-    examples = [
-        normalize_label(row.get("sourceText", ""))
-        for row in dossier.get("examples", [])
-        if normalize_label(row.get("sourceText", ""))
-    ]
-    return [f"- {value}" for value in examples] or ["(none)"]
+def _evidence_lines(
+    dossier: Mapping[str, Any],
+    *,
+    max_examples: int = 4,
+    max_text_characters: int = 700,
+) -> list[str]:
+    lines: list[str] = []
+    for row in dossier.get("examples", [])[:max_examples]:
+        if not isinstance(row, Mapping):
+            continue
+        location = []
+        if row.get("chapter") is not None or row.get("chapterId") is not None:
+            location.append(f"chapter {row.get('chapter') or row.get('chapterId')}")
+        if row.get("page") is not None:
+            location.append(f"page {row['page']}")
+        source = _bounded_identity_evidence(row.get("sourceText", ""), max_text_characters)
+        before = _bounded_identity_evidence(row.get("contextBefore", ""), max_text_characters)
+        after = _bounded_identity_evidence(row.get("contextAfter", ""), max_text_characters)
+        prefix = f"[{', '.join(location)}] " if location else ""
+        if source:
+            lines.append(f"- {prefix}SPEECH: {source}")
+        if before:
+            lines.append(f"  BEFORE: {before}")
+        if after:
+            lines.append(f"  AFTER: {after}")
+    return lines or ["(none)"]
+
+
+def _bounded_identity_evidence(value: object, max_characters: int) -> str:
+    text = normalize_label(value)
+    if len(text) <= max_characters:
+        return text
+    return text[: max_characters - 1].rstrip() + "…"
 
 
 def _fuzzy_by_label(fuzzy: Sequence[Mapping[str, Any]]) -> dict[str, list[str]]:

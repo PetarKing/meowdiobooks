@@ -196,11 +196,13 @@ def _shared_audition_identity(
     group_id: str,
     package: Path,
 ) -> dict[str, Any]:
-    """Project one generated audition onto another identity without copying audio."""
+    """Route one generated audition to an identity without replacing its desired profile."""
 
     shared = deepcopy(generated)
     anchor_id = str(generated["id"])
     revision = str(generated.get("voicePreviewRevision", ""))
+    desired_settings = deepcopy(base.get("voiceSettings"))
+    desired_direction = base.get("voiceDirection")
     reference_audio = str(Path("voices") / anchor_id / f"{revision}.wav") if revision else None
     candidates = []
     for raw in generated.get("voiceCandidates", []):
@@ -210,6 +212,8 @@ def _shared_audition_identity(
             {
                 "source": "shared",
                 "sharedVoiceGroupId": group_id,
+                "direction": desired_direction,
+                "voiceSettings": desired_settings,
                 "referenceAudio": (
                     str(Path("voices") / anchor_id / f"{candidate_revision}.wav")
                     if candidate_revision
@@ -224,6 +228,8 @@ def _shared_audition_identity(
             "name": str(base["name"]),
             "category": str(base.get("category", "character")),
             "lineCount": int(base.get("lineCount", 0)),
+            "voice": desired_direction,
+            "voiceSettings": desired_settings,
             "referenceAudio": reference_audio,
             "voiceCandidates": candidates,
         }
