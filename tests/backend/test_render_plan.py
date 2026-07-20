@@ -103,6 +103,29 @@ def test_compiles_directly_from_spans_with_identity_mapping_tts_metadata_and_fal
     assert plan["inputRevisions"]["script"] == "script-1"
 
 
+def test_repairs_book_corroborated_line_break_hyphenation_for_tts() -> None:
+    dialogue, cast, script = _artifacts()
+    script["entries"][0]["text"] = "Protect your al-\nlies. "
+    script["entries"][1]["text"] = "Your allies are waiting. "
+
+    plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
+
+    assert plan["chapters"][0]["segments"][0]["text"] == (
+        "Protect your allies. Your allies are waiting. "
+    )
+    assert plan["summary"]["repairedLineBreakHyphenations"] == 1
+
+
+def test_preserves_uncorroborated_line_break_hyphenated_compound() -> None:
+    dialogue, cast, script = _artifacts()
+    script["entries"][0]["text"] = "A well-\nknown path. "
+
+    plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
+
+    assert plan["chapters"][0]["segments"][0]["text"].startswith("A well-\nknown path.")
+    assert plan["summary"]["repairedLineBreakHyphenations"] == 0
+
+
 def test_shared_voice_revision_keeps_each_characters_accepted_settings():
     dialogue, cast, script = _artifacts()
     alice = next(row for row in cast["identities"] if row["characterId"] == "alice")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
+import re
 from typing import Any
 
 
@@ -39,6 +40,7 @@ def compile_render_plan(
     span_positions = {str(row["id"]): index for index, row in enumerate(spans)}
     entries = list(recording_script.get("entries", []))
     _validate_script_coverage(entries, spans, recording_script)
+    intact_words = _intact_words(entries)
     available_chapters = {str(row.get("chapterId") or "chapter-1") for row in entries}
     unknown_chapters = sorted(set(selected) - available_chapters)
     if unknown_chapters:
@@ -53,6 +55,7 @@ def compile_render_plan(
     state_by_span = _states(enrichment)
     segments_by_chapter: dict[str, list[dict[str, Any]]] = {value: [] for value in selected}
     omissions: list[dict[str, Any]] = []
+    repaired_line_hyphenations = 0
     segment_number = 0
     for entry in entries:
         chapter_id = str(entry.get("chapterId") or "chapter-1")
@@ -71,7 +74,10 @@ def compile_render_plan(
             continue
         if kind != "source":
             raise RenderPlanError(f"Unsupported recording-script entry kind: {kind}")
-        text = str(entry.get("text", ""))
+        text, line_hyphenations = _repair_line_break_hyphenation(
+            str(entry.get("text", "")), intact_words
+        )
+        repaired_line_hyphenations += line_hyphenations
         if not text:
             raise RenderPlanError(
                 f"Playable recording-script entry {entry.get('id')} has empty text"
@@ -140,8 +146,42 @@ def compile_render_plan(
                 for segment in chapter["segments"]
             ),
             "omittedChapters": len(omitted_chapter_ids),
+            "repairedLineBreakHyphenations": repaired_line_hyphenations,
         },
     }
+
+
+_LINE_BREAK_HYPHEN = re.compile(
+    r"(?P<left>[^\W\d_]+)-[ \t]*\r?\n[ \t]*(?P<right>[^\W\d_]+)",
+    re.UNICODE,
+)
+_INTACT_WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
+
+
+def _intact_words(entries: Sequence[Mapping[str, Any]]) -> set[str]:
+    """Collect book-local evidence without treating split fragments as intact words."""
+
+    words: set[str] = set()
+    for entry in entries:
+        text = _LINE_BREAK_HYPHEN.sub(" ", str(entry.get("text", "")))
+        words.update(match.group(0).casefold() for match in _INTACT_WORD.finditer(text))
+    return words
+
+
+def _repair_line_break_hyphenation(text: str, intact_words: set[str]) -> tuple[str, int]:
+    """Join only line-broken words corroborated elsewhere in the accepted book text."""
+
+    repaired = 0
+
+    def replace(match: re.Match[str]) -> str:
+        nonlocal repaired
+        joined = match.group("left") + match.group("right")
+        if joined.casefold() not in intact_words:
+            return match.group(0)
+        repaired += 1
+        return joined
+
+    return _LINE_BREAK_HYPHEN.sub(replace, text), repaired
 
 
 def _dialogue_spans(dialogue: Mapping[str, Any]) -> list[dict[str, Any]]:

@@ -22,6 +22,7 @@ from .local_llm import complete_json, qwen_server
 
 Report = Callable[[float, str | None], None]
 JsonCompletion = Callable[[str, str, int], object]
+VoiceProfileValidator = Callable[[Mapping[str, str]], None]
 
 SPEAKER_TYPES = {
     "one-person": "character",
@@ -351,6 +352,8 @@ def suggest_voice_settings_with_completion(
     max_workers: int = 1,
     evidence_policy: VoiceEvidencePolicy | None = None,
     include_narrator: bool = True,
+    profile_system_appendix: str = "",
+    profile_validator: VoiceProfileValidator | None = None,
 ) -> dict[str, dict[str, str]]:
     """Run provider-neutral voice profiling through the shared validation contract."""
 
@@ -396,9 +399,13 @@ def suggest_voice_settings_with_completion(
                 complete,
                 _voice_profile_prompt(target, evidence_policy=policy),
                 max_prompt_characters=policy.max_prompt_characters,
+                system_appendix=profile_system_appendix,
+                profile_validator=profile_validator,
             )
         except CastContractError:
             settings = fallback
+            if profile_validator is not None:
+                profile_validator(settings)
         return str(target["characterId"]), settings
 
     if max_workers == 1:
@@ -835,15 +842,22 @@ def _complete_voice_settings_with(
     prompt: str,
     *,
     max_prompt_characters: int = MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
+    system_appendix: str = "",
+    profile_validator: VoiceProfileValidator | None = None,
 ) -> dict[str, str]:
     failures: list[str] = []
     retry_prompt = prompt
+    system = VOICE_PROFILE_SYSTEM
+    if system_appendix.strip():
+        system += "\n\nPROVIDER OUTPUT CONSTRAINTS\n" + system_appendix.strip()
     for _attempt in range(2):
-        raw = complete(VOICE_PROFILE_SYSTEM, retry_prompt, 384)
+        raw = complete(system, retry_prompt, 384)
         settings: dict[str, str] | None = None
         try:
             settings = validate_voice_settings(raw)
             compile_voice_direction(settings)
+            if profile_validator is not None:
+                profile_validator(settings)
             return settings
         except CastContractError as error:
             failures.append(str(error))

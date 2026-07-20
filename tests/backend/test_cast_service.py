@@ -1030,6 +1030,46 @@ def test_provider_neutral_voice_completion_preserves_shared_validation():
     assert profiles["narrator"]["tone"] == "gentle"
 
 
+def test_provider_voice_constraint_retries_the_generated_profile_without_truncating():
+    calls = []
+
+    def complete(system, prompt, _max_tokens):
+        calls.append((system, prompt))
+        description = (
+            "This complete sentence is deliberately too long for the provider."
+            if len(calls) == 1
+            else "Quiet and precise."
+        )
+        return {
+            "presentation": "unspecified",
+            "age": "unspecified",
+            "tone": "gentle",
+            "pitch": "unspecified",
+            "pace": "natural",
+            "energy": "balanced",
+            "accent": "unspecified",
+            "description": description,
+        }
+
+    def validate_provider(settings):
+        if len(settings["description"]) > 24:
+            raise CastContractError("Provider instruction exceeds its complete-text budget")
+
+    profiles = suggest_voice_settings_with_completion(
+        [],
+        [],
+        [],
+        complete,
+        profile_system_appendix="Keep the description within the provider budget.",
+        profile_validator=validate_provider,
+    )
+
+    assert profiles["narrator"]["description"] == "Quiet and precise."
+    assert len(calls) == 2
+    assert "PROVIDER OUTPUT CONSTRAINTS" in calls[0][0]
+    assert "Provider instruction exceeds" in calls[1][1]
+
+
 def test_selective_voice_completion_does_not_reprofile_an_unchanged_narrator():
     prompts = []
 
