@@ -1,5 +1,6 @@
 :root {
-  font-family: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  font-family: var(--font-sans);
   color: #33253b;
   background: #f7f0e5;
   font-synthesis: none;

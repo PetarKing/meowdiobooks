@@ -17,8 +17,10 @@ describe('mobile workflow layout', () => {
     const formControls = rule('input,select,textarea')
     const normalizedFormControls = rule('input,select,textarea', supplementalMobileStyles)
 
+    expect(workflowStyles).toMatch(/--font-sans\s*:\s*"Avenir Next",\s*Avenir,\s*"Segoe UI",\s*system-ui,\s*sans-serif/)
     expect(formControls).toMatch(/font-size\s*:\s*16px\s*!important/)
-    expect(normalizedFormControls).toMatch(/font-weight\s*:\s*500\s*!important/)
+    expect(normalizedFormControls).toMatch(/font-family\s*:\s*var\(--font-sans\)\s*!important/)
+    expect(normalizedFormControls).toMatch(/font-weight\s*:\s*400\s*!important/)
     expect(normalizedFormControls).toMatch(/letter-spacing\s*:\s*0/)
     expect(normalizedFormControls).toMatch(/text-transform\s*:\s*none/)
   })
