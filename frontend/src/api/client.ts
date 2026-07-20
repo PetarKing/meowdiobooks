@@ -35,14 +35,15 @@ export class HttpWizardApi implements WorkflowGateway {
     private readonly fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
   ) {}
 
-  private async request<T>(path: string, init?: RequestInit): Promise<T> {
+  private async request<T>(path: string, init?: RequestInit, timeoutMs: number | null = 30_000): Promise<T> {
     const headers = init?.body instanceof FormData
       ? init.headers
       : { "Content-Type": "application/json", ...init?.headers };
+    const signal = init?.signal ?? (timeoutMs === null ? undefined : AbortSignal.timeout(timeoutMs));
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
-      signal: init?.signal ?? AbortSignal.timeout(30_000),
       ...init,
       headers,
+      signal,
     });
     if (!response.ok) {
       const payload = await response.json().catch(() => null) as { detail?: unknown } | null;
@@ -236,13 +237,16 @@ export class HttpWizardApi implements WorkflowGateway {
     return this.request(
       `/books/${bookId}/stages/cast/candidates/${castRevision}/voices/${encodeURIComponent(characterId)}/upload`,
       { method: "POST", body },
+      // Local audition generation is synchronous; aborting can hide an artifact the server committed.
+      null,
     );
   }
 
   transcribeVoiceSample(bookId: string, file: File): Promise<import("./contracts").VoiceSampleTranscript> {
     const body = new FormData();
     body.append("file", file);
-    return this.request(`/books/${bookId}/voice-samples/transcribe`, { method: "POST", body });
+    // Local transcription can legitimately take longer than the generic request timeout.
+    return this.request(`/books/${bookId}/voice-samples/transcribe`, { method: "POST", body }, null);
   }
 
   deleteVoiceAudition(

@@ -535,7 +535,7 @@ export function CastVoiceReview({
               </div></fieldset>
             </div>
             <div className="voice-regenerate-footer">
-              <small>{inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls."} Settings affect only the next audition; earlier auditions remain available below.</small>
+              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings affect only the next audition; earlier auditions remain available below.")}</small>
               <button
                 type="button"
                 className="ghost regenerate-voice-action"

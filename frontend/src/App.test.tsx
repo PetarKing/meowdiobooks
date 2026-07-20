@@ -204,6 +204,23 @@ describe('v2 wizard', () => {
     expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
   })
 
+  it('names the actual prerequisite for every locked workflow stage', async () => {
+    await open({
+      ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      activeArtifacts: {},
+      generatedChapters: [],
+    })
+
+    const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
+    expect(within(nav).getByRole('button', { name: 'Dialogue Complete Extract first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Review Complete Dialogue first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Cast & voices Complete Review first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Enrich Complete Cast & voices first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Generate Complete Enrich first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Export Generate audio first' })).toBeDisabled()
+  })
+
   it('does not mark Generate complete when its only chapter audio is stale', async () => {
     await open({
       ...base,
@@ -219,18 +236,18 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: 'Export Generate audio first' })).toBeDisabled()
   })
 
-  it('lets a hosted shell insert a private step and replace the header without copying the public app', async () => {
+  it('lets an embedding shell insert a custom step and replace the header without copying the public app', async () => {
     const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
 
     await open(base, undefined, undefined, undefined, {
       journey,
-      stepOverrides: { soundscape: () => <h1>Private ambient-effects workflow</h1> },
-      renderHeader: ({ libraryCount }) => <header>Hosted account · {libraryCount} books</header>,
+      stepOverrides: { soundscape: () => <h1>Custom ambient-effects workflow</h1> },
+      renderHeader: ({ libraryCount }) => <header>Custom shell · {libraryCount} books</header>,
     })
 
-    expect(screen.getByText('Hosted account · 0 books')).toBeInTheDocument()
+    expect(screen.getByText('Custom shell · 0 books')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
-    expect(screen.getByRole('heading', { name: 'Private ambient-effects workflow' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Custom ambient-effects workflow' })).toBeInTheDocument()
   })
 
   it('collapses the wizard rail without changing the active stage', async () => {
@@ -830,7 +847,7 @@ describe('v2 wizard', () => {
     expect(document.querySelectorAll('.accepted-summary > span')).toHaveLength(4)
   })
 
-  it('lets a hosted composition hide supplier cost receipts', async () => {
+  it('lets an embedding composition hide supplier cost receipts', async () => {
     await open({
       ...base,
       dialogue: {
@@ -1256,7 +1273,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'dialogue', expect.objectContaining({ attributionRoute: 'local' })))
   })
 
-  it('uses the configured remote route without exposing local choices in a hosted composition', async () => {
+  it('uses the configured remote route without exposing local choices in an embedding composition', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract'] as WizardStage[] },

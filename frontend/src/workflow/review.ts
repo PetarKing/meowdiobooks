@@ -1,4 +1,10 @@
 import type { ReviewCapability, ReviewWarning } from "../api/contracts";
+import type { TFunction } from "i18next";
+
+function reviewText(t: TFunction | undefined, key: string, values: Record<string, string | number> = {}) {
+  if (t) return String(t(key, values));
+  return key.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(values[name] ?? ""));
+}
 
 export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): ReviewWarning[] {
   if (!Array.isArray(candidate.warnings)) return [];
@@ -20,14 +26,22 @@ export function reviewDecisionActions(warning: ReviewWarning): ReviewCapability[
   return [...warning.availableActions].sort((left, right) => order.indexOf(left) - order.indexOf(right));
 }
 
-export function reviewConsequence(action: ReviewCapability, warning: ReviewWarning) {
+export function reviewConsequence(action: ReviewCapability, warning: ReviewWarning, t?: TFunction) {
   const count = warning.occurrences.length;
   const { kind, readerState } = warning;
-  const subject = count === 1 ? "This highlighted text" : `All ${count} highlighted sections`;
-  if (kind === "empty-page" && action === "keep") return `Confirm that all ${count} pages are intentionally empty; nothing is removed.`;
-  if (kind === "reading-order" && action === "keep") return `Accept the extracted order for all ${count} highlighted locations.`;
-  if (action === "keep" && readerState === "narrator") return `${subject} will be read by the narrator.`;
-  return ({ keep: `${subject} will keep ${readerState === "mixed" || count > 1 ? "their current readers" : "its current reader"}.`, exclude: `${subject} will not be spoken. Your PDF stays unchanged.`, narrate: `${subject} will be read by the narrator instead.`, "rerun-extraction": "Run extraction again from the same PDF.", "rerun-dialogue": "Rebuild who reads the detected dialogue." } as Record<ReviewCapability, string>)[action];
+  const subject = count === 1
+    ? reviewText(t, "This highlighted text")
+    : reviewText(t, "All {{count}} highlighted sections", { count });
+  if (kind === "empty-page" && action === "keep") return reviewText(t, "Confirm that all {{count}} pages are intentionally empty; nothing is removed.", { count });
+  if (kind === "reading-order" && action === "keep") return reviewText(t, "Accept the extracted order for all {{count}} highlighted locations.", { count });
+  if (action === "keep" && readerState === "narrator") return reviewText(t, "{{subject}} will be read by the narrator.", { subject });
+  return ({
+    keep: reviewText(t, readerState === "mixed" || count > 1 ? "{{subject}} will keep their current readers." : "{{subject}} will keep its current reader.", { subject }),
+    exclude: reviewText(t, "{{subject}} will not be spoken. Your PDF stays unchanged.", { subject }),
+    narrate: reviewText(t, "{{subject}} will be read by the narrator instead.", { subject }),
+    "rerun-extraction": reviewText(t, "Run extraction again from the same PDF."),
+    "rerun-dialogue": reviewText(t, "Rebuild who reads the detected dialogue."),
+  } as Record<ReviewCapability, string>)[action];
 }
 
 export function reviewQuestion(kind: string) {

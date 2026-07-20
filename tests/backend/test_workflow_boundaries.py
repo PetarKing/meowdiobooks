@@ -58,11 +58,11 @@ def test_runner_dispatches_a_typed_command_without_queue_or_http_state():
     assert result == {"bookId": "book-1", "chapters": ["chapter-1"]}
 
 
-def test_private_composition_can_insert_and_remove_an_optional_stage():
+def test_custom_composition_can_insert_and_remove_an_optional_stage():
     artifacts = PUBLIC_ARTIFACTS.with_spec(
         ArtifactSpec(
             "ambient-plan",
-            "meowdiobooks-cloud.ambient-plan.v1",
+            "example.ambient-plan.v1",
             requires=("cast",),
         )
     )
@@ -71,7 +71,7 @@ def test_private_composition_can_insert_and_remove_an_optional_stage():
         StageSpec(
             "ambient",
             prerequisites=("cast",),
-            command_kind="cloud:ambient",
+            command_kind="example:ambient",
             command_model=GenerateChapters,
             artifact_kind="ambient-plan",
         ),
@@ -86,12 +86,12 @@ def test_private_composition_can_insert_and_remove_an_optional_stage():
     assert definition.remove("ambient").stage("generate").id == "generate"
 
 
-def test_private_composition_can_replace_a_handler_without_changing_the_stage_contract():
+def test_custom_composition_can_replace_a_handler_without_changing_the_stage_contract():
     runner = WorkflowRunner(PUBLIC_WORKFLOW)
     runner.register_stage(
         "generate",
         lambda command, _report: {
-            "provider": "hosted-qwen",
+            "provider": "custom-handler",
             "bookId": command.book_id,
         },
     )
@@ -103,7 +103,7 @@ def test_private_composition_can_replace_a_handler_without_changing_the_stage_co
         lambda _progress, _message=None: None,
     )
 
-    assert result == {"provider": "hosted-qwen", "bookId": "book-1"}
+    assert result == {"provider": "custom-handler", "bookId": "book-1"}
 
 
 def test_composition_rejects_removing_a_required_stage():
@@ -111,15 +111,15 @@ def test_composition_rejects_removing_a_required_stage():
         PUBLIC_WORKFLOW.remove("dialogue")
 
 
-def test_custom_artifact_registry_preserves_private_artifacts_and_invalidation(tmp_path):
+def test_custom_artifact_registry_preserves_extension_artifacts_and_invalidation(tmp_path):
     artifacts = PUBLIC_ARTIFACTS.with_spec(
         ArtifactSpec(
             "ambient-plan",
-            "meowdiobooks-cloud.ambient-plan.v1",
+            "example.ambient-plan.v1",
             requires=("script",),
         )
     )
-    workspace = BookWorkspace.under(tmp_path, "book-private", artifacts)
+    workspace = BookWorkspace.under(tmp_path, "book-custom", artifacts)
     script_path, _ = workspace.write_candidate("script", {"revision": "s1"})
     ambient_path, ambient = workspace.write_candidate(
         "ambient-plan", {"revision": "a1", "events": []}
@@ -130,7 +130,7 @@ def test_custom_artifact_registry_preserves_private_artifacts_and_invalidation(t
     replacement, _ = workspace.write_candidate("script", {"revision": "s2"})
     workspace.publish("script", replacement)
 
-    assert ambient["contract"] == "meowdiobooks-cloud.ambient-plan.v1"
+    assert ambient["contract"] == "example.ambient-plan.v1"
     assert workspace.active() == {"script": str(replacement)}
 
 

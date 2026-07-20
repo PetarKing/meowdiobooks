@@ -309,6 +309,7 @@ describe('HttpWizardApi', () => {
     const request = fetchMock.mock.calls[0][1] as RequestInit
     expect((request.body as FormData).get('file')).toBe(sample)
     expect((request.body as FormData).get('reference_text')).toBe('The exact words in this sample.')
+    expect(request.signal).toBeUndefined()
   })
 
   it('requests an editable local transcript without a language constraint', async () => {
@@ -327,6 +328,7 @@ describe('HttpWizardApi', () => {
     )
     const request = fetchMock.mock.calls[0][1] as RequestInit
     expect((request.body as FormData).get('file')).toBe(sample)
+    expect(request.signal).toBeUndefined()
   })
 
   it('deletes one audition from an editable cast candidate', async () => {
