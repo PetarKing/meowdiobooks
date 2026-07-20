@@ -529,6 +529,7 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
 .dialogue-processing-modal { min-height:184px; }
 .process-modal h2 { margin:8px 0 20px; font:700 27px var(--font-display); }
 .process-modal p { margin:12px 0 0; color:var(--muted); font-size:12px; line-height:1.5; }
+.process-modal > button { margin-top:12px; }
 .dialogue-routing-backdrop { position:fixed; inset:0; z-index:1100; display:grid; place-items:center; overflow:auto; padding:24px; background:rgba(39,28,48,.46); backdrop-filter:blur(14px) saturate(.8); -webkit-backdrop-filter:blur(14px) saturate(.8); animation:phase-help-fade-in .18s ease both; }
 .dialogue-routing-modal { position:relative; width:min(820px,100%); padding:30px; border:1px solid rgba(255,255,255,.72); border-radius:27px; outline:0; background:radial-gradient(circle at 88% -8%,rgba(239,180,76,.17),transparent 21rem),linear-gradient(145deg,#fffdf8,#fff8ed 58%,#f3edf7); box-shadow:0 34px 100px rgba(25,16,32,.38),inset 0 1px rgba(255,255,255,.9); animation:phase-help-rise-in .22s cubic-bezier(.2,.82,.2,1) both; }
 .dialogue-routing-close { position:absolute; top:18px; right:18px; display:grid; width:38px; height:38px; place-items:center; padding:0 0 2px; border:1px solid var(--line-strong); border-radius:50%; background:rgba(255,255,255,.74); color:var(--ink); font:400 23px/1 var(--font-display); cursor:pointer; }
