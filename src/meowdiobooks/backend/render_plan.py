@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 
@@ -38,9 +39,7 @@ def compile_render_plan(
     span_positions = {str(row["id"]): index for index, row in enumerate(spans)}
     entries = list(recording_script.get("entries", []))
     _validate_script_coverage(entries, spans, recording_script)
-    available_chapters = {
-        str(row.get("chapterId") or "chapter-1") for row in entries
-    }
+    available_chapters = {str(row.get("chapterId") or "chapter-1") for row in entries}
     unknown_chapters = sorted(set(selected) - available_chapters)
     if unknown_chapters:
         raise RenderPlanError(f"Unknown selected chapters: {unknown_chapters}")
@@ -74,7 +73,9 @@ def compile_render_plan(
             raise RenderPlanError(f"Unsupported recording-script entry kind: {kind}")
         text = str(entry.get("text", ""))
         if not text:
-            raise RenderPlanError(f"Playable recording-script entry {entry.get('id')} has empty text")
+            raise RenderPlanError(
+                f"Playable recording-script entry {entry.get('id')} has empty text"
+            )
         source_spans = [span_index[value] for value in source_ids]
         anchor = source_spans[0]
         render_role = str(anchor.get("renderRole", "narration"))
@@ -183,8 +184,7 @@ def _validate_script_coverage(
     if sorted(owner_ids) != sorted(expected) or len(owner_ids) != len(set(owner_ids)):
         raise RenderPlanError("Recording script must own every Dialogue span exactly once")
     declared = [
-        str(value)
-        for value in recording_script.get("sourceCoverage", {}).get("sourceSpanIds", [])
+        str(value) for value in recording_script.get("sourceCoverage", {}).get("sourceSpanIds", [])
     ]
     if recording_script.get("sourceCoverage", {}).get("status") != "exact" or sorted(
         declared
@@ -252,7 +252,7 @@ def _voice(raw: Mapping[str, Any], character_id: str) -> dict[str, Any]:
         or (reference_mode == "transcript-conditioned" and not reference_text)
     ):
         raise RenderPlanError(f"Accepted voice metadata is incomplete for {character_id}")
-    return {
+    voice = {
         "characterId": character_id,
         "name": str(raw.get("name") or character_id),
         "category": str(raw.get("category") or "character"),
@@ -261,6 +261,12 @@ def _voice(raw: Mapping[str, Any], character_id: str) -> dict[str, Any]:
         "referenceText": reference_text,
         "referenceMode": reference_mode,
     }
+    voice_settings = raw.get("voiceSettings")
+    if voice_settings is not None:
+        if not isinstance(voice_settings, Mapping):
+            raise RenderPlanError(f"Accepted voice settings are invalid for {character_id}")
+        voice["voiceSettings"] = deepcopy(dict(voice_settings))
+    return voice
 
 
 def _effective_voices(
@@ -318,7 +324,7 @@ def _segment(
     state: str | None,
     mix_group: str | None = None,
 ) -> dict[str, Any]:
-    return {
+    segment = {
         "id": f"segment-{number:06d}",
         "chapterId": chapter_id,
         "scriptEntryIds": [str(entry.get("id"))],
@@ -335,6 +341,9 @@ def _segment(
         "mixGroupId": mix_group,
         "state": state,
     }
+    if "voiceSettings" in voice:
+        segment["voiceSettings"] = deepcopy(voice["voiceSettings"])
+    return segment
 
 
 def _coalesce_narration(
