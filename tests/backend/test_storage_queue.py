@@ -156,13 +156,46 @@ def test_queued_job_can_be_canceled_without_running(tmp_path):
     assert store.get(submitted.id).status == JobStatus.CANCELED
 
 
-def test_running_job_cannot_be_canceled_unsafely(tmp_path):
+def test_running_job_stops_at_the_next_progress_boundary(tmp_path):
+    store = JsonStore(tmp_path / "jobs.json", Job)
+    started = threading.Event()
+    release = threading.Event()
+
+    def wait_handler(_payload, report):
+        started.set()
+        release.wait(1)
+        report(50, "First task complete")
+        return {}
+
+    queue = JobQueue(store, {"wait": wait_handler})
+    queue.start()
+    submitted = queue.enqueue("wait")
+    wait_for(store, submitted.id, JobStatus.RUNNING)
+    assert started.wait(1)
+
+    try:
+        requested = queue.cancel(submitted.id)
+        assert requested.status == JobStatus.RUNNING
+        assert requested.cancel_requested_at is not None
+        assert requested.message == "Cancellation requested; stopping after the active task"
+        release.set()
+        canceled = wait_for(store, submitted.id, JobStatus.CANCELED)
+    finally:
+        release.set()
+        queue.stop()
+
+    assert canceled.error is None
+    assert canceled.result is None
+    assert canceled.message == "Canceled after the active task"
+
+
+def test_running_job_canceled_after_a_handler_without_progress_cannot_publish_success(tmp_path):
     store = JsonStore(tmp_path / "jobs.json", Job)
     release = threading.Event()
 
     def wait_handler(_payload):
         release.wait(1)
-        return {}
+        return {"published": True}
 
     queue = JobQueue(store, {"wait": wait_handler})
     queue.start()
@@ -171,12 +204,29 @@ def test_running_job_cannot_be_canceled_unsafely(tmp_path):
 
     try:
         queue.cancel(submitted.id)
-    except ValueError as error:
-        assert str(error) == "Only queued jobs can be canceled"
-    else:
-        raise AssertionError("running cancellation must be rejected")
+        release.set()
+        canceled = wait_for(store, submitted.id, JobStatus.CANCELED)
     finally:
         release.set()
+        queue.stop()
+
+    assert canceled.result is None
+
+
+def test_cancel_rejects_finished_job(tmp_path):
+    store = JsonStore(tmp_path / "jobs.json", Job)
+    queue = JobQueue(store, {"echo": lambda payload: payload})
+    queue.start()
+    try:
+        submitted = queue.enqueue("echo")
+        wait_for(store, submitted.id, JobStatus.SUCCEEDED)
+        try:
+            queue.cancel(submitted.id)
+        except ValueError as error:
+            assert str(error) == "Only queued or running jobs can be canceled"
+        else:
+            raise AssertionError("finished cancellation must be rejected")
+    finally:
         queue.stop()
 
 

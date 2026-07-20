@@ -13,6 +13,10 @@ BeforeRun = Callable[[Job], None]
 ActivityFactory = Callable[[], AbstractContextManager[object]]
 
 
+class JobCancellationRequested(RuntimeError):
+    """Stop cooperative work at the next safe progress boundary."""
+
+
 class JobQueue:
     def __init__(
         self,
@@ -67,16 +71,24 @@ class JobQueue:
         return job
 
     def cancel(self, job_id: str) -> Job | None:
-        """Cancel queued work; running work deliberately has no unsafe stop path."""
+        """Cancel queued work or ask running work to stop at its next safe boundary."""
 
         def apply(job: Job) -> Job:
-            if job.status != JobStatus.QUEUED:
-                raise ValueError("Only queued jobs can be canceled")
-            job.status = JobStatus.CANCELED
-            job.message = "Canceled before starting"
-            job.error = None
-            job.finished_at = utc_now()
-            job.updated_at = utc_now()
+            now = utc_now()
+            if job.status == JobStatus.QUEUED:
+                job.status = JobStatus.CANCELED
+                job.message = "Canceled before starting"
+                job.error = None
+                job.cancel_requested_at = now
+                job.finished_at = now
+                job.updated_at = now
+                return job
+            if job.status != JobStatus.RUNNING:
+                raise ValueError("Only queued or running jobs can be canceled")
+            if job.cancel_requested_at is None:
+                job.cancel_requested_at = now
+                job.message = "Cancellation requested; stopping after the active task"
+                job.updated_at = now
             return job
 
         canceled = self.store.update(job_id, apply)
@@ -87,9 +99,14 @@ class JobQueue:
     def _recover_interrupted_jobs(self) -> None:
         for job in self.store.all():
             if job.status == JobStatus.RUNNING:
-                job.status = JobStatus.FAILED
-                job.error = "ApplicationInterrupted: the app stopped while this stage was running"
-                job.message = "Interrupted; retry this stage from the beginning"
+                if job.cancel_requested_at is not None:
+                    job.status = JobStatus.CANCELED
+                    job.error = None
+                    job.message = "Canceled after the application stopped"
+                else:
+                    job.status = JobStatus.FAILED
+                    job.error = "ApplicationInterrupted: the app stopped while this stage was running"
+                    job.message = "Interrupted; retry this stage from the beginning"
                 job.finished_at = utc_now()
                 job.updated_at = utc_now()
                 self.store.put(job)
@@ -133,6 +150,8 @@ class JobQueue:
 
             def report(progress: float, message: str | None = None) -> None:
                 def apply(current: Job) -> Job:
+                    if current.cancel_requested_at is not None:
+                        raise JobCancellationRequested
                     if current.status == JobStatus.RUNNING:
                         current.progress = min(100, max(current.progress, progress))
                         current.message = message
@@ -143,21 +162,59 @@ class JobQueue:
 
             if self._before_run is not None:
                 self._before_run(job)
+            self._raise_if_cancellation_requested(job.id)
             with self._activity():
                 if len(inspect.signature(handler).parameters) >= 2:
                     result = handler(job.payload, report) or {}
                 else:
                     result = handler(job.payload) or {}
-            job.status = JobStatus.SUCCEEDED
-            job.result = result
-            job.progress = 100
-            job.message = "Complete"
+            self._raise_if_cancellation_requested(job.id)
         except Exception as exc:  # the worker must survive individual job failures
-            job.status = JobStatus.FAILED
-            job.error = str(
-                getattr(exc, "public_message", f"{type(exc).__name__}: {exc}")
-            )
-            job.message = "Failed"
+            failure = exc
+
+            def fail(current: Job) -> Job:
+                if isinstance(failure, JobCancellationRequested) or current.cancel_requested_at:
+                    return self._finish_canceled(current)
+                current.status = JobStatus.FAILED
+                current.error = str(
+                    getattr(
+                        failure,
+                        "public_message",
+                        f"{type(failure).__name__}: {failure}",
+                    )
+                )
+                current.message = "Failed"
+                current.finished_at = utc_now()
+                current.updated_at = current.finished_at
+                return current
+
+            self.store.update(job.id, fail)
+            return
+
+        def succeed(current: Job) -> Job:
+            if current.cancel_requested_at is not None:
+                return self._finish_canceled(current)
+            current.status = JobStatus.SUCCEEDED
+            current.result = result
+            current.progress = 100
+            current.message = "Complete"
+            current.finished_at = utc_now()
+            current.updated_at = current.finished_at
+            return current
+
+        self.store.update(job.id, succeed)
+
+    def _raise_if_cancellation_requested(self, job_id: str) -> None:
+        current = self.store.get(job_id)
+        if current is not None and current.cancel_requested_at is not None:
+            raise JobCancellationRequested
+
+    @staticmethod
+    def _finish_canceled(job: Job) -> Job:
+        job.status = JobStatus.CANCELED
+        job.result = None
+        job.error = None
+        job.message = "Canceled after the active task"
         job.finished_at = utc_now()
-        job.updated_at = utc_now()
-        self.store.put(job)
+        job.updated_at = job.finished_at
+        return job
