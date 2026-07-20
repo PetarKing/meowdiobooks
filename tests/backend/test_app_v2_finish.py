@@ -50,6 +50,34 @@ def _wait(client: TestClient, job_id: str) -> dict:
     raise AssertionError("job did not finish")
 
 
+def test_voice_transcription_uses_provider_safe_public_error(tmp_path, monkeypatch):
+    class ProviderFailure(RuntimeError):
+        public_message = "Voice transcription was interrupted. Try again."
+
+    def fail_transcription(_repo_root, _book_id, _sample_path):
+        raise ProviderFailure("private provider diagnostics")
+
+    monkeypatch.setattr(
+        "meowdiobooks.backend.app_v2.normalize_voice_sample",
+        lambda _raw, _filename: (b"normalized-voice", 4.0),
+    )
+
+    with TestClient(
+        create_app_v2(tmp_path, voice_sample_transcriber=fail_transcription)
+    ) as client:
+        imported = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()
+        response = client.post(
+            f"/api/books/{imported['book']['id']}/voice-samples/transcribe",
+            files={"file": ("voice.wav", b"voice", "audio/wav")},
+        )
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Voice transcription was interrupted. Try again."
+    assert "private provider diagnostics" not in response.text
+
+
 def _process(client: TestClient, book_id: str, stage: str, settings: dict) -> dict:
     response = client.post(
         f"/api/books/{book_id}/stages/{stage}/process", json={"settings": settings}

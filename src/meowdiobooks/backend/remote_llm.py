@@ -17,6 +17,10 @@ from .model_config import RemoteTextModelConfig
 class RemoteModelUnavailableError(RuntimeError):
     """A recoverable remote-model configuration or transport failure."""
 
+    def __init__(self, message: str, *, public_message: str | None = None) -> None:
+        super().__init__(message)
+        self.public_message = public_message or message
+
 
 RemoteUsageObserver = Callable[[RemoteTextModelConfig, Mapping[str, Any]], None]
 
@@ -173,7 +177,11 @@ def remote_chat_completion(
                 }
         time.sleep(delay)
     raise RemoteModelUnavailableError(
-        f"{config.display_name} could not complete this speaker check. {last_error}"
+        f"{config.display_name} could not complete this speaker check. {last_error}",
+        public_message=(
+            "The hosted speaker check was interrupted. Try again; "
+            "accepted work is unchanged."
+        ),
     )
 
 
