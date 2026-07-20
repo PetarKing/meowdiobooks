@@ -618,5 +618,5 @@ function VoiceSelect<K extends keyof Pick<VoiceSettings, "presentation" | "age" 
   onChange: (value: VoiceSettings[K]) => void;
 }) {
   const { t } = useTranslation();
-  return <label>{title}<select aria-label={title} value={value} onChange={(event) => onChange(event.target.value as VoiceSettings[K])}>{values.map((option) => <option key={option} value={option}>{t(label(option))}</option>)}</select><input type="hidden" name={field} value={value} /></label>;
+  return <label>{title}<span className="voice-select-control"><select aria-label={title} value={value} onChange={(event) => onChange(event.target.value as VoiceSettings[K])}>{values.map((option) => <option key={option} value={option}>{t(label(option))}</option>)}</select><span aria-hidden="true">{t(label(value))}</span></span><input type="hidden" name={field} value={value} /></label>;
 }

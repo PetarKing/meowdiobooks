@@ -16,6 +16,8 @@ describe('mobile workflow layout', () => {
   it('keeps form controls readable without triggering iOS focus zoom', () => {
     const formControls = rule('input,select,textarea')
     const normalizedFormControls = rule('input,select,textarea', supplementalMobileStyles)
+    const nativeVoiceSelect = rule('.voice-select-control select', supplementalMobileStyles)
+    const visibleVoiceValue = rule('.voice-select-control > span', supplementalMobileStyles)
 
     expect(workflowStyles).toMatch(/--font-sans\s*:\s*"Avenir Next",\s*Avenir,\s*"Segoe UI",\s*system-ui,\s*sans-serif/)
     expect(formControls).toMatch(/font-size\s*:\s*16px\s*!important/)
@@ -23,6 +25,9 @@ describe('mobile workflow layout', () => {
     expect(normalizedFormControls).toMatch(/font-weight\s*:\s*400\s*!important/)
     expect(normalizedFormControls).toMatch(/letter-spacing\s*:\s*0/)
     expect(normalizedFormControls).toMatch(/text-transform\s*:\s*none/)
+    expect(nativeVoiceSelect).toMatch(/position\s*:\s*absolute/)
+    expect(nativeVoiceSelect).toMatch(/opacity\s*:\s*0/)
+    expect(visibleVoiceValue).toMatch(/font\s*:\s*400 14px\/1 var\(--font-sans\)/)
   })
 
   it('bounds cast audio settings and keeps language choices readable on mobile', () => {

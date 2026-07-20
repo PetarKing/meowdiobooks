@@ -55,10 +55,17 @@ main { max-width:1360px; }
 .voice-fields label { display: grid; gap: 3px; font-size: 9px; font-weight: 700; color: var(--muted); }
 .voice-fields select,.voice-fields textarea { width: 100%; border: 1px solid var(--line); border-radius: 7px; padding: 7px; background: white; color: var(--ink); font: inherit; }
 .voice-fields input { width:100%; border:1px solid var(--line); border-radius:7px; padding:7px; background:white; color:var(--ink); font:inherit; }
+.voice-select-control { display:contents; }
+.voice-select-control > span { display:none; }
 .voice-fields .wide { grid-column: 1 / -1; }
 .error-note { background:#fff0f0; color:#8e313d; border:1px solid #e9b8bd; border-left:4px solid #c94345; border-radius:12px; padding:13px 15px; margin-bottom:18px; box-shadow:var(--shadow-sm); }
 @media (max-width: 650px) {
   input,select,textarea { font-family:var(--font-sans) !important; font-weight:400 !important; letter-spacing:0; text-transform:none; }
+  .voice-select-control { position:relative; display:block; height:42px; }
+  .voice-select-control select { position:absolute; inset:0; z-index:1; height:100%; opacity:0; cursor:pointer; }
+  .voice-select-control > span { display:flex; width:100%; height:100%; align-items:center; padding:0 32px 0 11px; border:1px solid var(--line); border-radius:7px; background:#fff; color:var(--ink); font:400 14px/1 var(--font-sans); text-transform:none; }
+  .voice-select-control::after { content:""; position:absolute; top:50%; right:13px; width:7px; height:7px; border-right:1.5px solid var(--ink); border-bottom:1.5px solid var(--ink); pointer-events:none; transform:translateY(-70%) rotate(45deg); }
+  .voice-select-control:has(select:focus-visible) > span { box-shadow:var(--focus); }
   .sample-reasons { flex-wrap: nowrap; overflow: auto; }
   .voice-fields { grid-template-columns: 1fr; }
   .voice-fields .wide { grid-column: auto; }
