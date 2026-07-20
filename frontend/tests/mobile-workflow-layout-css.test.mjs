@@ -16,6 +16,7 @@ describe('mobile workflow layout', () => {
   })
 
   it('bounds cast audio settings and keeps language choices readable on mobile', () => {
+    expect(rule('.cast-toolbar > .cast-toolbar-actions')).toMatch(/align-self\s*:\s*stretch/)
     expect(rule('.cast-audio-settings')).toMatch(/right\s*:\s*0/)
     expect(rule('.cast-audio-settings')).toMatch(/left\s*:\s*0/)
     expect(rule('.cast-audio-settings')).toMatch(/width\s*:\s*auto/)
