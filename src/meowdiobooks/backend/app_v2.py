@@ -290,6 +290,14 @@ def _generate_voice_candidates(
     """Generate the baseline cast, then reroll only the configured high-volume voices."""
 
     selected_ids = set(policy.selected_ids(characters))
+    for character in characters:
+        character_id = str(character.get("id") or character.get("characterId") or "")
+        character["voiceCandidatePlan"] = {
+            "automaticAlternatives": (
+                policy.extra_candidates if character_id in selected_ids else 0
+            ),
+            "shared": bool(character.get("sharedVoiceGroupId")),
+        }
     passes = 1 + (policy.extra_candidates if selected_ids else 0)
 
     def pass_report(index: int) -> Callable[[float, str | None], None]:
@@ -824,6 +832,7 @@ def create_app_v2(
                 if group is not None:
                     character.update(
                         {
+                            "sharedVoiceGroupId": group.id,
                             "name": f"Supporting voice {group.id.rsplit('-', 1)[-1]}",
                             "previewLine": shared_audition_line(language),
                             "lineCount": sum(
