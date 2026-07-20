@@ -1,10 +1,16 @@
+import io
 import json
+import urllib.error
 from pathlib import Path
 
 import pytest
 
 from meowdiobooks.backend.model_config import load_model_registry
-from meowdiobooks.backend.remote_llm import remote_chat_completion, remote_usage_cost
+from meowdiobooks.backend.remote_llm import (
+    RemoteModelUnavailableError,
+    remote_chat_completion,
+    remote_usage_cost,
+)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -139,3 +145,35 @@ def test_usage_observer_sees_provider_usage_before_invalid_output_retry(monkeypa
         {"input_tokens": 10, "output_tokens": 2},
         {"input_tokens": 12, "output_tokens": 3},
     ]
+
+
+def test_remote_failure_keeps_provider_diagnostics_out_of_public_message(monkeypatch):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    assert config is not None
+    raw_detail = b'{"error":"private provider diagnostics"}'
+
+    def fail_request(request, timeout):
+        raise urllib.error.HTTPError(
+            request.full_url,
+            400,
+            "Bad request",
+            hdrs=None,
+            fp=io.BytesIO(raw_detail),
+        )
+
+    monkeypatch.setattr(
+        "meowdiobooks.backend.remote_llm.configured_api_key",
+        lambda *_args: "test-key",
+    )
+    monkeypatch.setattr("urllib.request.urlopen", fail_request)
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda *_args: None)
+
+    with pytest.raises(RemoteModelUnavailableError) as raised:
+        remote_chat_completion(REPO_ROOT, config, "system rules", "source passage")
+
+    assert "private provider diagnostics" in str(raised.value)
+    assert "private provider diagnostics" not in raised.value.public_message
+    assert raised.value.public_message == (
+        "The hosted speaker check was interrupted. Try again; "
+        "accepted work is unchanged."
+    )

@@ -70,10 +70,15 @@ def _accept(client: TestClient, book_id: str, stage: str, revision: str, decisio
 
 def test_delete_book_removes_working_assets_but_preserves_library_export(tmp_path):
     data_dir = tmp_path / "state"
+    deleting: list[str] = []
     export_path = tmp_path / "finished" / "Alice.m4b"
     export_path.parent.mkdir()
     export_path.write_bytes(b"finished-audiobook")
-    app = create_app_v2(data_dir=data_dir, library_dir=export_path.parent)
+    app = create_app_v2(
+        data_dir=data_dir,
+        library_dir=export_path.parent,
+        on_book_deleting=lambda book: deleting.append(book.id),
+    )
 
     with TestClient(app) as client:
         imported = client.post(
@@ -101,6 +106,7 @@ def test_delete_book_removes_working_assets_but_preserves_library_export(tmp_pat
         response = client.delete(f"/api/books/{book_id}")
 
         assert response.status_code == 204
+        assert deleting == [book_id]
         assert client.get("/api/books").json() == []
         assert not (data_dir / "packages" / book_id).exists()
         assert export_path.read_bytes() == b"finished-audiobook"
@@ -108,7 +114,11 @@ def test_delete_book_removes_working_assets_but_preserves_library_export(tmp_pat
 
 
 def test_delete_book_is_blocked_during_active_processing(tmp_path):
-    app = create_app_v2(data_dir=tmp_path / "state")
+    deleting: list[str] = []
+    app = create_app_v2(
+        data_dir=tmp_path / "state",
+        on_book_deleting=lambda book: deleting.append(book.id),
+    )
     with TestClient(app) as client:
         book_id = client.post(
             "/api/books/import", files={"file": ("alice.pdf", _pdf(), "application/pdf")}
@@ -118,7 +128,31 @@ def test_delete_book_is_blocked_during_active_processing(tmp_path):
         response = client.delete(f"/api/books/{book_id}")
 
         assert response.status_code == 409
+        assert deleting == []
         assert client.get(f"/api/books/{book_id}").status_code == 200
+
+
+def test_delete_book_aborts_before_local_state_when_durable_cleanup_fails(tmp_path):
+    data_dir = tmp_path / "state"
+
+    def fail_cleanup(_book):
+        raise RuntimeError("private storage diagnostic")
+
+    app = create_app_v2(data_dir=data_dir, on_book_deleting=fail_cleanup)
+    with TestClient(app) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("alice.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+
+        response = client.delete(f"/api/books/{book_id}")
+
+        assert response.status_code == 500
+        assert response.json() == {
+            "detail": "Could not remove this book's stored working files."
+        }
+        assert "private storage diagnostic" not in response.text
+        assert client.get(f"/api/books/{book_id}").status_code == 200
+        assert (data_dir / "packages" / book_id).is_dir()
 
 
 def test_cast_mapping_does_not_restore_a_model_alias_detached_during_review():

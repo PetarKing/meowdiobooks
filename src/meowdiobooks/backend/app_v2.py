@@ -364,15 +364,18 @@ def create_app_v2(
     voice_candidate_policy: Mapping[str, Any] | VoiceCandidatePolicy | None = None,
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
+    on_book_deleting: Callable[[Book], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
     chapter_audio_source: ChapterAudioSource | None = None,
 ) -> FastAPI:
     """Create the v2 API with explicit provider seams for local or hosted composition.
 
     The post-import hook observes an already-persisted book. Raising from the hook removes the new
-    book and source so the same bytes can be retried as a fresh import. Chapter audio is local and
-    durable by default; hosted compositions may provide a context-managed source that materializes
-    an exact revision only while an export consumes it.
+    book and source so the same bytes can be retried as a fresh import. The pre-delete hook runs
+    after active-work checks and before local state is removed; raising aborts deletion so hosted
+    compositions can retry durable cleanup. Chapter audio is local and durable by default; hosted
+    compositions may provide a context-managed source that materializes an exact revision only
+    while an export consumes it.
     """
 
     root = Path(data_dir)
@@ -1171,7 +1174,7 @@ def create_app_v2(
     @app.delete("/api/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
     def delete_book(book_id: str) -> Response:
         try:
-            require_book(book_id)
+            book = require_book(book_id)
         except (OSError, ValueError) as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
         active_jobs = [
@@ -1185,6 +1188,14 @@ def create_app_v2(
                 status_code=409,
                 detail="Wait for this book's processing to finish or cancel it before deleting.",
             )
+        if on_book_deleting is not None:
+            try:
+                on_book_deleting(book)
+            except Exception as error:
+                raise HTTPException(
+                    status_code=500,
+                    detail="Could not remove this book's stored working files.",
+                ) from error
         package = package_for(book_id)
         try:
             if package.exists():
@@ -1843,7 +1854,10 @@ def create_app_v2(
                 sample.flush()
                 draft = voice_sample_transcriber(repo_root, book_id, Path(sample.name))
         except RuntimeError as error:
-            raise HTTPException(status_code=503, detail=str(error)) from error
+            raise HTTPException(
+                status_code=503,
+                detail=getattr(error, "public_message", str(error)),
+            ) from error
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return {"text": draft.text, "language": draft.language}
@@ -1948,7 +1962,10 @@ def create_app_v2(
             reference_output.unlink(missing_ok=True)
             raise HTTPException(
                 status_code=422,
-                detail=f"Could not create a cloned audition: {error}",
+                detail=(
+                    "Could not create a cloned audition: "
+                    f"{getattr(error, 'public_message', str(error))}"
+                ),
             ) from error
         preview_url = f"/api/books/{book_id}/voices/{character_id}/{voice_revision}/audio"
         candidates = [
