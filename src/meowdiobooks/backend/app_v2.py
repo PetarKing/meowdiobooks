@@ -343,6 +343,16 @@ def _generate_voice_candidates(
     return generated
 
 
+def _voice_sharing_policy_for_model(
+    model_id: str,
+    default_policy: VoiceSharingPolicy,
+    resolver: Callable[[str], VoiceSharingPolicy | None] | None,
+) -> VoiceSharingPolicy | None:
+    """Resolve optional model-specific sharing without replacing an explicit ``None``."""
+
+    return resolver(model_id) if resolver is not None else default_policy
+
+
 def create_app_v2(
     data_dir: Path | str = Path(".meowdiobooks"),
     frontend_dist: Path | str | None = None,
@@ -361,6 +371,9 @@ def create_app_v2(
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
     voice_sharing_policy: VoiceSharingPolicy | None = None,
+    voice_sharing_policy_for_model: (
+        Callable[[str], VoiceSharingPolicy | None] | None
+    ) = None,
     voice_candidate_policy: Mapping[str, Any] | VoiceCandidatePolicy | None = None,
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
@@ -809,17 +822,25 @@ def create_app_v2(
                     for character_id, row in reused.items()
                 }
             )
-            sharing_plan = plan_shared_voices(
-                finalized["identities"],
-                desired_settings_by_id,
-                _dialogue_with_chapters(dialogue, review).get("spans", []),
-                finalized.get("labelToCharacterId", {}),
+            selected_sharing_policy = _voice_sharing_policy_for_model(
+                model_id,
                 voice_sharing_policy,
-                shareable_character_ids={
-                    str(row["characterId"]) for row in profile_targets
-                },
+                voice_sharing_policy_for_model,
             )
-            shared_group_by_id = sharing_plan.group_by_character_id
+            if selected_sharing_policy is None:
+                shared_group_by_id = {}
+            else:
+                sharing_plan = plan_shared_voices(
+                    finalized["identities"],
+                    desired_settings_by_id,
+                    _dialogue_with_chapters(dialogue, review).get("spans", []),
+                    finalized.get("labelToCharacterId", {}),
+                    selected_sharing_policy,
+                    shareable_character_ids={
+                        str(row["characterId"]) for row in profile_targets
+                    },
+                )
+                shared_group_by_id = sharing_plan.group_by_character_id
             characters = []
             profile_by_id = {
                 str(row["characterId"]): row for row in profile_targets

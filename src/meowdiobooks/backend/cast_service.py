@@ -162,11 +162,15 @@ Use unspecified for any non-age field that the evidence does not support.
 The prompt separates representative target speech from target-scoped surrounding story context.
 Use surrounding narration only when it clearly describes the cast member. Other characters' speech is
 not supplied, so never borrow another speaker's vocal qualities.
-Map explicit life-stage descriptions in the source language to the closest allowed age. If narration
-clearly calls the cast member a child, boy or girl (or the source-language equivalent) and does not
-explicitly call them an adolescent or adult, age MUST be child. Use young-adult only for explicit
-adolescent, teenage or young-adult evidence; the word young alone is not enough. Mental maturity never
-overrides the physical voice heard in the current story scenes.
+Infer the physical voice age holistically from the supplied scenes. Interpret life-stage wording in
+its narrative, social and translation context rather than mapping one isolated noun mechanically.
+Distinguish a physically childlike voice from a young or mature person described informally. One
+informal, relational, figurative or translation-sensitive descriptor is insufficient by itself to
+establish a child voice; require coherent physical pre-adult evidence across its context. Mental
+maturity alone never overrides physical evidence, and role or status alone never establishes age. If
+scenes span different life stages, cast the voice for the main or current narrative performance rather
+than a recalled earlier scene. Use unspecified only when the scenes provide no coherent physical
+life-stage evidence.
 If narration unambiguously uses masculine descriptions or pronouns for the cast member, presentation
 MUST be masculine; unambiguous feminine descriptions or pronouns MUST produce feminine unless explicit
 vocal evidence contradicts them. If narration explicitly describes the cast member's voice as high or
@@ -425,14 +429,30 @@ def _voice_target(
     labels = [value for value in labels if value]
     policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
     selected = _select_voice_examples(labels, dossiers_by_label, policy)
+    precise_context = _selected_voice_context(selected)
     return {
         "characterId": str(identity["characterId"]),
         "name": str(identity["name"]),
         "category": str(identity.get("category", "character")),
         "labels": labels,
         "evidence": [normalize_label(row.get("sourceText", "")) for row in selected],
-        "storyContext": _surrounding_story_context(selected, labels, story_spans),
+        "storyContext": precise_context
+        or _surrounding_story_context(selected, labels, story_spans),
     }
+
+
+def _selected_voice_context(examples: Sequence[Mapping[str, Any]]) -> list[str]:
+    """Keep each selected speech linked to its literal adjacent dossier context."""
+
+    context: list[str] = []
+    for index, example in enumerate(examples, 1):
+        before = normalize_label(example.get("contextBefore", ""))
+        after = normalize_label(example.get("contextAfter", ""))
+        if before:
+            context.append(f"[EXAMPLE {index} BEFORE TARGET SPEECH] {before}")
+        if after:
+            context.append(f"[EXAMPLE {index} AFTER TARGET SPEECH] {after}")
+    return context
 
 
 def _select_voice_examples(
@@ -440,7 +460,7 @@ def _select_voice_examples(
     dossiers_by_label: Mapping[str, Mapping[str, Any]],
     policy: VoiceEvidencePolicy,
 ) -> list[Mapping[str, Any]]:
-    """Allocate examples round-robin, prioritizing labels with more source occurrences."""
+    """Allocate first appearances per alias in source order, then later appearances."""
 
     groups: list[dict[str, Any]] = []
     for position, label in enumerate(labels):
@@ -449,15 +469,16 @@ def _select_voice_examples(
             continue
         examples = [row for row in dossier.get("examples", []) if isinstance(row, Mapping)]
         if examples:
+            examples.sort(key=lambda row: _example_source_order(row, len(examples)))
             groups.append(
                 {
                     "position": position,
-                    "occurrences": int(dossier.get("occurrenceCount", len(examples))),
                     "examples": examples,
                     "cursor": 0,
+                    "first_source_order": _example_source_order(examples[0], position),
                 }
             )
-    groups.sort(key=lambda row: (-row["occurrences"], row["position"]))
+    groups.sort(key=lambda row: (row["first_source_order"], row["position"]))
 
     selected: list[Mapping[str, Any]] = []
     seen_text: set[str] = set()
@@ -476,6 +497,13 @@ def _select_voice_examples(
             if len(selected) == policy.max_examples:
                 return selected
     return selected
+
+
+def _example_source_order(example: Mapping[str, Any], fallback: int) -> int:
+    try:
+        return int(example.get("sourceOrder", fallback))
+    except (TypeError, ValueError):
+        return fallback
 
 
 def _surrounding_story_context(
@@ -733,7 +761,10 @@ def _voice_profile_prompt(
         [
             "",
             evidence_heading,
-            *([f"- {value}" for value in evidence] or ["(none; use unspecified)"]),
+            *(
+                [f"- [EXAMPLE {index}] {value}" for index, value in enumerate(evidence, 1)]
+                or ["(none; use unspecified)"]
+            ),
         ]
     )
     if story_context:
