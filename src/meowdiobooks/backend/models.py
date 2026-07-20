@@ -94,6 +94,7 @@ class Job(BaseModel):
     error: str | None = None
     progress: float = Field(default=0, ge=0, le=100)
     message: str | None = None
+    cancel_requested_at: datetime | None = None
     attempt: int = Field(default=1, ge=1)
     retry_of: str | None = None
     started_at: datetime | None = None

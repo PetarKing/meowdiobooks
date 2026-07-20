@@ -419,8 +419,13 @@ describe('v2 wizard', () => {
   it('blocks navigation behind a full-screen chapter generation dialog', async () => {
     await open()
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued', message: 'Synthesizing segment 4/19' })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', kind: 'v2:generate', status: 'running', message: 'Synthesizing segment 4/19' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
+    vi.mocked(wizardApi.cancelJob).mockResolvedValue({
+      id: 'generate-job', kind: 'v2:generate', status: 'running',
+      message: 'Cancellation requested; stopping after the active task',
+      cancel_requested_at: '2026-07-20T10:00:00Z',
+    })
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
     fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
@@ -438,7 +443,9 @@ describe('v2 wizard', () => {
     expect(within(dialog).getByText(/Keep Meowdiobooks open/)).toBeInTheDocument()
     expect(screen.queryByText('Synthesizing segment 4/19')).not.toBeInTheDocument()
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
-    expect(within(dialog).getByRole('button', { name: 'Cancel queued job' })).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel audio generation' }))
+    await waitFor(() => expect(wizardApi.cancelJob).toHaveBeenCalledWith('generate-job'))
+    expect(within(dialog).getByRole('button', { name: 'Canceling…' })).toBeDisabled()
     finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
     expect(document.querySelector('.topbar')).not.toHaveAttribute('inert')
@@ -2017,6 +2024,42 @@ describe('v2 wizard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent(publicError)
     expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
+  })
+
+  it('can cancel running full-cast voice generation', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1' },
+      cast: {
+        revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
+        detectedLanguage: 'english',
+      },
+      enrichment: undefined,
+      recordingScript: undefined,
+      generatedChapters: [],
+    }
+    let finishJob!: (job: Job) => void
+    vi.mocked(wizardApi.processStage).mockResolvedValue({
+      id: 'cast-job', kind: 'v2:cast', status: 'running', message: 'Generating voices',
+    })
+    vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
+    vi.mocked(wizardApi.cancelJob).mockResolvedValue({
+      id: 'cast-job', kind: 'v2:cast', status: 'running',
+      message: 'Cancellation requested; stopping after the active task',
+      cancel_requested_at: '2026-07-20T10:00:00Z',
+    })
+
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate required auditions →' }))
+
+    const dialog = await screen.findByRole('dialog', { name: 'Local processing' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel voice generation' }))
+    await waitFor(() => expect(wizardApi.cancelJob).toHaveBeenCalledWith('cast-job'))
+    expect(within(dialog).getByRole('button', { name: 'Canceling…' })).toBeDisabled()
+    finishJob({ id: 'cast-job', kind: 'v2:cast', status: 'canceled' })
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument())
   })
 
   it('reopens an accepted cast as recovery work without flashing the processing overlay', async () => {

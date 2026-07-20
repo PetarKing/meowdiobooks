@@ -449,6 +449,7 @@ export interface Job {
   error?: string | null;
   progress?: number;
   message?: string | null;
+  cancel_requested_at?: string | null;
   result?: Record<string, unknown> | null;
   started_at?: string | null;
   finished_at?: string | null;

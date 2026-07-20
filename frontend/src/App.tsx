@@ -229,6 +229,7 @@ export default function App({
   const [processingOverlaySuppressed, setProcessingOverlaySuppressed] = useState(false);
   const [error, setError] = useState<string>();
   const [activeJob, setActiveJob] = useState<Job>();
+  const [cancelRequestPending, setCancelRequestPending] = useState(false);
   const [extractionTransition, setExtractionTransition] = useState(false);
   const [reviewTransition, setReviewTransition] = useState(false);
   const [enrichmentTransition, setEnrichmentTransition] = useState(false);
@@ -557,6 +558,21 @@ export default function App({
     return current;
   }
 
+  async function cancelActiveStageJob() {
+    if (!activeJob || cancelRequestPending || activeJob.cancel_requested_at) return;
+    setCancelRequestPending(true);
+    setError(undefined);
+    try {
+      const current = await wizardApi.cancelJob(activeJob.id);
+      setActiveJob(current);
+      setProcessMessage(current.message ?? "Cancellation requested; stopping safely");
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setCancelRequestPending(false);
+    }
+  }
+
   async function processCandidate<S extends ProcessableStage>(stageId: S, settings: StageSettings[S], showProcessingOverlay = true): Promise<StageCandidate[S]> {
     if (!book) throw new Error("No book selected");
     setBusy(true);
@@ -843,6 +859,19 @@ export default function App({
     progress,
     generationEstimatePolicy,
   );
+  const runningStageCanBeCanceled = activeJob?.kind === "v2:cast" || activeJob?.kind === "v2:generate";
+  const showCancelActiveJob = Boolean(
+    activeJob
+    && ["queued", "running"].includes(activeJob.status)
+    && (activeJob.status === "queued" || runningStageCanBeCanceled),
+  );
+  const cancelActiveJobLabel = cancelRequestPending || activeJob?.cancel_requested_at
+    ? t("Canceling…")
+    : activeJob?.kind === "v2:cast"
+      ? t("Cancel voice generation")
+      : activeJob?.kind === "v2:generate"
+        ? t("Cancel audio generation")
+        : t("Cancel queued job");
 
   function toggleSidebar() {
     setSidebarCollapsed((current) => {
@@ -889,7 +918,7 @@ export default function App({
       </main>
     </div>
     {dialogueRouteChoiceOpen && dialogue.routing && <DialogueRoutingChoice routing={dialogue.routing} onChoose={runDialogueTranscript} onClose={() => setDialogueRouteChoiceOpen(false)} />}
-    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition || enrichmentTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} aria-modal="true"><div className={`process-modal ${enrichmentTransition ? "enrichment-transition-modal" : ""} ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition || enrichmentTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : enrichmentTransition ? t("Keeping your approved work intact and opening Generate…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{activeJob?.status === "queued" && !enrichmentTransition && !dialogueProcessing && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}</div></div>}
+    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition || enrichmentTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} aria-modal="true"><div className={`process-modal ${enrichmentTransition ? "enrichment-transition-modal" : ""} ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition || enrichmentTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : enrichmentTransition ? t("Keeping your approved work intact and opening Generate…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{showCancelActiveJob && !enrichmentTransition && !dialogueProcessing && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}</div></div>}
     {uploadingCharacterId && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-clone-progress-title"><div className="process-modal"><span className="eyebrow">{t("processing.contextLabel", { ns: "edition" })}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("voiceClone.progressDescription", { ns: "edition" })}</p></div></div>}
     {generationInProgress && <div className="process-overlay generation-overlay" role="dialog" aria-modal="true" aria-labelledby="generation-progress-title">
       <div ref={generationModalRef} className="process-modal generation-modal" tabIndex={-1}>
@@ -901,7 +930,7 @@ export default function App({
           <div><dt>{t("Remaining")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
         </dl>
         <p className="generation-modal-note">{t("processing.keepOpenNotice", { ns: "edition" })}</p>
-        {activeJob?.status === "queued" && <button className="ghost" onClick={() => void wizardApi.cancelJob(activeJob.id)}>{t("Cancel queued job")}</button>}
+        {showCancelActiveJob && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}
       </div>
     </div>}
     {bookPendingDeletion && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="delete-book-title"><div className="process-modal delete-book-modal"><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished audiobook exports in Library stay exactly where they are.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></div></div>}

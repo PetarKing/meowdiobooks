@@ -210,8 +210,10 @@ previous playable chapter revision untouched.
 ## Jobs and transactional publication
 
 `jobs.json` records queued, running, canceled, succeeded and failed jobs with attempts, retry lineage,
-progress and errors. Heavy local model work is serialized. Cancellation and failure do not publish
-partial phase artifacts.
+progress, cancellation requests and errors. Heavy local model work is serialized. Queued jobs cancel
+immediately. Running work stops cooperatively at its next progress or handler boundary, and a pending
+cancellation wins over a concurrent successful return. Cancellation and failure do not publish partial
+phase artifacts.
 
 Dialogue output must contain exactly one valid result for every focused unresolved/unlabelled target
 ID and no result for context-only IDs. Enrichment output must contain exactly one valid result for each
