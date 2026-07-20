@@ -18,6 +18,7 @@ from meowdiobooks.backend.app_v2 import (
     _rebase_accepted_cast,
     _matching_failed_job,
     _recoverable_stages,
+    _voice_sharing_policy_for_model,
     create_app_v2,
 )
 from meowdiobooks.backend.artifacts import active_artifacts, read_artifact, write_artifact
@@ -30,6 +31,20 @@ from meowdiobooks.backend.tts_v2 import (
 from meowdiobooks.backend.transcription import TranscriptionDraft
 from meowdiobooks.backend.voice_sharing import VoiceSharingPolicy
 from meowdiobooks.backend.models import Job, JobStatus
+
+
+def test_model_specific_voice_sharing_can_disable_reuse_without_changing_default():
+    default = VoiceSharingPolicy(dedicated_dialogue_coverage=0.8)
+
+    assert _voice_sharing_policy_for_model("studio", default, None) is default
+    assert (
+        _voice_sharing_policy_for_model(
+            "balanced",
+            default,
+            lambda model_id: None if model_id == "balanced" else default,
+        )
+        is None
+    )
 
 
 def _pdf() -> bytes:

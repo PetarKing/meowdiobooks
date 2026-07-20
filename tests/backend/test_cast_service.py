@@ -116,6 +116,46 @@ def test_voice_profile_prompt_is_one_small_bounded_task():
     assert "sameIdentityAs" not in VOICE_PROFILE_SYSTEM
 
 
+def test_voice_target_prefers_exact_dossier_context_over_unrelated_story_units():
+    target = _voice_target(
+        {
+            "characterId": "hiain",
+            "name": "Hiain",
+            "category": "character",
+            "literalLabels": ["Hiain"],
+        },
+        {
+            "hiain": {
+                "label": "Hiain",
+                "occurrenceCount": 1,
+                "examples": [
+                    {
+                        "sourceText": "Hiain: We move now!",
+                        "blockId": "page-block",
+                        "contextBefore": "Hiain tightened his grip.",
+                        "contextAfter": "He ran toward the gate.",
+                    }
+                ],
+            }
+        },
+        [
+            {
+                "id": "other",
+                "blockId": "page-block",
+                "renderRole": "narration",
+                "text": "A different woman crossed the square.",
+            }
+        ],
+    )
+
+    prompt = _voice_profile_prompt(target)
+
+    assert "[EXAMPLE 1] Hiain: We move now!" in prompt
+    assert "[EXAMPLE 1 BEFORE TARGET SPEECH] Hiain tightened his grip." in prompt
+    assert "[EXAMPLE 1 AFTER TARGET SPEECH] He ran toward the gate." in prompt
+    assert "different woman" not in prompt
+
+
 def test_voice_target_uses_one_first_representative_example_per_alias():
     target = _voice_target(
         {
@@ -142,7 +182,7 @@ def test_voice_target_uses_one_first_representative_example_per_alias():
     ]
 
 
-def test_expanded_voice_evidence_is_round_robin_and_frequency_prioritized():
+def test_expanded_voice_evidence_is_round_robin_in_alias_source_order():
     target = _voice_target(
         {
             "characterId": "emilia",
@@ -154,22 +194,22 @@ def test_expanded_voice_evidence_is_round_robin_and_frequency_prioritized():
             "rare emilia": {
                 "occurrenceCount": 1,
                 "examples": [
-                    {"sourceText": "Rare Emilia: One."},
-                    {"sourceText": "Rare Emilia: Two."},
+                    {"sourceText": "Rare Emilia: One.", "sourceOrder": 30},
+                    {"sourceText": "Rare Emilia: Two.", "sourceOrder": 60},
                 ],
             },
             "emilia": {
                 "occurrenceCount": 20,
                 "examples": [
-                    {"sourceText": "Emilia: One."},
-                    {"sourceText": "Emilia: Two."},
+                    {"sourceText": "Emilia: One.", "sourceOrder": 10},
+                    {"sourceText": "Emilia: Two.", "sourceOrder": 40},
                 ],
             },
             "lady emilia": {
                 "occurrenceCount": 8,
                 "examples": [
-                    {"sourceText": "Lady Emilia: One."},
-                    {"sourceText": "Lady Emilia: Two."},
+                    {"sourceText": "Lady Emilia: One.", "sourceOrder": 20},
+                    {"sourceText": "Lady Emilia: Two.", "sourceOrder": 50},
                 ],
             },
         },
@@ -189,7 +229,7 @@ def test_expanded_voice_evidence_is_round_robin_and_frequency_prioritized():
     ]
 
 
-def test_expanded_voice_evidence_total_cap_prefers_frequent_labels():
+def test_expanded_voice_evidence_total_cap_prefers_earliest_alias_appearances():
     target = _voice_target(
         {
             "characterId": "emilia",
@@ -197,14 +237,17 @@ def test_expanded_voice_evidence_total_cap_prefers_frequent_labels():
             "literalLabels": ["Rare", "Frequent", "Middle"],
         },
         {
-            "rare": {"occurrenceCount": 1, "examples": [{"sourceText": "Rare line."}]},
+            "rare": {
+                "occurrenceCount": 1,
+                "examples": [{"sourceText": "Rare line.", "sourceOrder": 30}],
+            },
             "frequent": {
                 "occurrenceCount": 30,
-                "examples": [{"sourceText": "Frequent line."}],
+                "examples": [{"sourceText": "Frequent line.", "sourceOrder": 10}],
             },
             "middle": {
                 "occurrenceCount": 10,
-                "examples": [{"sourceText": "Middle line."}],
+                "examples": [{"sourceText": "Middle line.", "sourceOrder": 20}],
             },
         },
         [],
