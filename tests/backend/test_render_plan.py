@@ -26,7 +26,14 @@ def _span(span_id, text, start, *, role="narration", label=None, labels=None):
     return row
 
 
-def _voice(character_id, name, *, category="character", accepted=True):
+def _voice(
+    character_id,
+    name,
+    *,
+    category="character",
+    accepted=True,
+    voice_settings=None,
+):
     return {
         "characterId": character_id,
         "name": name,
@@ -35,6 +42,13 @@ def _voice(character_id, name, *, category="character", accepted=True):
         "acceptedVoiceRevision": f"voice-{character_id}",
         "referenceAudio": f"voices/{character_id}.wav",
         "referenceText": f"Reference line for {name}.",
+        "voiceSettings": voice_settings
+        or {
+            "tone": "natural",
+            "pace": "natural",
+            "energy": "balanced",
+            "description": f"Deliver {name}'s lines naturally.",
+        },
     }
 
 
@@ -77,6 +91,7 @@ def test_compiles_directly_from_spans_with_identity_mapping_tts_metadata_and_fal
     assert alice["voiceRevision"] == "voice-alice"
     assert alice["referenceAudio"] == "voices/alice.wav"
     assert alice["referenceText"] == "Reference line for Alice."
+    assert alice["voiceSettings"]["description"] == "Deliver Alice's lines naturally."
     unresolved = next(row for row in segments if row["sourceSpanIds"] == ["s4"])
     assert unresolved["effectiveCharacterId"] == "narrator"
     assert unresolved["fallback"] == "unmapped-label:???"
@@ -86,6 +101,44 @@ def test_compiles_directly_from_spans_with_identity_mapping_tts_metadata_and_fal
     assert joint[0]["mixGroupId"] is not None
     assert plan["sourceCoverage"] == {"status": "exact", "sourceSpanCount": 6}
     assert plan["inputRevisions"]["script"] == "script-1"
+
+
+def test_shared_voice_revision_keeps_each_characters_accepted_settings():
+    dialogue, cast, script = _artifacts()
+    alice = next(row for row in cast["identities"] if row["characterId"] == "alice")
+    rabbit = next(row for row in cast["identities"] if row["characterId"] == "rabbit")
+    alice.update(
+        acceptedVoiceRevision="shared-voice-1",
+        referenceAudio="voices/alice/shared-voice-1.wav",
+        voiceSettings={
+            "tone": "bright",
+            "pace": "natural",
+            "energy": "balanced",
+            "description": "Sound lightly dispirited, with sharp bursts during combat.",
+        },
+    )
+    rabbit.update(
+        acceptedVoiceRevision="shared-voice-1",
+        referenceAudio="voices/alice/shared-voice-1.wav",
+        voiceSettings={
+            "tone": "gravelly",
+            "pace": "brisk",
+            "energy": "animated",
+            "description": "Deliver a forceful roar with explosive conviction.",
+        },
+    )
+
+    plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
+
+    shared = {
+        row["effectiveCharacterId"]: row
+        for row in plan["chapters"][0]["segments"]
+        if row["sourceSpanIds"] == ["s5"]
+    }
+    assert shared["alice"]["voiceRevision"] == shared["rabbit"]["voiceRevision"]
+    assert shared["alice"]["referenceAudio"] == shared["rabbit"]["referenceAudio"]
+    assert shared["alice"]["voiceSettings"]["tone"] == "bright"
+    assert shared["rabbit"]["voiceSettings"] == rabbit["voiceSettings"]
 
 
 def test_compiles_transcript_free_uploaded_voice_reference():
@@ -99,9 +152,7 @@ def test_compiles_transcript_free_uploaded_voice_reference():
 
     plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
 
-    segment = next(
-        row for row in plan["chapters"][0]["segments"] if row["sourceSpanIds"] == ["s3"]
-    )
+    segment = next(row for row in plan["chapters"][0]["segments"] if row["sourceSpanIds"] == ["s3"])
     assert segment["referenceAudio"] == "voices/alice/upload.wav"
     assert segment["referenceText"] == ""
     assert segment["referenceMode"] == "speaker-embedding"
@@ -171,11 +222,7 @@ def test_explicit_narrator_route_is_not_reported_as_an_unmapped_fallback():
     cast["labelToCharacterId"]["Alice"] = None
 
     plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
-    routed = next(
-        row
-        for row in plan["chapters"][0]["segments"]
-        if row["sourceSpanIds"] == ["s3"]
-    )
+    routed = next(row for row in plan["chapters"][0]["segments"] if row["sourceSpanIds"] == ["s3"])
 
     assert routed["effectiveCharacterId"] == "narrator"
     assert routed["effectiveSpeaker"] == "Narrator"
