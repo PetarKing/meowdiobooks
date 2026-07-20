@@ -3,16 +3,24 @@ import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const workflowStyles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+const supplementalStyles = readFileSync(resolve(process.cwd(), 'src/media.css'), 'utf8')
 const mobileStyles = workflowStyles.match(/@media\(max-width:\s*650px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const supplementalMobileStyles = supplementalStyles.match(/@media\s*\(max-width:\s*650px\)\s*\{([\s\S]*?)\n\}/)?.[1]
 
-function rule(selector) {
+function rule(selector, styles = mobileStyles) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  return mobileStyles?.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1]
+  return styles?.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1]
 }
 
 describe('mobile workflow layout', () => {
-  it('keeps form controls large enough to avoid iOS focus zoom', () => {
-    expect(rule('input,select,textarea')).toMatch(/font-size\s*:\s*16px\s*!important/)
+  it('keeps form controls readable without triggering iOS focus zoom', () => {
+    const formControls = rule('input,select,textarea')
+    const normalizedFormControls = rule('input,select,textarea', supplementalMobileStyles)
+
+    expect(formControls).toMatch(/font-size\s*:\s*16px\s*!important/)
+    expect(normalizedFormControls).toMatch(/font-weight\s*:\s*500\s*!important/)
+    expect(normalizedFormControls).toMatch(/letter-spacing\s*:\s*0/)
+    expect(normalizedFormControls).toMatch(/text-transform\s*:\s*none/)
   })
 
   it('bounds cast audio settings and keeps language choices readable on mobile', () => {

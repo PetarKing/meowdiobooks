@@ -58,6 +58,7 @@ main { max-width:1360px; }
 .voice-fields .wide { grid-column: 1 / -1; }
 .error-note { background:#fff0f0; color:#8e313d; border:1px solid #e9b8bd; border-left:4px solid #c94345; border-radius:12px; padding:13px 15px; margin-bottom:18px; box-shadow:var(--shadow-sm); }
 @media (max-width: 650px) {
+  input,select,textarea { font-weight:500 !important; letter-spacing:0; text-transform:none; }
   .sample-reasons { flex-wrap: nowrap; overflow: auto; }
   .voice-fields { grid-template-columns: 1fr; }
   .voice-fields .wide { grid-column: auto; }
