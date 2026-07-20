@@ -59,6 +59,10 @@ def test_disabled_policy_generates_only_one_candidate_per_voice(tmp_path: Path):
 
     assert calls == [["narrator", "alice"]]
     assert [len(row["voiceCandidates"]) for row in generated] == [1, 1]
+    assert [row["voiceCandidatePlan"] for row in generated] == [
+        {"automaticAlternatives": 0, "shared": False},
+        {"automaticAlternatives": 0, "shared": False},
+    ]
 
 
 def test_candidate_generation_rerolls_only_selected_high_volume_voices(tmp_path: Path):
@@ -66,6 +70,14 @@ def test_candidate_generation_rerolls_only_selected_high_volume_voices(tmp_path:
 
     def auditioner(_root, _package, _book, rows, report, _language, _model):
         calls.append([str(row["id"]) for row in rows])
+        expected = {
+            "narrator": {"automaticAlternatives": 1, "shared": False},
+            "alice": {"automaticAlternatives": 1, "shared": False},
+            "guard": {"automaticAlternatives": 0, "shared": False},
+        }
+        assert [row["voiceCandidatePlan"] for row in rows] == [
+            expected[str(row["id"])] for row in rows
+        ]
         report(100, "done")
         for row in rows:
             candidates = list(row.get("voiceCandidates", []))
@@ -91,3 +103,38 @@ def test_candidate_generation_rerolls_only_selected_high_volume_voices(tmp_path:
 
     assert calls == [["narrator", "alice", "guard"], ["narrator", "alice"]]
     assert [len(row["voiceCandidates"]) for row in generated] == [2, 2, 1]
+    assert [row["voiceCandidatePlan"] for row in generated] == [
+        {"automaticAlternatives": 1, "shared": False},
+        {"automaticAlternatives": 1, "shared": False},
+        {"automaticAlternatives": 0, "shared": False},
+    ]
+
+
+def test_candidate_plan_marks_shared_voice_without_selecting_provider_behavior(
+    tmp_path: Path,
+):
+    observed: list[dict] = []
+
+    def auditioner(_root, _package, _book, rows, _report, _language, _model):
+        observed.extend(row["voiceCandidatePlan"] for row in rows)
+        return rows
+
+    _generate_voice_candidates(
+        voice_auditioner=auditioner,
+        repo_root=tmp_path,
+        package=tmp_path,
+        book_id="book",
+        characters=[
+            {
+                "id": "shared-anchor",
+                "lineCount": 1,
+                "sharedVoiceGroupId": "shared-voice-1",
+            }
+        ],
+        report=lambda *_: None,
+        language="english",
+        model_id="voice",
+        policy=VoiceCandidatePolicy(enabled=False),
+    )
+
+    assert observed == [{"automaticAlternatives": 0, "shared": True}]

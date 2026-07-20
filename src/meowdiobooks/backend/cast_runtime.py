@@ -183,6 +183,7 @@ def _audition_identity(
                 or (str(Path("voices") / character_id / f"{revision}.wav") if revision else None)
             ),
             "voiceCandidates": generated.get("voiceCandidates", []),
+            "voiceCandidatePlan": generated.get("voiceCandidatePlan"),
             "voicePreviewError": generated.get("voicePreviewError"),
             "voiceAccepted": False,
         }
