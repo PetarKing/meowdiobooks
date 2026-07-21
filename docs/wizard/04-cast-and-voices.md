@@ -142,8 +142,17 @@ ties when the total cap cannot represent every alias. Each selected line expands
 current and next structural source unit. This is structural context gathering, not a name, keyword,
 pronoun or language-specific text search. The model sees surrounding
 narration plus the target's own speech; other characters' dialogue is omitted so their vocal qualities
-cannot leak into the suggestion. Narrator is one additional focused call using at most three narration
-snippets.
+cannot leak into the suggestion.
+
+Narrator is a separate focused call. It takes up to eight narration snippets, selected at evenly spaced
+positions through the accepted book in source order. There is no semantic ranking or special-case scene
+logic. Its shorter dedicated instruction asks for one confident, book-specific interpretation based on
+the work's overall personality, rhythm, intimacy, humor, scale, setting and period. Accents, dialects and
+other distinctive choices are welcome when they make the book feel more alive; safe neutrality is not
+the default. Close and first-person point of view may color the choice, but the model keeps the voice
+in sustainable storytelling mode rather than automatically copying the protagonist's age, mannerisms
+or dialogue performance. The result must still be intelligible across the complete book, and it remains
+an editable suggestion that the user auditions and may replace.
 
 The source units and target lines are assembled before the existing single Qwen call. The prompt is one
 finalized identity:
@@ -260,8 +269,8 @@ controls remain generative guidance, so listening and explicit candidate selecti
 
 1. Build fuzzy candidates and classify each label with one focused Qwen call.
 2. Require the user to resolve every flagged identity.
-3. Use one focused Qwen call per finalized cast member plus Narrator to propose editable voice
-   settings.
+3. Use one focused text-model call per finalized cast member plus a dedicated book-wide Narrator call
+   to propose editable voice settings.
 4. Compile those settings and generate auditions only after flagged identity decisions are resolved.
 5. In Tune and generate, either use Qwen VoiceDesign with editable traits/direction or select a sample.
    Qwen3-ASR drafts its transcript with automatic language detection; the user replays the compact

@@ -10,6 +10,7 @@ from meowdiobooks.backend.cast import (
 from meowdiobooks.backend.cast_service import (
     DISCOVERY_SYSTEM,
     MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
+    NARRATOR_PROFILE_SYSTEM,
     PAIR_SYSTEM,
     SYSTEM,
     VoiceEvidencePolicy,
@@ -264,6 +265,7 @@ def test_expanded_voice_evidence_total_cap_prefers_earliest_alias_appearances():
         {"max_examples": 2, "max_examples_per_label": 3},
         {"max_line_characters": 10},
         {"max_prompt_characters": 10},
+        {"max_narrator_examples": 0},
     ],
 )
 def test_voice_evidence_policy_rejects_unsafe_limits(policy):
@@ -528,6 +530,20 @@ def test_voice_direction_makes_accent_a_direct_audible_instruction():
     direction = compile_voice_direction(settings, language="english")
 
     assert "Japanese accent in English" in direction
+
+
+def test_voice_direction_normalizes_model_sentence_punctuation_before_compilation():
+    settings = {
+        **default_voice_settings(),
+        "accent": "Subtle Japanese-influenced English.",
+        "description": "冷峻克制，偶爾露出辛辣諷刺。",
+    }
+
+    direction = compile_voice_direction(settings, language="chinese")
+
+    assert "English. accent" not in direction
+    assert "English accent in Chinese" in direction
+    assert direction.endswith("冷峻克制，偶爾露出辛辣諷刺.")
 
 
 def test_voice_direction_preserves_subaru_traits_and_notes_within_provider_limit():
@@ -1028,6 +1044,55 @@ def test_provider_neutral_voice_completion_preserves_shared_validation():
     )
 
     assert profiles["narrator"]["tone"] == "gentle"
+
+
+def test_narrator_uses_simple_book_wide_sampling_and_a_dedicated_schema():
+    calls = []
+
+    def complete(system, prompt, _max_tokens, *, response_schema):
+        calls.append((system, prompt, response_schema))
+        return {
+            "presentation": "unspecified",
+            "age": "adult",
+            "tone": "warm",
+            "pitch": "medium",
+            "pace": "measured",
+            "energy": "balanced",
+            "accent": "lightly theatrical English",
+            "description": "Wry, intimate, and alive to sudden wonder.",
+        }
+
+    story_spans = [
+        {"id": f"n{index}", "renderRole": "narration", "text": f"Moment {index}."}
+        for index in range(10)
+    ]
+    story_spans.insert(
+        5,
+        {"id": "d1", "renderRole": "dialogue", "text": "This line is not narration."},
+    )
+
+    profiles = suggest_voice_settings_with_completion(
+        [],
+        [],
+        story_spans,
+        complete,
+        evidence_policy=VoiceEvidencePolicy(max_narrator_examples=4),
+    )
+
+    assert profiles["narrator"]["accent"] == "lightly theatrical English"
+    assert len(calls) == 1
+    system, prompt, schema = calls[0]
+    assert system == NARRATOR_PROFILE_SYSTEM
+    assert "safe neutrality" in system
+    assert "storytelling mode, not dialogue-character mode" in system
+    assert [line for line in prompt.splitlines() if line.startswith("- [EXAMPLE")] == [
+        "- [EXAMPLE 1] Moment 0.",
+        "- [EXAMPLE 2] Moment 3.",
+        "- [EXAMPLE 3] Moment 6.",
+        "- [EXAMPLE 4] Moment 9.",
+    ]
+    assert schema["required"] == list(schema["properties"])
+    assert schema["additionalProperties"] is False
 
 
 def test_provider_voice_constraint_retries_the_generated_profile_without_truncating():

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import re
+import json
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -20,18 +20,18 @@ from .dialogue_ai import (
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
 from .remote_llm import RemoteUsageObserver, remote_chat_completion, remote_usage_cost
+from .structured_output import strict_object_schema
 
 MULTI_SYSTEM = """Attribute every marked target in the ordered source excerpt.
 
-Return exactly one row per target, in target-ID order:
-- T001|D|Actual Name when it is spoken dialogue and the proper character name is supported
-- T001|D|? when it is spoken dialogue but the proper name is not reliably inferable
-- T001|N when it is quoted text that is not spoken aloud
+Return one structured row per target, in target-ID order. Use classification D for spoken dialogue
+and N for quoted text that is not spoken aloud. For dialogue, speaker is the supported proper name or
+?. For narration, speaker is an empty string.
 
 Use the speaker's actual proper character name. Pronouns, generic descriptions, and unsupported
 roles are not character names. Follow the conversation in source order. A direct attribution after
 a target wins. Do not copy the name of someone being addressed or discussed. Do not use outside
-book knowledge. Return only pipe-delimited rows."""
+book knowledge."""
 
 LEDGER_SYSTEM = """You are a forensic dialogue-continuity analyst.
 
@@ -39,14 +39,12 @@ Reconstruct the ordered passage as a turn ledger before deciding any indexed tar
 proper character name only from evidence inside this passage: direct attribution, continued quoted
 turns, explicit response structure, and unambiguous local identity chains.
 
-Return exactly one row per target, in target-ID order:
-- T001|D|Actual Name when that exact proper identity is supported
-- T001|D|? when it is dialogue but the proper name is not reliably inferable
-- T001|N when the quote is not spoken aloud
+Return one structured row per target, in target-ID order. Use classification D for spoken dialogue
+and N for quoted text that is not spoken aloud. For dialogue, speaker is the supported proper name or
+?. For narration, speaker is an empty string.
 
 Names of addressees or discussed people are distractors. Pronouns, descriptions, and unsupported
-roles are not proper names. Do not assume speakers merely alternate. Return only pipe-delimited
-rows."""
+roles are not proper names. Do not assume speakers merely alternate."""
 
 RemoteReporter = Callable[[float, str | None], None]
 
@@ -141,32 +139,62 @@ def ledger_prompt(window: Mapping[str, Any]) -> tuple[str, dict[str, str]]:
 
 
 def parse_remote_rows(raw: str, expected_ids: Sequence[str]) -> dict[str, str]:
-    text = raw.strip()
-    if text.startswith("```"):
-        text = text.split("\n", 1)[1] if "\n" in text else ""
-        text = text.rsplit("```", 1)[0].strip()
+    try:
+        payload = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as error:
+        raise DialogueContractError("Remote Dialogue completion must return JSON") from error
+    if not isinstance(payload, Mapping) or set(payload) != {"rows"}:
+        raise DialogueContractError("Remote Dialogue completion must contain only rows")
+    rows = payload["rows"]
+    if not isinstance(rows, list):
+        raise DialogueContractError("Remote Dialogue rows must be a list")
     parsed: dict[str, str] = {}
-    pattern = re.compile(r"^(T\d{3})\|([DN])(?:\|(.+))?$")
-    for line in (line.strip() for line in text.splitlines() if line.strip()):
-        match = pattern.fullmatch(line)
-        if not match:
-            raise DialogueContractError(f"Invalid remote Dialogue row: {line!r}")
-        target_id, classification, speaker = match.groups()
+    for row in rows:
+        if not isinstance(row, Mapping) or set(row) != {
+            "targetId",
+            "classification",
+            "speaker",
+        }:
+            raise DialogueContractError(f"Invalid remote Dialogue row: {row!r}")
+        target_id = str(row["targetId"])
+        classification = str(row["classification"])
+        speaker = str(row["speaker"])
         if target_id in parsed:
             raise DialogueContractError(f"Duplicate remote Dialogue target: {target_id}")
         if classification == "N":
-            if speaker is not None:
+            if speaker:
                 raise DialogueContractError("Narration rows cannot include a speaker")
             parsed[target_id] = "/"
-        elif speaker is None:
+        elif classification == "D" and speaker.strip():
+            parsed[target_id] = parse_attribution_answer(speaker.strip())
+        elif classification == "D":
             raise DialogueContractError("Dialogue rows require a speaker or ?")
         else:
-            parsed[target_id] = parse_attribution_answer(speaker.strip())
+            raise DialogueContractError(f"Invalid remote Dialogue classification: {classification}")
     if list(parsed) != list(expected_ids):
         raise DialogueContractError(
             f"Expected remote targets {list(expected_ids)!r}, got {list(parsed)!r}"
         )
     return parsed
+
+
+def _remote_dialogue_schema(expected_ids: Sequence[str]) -> dict[str, Any]:
+    return strict_object_schema(
+        "remote_dialogue_attribution",
+        {
+            "rows": {
+                "type": "array",
+                "items": strict_object_schema(
+                    "remote_dialogue_row",
+                    {
+                        "targetId": {"type": "string", "enum": list(expected_ids)},
+                        "classification": {"type": "string", "enum": ["D", "N"]},
+                        "speaker": {"type": "string"},
+                    },
+                ),
+            }
+        },
+    )
 
 
 def _pass(
@@ -181,7 +209,12 @@ def _pass(
     failures = []
     for _attempt in range(2):
         response = remote_chat_completion(
-            repo_root, config, system, retry, usage_observer=usage_observer
+            repo_root,
+            config,
+            system,
+            retry,
+            usage_observer=usage_observer,
+            response_schema=_remote_dialogue_schema(expected_ids),
         )
         try:
             return parse_remote_rows(response["text"], expected_ids), response
@@ -191,7 +224,7 @@ def _pass(
                 prompt
                 + "\n\nFORMAT CORRECTION: Return exactly "
                 + str(len(expected_ids))
-                + " rows for "
+                + " structured rows for "
                 + ", ".join(expected_ids)
                 + ", in that order."
             )

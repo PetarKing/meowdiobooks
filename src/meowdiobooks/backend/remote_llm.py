@@ -56,6 +56,7 @@ def remote_chat_completion(
     *,
     max_completion_tokens: int = 4096,
     usage_observer: RemoteUsageObserver | None = None,
+    response_schema: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one bounded remote request without persisting the credential or source passage."""
 
@@ -74,6 +75,15 @@ def remote_chat_completion(
         }
         if config.reasoning_effort:
             payload["reasoning"] = {"effort": config.reasoning_effort}
+        if response_schema is not None:
+            payload["text"] = {
+                "format": {
+                    "type": "json_schema",
+                    "name": _schema_name(response_schema),
+                    "strict": True,
+                    "schema": dict(response_schema),
+                }
+            }
         endpoint = f"{config.base_url}/responses"
     else:
         payload = {
@@ -183,6 +193,14 @@ def remote_chat_completion(
             "accepted work is unchanged."
         ),
     )
+
+
+def _schema_name(schema: Mapping[str, Any]) -> str:
+    """Return a stable Responses API name without leaking schema details."""
+
+    title = str(schema.get("title") or "structured_response")
+    normalized = "".join(character if character.isalnum() else "_" for character in title)
+    return normalized.strip("_")[:64] or "structured_response"
 
 
 def _observe_remote_call(

@@ -73,6 +73,8 @@ from .chapters import ChapterContractError, compile_reviewed_chapters, detect_ch
 from .decorators import (
     EnrichmentOptions,
     EnrichmentValidationError,
+    RANGE_DECORATOR_KINDS,
+    STATE_VALUES,
     plan_enrichment,
     skipped_enrichment,
     validate_enrichment_output,
@@ -110,6 +112,7 @@ from .models import (
 from .model_config import dialogue_routing_preview, load_model_registry
 from .voice_candidates import VoiceCandidatePolicy
 from .remote_llm import RemoteUsageObserver
+from .structured_output import JsonCompletion, complete_with_schema, strict_object_schema
 from .m4b import (
     FFmpegUnavailableError,
     M4BChapter,
@@ -204,7 +207,7 @@ def _run_enrichment_qwen(
 def run_enrichment_with_completion(
     turns: list[dict[str, Any]],
     plan: dict[str, Any],
-    complete: Callable[[str, str, int], object],
+    complete: JsonCompletion,
     report,
     *,
     max_workers: int = 1,
@@ -243,7 +246,13 @@ def run_enrichment_with_completion(
                 ],
             },
         }
-        result = complete(system, json.dumps(payload, ensure_ascii=False), 5000)
+        result = complete_with_schema(
+            complete,
+            system,
+            json.dumps(payload, ensure_ascii=False),
+            5000,
+            _enrichment_schema(owner_ids, plan["options"]),
+        )
         if not isinstance(result, Mapping):
             raise EnrichmentValidationError("Enrichment completion must return one JSON object")
         return result
@@ -260,6 +269,44 @@ def run_enrichment_with_completion(
             5 + index / max(len(windows), 1) * 90, f"Enriched window {index} of {len(windows)}"
         )
     return {"turnStates": state_rows, "rangeDecorators": range_rows}
+
+
+def _enrichment_schema(
+    owner_ids: list[str], options: Mapping[str, Any]
+) -> dict[str, Any]:
+    enabled_kinds = []
+    if options.get("ambience"):
+        enabled_kinds.append("ambience")
+    if options.get("effects"):
+        enabled_kinds.append("effect")
+    range_kinds = enabled_kinds or list(RANGE_DECORATOR_KINDS)
+    return strict_object_schema(
+        "transcript_enrichment",
+        {
+            "turnStates": {
+                "type": "array",
+                "items": strict_object_schema(
+                    "turn_state",
+                    {
+                        "turnId": {"type": "string", "enum": owner_ids},
+                        "state": {"type": "string", "enum": list(STATE_VALUES)},
+                    },
+                ),
+            },
+            "rangeDecorators": {
+                "type": "array",
+                "items": strict_object_schema(
+                    "range_decorator",
+                    {
+                        "kind": {"type": "string", "enum": range_kinds},
+                        "startTurnId": {"type": "string", "enum": owner_ids},
+                        "endTurnId": {"type": "string", "enum": owner_ids},
+                        "value": {"type": "string"},
+                    },
+                ),
+            },
+        },
+    )
 
 
 _STAGE_KIND = {

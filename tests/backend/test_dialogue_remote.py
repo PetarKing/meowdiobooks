@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 from threading import Barrier
 
@@ -12,8 +13,31 @@ from meowdiobooks.backend.dialogue_remote import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def response_text(speaker="?", *, classification="D"):
+    return json.dumps(
+        {
+            "rows": [
+                {
+                    "targetId": "T001",
+                    "classification": classification,
+                    "speaker": speaker,
+                }
+            ]
+        }
+    )
+
+
 def test_remote_rows_enforce_order_and_classification_contract():
-    assert parse_remote_rows("T001|D|Alice\nT002|D|?\nT003|N", ["T001", "T002", "T003"]) == {
+    raw = json.dumps(
+        {
+            "rows": [
+                {"targetId": "T001", "classification": "D", "speaker": "Alice"},
+                {"targetId": "T002", "classification": "D", "speaker": "?"},
+                {"targetId": "T003", "classification": "N", "speaker": ""},
+            ]
+        }
+    )
+    assert parse_remote_rows(raw, ["T001", "T002", "T003"]) == {
         "T001": "Alice",
         "T002": "?",
         "T003": "/",
@@ -46,11 +70,13 @@ def test_remote_dialogue_runs_six_batches_with_two_matching_passes_each(monkeypa
         ]
     )
     all_requests_started = Barrier(12, timeout=5)
+    schemas = []
 
-    def complete(_repo_root, _config, _system, _prompt, **_kwargs):
+    def complete(_repo_root, _config, _system, _prompt, **kwargs):
+        schemas.append(kwargs["response_schema"])
         all_requests_started.wait()
         return {
-            "text": "T001|D|?",
+            "text": response_text(),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -63,6 +89,13 @@ def test_remote_dialogue_runs_six_batches_with_two_matching_passes_each(monkeypa
     )
 
     assert result["resultSummary"]["aiVerifierCalls"] == 12
+    assert len(schemas) == 12
+    assert all(schema["title"] == "remote_dialogue_attribution" for schema in schemas)
+    assert all(
+        schema["properties"]["rows"]["items"]["properties"]["targetId"]["enum"]
+        == ["T001"]
+        for schema in schemas
+    )
 
 
 def test_remote_dialogue_keeps_only_exact_two_pass_name_agreement(monkeypatch):
@@ -71,7 +104,7 @@ def test_remote_dialogue_keeps_only_exact_two_pass_name_agreement(monkeypatch):
     def complete(_repo_root, _config, system, _prompt, **_kwargs):
         speaker = "Alice" if "forensic" not in system else "Alice"
         return {
-            "text": f"T001|D|{speaker}",
+            "text": response_text(speaker),
             "usage": {"prompt_tokens": 100, "completion_tokens": 10},
             "model": "test-luna",
             "attempts": 1,
@@ -107,7 +140,7 @@ def test_remote_dialogue_withholds_disagreement_instead_of_guessing(monkeypatch)
     def complete(_repo_root, _config, system, _prompt, **_kwargs):
         speaker = "Bob" if "forensic" in system else "Alice"
         return {
-            "text": f"T001|D|{speaker}",
+            "text": response_text(speaker),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -143,7 +176,7 @@ def test_remote_dialogue_keeps_one_supported_name_as_review_only_suggestion(monk
     def complete(_repo_root, _config, system, _prompt, **_kwargs):
         speaker = "?" if "forensic" in system else "Alice"
         return {
-            "text": f"T001|D|{speaker}",
+            "text": response_text(speaker),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -173,7 +206,7 @@ def test_remote_dialogue_collates_supported_short_and_full_names(monkeypatch):
     def complete(_repo_root, _config, system, _prompt, **_kwargs):
         speaker = "Alice Smith" if "forensic" in system else "Alice"
         return {
-            "text": f"T001|D|{speaker}",
+            "text": response_text(speaker),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -205,7 +238,7 @@ def test_remote_dialogue_does_not_offer_unsupported_disagreement_name(monkeypatc
     def complete(_repo_root, _config, system, _prompt, **_kwargs):
         speaker = "?" if "forensic" in system else "Carol"
         return {
-            "text": f"T001|D|{speaker}",
+            "text": response_text(speaker),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -237,7 +270,7 @@ def test_remote_dialogue_uses_the_same_larger_passage_for_final_evidence(monkeyp
     monkeypatch.setattr(
         "meowdiobooks.backend.dialogue_remote.remote_chat_completion",
         lambda *_args, **_kwargs: {
-            "text": "T001|D|Basil Hallward",
+            "text": response_text("Basil Hallward"),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
@@ -270,7 +303,7 @@ def test_remote_dialogue_normalises_pdf_spacing_and_indexes_all_continued_fragme
     def complete(_repo_root, _config, _system, prompt, **_kwargs):
         prompts.append(prompt)
         return {
-            "text": "T001|D|Basil Hallward",
+            "text": response_text("Basil Hallward"),
             "usage": {},
             "model": "test-luna",
             "attempts": 1,
