@@ -26,6 +26,58 @@ Before a substantial change, open an issue that states:
 New services, databases or tables, caches, cross-service dependencies, network inference, and new
 runtime dependencies require maintainer approval before implementation.
 
+## AI-assisted contributions
+
+AI coding agents made the early version of Meowdiobooks possible to deliver at its current pace. The
+project welcomes AI-assisted contributions, but AI is a capacity multiplier, not a reason to submit
+less considered work. When a tool makes implementation, exploration, or testing cheaper, use that
+capacity to produce broader evidence and stronger confidence than an unaided change would normally
+receive.
+
+The pull-request author remains accountable for the entire contribution, regardless of how it was
+produced:
+
+- Contributors do not need to disclose whether or which AI tools they used. Review is based on the
+  submitted work and its evidence, not the contributor's choice of tools.
+- Read and understand every submitted change, including tests, generated files, dependency updates,
+  migrations, and documentation. The author must be able to explain the design and its failure
+  modes.
+- AI assistance does not relax the Contributor License Agreement. The author confirms that every
+  submitted contribution can be licensed under that agreement and discloses any third-party source,
+  license, patent, trademark, or copyright restriction.
+- Report uncertainty, failed checks, untested paths, and tool limitations honestly. Never claim that
+  a command, scenario, browser flow, or output comparison was checked when it was not.
+
+Automated tests are the baseline, not sufficient proof of product behavior. Every pull request must
+include a reproducible verification record appropriate to its risk:
+
+- Record the commands, environments, scenarios, and results. Attach or link evidence that a reviewer
+  can inspect; an agent's statement that something works is not evidence by itself.
+- For user-visible or end-to-end workflow changes, include before-and-after screenshots and a short
+  screen recording of the affected flow. If visual evidence is genuinely inapplicable, say why and
+  provide the corresponding logs, output comparisons, benchmarks, or other inspectable artifacts.
+- If the available agent can operate a browser or inspect images, have it exercise the complete
+  affected flow in addition to running automated tests, including relevant error, retry, and
+  recovery paths. Otherwise, the contributor must perform the equivalent manual check.
+- For extraction, review, attribution, casting, generation, or export changes, run the relevant
+  [public-domain evaluation samples](../SampleBooks/public-domain-evaluation/README.md). Expand the
+  matrix with appropriately licensed or synthetic sources when language, layout, dialogue density,
+  book length, model route, or runtime differences could expose a regression. Record
+  before-and-after results rather than reporting only that the process completed.
+- For mission-critical product contracts, one implementation agent reviewing its own work is not
+  sufficient. When the tooling supports delegation, assign multiple fresh-context sub-agents
+  distinct verification work: read the relevant source and generated outputs, inspect different edge
+  cases, compare before-and-after behavior, and challenge one another's findings. Reconcile
+  disagreements and inspect the underlying evidence before submission. When sub-agents are
+  unavailable, perform equivalent independent manual review. Scale the breadth to the risk; agent
+  count alone is not proof.
+
+Do not submit unreviewed generated code, tests that merely repeat the implementation,
+happy-path-only evidence for regression-sensitive behavior, or large generated reports that obscure
+the actual findings. Repository issues, commits, and pull-request evidence must not contain
+credentials, private user data, or unredistributable material. Maintainers may require additional
+evidence or a narrower change before merge.
+
 ## Quality checks
 
 Set up the development environment using the [setup reference](SETUP.md), the source of truth for

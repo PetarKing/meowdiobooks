@@ -4,7 +4,17 @@
 
 ## Verification
 
-<!-- List automated checks and any real-book or rendered-app verification performed. -->
+<!--
+List the commands, environments, scenarios, and results. Link inspectable artifacts.
+For user-visible or end-to-end changes, attach before/after screenshots and a short screen
+recording.
+For regression-sensitive book processing, include the public-domain sample matrix and before/after
+comparisons. Write "Not applicable" only with a reason.
+-->
+
+- [ ] I reviewed and understand every submitted change, including generated code and tests.
+- [ ] I accurately reported completed, failed, and untested verification; attached evidence contains
+      no private, secret, or unredistributable material.
 
 ## Architecture and dependencies
 
