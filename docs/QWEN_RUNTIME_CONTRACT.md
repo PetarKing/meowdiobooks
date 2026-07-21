@@ -130,6 +130,20 @@ reconciliation model pass. These are editable casting suggestions, not identity 
 forbids inferring an accent from a name and requires `unspecified` when evidence is insufficient.
 Invalid objects receive the existing bounded retry and conservative fallback.
 
+Narrator profiling is deliberately separate from character profiling. Up to eight narration snippets
+are sampled at evenly spaced positions across the accepted book, then one concise instruction asks for
+a confident interpretation of the whole work. Book-motivated accents, dialects and distinctive
+performance choices are allowed; the model should not choose neutrality merely because several valid
+interpretations exist. Close or first-person point of view can inform attitude, but must remain
+long-form storytelling rather than automatically becoming an acted protagonist voice. The result uses
+the same editable eight-field voice contract and audition gate.
+
+When a hosted OpenAI Responses adapter is selected, the provider also receives a strict JSON Schema for
+Dialogue attribution, Cast discovery and adjudication, voice profiles, and Enrichment. The schema owns
+shape, required fields and fixed enums. Existing application validators continue to own semantic rules
+such as exact target coverage, ordering, uniqueness, evidence support and text-length budgets. Local
+Qwen keeps its JSON response mode and the same validators.
+
 The text model does **not** write audition dialogue. Audition text is a deterministic application
 template shared by Narrator and every cast member, localized to the selected voice language:
 

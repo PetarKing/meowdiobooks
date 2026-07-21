@@ -105,11 +105,13 @@ def test_provider_neutral_enrichment_completion_preserves_bounded_windows():
         EnrichmentOptions(max_output_rows=2, overlap_turns=1),
     )
     prompts = []
+    schemas = []
 
-    def complete(_system, prompt, max_tokens):
+    def complete(_system, prompt, max_tokens, *, response_schema):
         import json
 
         prompts.append((prompt, max_tokens))
+        schemas.append(response_schema)
         payload = json.loads(prompt)
         return {
             "turnStates": [
@@ -130,6 +132,12 @@ def test_provider_neutral_enrichment_completion_preserves_bounded_windows():
     assert [row["turnId"] for row in output["turnStates"]] == ["t1", "t2", "t3", "t4"]
     assert len(prompts) == len(plan["windows"])
     assert all(max_tokens == 5000 for _prompt, max_tokens in prompts)
+    assert all(schema["title"] == "transcript_enrichment" for schema in schemas)
+    assert all(schema["additionalProperties"] is False for schema in schemas)
+    assert {
+        tuple(schema["properties"]["turnStates"]["items"]["properties"]["turnId"]["enum"])
+        for schema in schemas
+    } == {tuple(window["ownerTurnIds"]) for window in plan["windows"]}
 
 
 def test_windows_never_cross_chapters():

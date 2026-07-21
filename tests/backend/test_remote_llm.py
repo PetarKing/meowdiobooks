@@ -100,6 +100,60 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
     assert config.pricing_version == "openai-gpt-5.6-luna-2026-07-18"
 
 
+def test_luna_uses_native_strict_structured_outputs_when_schema_is_supplied(monkeypatch):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    assert config is not None
+    captured = {}
+    schema = {
+        "title": "voice profile/v4",
+        "type": "object",
+        "properties": {"tone": {"type": "string"}},
+        "required": ["tone"],
+        "additionalProperties": False,
+    }
+
+    def open_response(request, timeout):
+        assert timeout == 600
+        captured["payload"] = json.loads(request.data)
+        return _Response(
+            {
+                "model": config.model,
+                "output": [
+                    {
+                        "type": "message",
+                        "content": [
+                            {"type": "output_text", "text": '{"tone":"warm"}'}
+                        ],
+                    }
+                ],
+                "usage": {},
+            }
+        )
+
+    monkeypatch.setattr(
+        "meowdiobooks.backend.remote_llm.configured_api_key",
+        lambda *_args: "test-key",
+    )
+    monkeypatch.setattr("urllib.request.urlopen", open_response)
+
+    remote_chat_completion(
+        REPO_ROOT,
+        config,
+        "system rules",
+        "source passage",
+        response_schema=schema,
+    )
+
+    assert captured["payload"]["text"] == {
+        "format": {
+            "type": "json_schema",
+            "name": "voice_profile_v4",
+            "strict": True,
+            "schema": schema,
+        }
+    }
+
+
 def test_usage_observer_sees_provider_usage_before_invalid_output_retry(monkeypatch):
     config = load_model_registry(REPO_ROOT).remote_dialogue_model()
     assert config is not None

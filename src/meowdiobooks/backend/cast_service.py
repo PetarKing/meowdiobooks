@@ -19,9 +19,14 @@ from .cast import (
     suggest_fuzzy_candidates,
 )
 from .local_llm import complete_json, qwen_server
+from .structured_output import (
+    JsonCompletion,
+    JsonSchema,
+    complete_with_schema,
+    strict_object_schema,
+)
 
 Report = Callable[[float, str | None], None]
-JsonCompletion = Callable[[str, str, int], object]
 VoiceProfileValidator = Callable[[Mapping[str, str]], None]
 
 SPEAKER_TYPES = {
@@ -48,6 +53,7 @@ class VoiceEvidencePolicy:
     max_line_characters: int = 1_200
     max_context_characters: int = 4_000
     max_prompt_characters: int = 6_000
+    max_narrator_examples: int = 8
 
     def __post_init__(self) -> None:
         values = {
@@ -56,6 +62,7 @@ class VoiceEvidencePolicy:
             "max_line_characters": self.max_line_characters,
             "max_context_characters": self.max_context_characters,
             "max_prompt_characters": self.max_prompt_characters,
+            "max_narrator_examples": self.max_narrator_examples,
         }
         invalid = [name for name, value in values.items() if value < 1]
         if invalid:
@@ -182,6 +189,27 @@ Keep the accent and description concise enough that the complete compiled direct
 characters. Preserve useful audible cues, but phrase them compactly.
 Do not infer an accent from a name. Do not explain your choices. Return JSON only."""
 
+NARRATOR_PROFILE_SYSTEM = """Cast the primary narrator for this audiobook.
+
+The supplied excerpts are sampled from across the book. Make one confident, tasteful creative choice
+for a narrator who feels specifically suited to the complete work.
+
+Guidance:
+1. Consider the excerpts together: personality, rhythm, intimacy, humor, emotional scale, setting,
+   and period.
+2. Choose a voice with character. Accents, dialects, theatricality, regional color, elegance,
+   roughness, and other distinctive choices are welcome when they make the book feel more alive.
+3. Prefer a compelling, book-specific interpretation over safe neutrality. The choice may be
+   imaginative without being explicitly prescribed by the text.
+4. Keep the narrator in storytelling mode, not dialogue-character mode. Close or first-person point
+   of view may contribute personality, but translate it into sustained narration rather than copying
+   the protagonist's age, mannerisms, or emotional tics. Do not exaggerate youthful, petulant, cute,
+   or theatrical qualities unless they genuinely dominate the narrative voice.
+5. Cast for the complete book, not only its loudest excerpt. Keep it intelligible and sustainable for
+   long-form listening.
+6. Avoid an arbitrary gimmick or caricature unless the book itself supports one.
+7. Give only concise, audible voice and performance direction; do not explain the literary analysis."""
+
 VOICE_PROFILE_OPTIONS = {
     "presentation": {"feminine", "masculine", "androgynous", "unspecified"},
     "age": {"child", "young-adult", "adult", "older-adult", "unspecified"},
@@ -192,6 +220,87 @@ VOICE_PROFILE_OPTIONS = {
 }
 
 VOICE_DIRECTION_MAX_CHARACTERS = 250
+
+
+def voice_profile_schema() -> dict[str, Any]:
+    """Return the strict reusable voice-profile response contract."""
+
+    properties = {
+        field: {"type": "string", "enum": sorted(values)}
+        for field, values in VOICE_PROFILE_OPTIONS.items()
+    }
+    properties.update(
+        {
+            "accent": {"type": "string"},
+            "description": {"type": "string"},
+        }
+    )
+    return strict_object_schema("voice_profile", properties)
+
+
+def _cast_decision_schema(relationship_labels: Sequence[str]) -> dict[str, Any]:
+    labels = [normalize_label(label) for label in relationship_labels if normalize_label(label)]
+    relationship_items: dict[str, Any] = {"type": "string"}
+    if labels:
+        relationship_items["enum"] = labels
+    relationships: dict[str, Any] = {
+        "type": "array",
+        "items": relationship_items,
+    }
+    return strict_object_schema(
+        "cast_label_decision",
+        {
+            "speakerType": {"type": "string", "enum": sorted(SPEAKER_TYPES)},
+            "sameIdentityAs": relationships,
+            "possiblySameIdentityAs": relationships,
+        },
+    )
+
+
+def _cast_discovery_schema(
+    owned_labels: Sequence[str], known_labels: Sequence[str]
+) -> dict[str, Any]:
+    return strict_object_schema(
+        "cast_discovery",
+        {
+            "classifications": {
+                "type": "array",
+                "items": strict_object_schema(
+                    "cast_classification",
+                    {
+                        "label": {"type": "string", "enum": list(owned_labels)},
+                        "speakerType": {
+                            "type": "string",
+                            "enum": sorted(SPEAKER_TYPES),
+                        },
+                    },
+                ),
+            },
+            "candidatePairs": {
+                "type": "array",
+                "items": strict_object_schema(
+                    "cast_candidate_pair",
+                    {
+                        "leftLabel": {"type": "string", "enum": list(owned_labels)},
+                        "rightLabel": {"type": "string", "enum": list(known_labels)},
+                        "reason": {"type": "string"},
+                    },
+                ),
+            },
+        },
+    )
+
+
+CAST_PAIR_SCHEMA = strict_object_schema(
+    "cast_pair_decision",
+    {
+        "relationship": {
+            "type": "string",
+            "enum": ["same", "possible", "different"],
+        },
+        "reason": {"type": "string"},
+    },
+)
 
 
 def propose_cast(
@@ -354,6 +463,7 @@ def suggest_voice_settings_with_completion(
     include_narrator: bool = True,
     profile_system_appendix: str = "",
     profile_validator: VoiceProfileValidator | None = None,
+    profile_response_schema: JsonSchema | None = None,
 ) -> dict[str, dict[str, str]]:
     """Run provider-neutral voice profiling through the shared validation contract."""
 
@@ -370,12 +480,7 @@ def suggest_voice_settings_with_completion(
                 "characterId": "narrator",
                 "name": "Narrator",
                 "category": "narrator",
-                "evidence": [
-                    normalize_label(row.get("text", ""))
-                    for row in story_spans
-                    if row.get("renderRole") == "narration"
-                    and normalize_label(row.get("text", ""))
-                ][: min(3, policy.max_examples)],
+                "evidence": _narrator_voice_examples(story_spans, policy),
                 "labels": [],
                 "storyContext": [],
             }
@@ -399,8 +504,18 @@ def suggest_voice_settings_with_completion(
                 complete,
                 _voice_profile_prompt(target, evidence_policy=policy),
                 max_prompt_characters=policy.max_prompt_characters,
+                system=(
+                    NARRATOR_PROFILE_SYSTEM
+                    if str(target["category"]) == "narrator"
+                    else VOICE_PROFILE_SYSTEM
+                ),
                 system_appendix=profile_system_appendix,
                 profile_validator=profile_validator,
+                response_schema=(
+                    profile_response_schema
+                    if profile_response_schema is not None
+                    else voice_profile_schema()
+                ),
             )
         except CastContractError:
             settings = fallback
@@ -421,6 +536,23 @@ def suggest_voice_settings_with_completion(
         )
     notify(100, "Voice suggestions are ready for auditions")
     return profiles
+
+
+def _narrator_voice_examples(
+    story_spans: Sequence[Mapping[str, Any]], policy: VoiceEvidencePolicy
+) -> list[str]:
+    """Evenly sample bounded narration from the complete accepted book."""
+
+    narration = [
+        normalize_label(row.get("text", ""))
+        for row in story_spans
+        if row.get("renderRole") == "narration" and normalize_label(row.get("text", ""))
+    ]
+    count = min(len(narration), policy.max_narrator_examples)
+    if count < 2:
+        return narration[:count]
+    last = len(narration) - 1
+    return [narration[index * last // (count - 1)] for index in range(count)]
 
 
 def _voice_target(
@@ -674,14 +806,14 @@ def compile_voice_direction(settings: Mapping[str, Any], *, language: str = "eng
     voice_phrase = " ".join([*voice_qualifiers, "voice"]).capitalize()
     parts = [voice_phrase, *[value for value in (tone, pitch, pace, energy) if value]]
 
-    accent = normalize_label(settings.get("accent", ""))
+    accent = normalize_label(settings.get("accent", "")).rstrip(".。!?！？")
     if accent and accent.lower() != "unspecified":
         spoken_language = normalize_label(language).replace("-", " ").title() or "Selected language"
         accent = accent[0].upper() + accent[1:]
         parts.append(f"{accent} accent in {spoken_language}")
-    description = normalize_label(settings.get("description", ""))
+    description = normalize_label(settings.get("description", "")).rstrip(".。!?！？")
     if description:
-        parts.append(description.rstrip("."))
+        parts.append(description)
     direction = "; ".join(parts) + "."
     if len(direction) > VOICE_DIRECTION_MAX_CHARACTERS:
         raise CastContractError(
@@ -842,16 +974,18 @@ def _complete_voice_settings_with(
     prompt: str,
     *,
     max_prompt_characters: int = MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
+    system: str = VOICE_PROFILE_SYSTEM,
     system_appendix: str = "",
     profile_validator: VoiceProfileValidator | None = None,
+    response_schema: JsonSchema | None = None,
 ) -> dict[str, str]:
     failures: list[str] = []
     retry_prompt = prompt
-    system = VOICE_PROFILE_SYSTEM
     if system_appendix.strip():
         system += "\n\nPROVIDER OUTPUT CONSTRAINTS\n" + system_appendix.strip()
+    schema = response_schema or voice_profile_schema()
     for _attempt in range(2):
-        raw = complete(system, retry_prompt, 384)
+        raw = complete_with_schema(complete, system, retry_prompt, 384, schema)
         settings: dict[str, str] | None = None
         try:
             settings = validate_voice_settings(raw)
@@ -899,8 +1033,9 @@ def _complete_validated_decision_with(
 ) -> dict[str, Any]:
     failures: list[str] = []
     retry_prompt = prompt
+    schema = _cast_decision_schema(relationship_labels)
     for _attempt in range(3):
-        result = complete(SYSTEM, retry_prompt, 512)
+        result = complete_with_schema(complete, SYSTEM, retry_prompt, 512, schema)
         try:
             return _validate_decision(result, target_label, relationship_labels)
         except CastContractError as error:
@@ -991,8 +1126,15 @@ def _complete_discovery_batch_with(
 ) -> dict[str, Any]:
     failures: list[str] = []
     retry_prompt = prompt
+    schema = _cast_discovery_schema(owned_labels, known_labels)
     for _attempt in range(3):
-        raw = complete(DISCOVERY_SYSTEM, retry_prompt, 4_096)
+        raw = complete_with_schema(
+            complete,
+            DISCOVERY_SYSTEM,
+            retry_prompt,
+            4_096,
+            schema,
+        )
         try:
             return _validate_discovery_batch(raw, owned_labels, known_labels)
         except CastContractError as error:
@@ -1103,7 +1245,13 @@ def _complete_pair_decision_with(
     failures: list[str] = []
     retry_prompt = prompt
     for _attempt in range(3):
-        raw = complete(PAIR_SYSTEM, retry_prompt, 384)
+        raw = complete_with_schema(
+            complete,
+            PAIR_SYSTEM,
+            retry_prompt,
+            384,
+            CAST_PAIR_SCHEMA,
+        )
         try:
             return _validate_pair_decision(raw)
         except CastContractError as error:
