@@ -221,7 +221,10 @@ check on Apple Silicon.
 
 Contributions should start with an issue describing user value, scope, affected contracts, test
 strategy, and dependencies. New services, databases, caches, cross-service coupling, or runtime
-dependencies require maintainer approval before implementation. See the [contributor reference](docs/CONTRIBUTING.md).
+dependencies require maintainer approval before implementation. AI-assisted contributions are
+welcome when the author remains accountable and supplies evidence proportional to the change. See
+the [contributor reference](docs/CONTRIBUTING.md), including the
+[AI-assisted contribution policy](docs/CONTRIBUTING.md#ai-assisted-contributions).
 
 ## Documentation
 
