@@ -250,6 +250,23 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Custom ambient-effects workflow' })).toBeInTheDocument()
   })
 
+  it('names the active mobile step and respects a custom journey length', async () => {
+    const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
+
+    await open(base, undefined, undefined, undefined, {
+      journey,
+      stepOverrides: { soundscape: () => <h1>Custom ambient-effects workflow</h1> },
+    })
+
+    const progress = screen.getByRole('status', { name: 'Workflow progress' })
+    expect(progress).toHaveTextContent('Step 7 of 8 · Generate')
+    expect(progress).toHaveTextContent('7 / 8')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
+    expect(progress).toHaveTextContent('Step 6 of 8 · Soundscape')
+    expect(progress).toHaveTextContent('6 / 8')
+  })
+
   it('collapses the wizard rail without changing the active stage', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })

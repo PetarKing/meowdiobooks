@@ -4,8 +4,14 @@ import { describe, expect, it } from 'vitest'
 
 const workflowStyles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
 const supplementalStyles = readFileSync(resolve(process.cwd(), 'src/media.css'), 'utf8')
+const appSource = readFileSync(resolve(process.cwd(), 'src/App.tsx'), 'utf8')
 const mobileStyles = workflowStyles.match(/@media\(max-width:\s*650px\)\s*\{([\s\S]*?)\n\}/)?.[1]
 const supplementalMobileStyles = supplementalStyles.match(/@media\s*\(max-width:\s*650px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const tabletStyles = workflowStyles.match(/@media\(max-width:\s*900px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const tabletHeaderStyles = workflowStyles.match(/@media\(min-width:651px\) and \(max-width:919px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const compactTabletStyles = workflowStyles.match(/@media\(min-width:651px\) and \(max-width:780px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const narrowPhoneStyles = workflowStyles.match(/@media\(max-width:340px\)\s*\{([\s\S]*?)\n\}/)?.[1]
+const shortPhoneStyles = workflowStyles.match(/@media\(max-width:650px\) and \(max-height:700px\)\s*\{([\s\S]*?)\n\}/)?.[1]
 
 function rule(selector, styles = mobileStyles) {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -13,6 +19,35 @@ function rule(selector, styles = mobileStyles) {
 }
 
 describe('mobile workflow layout', () => {
+  it('uses a compact collision-free header through tablet widths', () => {
+    expect(rule('.topbar-inner', tabletHeaderStyles)).toMatch(/grid-template-columns\s*:\s*auto minmax\(0,1fr\) auto/)
+    expect(rule('.brand > span:last-child', tabletHeaderStyles)).toMatch(/display\s*:\s*none/)
+    expect(rule('.product-tabs', tabletHeaderStyles)).toMatch(/justify-self\s*:\s*center/)
+    expect(rule('.local-pill', tabletHeaderStyles)).toMatch(/display\s*:\s*none/)
+  })
+
+  it('compacts the workflow rail on narrow tablets without hiding accessible stage names', () => {
+    expect(rule('.workspace,.workspace.rail-collapsed', compactTabletStyles)).toMatch(/--workspace-rail-width\s*:\s*72px/)
+    expect(rule('.rail-toggle,.book-mini,.workflow-familiar', compactTabletStyles)).toMatch(/display\s*:\s*none/)
+    expect(rule('.rail nav button > span,.rail-collapsed .rail nav button > span', compactTabletStyles)).toMatch(/display\s*:\s*none/)
+    expect(appSource).toContain('aria-label={`${label} ${localizedStatus}`}')
+    expect(rule('.extraction-choices', tabletStyles)).toMatch(/grid-template-columns\s*:\s*repeat\(2,minmax\(0,1fr\)\)/)
+  })
+
+  it('contains narrow-phone library artwork and bottom-navigation badges', () => {
+    expect(rule('.library-head', narrowPhoneStyles)).toMatch(/grid-template-columns\s*:\s*minmax\(0,1fr\) 76px/)
+    expect(rule('.library-head-copy h1', narrowPhoneStyles)).toMatch(/font-size\s*:\s*33px/)
+    expect(rule('.product-soon')).toMatch(/right\s*:\s*2px/)
+    expect(rule('.product-soon')).toMatch(/left\s*:\s*auto/)
+    expect(rule('.product-soon')).toMatch(/top\s*:\s*2px/)
+  })
+
+  it('reduces decorative height on short phone viewports', () => {
+    expect(rule('.welcome-hero', shortPhoneStyles)).toMatch(/min-height\s*:\s*340px/)
+    expect(rule('.coming-soon-art', shortPhoneStyles)).toMatch(/min-height\s*:\s*190px/)
+    expect(rule('.coming-soon-art', shortPhoneStyles)).toMatch(/max-height\s*:\s*220px/)
+  })
+
   it('keeps form controls readable without triggering iOS focus zoom', () => {
     const formControls = rule('input,select,textarea')
     const normalizedFormControls = rule('input,select,textarea', supplementalMobileStyles)

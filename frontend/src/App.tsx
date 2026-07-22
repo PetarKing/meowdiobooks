@@ -907,12 +907,17 @@ export default function App({
       {showWizard && <aside id="wizard-sidebar" className="rail">
         <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
         <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
-        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={sidebarCollapsed ? `${label} · ${localizedStatus}` : undefined} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
+        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={`${label} · ${localizedStatus}`} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
         <figure className="workflow-familiar" aria-label={t("Your wizard cat companion")}>
           <img src={catWizardArtwork} alt={t("A cat wizard guiding a manuscript into dialogue and sound")} />
         </figure>
       </aside>}
       <main className={!showWizard ? "home-main" : stage <= stageIndex("review") ? "review-wide" : ""}>
+        {showWizard && activeJourneyStep && <div className="mobile-progress" role="status" aria-label={t("Workflow progress")}>
+          <span>{t("Step {{current}} of {{total}} · {{stage}}", { current: stage + 1, total: stages.length, stage: t(activeJourneyStep.label) })}</span>
+          <strong aria-hidden="true">{stage + 1} / {stages.length}</strong>
+          <div aria-hidden="true"><i style={{ width: `${((stage + 1) / stages.length) * 100}%` }} /></div>
+        </div>}
         {error && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}</div>}
         {view}
       </main>
