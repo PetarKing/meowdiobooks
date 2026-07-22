@@ -891,6 +891,9 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
 }
 
 @media(max-width: 650px) {
+  .choice-shell.has-detail { min-height:132px; }
+  .choice-tooltip { top:10px; transform:translateY(3px); }
+  .choice-tooltip.visible { transform:translateY(0); }
   input,select,textarea { font-size:16px !important; }
   .dialogue-routing-backdrop { align-items:end; padding:10px; }.dialogue-routing-modal { max-height:calc(100dvh - 20px); overflow:auto; padding:23px 16px 18px; border-radius:24px 24px 18px 18px; }.dialogue-routing-heading { padding-right:34px; }.dialogue-routing-heading h2 { font-size:28px; }.dialogue-routing-heading p { font-size:12px; }.dialogue-routing-options { grid-template-columns:1fr; }.dialogue-routing-card { min-height:0; }.dialogue-routing-close { top:14px; right:14px; }
   .step-eyebrow { justify-content:flex-start; }.phase-help-trigger { width:27px; height:27px; }

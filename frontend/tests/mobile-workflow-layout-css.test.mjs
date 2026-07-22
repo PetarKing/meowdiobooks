@@ -52,6 +52,12 @@ describe('mobile workflow layout', () => {
     expect(rule('.accepted-summary b,.accepted-summary small')).toMatch(/overflow-wrap\s*:\s*anywhere/)
   })
 
+  it('keeps extraction guidance inside horizontally scrollable cards', () => {
+    expect(rule('.choice-shell.has-detail')).toMatch(/min-height\s*:\s*132px/)
+    expect(rule('.choice-tooltip')).toMatch(/top\s*:\s*10px/)
+    expect(rule('.choice-tooltip')).not.toMatch(/top\s*:\s*50%/)
+  })
+
   it('allows generated chapter actions and stats to shrink and wrap', () => {
     expect(rule('.generate-hero-stats dd')).toMatch(/overflow-wrap\s*:\s*anywhere/)
     expect(rule('.generation-selection > *')).toMatch(/min-width\s*:\s*0/)
