@@ -247,6 +247,11 @@ describe('HttpWizardApi', () => {
         accepted_stage_revisions: [{ stage: 'import', revision: 1 }, { stage: 'extract', revision: 1 }],
       },
       activeArtifacts: { extraction: 'extract-1' }, pendingCandidates: { dialogue: { revision: 'dialogue-pending', status: 'candidate' } }, dialogue: {}, reviewWarnings: [],
+      dialogueRecovery: {
+        kind: 'malformed-playable-span', spanIds: ['span:p48-b2:1373-1372'], page: 48,
+        message: 'This transcript contains an invalid text range on page 48. No audio was generated or changed.',
+        availableActions: ['rerun-dialogue'],
+      },
       reviewInspection: { decisions: [], history: [] },
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
@@ -255,6 +260,10 @@ describe('HttpWizardApi', () => {
 
     expect(snapshot.book).toMatchObject({ filename: 'alice.pdf', pageCount: 120, completedStages: ['import', 'extract'] })
     expect(snapshot.pendingCandidates?.dialogue).toMatchObject({ revision: 'dialogue-pending', status: 'candidate' })
+    expect(snapshot.dialogueRecovery).toMatchObject({
+      kind: 'malformed-playable-span', spanIds: ['span:p48-b2:1373-1372'], page: 48,
+      availableActions: ['rerun-dialogue'],
+    })
     expect(snapshot.chapters).toEqual([])
   })
 

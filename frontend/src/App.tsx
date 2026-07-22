@@ -779,6 +779,35 @@ export default function App({
     }
   }
 
+  async function rebuildDialogueFromRecovery() {
+    if (!book || !snapshot?.dialogueRecovery || busy) return;
+    const accepted = snapshot.dialogue ?? dialogue;
+    const strategy = accepted.strategy ?? "fill-gaps";
+    const targets = accepted.attributionTargets ?? ["unlabelled-candidates"];
+    setBusy(true);
+    setError(undefined);
+    try {
+      const preview = await gateway.previewDialogue(
+        book.id,
+        dialogueSettings(accepted, strategy, targets),
+      );
+      setDialogue(preview);
+      setDialogueStrategy(strategy);
+      setAttributionTargets(targets);
+      setDialogueInitialDecisions([]);
+      setDialogueCandidate(undefined);
+      setEditingAcceptedDialogue(false);
+      setConflictChoices({});
+      setStructuralChoices({});
+      setRevisingStages((current) => [...new Set([...current, "dialogue"])]);
+      setStage(stageIndex("dialogue"));
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function requestDialogueTranscript() {
     if (!book || busy) return;
     let currentDialogue = dialogue;
@@ -1446,6 +1475,15 @@ export default function App({
   }
 
   function GenerateStage() {
+    const dialogueRecovery = snapshot?.dialogueRecovery;
+    if (dialogueRecovery) return <>
+      <PageTitle stage="generate" step={t("Step 6 · Generate")} title={t("Dialogue needs rebuilding")} copy={t("The transcript must be corrected before chapter audio can be generated.")} />
+      <Panel eyebrow={t("Source safety check")} title={t("No audio was generated or changed")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}>
+        <p className="panel-copy">{t(dialogueRecovery.message, { defaultValue: dialogueRecovery.message })}</p>
+        <p className="dialogue-recovery-note"><b>{t("What happens next")}</b><span>{t("Rebuild Dialogue with your previous settings, review the corrected transcript, and accept it. Review, Cast & voices, and later stages will then need to be completed again.")}</span></p>
+        <div className="dialogue-recovery-actions"><button className="primary" disabled={busy} onClick={() => void rebuildDialogueFromRecovery()}>{busy ? t("Opening Dialogue…") : t("Rebuild Dialogue")} →</button></div>
+      </Panel>
+    </>;
     if (!snapshot?.recordingScript) return null;
     const generated = snapshot?.generatedChapters ?? [];
     const chapters = snapshot?.chapters ?? [];

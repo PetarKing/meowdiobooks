@@ -343,6 +343,35 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'generate', { chapterIds: ['chapter-1'], language: 'english' }))
   })
 
+  it('blocks malformed Dialogue before generation and opens a fresh prefilled preview', async () => {
+    const recoverySnapshot: WizardSnapshot = {
+      ...base,
+      dialogueRecovery: {
+        kind: 'malformed-playable-span',
+        spanIds: ['span:p48-b2:1373-1372'],
+        page: 48,
+        message: 'This transcript contains an invalid text range on page 48. No audio was generated or changed.',
+        availableActions: ['rerun-dialogue'],
+      },
+    }
+    await open(recoverySnapshot)
+
+    expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No audio was generated or changed' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Generate .* selected/ })).not.toBeInTheDocument()
+    const previewsBeforeRecovery = vi.mocked(wizardApi.previewDialogue).mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: /Rebuild Dialogue/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Build the transcript' })).toBeInTheDocument()
+    expect(wizardApi.previewDialogue).toHaveBeenCalledTimes(previewsBeforeRecovery + 1)
+    expect(wizardApi.previewDialogue).toHaveBeenLastCalledWith('book-1', expect.objectContaining({
+      strategy: 'fill-gaps',
+      regexes: [expect.objectContaining({ id: 'quotes', enabled: true })],
+    }))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
   it('offers a simple confirmed split for one selected two-hour chapter', async () => {
     const longChapter = { id: 'complete-document', title: 'Complete document', startPage: 1, endPage: 223, estimatedCharacters: 135_000 }
     const longSummary = {

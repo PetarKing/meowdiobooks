@@ -6,6 +6,8 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+from .dialogue import malformed_playable_spans
+
 
 class RecordingScriptContractError(ValueError):
     """Raised when accepted upstream work cannot produce a recording script."""
@@ -48,6 +50,12 @@ def build_recording_script(
         raise RecordingScriptContractError(
             "Enrichment does not reference the accepted Dialogue and Cast"
         )
+    malformed = malformed_playable_spans(dialogue)
+    if malformed:
+        raise RecordingScriptContractError(
+            f"Dialogue span {malformed[0].get('id', 'unknown')} has an invalid text range; "
+            "rebuild Dialogue before generation"
+        )
 
     spans = _spans(dialogue)
     entries: list[dict[str, Any]] = []
@@ -55,6 +63,11 @@ def build_recording_script(
     for span in spans:
         span_id = str(span["id"])
         keep = span.get("reviewAction") != "exclude"
+        text = str(span.get("text", span.get("source", ""))) if keep else ""
+        if keep and not text:
+            raise RecordingScriptContractError(
+                f"Dialogue span {span_id} has no playable text; rebuild Dialogue before generation"
+            )
         retained[span_id] = keep
         entries.append(
             {
@@ -62,7 +75,7 @@ def build_recording_script(
                 "kind": "source" if keep else "omission",
                 "chapterId": str(span.get("chapterId") or "chapter-1"),
                 "sourceSpanIds": [span_id],
-                "text": str(span.get("text", span.get("source", ""))) if keep else "",
+                "text": text,
                 "sourceText": str(span.get("source", "")),
                 "provenance": (
                     f"review:{span.get('reviewOccurrenceId')}:exclude"
@@ -246,6 +259,13 @@ def recording_script_blockers(script: Mapping[str, Any]) -> list[str]:
         blockers.append("Prepare the final recording script")
     if script.get("sourceCoverage", {}).get("status") != "exact":
         blockers.append("Restore exact Dialogue source-span coverage")
+    malformed = [
+        row
+        for row in script.get("entries", [])
+        if row.get("kind", "source") == "source" and not str(row.get("text", ""))
+    ]
+    if malformed:
+        blockers.append("Rebuild Dialogue before generation")
     return blockers
 
 
@@ -264,7 +284,11 @@ def recording_script_matches(
         "cast": str(cast.get("revision") or ""),
         "enrichment": str(enrichment.get("revision") or "") if enrichment else None,
     }
-    return not recording_script_blockers(script) and script.get("inputRevisions") == expected
+    return (
+        not malformed_playable_spans(dialogue)
+        and not recording_script_blockers(script)
+        and script.get("inputRevisions") == expected
+    )
 
 
 def _script_chapters(
