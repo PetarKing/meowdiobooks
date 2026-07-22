@@ -358,6 +358,29 @@ def _is_page_number_edge_block(
     return index + 1 == len(blocks) or int(blocks[index + 1].get("page", page)) > page
 
 
+def _normalise_cross_boundary_fragments(
+    fragments: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep only playable fragments and renumber the remaining linked turn."""
+
+    playable = [
+        dict(fragment)
+        for fragment in fragments
+        if int(fragment["spokenStart"]) < int(fragment["spokenEnd"])
+        and str(fragment.get("text", ""))
+    ]
+    for index, fragment in enumerate(playable, 1):
+        match_id = str(fragment["matchId"]).rsplit(":fragment-", 1)[0]
+        fragment.update(
+            {
+                "matchId": f"{match_id}:fragment-{index}",
+                "fragmentIndex": index,
+                "fragmentCount": len(playable),
+            }
+        )
+    return playable
+
+
 def _cross_boundary_quote_candidates(
     blocks: Sequence[Mapping[str, Any]], profile: RegexProfile
 ) -> list[dict[str, Any]]:
@@ -450,8 +473,10 @@ def _cross_boundary_quote_candidates(
                     "origin": f"regex:{profile.id}:cross-boundary",
                 }
             )
-        result.extend(fragments)
-        consumed_through = end_index
+        playable_fragments = _normalise_cross_boundary_fragments(fragments)
+        if playable_fragments:
+            result.extend(playable_fragments)
+            consumed_through = end_index
     return result
 
 
@@ -530,6 +555,7 @@ def _cross_boundary_label_candidates(
                 )
                 else "explicit"
             )
+            fragments = []
             for fragment_index in range(start_index, end_index + 1):
                 fragment_block = blocks[fragment_index]
                 fragment_source = str(fragment_block["text"])
@@ -541,7 +567,7 @@ def _cross_boundary_label_candidates(
                 )
                 spoken_start = start_match.end() if fragment_index == start_index else 0
                 spoken_end = closer_index if fragment_index == end_index else len(fragment_source)
-                result.append(
+                fragments.append(
                     {
                         "matchId": (
                             f"match:{profile.id}:{fragment_block['id']}:"
@@ -569,8 +595,11 @@ def _cross_boundary_label_candidates(
                         "origin": f"regex:{profile.id}:cross-boundary",
                     }
                 )
-            consumed_through = end_index
-            break
+            playable_fragments = _normalise_cross_boundary_fragments(fragments)
+            if playable_fragments:
+                result.extend(playable_fragments)
+                consumed_through = end_index
+                break
     return result
 
 
@@ -1305,15 +1334,10 @@ def dialogue_recovery(result: Mapping[str, Any]) -> dict[str, Any] | None:
         except (KeyError, TypeError, ValueError):
             continue
         break
-    location = f" on page {page}" if page is not None else ""
     return {
         "kind": "malformed-playable-span",
         "spanIds": span_ids,
         **({"page": page} if page is not None else {}),
-        "message": (
-            f"This transcript contains an invalid text range{location}. "
-            "No audio was generated or changed."
-        ),
         "availableActions": ["rerun-dialogue"],
     }
 

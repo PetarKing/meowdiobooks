@@ -203,12 +203,17 @@ def test_snapshot_exposes_malformed_dialogue_recovery_without_mutating_artifact(
             "kind": "malformed-playable-span",
             "spanIds": ["span:p48-b2:1373-1372"],
             "page": 48,
-            "message": (
-                "This transcript contains an invalid text range on page 48. "
-                "No audio was generated or changed."
-            ),
             "availableActions": ["rerun-dialogue"],
         }
+        assert path.read_text(encoding="utf-8") == before
+
+    with TestClient(create_app_v2(tmp_path)) as restarted_client:
+        restarted_snapshot = restarted_client.get(f"/api/books/{book_id}/snapshot")
+
+        assert restarted_snapshot.status_code == 200
+        assert restarted_snapshot.json()["dialogueRecovery"] == snapshot.json()[
+            "dialogueRecovery"
+        ]
         assert path.read_text(encoding="utf-8") == before
 
 

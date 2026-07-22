@@ -639,10 +639,6 @@ def test_malformed_playable_span_is_rejected_and_exposes_rebuild_recovery():
         "kind": "malformed-playable-span",
         "spanIds": ["span:p48-b2:1373-1372"],
         "page": 48,
-        "message": (
-            "This transcript contains an invalid text range on page 48. "
-            "No audio was generated or changed."
-        ),
         "availableActions": ["rerun-dialogue"],
     }
 
@@ -665,6 +661,53 @@ def test_labelled_bracket_turn_continues_across_a_page_without_user_guesswork():
         1: pages[0]["text"],
         2: pages[1]["text"],
     }
+
+
+@pytest.mark.parametrize(
+    ("blocks", "profile_id", "speaker"),
+    [
+        (
+            [
+                {"id": "p1-b1", "page": 1, "text": "Gustav: ["},
+                {"id": "p2-b1", "page": 2, "text": ""},
+                {"id": "p3-b1", "page": 3, "text": "Wait."},
+                {"id": "p4-b1", "page": 4, "text": "]"},
+            ],
+            "label-brackets",
+            "Gustav",
+        ),
+        (
+            [
+                {"id": "p1-b1", "page": 1, "text": "Before “"},
+                {"id": "p2-b1", "page": 2, "text": ""},
+                {"id": "p3-b1", "page": 3, "text": "Wait."},
+                {"id": "p4-b1", "page": 4, "text": "” after"},
+            ],
+            "unlabeled-curly-quotes",
+            None,
+        ),
+    ],
+)
+def test_cross_boundary_delimiter_only_fragments_remain_source_exact_narration(
+    blocks, profile_id, speaker
+):
+    result = scan_dialogue(blocks, enabled_profile_ids=[profile_id])
+
+    assert result["summary"]["continuedTurns"] == 1
+    assert result["summary"]["structuralIssues"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["text"] == "Wait."
+    assert result["acceptedMatches"][0]["sourceSpeakerLabel"] == speaker
+    assert result["acceptedMatches"][0]["fragmentIndex"] == 1
+    assert result["acceptedMatches"][0]["fragmentCount"] == 1
+    assert reconstruct_partition(result) == {
+        row["page"]: row["text"] for row in blocks
+    }
+    assert all(
+        span["renderRole"] == "narration"
+        for span in result["partition"]
+        if span["blockId"] != "p3-b1"
+    )
 
 
 def test_unlabelled_straight_turn_crosses_a_page_without_speaking_the_page_number():

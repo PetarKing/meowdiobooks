@@ -249,7 +249,6 @@ describe('HttpWizardApi', () => {
       activeArtifacts: { extraction: 'extract-1' }, pendingCandidates: { dialogue: { revision: 'dialogue-pending', status: 'candidate' } }, dialogue: {}, reviewWarnings: [],
       dialogueRecovery: {
         kind: 'malformed-playable-span', spanIds: ['span:p48-b2:1373-1372'], page: 48,
-        message: 'This transcript contains an invalid text range on page 48. No audio was generated or changed.',
         availableActions: ['rerun-dialogue'],
       },
       reviewInspection: { decisions: [], history: [] },

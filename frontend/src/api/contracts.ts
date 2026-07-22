@@ -420,7 +420,6 @@ export interface WizardSnapshot {
     kind: "malformed-playable-span";
     spanIds: string[];
     page?: number;
-    message: string;
     availableActions: ["rerun-dialogue"];
   };
   warnings: ReviewWarning[];
