@@ -66,4 +66,10 @@ describe('mobile workflow layout', () => {
     expect(rule('.export-format-options strong')).toMatch(/justify-self\s*:\s*start/)
     expect(rule('.export-summary')).toMatch(/flex-direction\s*:\s*column/)
   })
+
+  it('keeps the dialogue recovery action touch-sized', () => {
+    expect(workflowStyles).toMatch(
+      /\.dialogue-recovery-actions \.primary\s*\{[^}]*min-height\s*:\s*44px/
+    )
+  })
 })

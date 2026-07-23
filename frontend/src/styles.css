@@ -258,6 +258,7 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
 .dialogue-recovery-note { display:flex; align-items:flex-start; gap:14px; margin:20px 0 0; padding:15px 16px; border:1px solid var(--line); border-radius:14px; background:var(--paper); color:var(--muted); font-size:11px; line-height:1.55; }
 .dialogue-recovery-note b { flex:0 0 auto; color:var(--ink); font:700 14px var(--font-display); }
 .dialogue-recovery-actions { display:flex; justify-content:flex-end; margin-top:18px; }
+.dialogue-recovery-actions .primary { min-height:44px; }
 .accepted-summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:1px; overflow:hidden; border:1px solid var(--line); border-radius:12px; background:var(--line); }
 .accepted-summary span { display:flex; flex-direction:column; gap:6px; padding:16px; background:var(--paper); }
 .accepted-summary b { font:700 21px var(--font-display); text-transform:capitalize; }
