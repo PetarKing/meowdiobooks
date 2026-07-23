@@ -235,8 +235,6 @@ def validate_identity_proposals(
                 "aliases": aliases,
                 "competingLabels": competitors,
                 "reason": reason,
-                "voiceProfile": normalize_label(raw.get("voiceProfile", "")) or None,
-                "auditionLine": normalize_label(raw.get("auditionLine", "")) or None,
                 # The model may flag more items, but cannot clear deterministic material risk.
                 "reviewRequired": material or raw.get("reviewRequired") is True,
             }
@@ -348,8 +346,6 @@ def finalize_identity_mapping(
                 "name": normalize_label(canonical),
                 "category": category,
                 "literalLabels": [],
-                "voiceProfile": row.get("voiceProfile"),
-                "auditionLine": row.get("auditionLine"),
                 "voiceAccepted": False,
             },
         )
