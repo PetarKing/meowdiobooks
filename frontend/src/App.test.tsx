@@ -250,6 +250,23 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Custom ambient-effects workflow' })).toBeInTheDocument()
   })
 
+  it('names the active mobile step and respects a custom journey length', async () => {
+    const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
+
+    await open(base, undefined, undefined, undefined, {
+      journey,
+      stepOverrides: { soundscape: () => <h1>Custom ambient-effects workflow</h1> },
+    })
+
+    const progress = screen.getByRole('status', { name: 'Workflow progress' })
+    expect(progress).toHaveTextContent('Step 7 of 8 · Generate')
+    expect(progress).toHaveTextContent('7 / 8')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
+    expect(progress).toHaveTextContent('Step 6 of 8 · Soundscape')
+    expect(progress).toHaveTextContent('6 / 8')
+  })
+
   it('collapses the wizard rail without changing the active stage', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
@@ -258,6 +275,7 @@ describe('v2 wizard', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(workspace).not.toHaveClass('rail-collapsed')
+    expect(within(nav).getByRole('button', { name: 'Cast & voices Complete' })).toHaveAttribute('title', 'Cast & voices · Complete')
 
     fireEvent.click(toggle)
 
@@ -286,6 +304,54 @@ describe('v2 wizard', () => {
     expect(comparison).toHaveClass('extract-compare')
     expect(comparison).toHaveClass('page-comparison')
     expect(within(comparison as HTMLElement).getByText('LITEPARSE TEXT')).toBeInTheDocument()
+  })
+
+  it('explains extraction methods without changing the selected parser', async () => {
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
+
+    const liteparseInfo = screen.getByRole('button', { name: 'About LiteParse' })
+    const nativeInfo = screen.getByRole('button', { name: 'About Native PDF text' })
+    const layoutInfo = screen.getByRole('button', { name: 'About Layout-aware' })
+    const liteparseTooltip = document.getElementById(liteparseInfo.getAttribute('aria-describedby')!)
+    const nativeTooltip = document.getElementById(nativeInfo.getAttribute('aria-describedby')!)
+    const layoutTooltip = document.getElementById(layoutInfo.getAttribute('aria-describedby')!)
+    const previewCalls = vi.mocked(wizardApi.previewExtraction).mock.calls.length
+
+    expect(liteparseTooltip).toHaveTextContent('Recommended for most books')
+    expect(nativeTooltip).toHaveTextContent('Reads text embedded directly in the PDF')
+    expect(layoutTooltip).toHaveTextContent('Preserves columns and spacing more carefully')
+    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'true')
+
+    fireEvent.mouseEnter(liteparseInfo)
+    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'false')
+    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'true')
+    fireEvent.mouseLeave(liteparseInfo)
+    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'true')
+
+    layoutInfo.focus()
+    fireEvent.focus(layoutInfo)
+    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'false')
+    fireEvent.mouseEnter(layoutInfo)
+    fireEvent.keyDown(layoutInfo, { key: 'Escape' })
+    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
+    expect(layoutInfo).toHaveAttribute('aria-expanded', 'false')
+    expect(document.activeElement).toBe(layoutInfo)
+    fireEvent.mouseLeave(layoutInfo)
+    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
+    layoutInfo.blur()
+    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
+
+    fireEvent.click(nativeInfo)
+    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'false')
+    fireEvent.click(nativeInfo)
+    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('button', { name: /LiteParse Recommended Fast spatial parser/ })).toHaveClass('selected')
+    expect(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ })).not.toHaveClass('selected')
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls)
+
+    fireEvent.click(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ }))
+    expect(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ })).toHaveClass('selected')
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls + 1)
   })
 
   it('keeps the clicked extraction page mounted and focused while its preview loads', async () => {
