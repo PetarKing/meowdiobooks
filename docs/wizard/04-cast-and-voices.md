@@ -233,8 +233,9 @@ instructions. Editing controls and regenerating does not call the text model aga
 
 ## AI contract C — VoiceDesign audition
 
-The text model does not generate audition lines. Narrator and every cast member use the same
-application-authored neutral template, localized to the selected voice language:
+The default and local workflow does not ask the text model to generate audition lines. Narrator and
+every cast member use the same application-authored neutral template, localized to the selected voice
+language:
 
 ```text
 This is the voice of <name>. The bright morning carried a gentle breeze across the quiet village.
@@ -243,6 +244,15 @@ This is the voice of <name>. The bright morning carried a gentle breeze across t
 This preserves a comparable synthetic introduction while providing enough sound and rhythm variation
 to hear pitch, pace, timbre and accent. Each configured voice language has a fixed equivalent. The
 interface language does not affect the audition; the selected voice language does.
+
+A hosted composition may explicitly opt into a separate, isolated structured-output task after the
+eight-field voice profile is frozen. That call receives the frozen profile, the same bounded evidence,
+and the selected synthesis language, and may return only `{"auditionLine":"..."}`. The line is stored
+separately from editable `voiceSettings`. It must contain 150–300 characters, targeting 180–260
+characters and roughly 30–50 spoken words. Invalid or unavailable line output does not change the voice
+profile and falls back to the localized application template without another model call. Shared voice
+groups intentionally retain the neutral shared template so one audition remains comparable across all
+members.
 
 The application compiles the accepted or edited handles into one `instruct` string. VoiceDesign
 receives:
@@ -275,7 +285,9 @@ controls remain generative guidance, so listening and explicit candidate selecti
 1. Build fuzzy candidates and classify each label with one focused Qwen call.
 2. Require the user to resolve every flagged identity.
 3. Use one focused text-model call per finalized cast member plus a dedicated book-wide Narrator call
-   to propose editable voice settings.
+   to propose editable voice settings. An opted-in hosted composition may then run one isolated
+   line-only task per generated voice, with bounded validation, without reopening the
+   validated profile.
 4. Compile those settings and generate auditions only after flagged identity decisions are resolved.
 5. In Tune and generate, either use Qwen VoiceDesign with editable traits/direction or select a sample.
    Qwen3-ASR drafts its transcript with automatic language detection; the user replays the compact

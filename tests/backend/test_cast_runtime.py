@@ -1,9 +1,11 @@
 from meowdiobooks.backend.cast import stable_character_id
 from meowdiobooks.backend.cast_runtime import (
+    _audition_character,
     _has_complete_audition_pack,
     _reuse_unchanged_cast_voices,
     _shared_audition_identity,
 )
+from meowdiobooks.backend.languages import audition_line
 
 
 def _voice(character_id, name, labels, revision):
@@ -44,6 +46,27 @@ def test_label_only_rename_reuses_audition_and_opaque_character_id():
     assert reused[old_id]["voicePreviewRevision"] == "alice-voice-1"
     assert finalized["identities"][0]["characterId"] == old_id
     assert finalized["labelToCharacterId"] == {"Alice": old_id}
+
+
+def test_audition_character_prefers_profile_line_and_falls_back_to_local_template():
+    identity = {
+        "characterId": "alice",
+        "name": "Alice",
+        "category": "character",
+        "auditionLine": (
+            "I heard the key turn softly in the garden door, then watched the morning light "
+            "spill across the floor. Whatever waits beyond that gate, I will meet it with "
+            "a steady voice and an open heart."
+        ),
+    }
+
+    profiled = _audition_character(identity, language="english")
+    invalid = _audition_character(
+        {**identity, "auditionLine": "!!!"}, language="english"
+    )
+
+    assert profiled["previewLine"] == identity["auditionLine"]
+    assert invalid["previewLine"] == audition_line("Alice", "english")
 
 
 def test_merge_invalidates_only_the_resulting_identity():

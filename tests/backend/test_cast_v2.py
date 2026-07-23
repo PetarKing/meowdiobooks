@@ -121,8 +121,6 @@ def test_strict_proposal_validation_requires_complete_known_categories_and_flags
                 "competingLabels": [],
                 "reason": "The contextual examples identify the full name.",
                 "reviewRequired": False,
-                "voiceProfile": "Determined young adult",
-                "auditionLine": "I refuse to give up.",
             },
             {
                 "label": "Everyone",
@@ -233,8 +231,6 @@ def test_flagged_identities_block_finalization_then_map_labels_to_stable_ids():
             "category": "character",
             "canonicalName": "Natsuki Subaru",
             "reviewRequired": True,
-            "voiceProfile": "Determined young adult",
-            "auditionLine": "I refuse to give up.",
         },
         {
             "label": "Subaru-kun",

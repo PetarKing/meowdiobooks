@@ -22,6 +22,7 @@ from meowdiobooks.backend.app_v2 import (
     create_app_v2,
 )
 from meowdiobooks.backend.artifacts import active_artifacts, read_artifact, write_artifact
+from meowdiobooks.backend.languages import shared_audition_line
 from meowdiobooks.backend.tts_v2 import (
     TTSContractError,
     _assemble_chapter_wav,
@@ -542,8 +543,6 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
                 "aliases": [],
                 "competingLabels": [],
                 "reason": "The explicit label is stable in context.",
-                "voiceProfile": "Bright, curious young voice.",
-                "auditionLine": "Hello",
                 "reviewRequired": False,
             }
         ],
@@ -557,6 +556,8 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
     def fake_voice_settings(
         _repo, identities, _dossiers, _spans, _report, **_kwargs
     ):
+        assert "generate_audition_line" not in _kwargs
+        assert "language" not in _kwargs
         profile_batches.append([str(row["characterId"]) for row in identities])
         narrator = {
             "presentation": "unspecified",
@@ -847,6 +848,212 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         assert render_calls[0]["sourceCoverage"] == {"status": "exact", "sourceSpanCount": 1}
 
 
+def test_opt_in_profile_audition_lines_are_stored_and_reused_for_regeneration(tmp_path):
+    proposal = {
+        "status": "ready",
+        "dossiers": [
+            {"label": "Alice", "occurrenceCount": 1, "examples": []},
+            {"label": "Bob", "occurrenceCount": 0, "examples": []},
+        ],
+        "fuzzyCandidates": [],
+        "globalLabelLedger": "Alice\t1\tfirst:0",
+        "proposals": [
+            {
+                "label": "Alice",
+                "category": "character",
+                "canonicalName": "Alice",
+                "aliases": [],
+                "competingLabels": [],
+                "reason": "The explicit label is stable in context.",
+                "reviewRequired": False,
+            },
+            {
+                "label": "Bob",
+                "category": "character",
+                "canonicalName": "Bob",
+                "aliases": [],
+                "competingLabels": [],
+                "reason": "The explicit label is stable in context.",
+                "reviewRequired": False,
+            },
+        ],
+        "reconciliationConflicts": [],
+        "processing": {"labels": 1, "batches": 1, "model": "test"},
+    }
+    settings = {
+        "presentation": "unspecified",
+        "age": "adult",
+        "tone": "warm",
+        "pitch": "medium",
+        "pace": "measured",
+        "energy": "balanced",
+        "accent": "unspecified",
+        "description": "Clear and natural.",
+    }
+    profiler_calls = []
+
+    def profile(_repo, identities, _dossiers, _spans, _report, **kwargs):
+        profiler_calls.append(kwargs)
+        return {
+            "narrator": {
+                **settings,
+                "auditionLine": (
+                    "Night settled quietly over the harbour as the final lanterns flickered "
+                    "along the quay. Far beyond the breakwater, a patient bell marked the "
+                    "hours, and every darkened window seemed to hold a secret."
+                ),
+            },
+            **{
+                str(row["characterId"]): {
+                    **settings,
+                    "auditionLine": (
+                        (
+                            "I kept the silver key, though nobody asked me why. Perhaps tomorrow "
+                            "I will cross the square, unlock the weathered garden door, and finally "
+                            "discover which promise has been waiting there for me."
+                        )
+                        if row["name"] == "Alice"
+                        else "!!!"
+                    ),
+                }
+                for row in identities
+            },
+        }
+
+    audition_inputs = []
+
+    def audition(_repo, package, _book_id, characters, report, _language, _model_id):
+        audition_inputs.append([dict(row) for row in characters])
+        for row in characters:
+            revision = f"voice-{row['id']}-{len(row.get('voiceCandidates', [])) + 1}"
+            path = package / "voices" / row["id"] / f"{revision}.wav"
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b"RIFF-test")
+            row.update(
+                {
+                    "voicePreviewRevision": revision,
+                    "previewUrl": f"/voice/{revision}",
+                    "referenceText": row["previewLine"],
+                    "voice": row["voiceDirection"],
+                    "voiceCandidates": [
+                        *row.get("voiceCandidates", []),
+                        {
+                            "revision": revision,
+                            "previewUrl": f"/voice/{revision}",
+                            "referenceText": row["previewLine"],
+                            "direction": row["voiceDirection"],
+                            "voiceSettings": row["voiceSettings"],
+                        },
+                    ],
+                }
+            )
+        report(100, "done")
+        return characters
+
+    with TestClient(
+        create_app_v2(
+            tmp_path,
+            cast_proposer=lambda *_args: proposal,
+            voice_profiler=profile,
+            voice_auditioner=audition,
+            generate_voice_audition_lines=True,
+        )
+    ) as client:
+        imported = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()
+        book_id = imported["book"]["id"]
+        _seed_reviewed_transcript(tmp_path, book_id)
+
+        identity = _process(client, book_id, "cast", {})
+        audition_result = _process(
+            client,
+            book_id,
+            "cast",
+            {"proposalRevision": identity["revision"], "language": "english"},
+        )
+        candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{audition_result['revision']}"
+        ).json()
+        alice = next(row for row in candidate["identities"] if row["name"] == "Alice")
+        bob = next(row for row in candidate["identities"] if row["name"] == "Bob")
+
+        assert profiler_calls == [
+            {
+                "include_narrator": True,
+                "generate_audition_line": True,
+                "language": "english",
+            }
+        ]
+        assert candidate["narrator"]["auditionLine"] == (
+            "Night settled quietly over the harbour as the final lanterns flickered along "
+            "the quay. Far beyond the breakwater, a patient bell marked the hours, and every "
+            "darkened window seemed to hold a secret."
+        )
+        assert candidate["narrator"]["referenceText"] == candidate["narrator"]["auditionLine"]
+        assert alice["auditionLine"] == (
+            "I kept the silver key, though nobody asked me why. Perhaps tomorrow I will cross "
+            "the square, unlock the weathered garden door, and finally discover which promise "
+            "has been waiting there for me."
+        )
+        assert alice["referenceText"] == alice["auditionLine"]
+        assert "auditionLine" not in alice["voiceSettings"]
+        assert "auditionLine" not in bob
+        assert bob["referenceText"] == _audition_line("Bob", "english")
+        assert bob["voiceSettings"] == settings
+
+        regenerated = _process(
+            client,
+            book_id,
+            "cast",
+            {
+                "proposalRevision": audition_result["revision"],
+                "characterId": alice["characterId"],
+                "voiceSettings": {**alice["voiceSettings"], "pace": "brisk"},
+            },
+        )
+        regenerated_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{regenerated['revision']}"
+        ).json()
+        decisions = [
+            {
+                "characterId": row["characterId"],
+                "voiceRevision": row["voicePreviewRevision"],
+            }
+            for row in [
+                regenerated_candidate["narrator"],
+                *regenerated_candidate["identities"],
+            ]
+        ]
+        accepted = _accept(
+            client, book_id, "cast", regenerated["revision"], decisions
+        )
+        assert accepted.status_code == 200, accepted.text
+
+    regenerated_alice = next(
+        row for row in regenerated_candidate["identities"] if row["name"] == "Alice"
+    )
+    assert regenerated_alice["auditionLine"] == alice["auditionLine"]
+    assert regenerated_alice["referenceText"] == alice["auditionLine"]
+    assert audition_inputs[-1][0]["previewLine"] == alice["auditionLine"]
+    accepted_cast = read_artifact(tmp_path / "packages" / book_id, "cast")
+    assert accepted_cast["narrator"]["auditionLine"] == candidate["narrator"]["auditionLine"]
+    assert next(
+        row for row in accepted_cast["identities"] if row["name"] == "Alice"
+    )["auditionLine"] == alice["auditionLine"]
+    assert "auditionLine" not in next(
+        row for row in accepted_cast["identities"] if row["name"] == "Bob"
+    )
+
+    with TestClient(create_app_v2(tmp_path)) as restarted:
+        reopened = restarted.get(f"/api/books/{book_id}/snapshot").json()["cast"]
+
+    assert reopened["narrator"]["auditionLine"] == candidate["narrator"]["auditionLine"]
+    assert next(row for row in reopened["identities"] if row["name"] == "Alice")[
+        "auditionLine"
+    ] == alice["auditionLine"]
+
+
 def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_path):
     labels = ["Guard", "Rebel", *(["Major"] * 98)]
     spans = [
@@ -937,6 +1144,11 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
                     **settings,
                     "tone": "dark" if row["name"] == "Guard" else "bright",
                     "description": f"Profile designed for {row['name']}.",
+                    "auditionLine": (
+                        "A restless wind moved over the watchtower while distant bells answered "
+                        "from the valley. I held my ground, listened for the returning signal, "
+                        "and prepared to carry the warning through the sleeping town."
+                    ),
                 }
                 for row in identities
             },
@@ -946,6 +1158,7 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
                 collision_window_turns=8,
                 compatibility_fields=("age", "presentation"),
             ),
+            generate_voice_audition_lines=True,
         )
     ) as client:
         imported = client.post(
@@ -1025,6 +1238,8 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
     ]
     assert by_name["Guard"]["voiceCandidates"][0]["source"] == "shared"
     assert by_name["Rebel"]["voiceCandidates"][0]["source"] == "shared"
+    assert by_name["Guard"]["referenceText"] == shared_audition_line("english")
+    assert by_name["Rebel"]["referenceText"] == shared_audition_line("english")
     assert by_name["Guard"]["voiceCandidates"][0]["sharedVoiceGroupId"].startswith(
         "shared-voice-"
     )
