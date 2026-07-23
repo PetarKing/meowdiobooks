@@ -58,6 +58,7 @@ from .cast_runtime import (
     _audition_line,
     _cast_with_line_counts,
     _expand_cast_label_mapping,
+    _has_complete_audition_pack,
     _rebase_accepted_cast,
     _reuse_unchanged_cast_voices,
     _shared_audition_identity,
@@ -403,6 +404,18 @@ def _voice_sharing_policy_for_model(
     return resolver(model_id) if resolver is not None else default_policy
 
 
+def _voice_recipe_version(models: list[dict[str, Any]], model_id: str) -> str:
+    """Resolve the current whole-pack recipe version for one selectable voice model."""
+
+    model = next((row for row in models if str(row.get("id", "")) == model_id), None)
+    if model is None:
+        raise CastContractError(f"Unknown voice model: {model_id}")
+    version = str(model.get("recipeVersion", "")).strip()
+    if not version:
+        raise CastContractError(f"Voice model {model_id} does not declare a recipe version")
+    return version
+
+
 def create_app_v2(
     data_dir: Path | str = Path(".meowdiobooks"),
     frontend_dist: Path | str | None = None,
@@ -501,6 +514,21 @@ def create_app_v2(
 
     def workspace_for(book_id: str) -> BookWorkspace:
         return BookWorkspace.under(root, book_id)
+
+    def current_voice_recipe_version(model_id: str) -> str:
+        return _voice_recipe_version(voice_models(repo_root), model_id)
+
+    def cast_with_recipe_freshness(payload: dict[str, Any]) -> dict[str, Any]:
+        if not payload or payload.get("phase") == "identity-review":
+            return payload
+        model_id = str(payload.get("voiceModel") or default_voice_id)
+        current_version = current_voice_recipe_version(model_id)
+        return {
+            **payload,
+            "auditionPackRefreshRequired": (
+                str(payload.get("auditionPackRecipeVersion", "")) != current_version
+            ),
+        }
 
     def require_library_export(export_id: str) -> tuple[LibraryExport, Path]:
         item = library.get(export_id)
@@ -675,6 +703,8 @@ def create_app_v2(
                     dialogue_revision=str(dialogue["revision"]),
                     review_revision=str(review["revision"]),
                     revision=revision,
+                    voice_recipe_version_for_model=current_voice_recipe_version,
+                    default_voice_model=default_voice_id,
                 )
             if reusable is not None:
                 path, artifact = write_artifact(package, "cast", reusable, publish=False)
@@ -720,6 +750,11 @@ def create_app_v2(
                     )
                 model_id = str(proposal.get("voiceModel", default_voice_id))
                 language = normalize_language(proposal.get("language", "english"))
+                current_recipe_version = current_voice_recipe_version(model_id)
+                if str(proposal.get("auditionPackRecipeVersion", "")) != current_recipe_version:
+                    raise CastContractError(
+                        "The audition recipe changed; regenerate the complete audition pack first"
+                    )
                 rows = [proposal.get("narrator"), *proposal.get("identities", [])]
                 target = next(
                     (
@@ -797,21 +832,46 @@ def create_app_v2(
                 raise CastContractError(
                     "Select a language supported by the selected voice-audition model"
                 )
-            reuse_existing = (
+            current_recipe_version = current_voice_recipe_version(model_id)
+            same_selection = (
                 phase == "audition-review"
                 and model_id == str(proposal.get("voiceModel", default_voice_id))
                 and language == normalize_language(proposal.get("language", "english"))
             )
-            reused = (
-                _reuse_unchanged_cast_voices(finalized, proposal) if reuse_existing else {}
+            recipe_is_current = (
+                str(proposal.get("auditionPackRecipeVersion", "")) == current_recipe_version
             )
+            matched = _reuse_unchanged_cast_voices(finalized, proposal) if same_selection else {}
+            reused: dict[str, dict[str, Any]] = {}
+            for character_id, row in matched.items():
+                route = row.get("voiceRoute")
+                if isinstance(route, dict) and route.get("kind") == "layered":
+                    layered = deepcopy(row)
+                    for key in (
+                        "acceptedVoiceRevision",
+                        "previewUrl",
+                        "referenceAudio",
+                        "referenceMode",
+                        "referenceText",
+                        "voiceCandidates",
+                        "voicePreviewRevision",
+                        "voiceRevision",
+                    ):
+                        layered.pop(key, None)
+                    reused[character_id] = layered
+                elif recipe_is_current and _has_complete_audition_pack(row):
+                    reused[character_id] = row
             affected = [
                 row
                 for row in finalized["identities"]
                 if str(row["characterId"]) not in reused
             ]
-            profile_targets = affected if reuse_existing else finalized["identities"]
-            include_narrator_profile = not reuse_existing
+            profile_targets = [
+                row
+                for row in finalized["identities"]
+                if str(row["characterId"]) not in matched
+            ]
+            include_narrator_profile = not same_selection
             profiles: dict[str, dict[str, str]] = {}
             if profile_targets or include_narrator_profile:
                 checkpoint_key = profile_checkpoint_key(
@@ -897,7 +957,7 @@ def create_app_v2(
             desired_settings_by_id.update(
                 {
                     character_id: row.get("voiceSettings", {})
-                    for character_id, row in reused.items()
+                    for character_id, row in matched.items()
                 }
             )
             selected_sharing_policy = _voice_sharing_policy_for_model(
@@ -915,15 +975,15 @@ def create_app_v2(
                     finalized.get("labelToCharacterId", {}),
                     selected_sharing_policy,
                     shareable_character_ids={
-                        str(row["characterId"]) for row in profile_targets
+                        str(row["characterId"]) for row in affected
                     },
                 )
                 shared_group_by_id = sharing_plan.group_by_character_id
             characters = []
-            profile_by_id = {
-                str(row["characterId"]): row for row in profile_targets
+            affected_by_id = {
+                str(row["characterId"]): row for row in affected
             }
-            for row in profile_targets:
+            for row in affected:
                 character_id = str(row["characterId"])
                 group = shared_group_by_id.get(character_id)
                 if group is not None and character_id != group.character_ids[0]:
@@ -938,16 +998,27 @@ def create_app_v2(
                             "name": f"Supporting voice {group.id.rsplit('-', 1)[-1]}",
                             "previewLine": shared_audition_line(language),
                             "lineCount": sum(
-                                int(profile_by_id[member_id].get("lineCount", 0))
+                                int(affected_by_id[member_id].get("lineCount", 0))
                                 for member_id in group.character_ids
-                                if member_id in profile_by_id
+                                if member_id in affected_by_id
                             ),
                         }
                     )
                 characters.append(character)
-            if not reuse_existing:
-                narrator_profile = profiles.get(
-                    "narrator", default_voice_settings("narrator")
+            previous_narrator = proposal.get("narrator")
+            reusable_narrator = (
+                same_selection
+                and recipe_is_current
+                and isinstance(previous_narrator, dict)
+                and _has_complete_audition_pack(previous_narrator)
+            )
+            if not reusable_narrator:
+                narrator_profile = (
+                    deepcopy(previous_narrator.get("voiceSettings"))
+                    if same_selection
+                    and isinstance(previous_narrator, dict)
+                    and isinstance(previous_narrator.get("voiceSettings"), dict)
+                    else profiles.get("narrator", default_voice_settings("narrator"))
                 )
                 narrator_settings = validate_voice_settings(
                     narrator_profile, fallback_category="narrator"
@@ -999,10 +1070,8 @@ def create_app_v2(
                 report(90, "Cast labels updated; all existing auditions remain valid")
                 generated = []
             by_id = {str(row["id"]): row for row in generated}
-            if reuse_existing:
-                previous_narrator = proposal.get("narrator")
-                if not isinstance(previous_narrator, dict):
-                    raise CastContractError("Editable Cast candidate is missing the narrator voice")
+            if reusable_narrator:
+                assert isinstance(previous_narrator, dict)
                 narrator = {
                     **previous_narrator,
                     "name": "Narrator",
@@ -1019,6 +1088,8 @@ def create_app_v2(
                 "status": "needs-voice-review",
                 "language": language,
                 "voiceModel": model_id,
+                "auditionPackRecipeVersion": current_recipe_version,
+                "auditionPackRefreshRequired": False,
                 "narrator": narrator,
                 "identities": [
                     reused.get(str(row["characterId"]))
@@ -1403,7 +1474,9 @@ def create_app_v2(
             ),
             None,
         )
-        visible_cast = _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue)
+        visible_cast = cast_with_recipe_freshness(
+            _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue)
+        )
         recoverable_stages = _recoverable_stages(jobs.all(), book.id)
         malformed_dialogue_recovery = dialogue_recovery(dialogue)
         return {
@@ -2001,6 +2074,14 @@ def create_app_v2(
             raise HTTPException(status_code=404, detail=str(error)) from error
         if candidate.get("phase") != "audition-review":
             raise HTTPException(status_code=409, detail="Voice samples require an editable Voice draft")
+        model_id = str(candidate.get("voiceModel") or default_voice_id)
+        if str(candidate.get("auditionPackRecipeVersion", "")) != current_voice_recipe_version(
+            model_id
+        ):
+            raise HTTPException(
+                status_code=409,
+                detail="The audition recipe changed; regenerate the complete audition pack first",
+            )
 
         rows = [candidate.get("narrator"), *candidate.get("identities", [])]
         target = next(
@@ -2325,6 +2406,13 @@ def create_app_v2(
                 else:
                     path = package_for(book_id) / "artifacts" / kind / f"{body.revision}.json"
             elif parsed == WizardStage.CAST:
+                model_id = str(candidate.get("voiceModel") or default_voice_id)
+                if str(
+                    candidate.get("auditionPackRecipeVersion", "")
+                ) != current_voice_recipe_version(model_id):
+                    raise CastContractError(
+                        "The audition recipe changed; regenerate the complete audition pack first"
+                    )
                 accepted_payload = _accept_voice_revisions(candidate, body.decisions, uuid4().hex)
                 path, accepted_payload = write_artifact(
                     package_for(book_id), "cast", accepted_payload, publish=False

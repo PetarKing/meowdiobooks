@@ -183,6 +183,7 @@ def voice_model_capabilities(repo_root: Path) -> list[dict[str, Any]]:
         {
             "id": pipeline.id,
             "label": pipeline.label,
+            "recipeVersion": pipeline.recipe_version,
             "supportedLanguages": sorted(pipeline.languages),
         }
         for pipeline in pipelines

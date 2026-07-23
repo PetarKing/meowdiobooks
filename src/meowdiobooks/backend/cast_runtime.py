@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from .artifacts import artifact_history
 from .cast import label_comparison_key
@@ -63,12 +63,40 @@ def _reuse_unchanged_cast_voices(
     return reused
 
 
+def _has_complete_audition_pack(voice: dict[str, Any]) -> bool:
+    """Return whether one voice row has every audition promised by its plan."""
+
+    candidates = [
+        row
+        for row in voice.get("voiceCandidates", [])
+        if isinstance(row, dict) and str(row.get("revision", "")).strip()
+    ]
+    plan = voice.get("voiceCandidatePlan")
+    alternatives = (
+        plan.get("automaticAlternatives", 0)
+        if isinstance(plan, dict)
+        else 0
+    )
+    expected = 1 + (
+        alternatives
+        if isinstance(alternatives, int)
+        and not isinstance(alternatives, bool)
+        and alternatives > 0
+        else 0
+    )
+    if candidates:
+        return len(candidates) >= expected
+    return bool(str(voice.get("voicePreviewRevision", "")).strip())
+
+
 def _rebase_accepted_cast(
     package: Path,
     *,
     dialogue_revision: str,
     review_revision: str,
     revision: str,
+    voice_recipe_version_for_model: Callable[[str], str],
+    default_voice_model: str,
 ) -> dict[str, Any] | None:
     """Reuse accepted identities and auditions when only Review changed."""
 
@@ -83,6 +111,8 @@ def _rebase_accepted_cast(
     )
     if previous is None:
         return None
+    model_id = str(previous.get("voiceModel") or default_voice_model)
+    current_recipe_version = voice_recipe_version_for_model(model_id)
     return {
         **deepcopy(previous),
         "revision": revision,
@@ -90,6 +120,9 @@ def _rebase_accepted_cast(
         "status": "needs-voice-review",
         "reviewRevision": review_revision,
         "reusedFromRevision": previous["revision"],
+        "auditionPackRefreshRequired": (
+            str(previous.get("auditionPackRecipeVersion", "")) != current_recipe_version
+        ),
     }
 
 

@@ -1592,6 +1592,8 @@ def test_review_only_change_reuses_the_accepted_cast_and_auditions(tmp_path):
         dialogue_revision="dialogue-1",
         review_revision="review-2",
         revision="cast-candidate-2",
+        voice_recipe_version_for_model=lambda _model_id: "1",
+        default_voice_model="qwen",
     )
 
     assert rebased is not None
@@ -1599,15 +1601,209 @@ def test_review_only_change_reuses_the_accepted_cast_and_auditions(tmp_path):
     assert rebased["reviewRevision"] == "review-2"
     assert rebased["reusedFromRevision"] == accepted["revision"]
     assert rebased["narrator"] == accepted["narrator"]
+    assert rebased["auditionPackRefreshRequired"] is True
     assert (
         _rebase_accepted_cast(
             package,
             dialogue_revision="dialogue-2",
             review_revision="review-2",
             revision="cast-candidate-3",
+            voice_recipe_version_for_model=lambda _model_id: "1",
+            default_voice_model="qwen",
         )
         is None
     )
+
+
+def test_review_only_change_reuses_a_current_whole_audition_pack(tmp_path):
+    package = tmp_path / "package"
+    write_artifact(
+        package,
+        "cast",
+        {
+            "revision": "cast-accepted-1",
+            "phase": "accepted",
+            "status": "accepted",
+            "dialogueRevision": "dialogue-1",
+            "reviewRevision": "review-1",
+            "voiceModel": "balanced",
+            "auditionPackRecipeVersion": "7",
+            "narrator": {"characterId": "narrator", "voiceCandidates": []},
+            "identities": [],
+        },
+        publish=False,
+    )
+
+    rebased = _rebase_accepted_cast(
+        package,
+        dialogue_revision="dialogue-1",
+        review_revision="review-2",
+        revision="cast-candidate-2",
+        voice_recipe_version_for_model=lambda model_id: (
+            "7" if model_id == "balanced" else "unexpected"
+        ),
+        default_voice_model="fallback",
+    )
+
+    assert rebased is not None
+    assert rebased["auditionPackRefreshRequired"] is False
+
+
+def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
+    recipe = {"version": "1"}
+    profile_calls = 0
+    audition_batches: list[list[str]] = []
+
+    proposal = {
+        "status": "ready",
+        "dossiers": [{"label": "Alice", "occurrenceCount": 1, "examples": []}],
+        "fuzzyCandidates": [],
+        "globalLabelLedger": "Alice\t1\tfirst:0",
+        "proposals": [
+            {
+                "label": "Alice",
+                "category": "character",
+                "canonicalName": "Alice",
+                "aliases": [],
+                "competingLabels": [],
+                "reason": "Explicit source label.",
+                "reviewRequired": False,
+            }
+        ],
+        "reconciliationConflicts": [],
+        "processing": {"labels": 1, "batches": 1, "model": "test"},
+    }
+
+    def profile(_repo, identities, *_args, **_kwargs):
+        nonlocal profile_calls
+        profile_calls += 1
+        settings = {
+            "presentation": "unspecified",
+            "age": "adult",
+            "tone": "warm",
+            "pitch": "medium",
+            "pace": "measured",
+            "energy": "balanced",
+            "accent": "unspecified",
+            "description": "Stable reviewed direction.",
+        }
+        return {"narrator": settings, **{str(row["characterId"]): settings for row in identities}}
+
+    def audition(_repo, _package, _book_id, characters, report, _language, _model):
+        audition_batches.append([str(row["id"]) for row in characters])
+        for row in characters:
+            revision = f"{recipe['version']}-{row['id']}-{len(audition_batches)}"
+            row.update(
+                {
+                    "voicePreviewRevision": revision,
+                    "previewUrl": f"/voice/{revision}",
+                    "referenceText": row["previewLine"],
+                    "voice": row["voiceDirection"],
+                    "voiceCandidates": [
+                        {
+                            "revision": revision,
+                            "previewUrl": f"/voice/{revision}",
+                            "referenceText": row["previewLine"],
+                            "direction": row["voiceDirection"],
+                            "voiceSettings": row["voiceSettings"],
+                        }
+                    ],
+                }
+            )
+        report(100, "done")
+        return characters
+
+    with TestClient(
+        create_app_v2(
+            tmp_path,
+            cast_proposer=lambda *_args: proposal,
+            voice_profiler=profile,
+            voice_auditioner=audition,
+            voice_models=lambda _root: [
+                {
+                    "id": "balanced",
+                    "label": "Balanced",
+                    "recipeVersion": recipe["version"],
+                    "supportedLanguages": ["english"],
+                }
+            ],
+            voice_languages=lambda _root, _model: ["english"],
+            default_voice_model="balanced",
+            voice_candidate_policy={
+                "enabled": False,
+                "coverage_fraction": 0.8,
+                "min_voices": 0,
+                "max_voices": 1,
+                "extra_candidates": 1,
+            },
+        )
+    ) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+        _seed_reviewed_transcript(tmp_path, book_id)
+
+        identity = _process(client, book_id, "cast", {})
+        first = _process(
+            client,
+            book_id,
+            "cast",
+            {
+                "proposalRevision": identity["revision"],
+                "voiceModel": "balanced",
+                "language": "english",
+            },
+        )
+        first_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{first['revision']}"
+        ).json()
+        first_voices = [first_candidate["narrator"], *first_candidate["identities"]]
+        decisions = [
+            {"characterId": row["characterId"], "voiceRevision": row["voicePreviewRevision"]}
+            for row in first_voices
+        ]
+        assert _accept(client, book_id, "cast", first["revision"], decisions).status_code == 200
+
+        recipe["version"] = "2"
+        reopened = _process(client, book_id, "cast", {})
+        reopened_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{reopened['revision']}"
+        ).json()
+        assert reopened_candidate["auditionPackRefreshRequired"] is True
+        assert _accept(client, book_id, "cast", reopened["revision"], decisions).status_code == 409
+
+        refreshed = _process(
+            client,
+            book_id,
+            "cast",
+            {
+                "proposalRevision": reopened["revision"],
+                "voiceModel": "balanced",
+                "language": "english",
+            },
+        )
+        refreshed_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{refreshed['revision']}"
+        ).json()
+
+    refreshed_voices = [refreshed_candidate["narrator"], *refreshed_candidate["identities"]]
+    assert refreshed_candidate["auditionPackRecipeVersion"] == "2"
+    assert refreshed_candidate["auditionPackRefreshRequired"] is False
+    assert profile_calls == 1
+    assert audition_batches == [
+        ["narrator", first_candidate["identities"][0]["characterId"]],
+        ["narrator", first_candidate["identities"][0]["characterId"]],
+    ]
+    assert [row["characterId"] for row in refreshed_voices] == [
+        row["characterId"] for row in first_voices
+    ]
+    assert [row["voiceSettings"] for row in refreshed_voices] == [
+        row["voiceSettings"] for row in first_voices
+    ]
+    assert all(str(row["voicePreviewRevision"]).startswith("2-") for row in refreshed_voices)
+    assert not {row["voicePreviewRevision"] for row in first_voices} & {
+        candidate["revision"] for row in refreshed_voices for candidate in row["voiceCandidates"]
+    }
 
 
 def test_legacy_cast_line_counts_are_backfilled_without_rewriting_audio():

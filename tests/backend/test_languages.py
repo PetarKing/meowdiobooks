@@ -38,6 +38,7 @@ audition_source = "example/audition"
 audition_revision = "one"
 renderer_source = "example/renderer"
 renderer_revision = "one"
+recipe_version = "1"
 languages = ["english", "french"]
 """.strip(),
         encoding="utf-8",

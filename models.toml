@@ -65,6 +65,8 @@ policy = "dual-perspective-exact"
 [voice_pipelines."qwen-voice-design-1.7b"]
 label = "Qwen3-TTS 1.7B VoiceDesign"
 engine = "mlx_audio"
+# Bump whenever the complete audition recipe changes while this selectable model ID remains stable.
+recipe_version = "1"
 audition_path = "models/qwen_1_7b_voice_design"
 renderer_path = "models/qwen_1_7b_base_4bit"
 audition_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"

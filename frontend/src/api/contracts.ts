@@ -327,6 +327,8 @@ export interface CastArtifact {
   revision: string;
   phase: "identity-review" | "audition-review" | "accepted";
   reusedFromRevision?: string;
+  auditionPackRecipeVersion?: string;
+  auditionPackRefreshRequired?: boolean;
   dossiers: CastDossier[];
   proposals: CastProposal[];
   processing?: { labels?: number; batches?: number; model?: string };
@@ -432,7 +434,7 @@ export interface WizardSnapshot {
     history: ArtifactHistoryEntry[];
   };
   cast?: CastArtifact;
-  voiceModels: Array<{ id: string; label: string; supportedLanguages: string[] }>;
+  voiceModels: Array<{ id: string; label: string; recipeVersion?: string; supportedLanguages: string[] }>;
   voiceSelection: { modelId?: string; language?: string };
   recoverableStages?: Partial<Record<ProcessableStage, {
     attempt: number;

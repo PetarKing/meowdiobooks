@@ -83,6 +83,7 @@ class VoicePipelineConfig:
     audition_revision: str
     renderer_source: str
     renderer_revision: str
+    recipe_version: str
     languages: tuple[str, ...]
 
 
@@ -370,6 +371,7 @@ def _voice_pipeline(model_id: str, value: Any) -> VoicePipelineConfig:
         audition_revision=_string(row, "audition_revision"),
         renderer_source=_string(row, "renderer_source"),
         renderer_revision=_string(row, "renderer_revision"),
+        recipe_version=_string(row, "recipe_version"),
         languages=languages,
     )
 

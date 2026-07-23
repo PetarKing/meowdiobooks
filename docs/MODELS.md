@@ -89,6 +89,11 @@ Each `voice_pipelines` entry is one user-selectable pair:
 - `renderer_path` renders chapters from that accepted reference;
 - `languages` controls the existing Voice model and Book language controls in Cast & Voices.
 
+`recipe_version` is a short opaque version scoped to that stable voice-pipeline ID. Increment it
+whenever the composition that produces auditions changes. Core records it once on the complete Cast
+audition pack: a match permits reuse, while a changed or legacy-missing version refreshes the whole
+pack without discarding identities, mappings, settings or directions.
+
 Adding a second voice pipeline automatically adds it to the existing selector; no frontend changes
 are required. A configured language must be supported by both installed model configurations.
 

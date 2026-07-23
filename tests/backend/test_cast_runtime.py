@@ -1,6 +1,7 @@
 from meowdiobooks.backend.cast import stable_character_id
 from meowdiobooks.backend.cast_runtime import (
     _audition_character,
+    _has_complete_audition_pack,
     _reuse_unchanged_cast_voices,
     _shared_audition_identity,
 )
@@ -98,6 +99,16 @@ def test_merge_invalidates_only_the_resulting_identity():
 
     assert reused == {}
     assert [row["name"] for row in affected] == ["Alice"]
+
+
+def test_complete_audition_pack_requires_every_planned_take():
+    voice = _voice("alice", "Alice", ["Alice"], "alice-voice-1")
+    voice["voiceCandidatePlan"] = {"automaticAlternatives": 1}
+
+    assert _has_complete_audition_pack(voice) is False
+
+    voice["voiceCandidates"].append({"revision": "alice-voice-2"})
+    assert _has_complete_audition_pack(voice) is True
 
 
 def test_shared_audition_preserves_each_identity_desired_settings(tmp_path):

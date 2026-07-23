@@ -2765,6 +2765,32 @@ describe('v2 wizard', () => {
     expect(applyEdits).toBeEnabled()
   })
 
+  it('offers one complete pack refresh when the registered voice recipe changed', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import','extract','dialogue','review'] },
+      cast: {
+        revision: 'auditions-old',
+        phase: 'audition-review',
+        auditionPackRecipeVersion: '6',
+        auditionPackRefreshRequired: true,
+        dossiers: [],
+        proposals: [{ label: 'Alice', category: 'character', canonicalName: 'Alice', reviewRequired: false }],
+        identityDecisions: [{ label: 'Alice', category: 'character', canonicalName: 'Alice', aliases: [], primaryLabel: 'Alice' }],
+        narrator: { characterId: 'narrator', name: 'Narrator', voicePreviewRevision: 'nv6', previewUrl: '/n.wav' },
+        identities: [{ characterId: 'alice', name: 'Alice', voicePreviewRevision: 'av6', previewUrl: '/a.wav' }],
+      },
+      generatedChapters: [],
+    }
+
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+
+    expect(screen.getByText('The voice recipe changed; regenerate the complete audition pack')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Regenerate audition pack →' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: 'Accept cast & voices →' })).not.toBeInTheDocument()
+  })
+
   it('warns before defaulting only unapproved voices and preserves an approved earlier revision', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
