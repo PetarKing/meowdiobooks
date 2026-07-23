@@ -25,6 +25,11 @@ invalidate the whole cast. **Reclassify from Dialogue** explicitly reruns label
 classification from the accepted Dialogue and Review without overwriting the previously accepted Cast
 revision. The new candidate must still be accepted. A Dialogue change also requires fresh classification.
 
+The complete audition pack pins one recipe version for its selected voice model. The same registered
+version reuses the pack. A changed or legacy-missing version preserves reviewed identities, mappings,
+settings, directions and routes, but requires a complete pack refresh; one Cast revision never mixes
+old- and new-recipe auditions.
+
 Example: `Dr. Vey` and `the doctor` remain two source labels. If evidence supports one person and the
 user confirms the merge, both map to one durable character ID. Generation follows that ID, not either
 display string.

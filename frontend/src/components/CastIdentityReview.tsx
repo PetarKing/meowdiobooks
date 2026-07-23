@@ -33,7 +33,7 @@ interface Props {
   setDecisions: Dispatch<SetStateAction<Record<string, IdentityDecision>>>;
   resolvedLabels: string[];
   setResolvedLabels: Dispatch<SetStateAction<string[]>>;
-  voiceModels: Array<{ id: string; label: string; supportedLanguages: string[] }>;
+  voiceModels: Array<{ id: string; label: string; recipeVersion?: string; supportedLanguages: string[] }>;
   voiceModel: string;
   language: string;
   onVoiceModelChange: (modelId: string) => void;

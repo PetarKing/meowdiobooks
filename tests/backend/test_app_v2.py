@@ -666,6 +666,7 @@ def test_snapshot_exposes_installed_voice_model_languages(tmp_path):
         snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
 
         assert snapshot["voiceModels"][0]["id"] == "qwen-voice-design-1.7b"
+        assert snapshot["voiceModels"][0]["recipeVersion"] == "1"
         assert "english" in snapshot["voiceModels"][0]["supportedLanguages"]
         assert snapshot["voiceSelection"]["modelId"] == "qwen-voice-design-1.7b"
 

@@ -155,12 +155,16 @@ Cast references accepted Dialogue and Review revisions. It contains:
   identity. A cloned candidate keeps its generated audition for review and its uploaded sample plus
   user-entered transcript as the production reference, all selected through one preserved candidate
   revision. Legacy transcript-free speaker-embedding artifacts remain readable;
+- one whole-pack voice recipe version. Auditions are reusable only while it matches the currently
+  registered version for the selected voice model. A changed or missing version preserves identities,
+  mappings, settings, directions and routes but requires the complete audition pack to be regenerated;
 - or, for a group only, a confirmed layered `voiceRoute` containing at least two existing character
   IDs whose own accepted voice revisions remain authoritative.
 
 Fuzzy similarity and model proposals never perform a material merge automatically. Flagged identity
 decisions block auditions. Missing or unaccepted narrator/character voices and incomplete group voice
-routes block later phases. Layered routing never changes label, alias, or identity semantics.
+routes block later phases. Layered routing never changes label, alias, or identity semantics. One Cast
+revision never mixes auditions from different recipe versions.
 
 ## Enrichment artifact
 
