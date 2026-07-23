@@ -416,6 +416,12 @@ export interface WizardSnapshot {
   activeArtifacts: Partial<Record<ArtifactKind, string>>;
   pendingCandidates?: Partial<Record<ArtifactKind, ArtifactHistoryEntry>>;
   dialogue?: DialogueArtifact;
+  dialogueRecovery?: {
+    kind: "malformed-playable-span";
+    spanIds: string[];
+    page?: number;
+    availableActions: ["rerun-dialogue"];
+  };
   warnings: ReviewWarning[];
   boundaryCandidates: BoundaryCandidate[];
   reviewInspection: {

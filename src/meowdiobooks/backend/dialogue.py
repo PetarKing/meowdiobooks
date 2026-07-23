@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 9
+DIALOGUE_SCAN_VERSION = 10
 
 
 class DialogueContractError(ValueError):
@@ -358,6 +358,29 @@ def _is_page_number_edge_block(
     return index + 1 == len(blocks) or int(blocks[index + 1].get("page", page)) > page
 
 
+def _normalise_cross_boundary_fragments(
+    fragments: Sequence[Mapping[str, Any]],
+) -> list[dict[str, Any]]:
+    """Keep only playable fragments and renumber the remaining linked turn."""
+
+    playable = [
+        dict(fragment)
+        for fragment in fragments
+        if int(fragment["spokenStart"]) < int(fragment["spokenEnd"])
+        and str(fragment.get("text", ""))
+    ]
+    for index, fragment in enumerate(playable, 1):
+        match_id = str(fragment["matchId"]).rsplit(":fragment-", 1)[0]
+        fragment.update(
+            {
+                "matchId": f"{match_id}:fragment-{index}",
+                "fragmentIndex": index,
+                "fragmentCount": len(playable),
+            }
+        )
+    return playable
+
+
 def _cross_boundary_quote_candidates(
     blocks: Sequence[Mapping[str, Any]], profile: RegexProfile
 ) -> list[dict[str, Any]]:
@@ -450,8 +473,10 @@ def _cross_boundary_quote_candidates(
                     "origin": f"regex:{profile.id}:cross-boundary",
                 }
             )
-        result.extend(fragments)
-        consumed_through = end_index
+        playable_fragments = _normalise_cross_boundary_fragments(fragments)
+        if playable_fragments:
+            result.extend(playable_fragments)
+            consumed_through = end_index
     return result
 
 
@@ -530,6 +555,7 @@ def _cross_boundary_label_candidates(
                 )
                 else "explicit"
             )
+            fragments = []
             for fragment_index in range(start_index, end_index + 1):
                 fragment_block = blocks[fragment_index]
                 fragment_source = str(fragment_block["text"])
@@ -541,7 +567,7 @@ def _cross_boundary_label_candidates(
                 )
                 spoken_start = start_match.end() if fragment_index == start_index else 0
                 spoken_end = closer_index if fragment_index == end_index else len(fragment_source)
-                result.append(
+                fragments.append(
                     {
                         "matchId": (
                             f"match:{profile.id}:{fragment_block['id']}:"
@@ -569,8 +595,11 @@ def _cross_boundary_label_candidates(
                         "origin": f"regex:{profile.id}:cross-boundary",
                     }
                 )
-            consumed_through = end_index
-            break
+            playable_fragments = _normalise_cross_boundary_fragments(fragments)
+            if playable_fragments:
+                result.extend(playable_fragments)
+                consumed_through = end_index
+                break
     return result
 
 
@@ -678,7 +707,11 @@ def _nested_same_rule_starts(
     candidate: Mapping[str, Any], profile: RegexProfile, source: str
 ) -> list[re.Match[str]]:
     start = max(int(candidate["sourceStart"]) + 1, int(candidate["spokenStart"]))
-    end = int(candidate["sourceEnd"])
+    # A symmetric built-in delimiter such as a straight quote can make the outer
+    # closer look like the opener of another labelled turn. Built-in start
+    # grammars search only inside playable text; a complete custom regex still
+    # needs its source delimiter in the search window.
+    end = int(candidate["spokenEnd"] if profile.start_pattern else candidate["sourceEnd"])
     if start >= end:
         return []
     if profile.start_pattern:
@@ -735,20 +768,25 @@ def _split_interrupted_candidate(
         spoken_end = (
             starts[index + 1] if index + 1 < len(starts) else int(candidate["spokenEnd"])
         )
+        spoken_start = spoken_starts[index]
+        text = source[spoken_start:spoken_end]
+        if not (source_start <= spoken_start < spoken_end <= source_end and text):
+            span_id = f"span:{candidate['blockId']}:{spoken_start}-{spoken_end}"
+            raise DialogueContractError(_invalid_playable_span_message(span_id))
         speaker = speakers[index]
         row = dict(candidate)
         row.update(
             {
                 "matchId": f"{candidate['matchId']}:split-{index + 1}",
-                "spanId": f"span:{candidate['blockId']}:{spoken_starts[index]}-{spoken_end}",
+                "spanId": f"span:{candidate['blockId']}:{spoken_start}-{spoken_end}",
                 "pageStart": int(block["pageStart"]) + source_start,
                 "pageEnd": int(block["pageStart"]) + source_end,
                 "sourceStart": source_start,
                 "sourceEnd": source_end,
-                "spokenStart": spoken_starts[index],
+                "spokenStart": spoken_start,
                 "spokenEnd": spoken_end,
                 "source": source[source_start:source_end],
-                "text": source[spoken_starts[index]:spoken_end],
+                "text": text,
                 "sourceSpeakerLabel": speaker,
                 "speakerStatus": (
                     "unlabelled"
@@ -1081,6 +1119,7 @@ def scan_dialogue(
     for conflict in [*conflicts, *resolved_conflicts]:
         conflict["claims"] = _match_evidence_with_context(conflict["claims"], blocks)
     partition = _partition(blocks, accepted, narrator_intact_paragraphs)
+    validate_dialogue_partition({"partition": partition})
 
     profile_results = []
     for profile in sorted(profiles, key=lambda item: (item.priority, item.id)):
@@ -1240,6 +1279,76 @@ def reconstruct_partition(result: Mapping[str, Any]) -> dict[int, str]:
     return {page: "".join(parts) for page, parts in reconstructed.items()}
 
 
+def malformed_playable_spans(result: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Return dialogue spans whose playable interval cannot reproduce their text."""
+
+    spans = result.get("spans") or result.get("partition") or []
+    malformed: list[dict[str, Any]] = []
+    for raw in spans:
+        if not isinstance(raw, Mapping) or raw.get("renderRole") != "dialogue":
+            continue
+        span = dict(raw)
+        try:
+            source_start = int(span.get("sourceStart", 0))
+            source_end = int(span.get("sourceEnd", source_start))
+            spoken_start = int(span.get("spokenStart", source_start))
+            spoken_end = int(span.get("spokenEnd", source_end))
+        except (TypeError, ValueError):
+            malformed.append(span)
+            continue
+        source = str(span.get("source", ""))
+        text = str(span.get("text", ""))
+        relative_start = spoken_start - source_start
+        relative_end = spoken_end - source_start
+        if not (
+            source_start <= spoken_start < spoken_end <= source_end
+            and len(source) == source_end - source_start
+            and text
+            and source[relative_start:relative_end] == text
+        ):
+            malformed.append(span)
+    return malformed
+
+
+def validate_dialogue_partition(result: Mapping[str, Any]) -> None:
+    """Reject a partition before malformed playable spans can be published."""
+
+    malformed = malformed_playable_spans(result)
+    if malformed:
+        raise DialogueContractError(
+            _invalid_playable_span_message(str(malformed[0].get("id", "unknown")))
+        )
+
+
+def dialogue_recovery(result: Mapping[str, Any]) -> dict[str, Any] | None:
+    """Describe the explicit recovery required by an accepted malformed Dialogue."""
+
+    malformed = malformed_playable_spans(result)
+    if not malformed:
+        return None
+    span_ids = [str(row.get("id", "unknown")) for row in malformed]
+    page = None
+    for row in malformed:
+        try:
+            page = int(row["page"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        break
+    return {
+        "kind": "malformed-playable-span",
+        "spanIds": span_ids,
+        **({"page": page} if page is not None else {}),
+        "availableActions": ["rerun-dialogue"],
+    }
+
+
+def _invalid_playable_span_message(span_id: str) -> str:
+    return (
+        f"Couldn't build the transcript because dialogue span {span_id} has an invalid "
+        "text range. Adjust the dialogue rules and try again."
+    )
+
+
 def dialogue_progression_blockers(result: Mapping[str, Any]) -> list[str]:
     """Return conflicts that require a regex toggle or revised Dialogue run."""
     conflicts = list(result.get("conflicts", []))
@@ -1250,5 +1359,11 @@ def dialogue_progression_blockers(result: Mapping[str, Any]) -> list[str]:
     if structural_issues:
         blockers.append(
             f"Resolve {len(structural_issues)} interrupted dialogue turn(s) before acceptance"
+        )
+    malformed = malformed_playable_spans(result)
+    if malformed:
+        blockers.append(
+            f"Dialogue span {malformed[0].get('id', 'unknown')} has an invalid text range; "
+            "rerun Dialogue before continuing"
         )
     return blockers

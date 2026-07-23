@@ -316,6 +316,12 @@ export default function App({
 
   const book = snapshot?.book;
   const completed = snapshot?.book.completedStages ?? [];
+  const recoveryStageIndex = stageIndex("review");
+  const routeStage = (requestedStage: number, current = snapshot) => (
+    current?.dialogueRecovery && requestedStage >= recoveryStageIndex
+      ? recoveryStageIndex
+      : requestedStage
+  );
   const generateComplete = Boolean(snapshot?.generatedChapters.some((row) => row.current));
   const unlockedThrough = generateComplete
     ? stageIndex("export")
@@ -436,7 +442,11 @@ export default function App({
 
   async function hydrate(bookId: string) {
     let next = await gateway.getBookSnapshot(bookId);
-    if (next.book.completedStages.includes("enrich") && !next.recordingScript) {
+    if (
+      next.book.completedStages.includes("enrich")
+      && !next.recordingScript
+      && !next.dialogueRecovery
+    ) {
       await gateway.prepareRecordingScript(bookId);
       next = await gateway.getBookSnapshot(bookId);
       if (!next.recordingScript) throw new Error("Generate could not be prepared. Your approved work is unchanged.");
@@ -624,7 +634,10 @@ export default function App({
       const next = await hydrate(book.id);
       if (stageId === "review") setReviewCandidate(undefined);
       setRevisingStages((current) => current.filter((row) => row !== stageId));
-      setStage(Math.min(stageIndex("generate"), nextStage(next.book.completedStages)));
+      setStage(routeStage(
+        Math.min(stageIndex("generate"), nextStage(next.book.completedStages)),
+        next,
+      ));
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -646,7 +659,10 @@ export default function App({
       await gateway.acceptStage(book.id, "extract", String(candidate.revision), []);
       const next = await hydrate(book.id);
       setRevisingStages((current) => current.filter((row) => row !== "extract"));
-      setStage(Math.min(stageIndex("generate"), nextStage(next.book.completedStages)));
+      setStage(routeStage(
+        Math.min(stageIndex("generate"), nextStage(next.book.completedStages)),
+        next,
+      ));
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -667,7 +683,7 @@ export default function App({
       setExtractionPreview(await gateway.previewExtraction(result.book.id, page, method));
       setBooks((current) => [result.book, ...current.filter((row) => row.id !== result.book.id)]);
       setFile(undefined);
-      setStage(nextStage(next.book.completedStages));
+      setStage(routeStage(nextStage(next.book.completedStages), next));
       setHome(false);
     } catch (reason) {
       setError(message(reason));
@@ -685,7 +701,7 @@ export default function App({
       const pages = await gateway.getRepresentativePages(local.id);
       setRepresentatives(pages);
       setExtractionPreview(await gateway.previewExtraction(local.id, pages[0]?.page ?? 1, method));
-      setStage(nextStage(next.book.completedStages));
+      setStage(routeStage(nextStage(next.book.completedStages), next));
       setHome(false);
     } catch (reason) {
       setError(message(reason));
@@ -779,6 +795,35 @@ export default function App({
     }
   }
 
+  async function rebuildDialogueFromRecovery() {
+    if (!book || !snapshot?.dialogueRecovery || busy) return;
+    const accepted = snapshot.dialogue ?? dialogue;
+    const strategy = accepted.strategy ?? "fill-gaps";
+    const targets = accepted.attributionTargets ?? ["unlabelled-candidates"];
+    setBusy(true);
+    setError(undefined);
+    try {
+      const preview = await gateway.previewDialogue(
+        book.id,
+        dialogueSettings(accepted, strategy, targets),
+      );
+      setDialogue(preview);
+      setDialogueStrategy(strategy);
+      setAttributionTargets(targets);
+      setDialogueInitialDecisions([]);
+      setDialogueCandidate(undefined);
+      setEditingAcceptedDialogue(false);
+      setConflictChoices({});
+      setStructuralChoices({});
+      setRevisingStages((current) => [...new Set([...current, "dialogue"])]);
+      setStage(stageIndex("dialogue"));
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function requestDialogueTranscript() {
     if (!book || busy) return;
     let currentDialogue = dialogue;
@@ -822,6 +867,11 @@ export default function App({
   }
 
   const activeJourneyStep = stages[stage];
+  const recoveringDownstreamDialogue = Boolean(
+    snapshot?.dialogueRecovery
+    && activeJourneyStep
+    && stage >= recoveryStageIndex,
+  );
   const builtinViews: Partial<Record<WizardStep, ReactNode>> = {
     extract: ExtractStage(),
     dialogue: DialogueStage(),
@@ -843,8 +893,13 @@ export default function App({
           completedStages={completed}
           busy={busy}
           refresh={async () => { if (book) await hydrate(book.id); }}
-          navigateToStep={(stepId) => setStage(stageIndex(stepId))}
+          navigateToStep={(stepId) => {
+            const requestedStage = stageIndex(stepId);
+            setStage(routeStage(requestedStage));
+          }}
         />
+      : recoveringDownstreamDialogue
+        ? DialogueRecoveryStage()
       : activeJourneyStep?.builtin
         ? builtinViews[activeJourneyStep.builtin]
         : null;
@@ -907,7 +962,7 @@ export default function App({
       {showWizard && <aside id="wizard-sidebar" className="rail">
         <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
         <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
-        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={`${label} · ${localizedStatus}`} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(index)}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
+        <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={`${label} · ${localizedStatus}`} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(routeStage(index))}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
         <figure className="workflow-familiar" aria-label={t("Your wizard cat companion")}>
           <img src={catWizardArtwork} alt={t("A cat wizard guiding a manuscript into dialogue and sound")} />
         </figure>
@@ -1451,6 +1506,22 @@ export default function App({
           <button className="primary" disabled={busy} onClick={() => void continueWithoutEnrichment()}>{t("Continue to Generate")} →</button>
         </div>
       </section>;
+  }
+
+  function DialogueRecoveryStage() {
+    const recovery = snapshot?.dialogueRecovery;
+    if (!recovery) return null;
+    const recoveryMessage = recovery.page === undefined
+      ? t("This transcript contains an invalid text range. No audio was generated or changed.")
+      : t("This transcript contains an invalid text range on page {{page}}. No audio was generated or changed.", { page: recovery.page });
+    return <>
+      <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Dialogue needs rebuilding")} copy={t("The transcript must be corrected before downstream review or audio work can continue.")} />
+      <Panel eyebrow={t("Source safety check")} title={t("No audio was generated or changed")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}>
+        <p className="panel-copy">{recoveryMessage}</p>
+        <p className="dialogue-recovery-note"><b>{t("What happens next")}</b><span>{t("Rebuild Dialogue with your previous settings, review the corrected transcript, and accept it. Review, Cast & voices, and later stages will then need to be completed again.")}</span></p>
+        <div className="dialogue-recovery-actions"><button className="primary" disabled={busy} onClick={() => void rebuildDialogueFromRecovery()}>{busy ? t("Opening Dialogue…") : t("Rebuild Dialogue")} →</button></div>
+      </Panel>
+    </>;
   }
 
   function GenerateStage() {

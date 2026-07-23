@@ -160,6 +160,63 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
     return package, dialogue, review
 
 
+def test_snapshot_exposes_malformed_dialogue_recovery_without_mutating_artifact(tmp_path):
+    with TestClient(create_app_v2(tmp_path)) as client:
+        imported = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()
+        book_id = imported["book"]["id"]
+        package = tmp_path / "packages" / book_id
+        _, extraction = write_artifact(
+            package,
+            "extraction",
+            {"revision": "extract-recovery", "blocks": [], "pages": []},
+        )
+        path, _dialogue = write_artifact(
+            package,
+            "dialogue",
+            {
+                "revision": "dialogue-recovery",
+                "extractionRevision": extraction["revision"],
+                "spans": [
+                    {
+                        "id": "span:p48-b2:1373-1372",
+                        "blockId": "p48-b2",
+                        "page": 48,
+                        "sourceStart": 1366,
+                        "sourceEnd": 1373,
+                        "spokenStart": 1373,
+                        "spokenEnd": 1372,
+                        "source": 'Bob: " ',
+                        "text": "",
+                        "renderRole": "dialogue",
+                    }
+                ],
+            },
+        )
+        before = path.read_text(encoding="utf-8")
+
+        snapshot = client.get(f"/api/books/{book_id}/snapshot")
+
+        assert snapshot.status_code == 200
+        assert snapshot.json()["dialogueRecovery"] == {
+            "kind": "malformed-playable-span",
+            "spanIds": ["span:p48-b2:1373-1372"],
+            "page": 48,
+            "availableActions": ["rerun-dialogue"],
+        }
+        assert path.read_text(encoding="utf-8") == before
+
+    with TestClient(create_app_v2(tmp_path)) as restarted_client:
+        restarted_snapshot = restarted_client.get(f"/api/books/{book_id}/snapshot")
+
+        assert restarted_snapshot.status_code == 200
+        assert restarted_snapshot.json()["dialogueRecovery"] == snapshot.json()[
+            "dialogueRecovery"
+        ]
+        assert path.read_text(encoding="utf-8") == before
+
+
 def test_failed_cast_with_identical_inputs_is_resumable_and_exposed_safely():
     payload = {
         "book_id": "book-1",

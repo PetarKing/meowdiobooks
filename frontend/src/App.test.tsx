@@ -275,6 +275,7 @@ describe('v2 wizard', () => {
 
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
     expect(workspace).not.toHaveClass('rail-collapsed')
+    expect(within(nav).getByRole('button', { name: 'Cast & voices Complete' })).toHaveAttribute('title', 'Cast & voices · Complete')
 
     fireEvent.click(toggle)
 
@@ -406,6 +407,60 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest('.chapter-card')).toHaveClass('selected')
     fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'generate', { chapterIds: ['chapter-1'], language: 'english' }))
+  })
+
+  it('routes malformed Dialogue to Review and opens a fresh prefilled preview', async () => {
+    const recoverySnapshot: WizardSnapshot = {
+      ...base,
+      dialogueRecovery: {
+        kind: 'malformed-playable-span',
+        spanIds: ['span:p48-b2:1373-1372'],
+        page: 48,
+        availableActions: ['rerun-dialogue'],
+      },
+    }
+    await open(recoverySnapshot)
+
+    expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'No audio was generated or changed' })).toBeInTheDocument()
+    expect(screen.getByText('This transcript contains an invalid text range on page 48. No audio was generated or changed.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Complete' })).toHaveClass('active')
+    expect(screen.queryByRole('button', { name: /Generate .* selected/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cast & voices Complete' }))
+    expect(screen.getByRole('button', { name: 'Review Complete' })).toHaveClass('active')
+    expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
+    const previewsBeforeRecovery = vi.mocked(wizardApi.previewDialogue).mock.calls.length
+
+    fireEvent.click(screen.getByRole('button', { name: /Rebuild Dialogue/ }))
+
+    expect(await screen.findByRole('heading', { name: 'Build the transcript' })).toBeInTheDocument()
+    expect(wizardApi.previewDialogue).toHaveBeenCalledTimes(previewsBeforeRecovery + 1)
+    expect(wizardApi.previewDialogue).toHaveBeenLastCalledWith('book-1', expect.objectContaining({
+      strategy: 'fill-gaps',
+      regexes: [expect.objectContaining({ id: 'quotes', enabled: true })],
+    }))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.openChapterAudio).not.toHaveBeenCalled()
+  })
+
+  it('opens recovery without preparing a missing recording script', async () => {
+    const recoverySnapshot: WizardSnapshot = {
+      ...base,
+      activeArtifacts: { ...base.activeArtifacts, script: undefined },
+      recordingScript: undefined,
+      dialogueRecovery: {
+        kind: 'malformed-playable-span',
+        spanIds: ['span:p48-b2:1373-1372'],
+        page: 48,
+        availableActions: ['rerun-dialogue'],
+      },
+    }
+
+    await open(recoverySnapshot)
+
+    expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
+    expect(wizardApi.prepareRecordingScript).not.toHaveBeenCalled()
   })
 
   it('offers a simple confirmed split for one selected two-hour chapter', async () => {

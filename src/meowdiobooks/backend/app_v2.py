@@ -82,8 +82,10 @@ from .decorators import (
 from .dialogue import (
     DialogueContractError,
     dialogue_progression_blockers,
+    dialogue_recovery,
     pages_to_dialogue_blocks,
     scan_dialogue,
+    validate_dialogue_partition,
 )
 from .dialogue_ai import apply_dialogue_corrections, run_dialogue_qwen
 from .dialogue_remote import run_dialogue_remote
@@ -612,6 +614,7 @@ def create_app_v2(
                 raise DialogueContractError(f"Unknown Dialogue attribution route: {route}")
         else:
             raise DialogueContractError(f"Unknown Dialogue strategy: {strategy}")
+        validate_dialogue_partition(result)
         revision = uuid4().hex
         path, artifact = write_artifact(
             package_for(book.id),
@@ -1357,6 +1360,7 @@ def create_app_v2(
         )
         visible_cast = _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue)
         recoverable_stages = _recoverable_stages(jobs.all(), book.id)
+        malformed_dialogue_recovery = dialogue_recovery(dialogue)
         return {
             "book": book.model_dump(mode="json"),
             "activeArtifacts": {kind: row.get("revision") for kind, row in current.items()},
@@ -1369,6 +1373,7 @@ def create_app_v2(
                 **({"cast": _history_summary(pending_cast)} if pending_cast is not None else {}),
             },
             "dialogue": dialogue,
+            "dialogueRecovery": malformed_dialogue_recovery,
             "dialogueWarnings": dialogue_warnings,
             "reviewWarnings": review_warnings,
             "reviewInspection": {
@@ -2268,6 +2273,7 @@ def create_app_v2(
                         body.decisions,
                         revision=uuid4().hex,
                     )
+                    validate_dialogue_partition(accepted_payload)
                     path, accepted_payload = write_artifact(
                         package_for(book_id), "dialogue", accepted_payload, publish=False
                     )

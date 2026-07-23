@@ -113,6 +113,9 @@ export class HttpWizardApi implements WorkflowGateway {
       activeArtifacts,
       pendingCandidates: raw.pendingCandidates as WizardSnapshot["pendingCandidates"] ?? {},
       dialogue,
+      dialogueRecovery: raw.dialogueRecovery && typeof raw.dialogueRecovery === "object"
+        ? raw.dialogueRecovery as WizardSnapshot["dialogueRecovery"]
+        : undefined,
       warnings: reviewWarnings.map(normalizeWarning),
       boundaryCandidates: Array.isArray(raw.boundaryCandidates)
         ? raw.boundaryCandidates as WizardSnapshot["boundaryCandidates"]

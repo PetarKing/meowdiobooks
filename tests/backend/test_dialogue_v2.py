@@ -3,9 +3,11 @@ import pytest
 from meowdiobooks.backend.dialogue import (
     DialogueContractError,
     dialogue_progression_blockers,
+    dialogue_recovery,
     pages_to_dialogue_blocks,
     reconstruct_partition,
     scan_dialogue,
+    validate_dialogue_partition,
 )
 
 
@@ -598,6 +600,49 @@ def test_interrupted_labelled_turn_requires_a_source_exact_user_choice():
     assert reconstruct_partition(narrated)[93] == source
 
 
+def test_straight_quote_closer_is_not_reused_as_an_interrupted_turn_opener():
+    source = 'Alice: "Hello.\nBob: "'
+
+    result = scan_dialogue(
+        [{"page": 48, "id": "p48-b2", "text": source}],
+        enabled_profile_ids=["label-straight-quotes"],
+    )
+
+    assert result["summary"]["structuralIssues"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["text"] == "Hello.\nBob: "
+    assert reconstruct_partition(result)[48] == source
+
+
+def test_malformed_playable_span_is_rejected_and_exposes_rebuild_recovery():
+    dialogue = {
+        "spans": [
+            {
+                "id": "span:p48-b2:1373-1372",
+                "blockId": "p48-b2",
+                "page": 48,
+                "sourceStart": 1366,
+                "sourceEnd": 1373,
+                "spokenStart": 1373,
+                "spokenEnd": 1372,
+                "source": 'Bob: " ',
+                "text": "",
+                "renderRole": "dialogue",
+            }
+        ]
+    }
+
+    with pytest.raises(DialogueContractError, match="span:p48-b2:1373-1372"):
+        validate_dialogue_partition(dialogue)
+
+    assert dialogue_recovery(dialogue) == {
+        "kind": "malformed-playable-span",
+        "spanIds": ["span:p48-b2:1373-1372"],
+        "page": 48,
+        "availableActions": ["rerun-dialogue"],
+    }
+
+
 def test_labelled_bracket_turn_continues_across_a_page_without_user_guesswork():
     pages = [
         {"page": 1, "text": "Gustav: [A gladiator should use their life for\n"},
@@ -616,6 +661,53 @@ def test_labelled_bracket_turn_continues_across_a_page_without_user_guesswork():
         1: pages[0]["text"],
         2: pages[1]["text"],
     }
+
+
+@pytest.mark.parametrize(
+    ("blocks", "profile_id", "speaker"),
+    [
+        (
+            [
+                {"id": "p1-b1", "page": 1, "text": "Gustav: ["},
+                {"id": "p2-b1", "page": 2, "text": ""},
+                {"id": "p3-b1", "page": 3, "text": "Wait."},
+                {"id": "p4-b1", "page": 4, "text": "]"},
+            ],
+            "label-brackets",
+            "Gustav",
+        ),
+        (
+            [
+                {"id": "p1-b1", "page": 1, "text": "Before “"},
+                {"id": "p2-b1", "page": 2, "text": ""},
+                {"id": "p3-b1", "page": 3, "text": "Wait."},
+                {"id": "p4-b1", "page": 4, "text": "” after"},
+            ],
+            "unlabeled-curly-quotes",
+            None,
+        ),
+    ],
+)
+def test_cross_boundary_delimiter_only_fragments_remain_source_exact_narration(
+    blocks, profile_id, speaker
+):
+    result = scan_dialogue(blocks, enabled_profile_ids=[profile_id])
+
+    assert result["summary"]["continuedTurns"] == 1
+    assert result["summary"]["structuralIssues"] == 0
+    assert len(result["acceptedMatches"]) == 1
+    assert result["acceptedMatches"][0]["text"] == "Wait."
+    assert result["acceptedMatches"][0]["sourceSpeakerLabel"] == speaker
+    assert result["acceptedMatches"][0]["fragmentIndex"] == 1
+    assert result["acceptedMatches"][0]["fragmentCount"] == 1
+    assert reconstruct_partition(result) == {
+        row["page"]: row["text"] for row in blocks
+    }
+    assert all(
+        span["renderRole"] == "narration"
+        for span in result["partition"]
+        if span["blockId"] != "p3-b1"
+    )
 
 
 def test_unlabelled_straight_turn_crosses_a_page_without_speaking_the_page_number():

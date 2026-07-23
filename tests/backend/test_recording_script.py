@@ -132,6 +132,25 @@ def test_superseded_or_blocked_inputs_fail_closed():
         )
 
 
+def test_malformed_dialogue_is_rejected_and_invalidates_cached_script():
+    dialogue, review, cast, _enrichment = _upstream()
+    dialogue["spans"][1].update({"spokenStart": 4, "spokenEnd": 3})
+
+    with pytest.raises(RecordingScriptContractError, match="invalid text range"):
+        build_recording_script(dialogue, review, cast, revision="script-bad")
+
+    dialogue["spans"][1].update({"spokenStart": 0, "spokenEnd": 6})
+    script = build_recording_script(dialogue, review, cast, revision="script-good")
+    dialogue["spans"][1].update({"spokenStart": 4, "spokenEnd": 3})
+
+    assert not recording_script_matches(script, dialogue, review, cast, None)
+
+    dialogue["spans"][1].update({"spokenStart": 0, "spokenEnd": 6})
+    script["entries"][0]["text"] = ""
+
+    assert recording_script_blockers(script) == ["Rebuild Dialogue before generation"]
+
+
 def test_splits_a_long_script_chapter_into_balanced_source_safe_chapters():
     text = "A" * 9_000
     spans = [
