@@ -67,6 +67,7 @@ from .cast_service import (
     default_voice_settings,
     propose_cast,
     suggest_voice_settings,
+    validate_audition_line,
     validate_voice_settings,
 )
 from .chapters import ChapterContractError, compile_reviewed_chapters, detect_chapter_candidates
@@ -414,6 +415,7 @@ def create_app_v2(
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
     voice_profiler_revision: str = "meowdiobooks.voice-profile.v2",
+    generate_voice_audition_lines: bool = False,
     enricher: Callable[..., dict[str, Any]] | None = None,
     remote_usage_observer: RemoteUsageObserver | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
@@ -741,10 +743,15 @@ def create_app_v2(
                         },
                         fallback_category=str(target.get("category", "character")),
                     ),
-                    "previewLine": _audition_line(
-                        str(target.get("name", character_id)), language
-                    ),
                 }
+                try:
+                    character["previewLine"] = validate_audition_line(
+                        target.get("auditionLine")
+                    )
+                except CastContractError:
+                    character["previewLine"] = _audition_line(
+                        str(target.get("name", character_id)), language
+                    )
                 character["voiceDirection"] = compile_voice_direction(
                     character["voiceSettings"], language=language
                 )
@@ -830,6 +837,16 @@ def create_app_v2(
                     profiles = restored_profiles
                     report(28, "Reusing unchanged voice suggestions")
                 else:
+                    voice_profiler_kwargs: dict[str, Any] = {
+                        "include_narrator": include_narrator_profile,
+                    }
+                    if generate_voice_audition_lines:
+                        voice_profiler_kwargs.update(
+                            {
+                                "generate_audition_line": True,
+                                "language": language,
+                            }
+                        )
                     profiles = voice_profiler(
                         repo_root,
                         profile_targets,
@@ -838,7 +855,7 @@ def create_app_v2(
                         lambda progress, message=None: report(
                             2 + progress * 0.28, message
                         ),
-                        include_narrator=include_narrator_profile,
+                        **voice_profiler_kwargs,
                     )
                     for row in profile_targets:
                         character_id = str(row["characterId"])
@@ -855,13 +872,23 @@ def create_app_v2(
                     write_profile_checkpoint(package, checkpoint_key, profiles)
             for row in profile_targets:
                 character_id = str(row["characterId"])
-                desired_settings = profiles.get(character_id) or default_voice_settings(
+                profile = profiles.get(character_id) or default_voice_settings(
                     str(row.get("category", "character"))
+                )
+                desired_settings = validate_voice_settings(
+                    profile,
+                    fallback_category=str(row.get("category", "character")),
                 )
                 row["voiceSettings"] = deepcopy(desired_settings)
                 row["voiceDirection"] = compile_voice_direction(
                     desired_settings, language=language
                 )
+                try:
+                    row["auditionLine"] = validate_audition_line(
+                        profile.get("auditionLine")
+                    )
+                except CastContractError:
+                    row.pop("auditionLine", None)
             desired_settings_by_id = {
                 str(row["characterId"]): row.get("voiceSettings", {})
                 for row in finalized["identities"]
@@ -918,8 +945,20 @@ def create_app_v2(
                     )
                 characters.append(character)
             if not reuse_existing:
-                narrator_settings = profiles.get(
+                narrator_profile = profiles.get(
                     "narrator", default_voice_settings("narrator")
+                )
+                narrator_settings = validate_voice_settings(
+                    narrator_profile, fallback_category="narrator"
+                )
+                try:
+                    narrator_audition_line = validate_audition_line(
+                        narrator_profile.get("auditionLine")
+                    )
+                except CastContractError:
+                    narrator_audition_line = None
+                narrator_line = narrator_audition_line or _audition_line(
+                    "Narrator", language
                 )
                 characters.insert(
                     0,
@@ -932,7 +971,12 @@ def create_app_v2(
                         "voiceDirection": compile_voice_direction(
                             narrator_settings, language=language
                         ),
-                        "previewLine": _audition_line("Narrator", language),
+                        "previewLine": narrator_line,
+                        **(
+                            {"auditionLine": narrator_audition_line}
+                            if narrator_audition_line is not None
+                            else {}
+                        ),
                     },
                 )
             if characters:

@@ -314,6 +314,7 @@ export interface CastVoice {
   voicePreviewRevision?: string;
   previewUrl?: string;
   referenceText?: string;
+  auditionLine?: string;
   voiceDirection?: string;
   voiceSettings?: VoiceSettings;
   voiceCandidates?: VoiceCandidate[];

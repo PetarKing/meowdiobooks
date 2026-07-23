@@ -8,6 +8,7 @@ from meowdiobooks.backend.cast import (
     label_comparison_key,
 )
 from meowdiobooks.backend.cast_service import (
+    AUDITION_LINE_SYSTEM,
     DISCOVERY_SYSTEM,
     MAX_VOICE_PROFILE_PROMPT_CHARACTERS,
     NARRATOR_PROFILE_SYSTEM,
@@ -26,6 +27,7 @@ from meowdiobooks.backend.cast_service import (
     _surrounding_story_context,
     _voice_target,
     _voice_profile_prompt,
+    audition_line_schema,
     compile_voice_direction,
     default_voice_settings,
     _validate_decision,
@@ -33,7 +35,9 @@ from meowdiobooks.backend.cast_service import (
     propose_cast_with_completion,
     suggest_voice_settings,
     suggest_voice_settings_with_completion,
+    validate_audition_line,
     validate_voice_settings,
+    voice_profile_schema,
 )
 
 
@@ -1044,6 +1048,113 @@ def test_provider_neutral_voice_completion_preserves_shared_validation():
     )
 
     assert profiles["narrator"]["tone"] == "gentle"
+
+
+def test_opt_in_audition_line_uses_a_separate_call_and_preserves_profile_contract():
+    calls = []
+    profile = {
+        "presentation": "unspecified",
+        "age": "adult",
+        "tone": "gentle",
+        "pitch": "medium",
+        "pace": "measured",
+        "energy": "balanced",
+        "accent": "rural English",
+        "description": "Weathered, warm, and quietly observant.",
+    }
+
+    def complete(system, prompt, max_tokens, *, response_schema):
+        calls.append((system, prompt, max_tokens, response_schema))
+        if response_schema["title"] == "voice_profile":
+            return profile
+        return {
+            "auditionLine": (
+                "The rain has passed, but the old road still remembers every traveller. "
+                "Beyond the hill, a brass bell answers the waking birds, and I wonder "
+                "which familiar story the clear morning will carry home."
+            )
+        }
+
+    profiles = suggest_voice_settings_with_completion(
+        [],
+        [],
+        [{"renderRole": "narration", "text": "Rain moved softly over the old road."}],
+        complete,
+        generate_audition_line=True,
+        language="english",
+    )
+
+    assert len(calls) == 2
+    assert calls[0][3] == voice_profile_schema()
+    assert set(calls[0][3]["properties"]) == {
+        "presentation",
+        "age",
+        "tone",
+        "pitch",
+        "pace",
+        "energy",
+        "accent",
+        "description",
+    }
+    assert calls[1][0] == AUDITION_LINE_SYSTEM
+    assert calls[1][2] == 512
+    assert calls[1][3] == audition_line_schema()
+    assert "Selected synthesis language: english" in calls[1][1]
+    assert '"accent": "rural English"' in calls[1][1]
+    assert "Rain moved softly over the old road." in calls[1][1]
+    assert {
+        key: value
+        for key, value in profiles["narrator"].items()
+        if key != "auditionLine"
+    } == profile
+    assert profiles["narrator"]["auditionLine"].startswith("The rain has passed")
+
+
+def test_invalid_opt_in_audition_line_falls_back_without_changing_valid_profile():
+    calls = []
+    profile = {
+        "presentation": "unspecified",
+        "age": "adult",
+        "tone": "gentle",
+        "pitch": "medium",
+        "pace": "measured",
+        "energy": "balanced",
+        "accent": "rural English",
+        "description": "Weathered, warm, and quietly observant.",
+    }
+
+    def complete(_system, _prompt, _max_tokens, *, response_schema):
+        calls.append(response_schema["title"])
+        if response_schema["title"] == "voice_profile":
+            return profile
+        return {"auditionLine": "!!!"}
+
+    profiles = suggest_voice_settings_with_completion(
+        [],
+        [],
+        [],
+        complete,
+        generate_audition_line=True,
+        language="english",
+    )
+
+    assert calls == ["voice_profile", "audition_line"]
+    assert profiles["narrator"] == profile
+
+
+def test_audition_line_validation_requires_bounded_speakable_text():
+    line = (
+        "Wait and listen: the storm is moving beyond the harbour now, while warm lanterns "
+        "shine across the water and each quiet footstep returns a different answer from "
+        "the sleeping street."
+    )
+    assert validate_audition_line(f"  {line}  ") == line
+    with pytest.raises(CastContractError, match="speakable"):
+        validate_audition_line("?!")
+    with pytest.raises(CastContractError, match="at least 150 characters"):
+        validate_audition_line("Too short to be a useful audition.")
+    with pytest.raises(CastContractError, match="300 characters or fewer"):
+        validate_audition_line("a" * 301)
 
 
 def test_narrator_uses_simple_book_wide_sampling_and_a_dedicated_schema():

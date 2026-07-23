@@ -144,8 +144,9 @@ shape, required fields and fixed enums. Existing application validators continue
 such as exact target coverage, ordering, uniqueness, evidence support and text-length budgets. Local
 Qwen keeps its JSON response mode and the same validators.
 
-The text model does **not** write audition dialogue. Audition text is a deterministic application
-template shared by Narrator and every cast member, localized to the selected voice language:
+The default local Qwen workflow does **not** write audition dialogue. Audition text is a deterministic
+application template shared by Narrator and every cast member, localized to the selected voice
+language:
 
 ```text
 This is the voice of <name>. The bright morning carried a gentle breeze across the quiet village.
@@ -154,6 +155,14 @@ This is the voice of <name>. The bright morning carried a gentle breeze across t
 The second sentence supplies enough pronunciation, pitch, pace and timbre variation to compare
 candidates without feeding the model a potentially unrepresentative real line. Every configured
 voice language has its own fixed equivalent; the interface language never changes the spoken text.
+
+Hosted compositions may opt into a separate line-only text-model task after the existing eight-field
+voice profile has been validated and frozen. This does not extend or retry the profile schema: the
+second call receives the frozen profile, the same bounded character evidence, and the selected
+synthesis language, and may return only `auditionLine`. The application validates and stores that
+150–300-character field outside `voiceSettings`; invalid or missing output uses the same deterministic localized
+template after one bounded validation retry. Shared voice groups always use the deterministic shared
+line.
 
 ## VoiceDesign audition request
 

@@ -8,7 +8,12 @@ from typing import Any
 
 from .artifacts import artifact_history
 from .cast import label_comparison_key
-from .cast_service import compile_voice_direction, default_voice_settings
+from .cast_service import (
+    CastContractError,
+    compile_voice_direction,
+    default_voice_settings,
+    validate_audition_line,
+)
 from .languages import audition_line
 
 
@@ -92,6 +97,10 @@ def _audition_character(
     identity: dict[str, Any], settings: dict[str, str] | None = None, *, language: str = "english"
 ) -> dict[str, Any]:
     voice_settings = settings or default_voice_settings(str(identity.get("category", "character")))
+    try:
+        preview_line = validate_audition_line(identity.get("auditionLine"))
+    except CastContractError:
+        preview_line = _audition_line(str(identity["name"]), language)
     return {
         "id": identity["characterId"],
         "name": identity["name"],
@@ -99,7 +108,7 @@ def _audition_character(
         "lineCount": int(identity.get("lineCount", 0)),
         "voiceSettings": voice_settings,
         "voiceDirection": compile_voice_direction(voice_settings, language=language),
-        "previewLine": _audition_line(str(identity["name"]), language),
+        "previewLine": preview_line,
     }
 
 
@@ -188,6 +197,11 @@ def _audition_identity(
             "voiceAccepted": False,
         }
     )
+    audition_line = generated.get("auditionLine") or identity.get("auditionLine")
+    if audition_line:
+        identity["auditionLine"] = audition_line
+    else:
+        identity.pop("auditionLine", None)
     return identity
 
 

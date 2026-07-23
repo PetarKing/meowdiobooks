@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import json
 import re
 from typing import Any
 
@@ -28,6 +29,7 @@ from .structured_output import (
 
 Report = Callable[[float, str | None], None]
 VoiceProfileValidator = Callable[[Mapping[str, str]], None]
+AuditionLineValidator = Callable[[object], str]
 
 SPEAKER_TYPES = {
     "one-person": "character",
@@ -220,6 +222,23 @@ VOICE_PROFILE_OPTIONS = {
 }
 
 VOICE_DIRECTION_MAX_CHARACTERS = 250
+AUDITION_LINE_MIN_CHARACTERS = 150
+AUDITION_LINE_MAX_CHARACTERS = 300
+AUDITION_LINE_SYSTEM = """Write one original audiobook audition passage that this character or narrator could naturally say.
+
+Return exactly one JSON object:
+{"auditionLine":"one natural, self-contained audition passage"}
+
+The audition must:
+- be written only in the selected synthesis language;
+- remain faithful to the frozen profile without revising or explaining it;
+- be 150–300 characters long, targeting 180–260 characters and roughly 30–50 words;
+- sound like natural spoken prose with varied rhythm, vowels and consonants;
+- provide enough emotional and tonal movement to judge timbre, pace, clarity and expressiveness;
+- express the character or narrator's own speaking style rather than describing the voice;
+- avoid copied source dialogue, stage directions and meta-commentary.
+
+Return JSON only."""
 
 
 def voice_profile_schema() -> dict[str, Any]:
@@ -236,6 +255,21 @@ def voice_profile_schema() -> dict[str, Any]:
         }
     )
     return strict_object_schema("voice_profile", properties)
+
+
+def audition_line_schema() -> dict[str, Any]:
+    """Return the isolated structured-output contract for one audition line."""
+
+    return strict_object_schema(
+        "audition_line",
+        {
+            "auditionLine": {
+                "type": "string",
+                "minLength": AUDITION_LINE_MIN_CHARACTERS,
+                "maxLength": AUDITION_LINE_MAX_CHARACTERS,
+            }
+        },
+    )
 
 
 def _cast_decision_schema(relationship_labels: Sequence[str]) -> dict[str, Any]:
@@ -435,6 +469,7 @@ def suggest_voice_settings(
     report: Report | None = None,
     *,
     include_narrator: bool = True,
+    language: str | None = None,
 ) -> dict[str, dict[str, str]]:
     """Suggest one scene-grounded voice profile per identity with one model call each."""
 
@@ -448,6 +483,7 @@ def suggest_voice_settings(
             ),
             report=report,
             include_narrator=include_narrator,
+            language=language,
         )
 
 
@@ -464,6 +500,11 @@ def suggest_voice_settings_with_completion(
     profile_system_appendix: str = "",
     profile_validator: VoiceProfileValidator | None = None,
     profile_response_schema: JsonSchema | None = None,
+    generate_audition_line: bool = False,
+    language: str | None = None,
+    audition_line_system: str = AUDITION_LINE_SYSTEM,
+    audition_line_validator: AuditionLineValidator | None = None,
+    audition_line_response_schema: JsonSchema | None = None,
 ) -> dict[str, dict[str, str]]:
     """Run provider-neutral voice profiling through the shared validation contract."""
 
@@ -521,6 +562,19 @@ def suggest_voice_settings_with_completion(
             settings = fallback
             if profile_validator is not None:
                 profile_validator(settings)
+        if generate_audition_line:
+            audition_line = _complete_audition_line_with(
+                complete,
+                target,
+                settings,
+                language=language,
+                evidence_policy=policy,
+                system=audition_line_system,
+                validator=audition_line_validator,
+                response_schema=audition_line_response_schema,
+            )
+            if audition_line is not None:
+                settings["auditionLine"] = audition_line
         return str(target["characterId"]), settings
 
     if max_workers == 1:
@@ -763,6 +817,23 @@ def validate_voice_settings(raw: object, *, fallback_category: str = "character"
     return {**default_voice_settings(fallback_category), **result}
 
 
+def validate_audition_line(raw: object) -> str:
+    """Return one bounded, speakable audition line without changing punctuation."""
+
+    value = normalize_label(raw)
+    if not value or not any(character.isalnum() for character in value):
+        raise CastContractError("Audition line must contain speakable text")
+    if len(value) < AUDITION_LINE_MIN_CHARACTERS:
+        raise CastContractError(
+            f"Audition line must contain at least {AUDITION_LINE_MIN_CHARACTERS} characters"
+        )
+    if len(value) > AUDITION_LINE_MAX_CHARACTERS:
+        raise CastContractError(
+            f"Audition line must contain {AUDITION_LINE_MAX_CHARACTERS} characters or fewer"
+        )
+    return value
+
+
 def compile_voice_direction(settings: Mapping[str, Any], *, language: str = "english") -> str:
     """Compile editable handles into one provider-portable VoiceDesign description."""
 
@@ -913,6 +984,36 @@ def _voice_profile_prompt(
     )
 
 
+def _audition_line_prompt(
+    target: Mapping[str, Any],
+    settings: Mapping[str, str],
+    *,
+    language: str | None,
+    evidence_policy: VoiceEvidencePolicy | None = None,
+) -> str:
+    policy = evidence_policy or DEFAULT_VOICE_EVIDENCE_POLICY
+    normalized_language = normalize_label(language)
+    header = "\n".join(
+        [
+            "AUDITION REQUEST",
+            f"Selected synthesis language: {normalized_language or 'unspecified'}",
+            "The following validated voice profile is frozen and MUST NOT be revised:",
+            json.dumps(dict(settings), ensure_ascii=False, sort_keys=True),
+            "",
+            "Write one original, self-contained passage this exact character or narrator could say.",
+            "Use only the selected synthesis language. Do not explain the line.",
+            "",
+            "BOUNDED CAST EVIDENCE",
+        ]
+    )
+    available = max(1, policy.max_prompt_characters - len(header) - 1)
+    evidence = _bounded_voice_prompt(
+        _voice_profile_prompt(target, evidence_policy=policy),
+        max_characters=available,
+    )
+    return f"{header}\n{evidence}"
+
+
 def _bounded_voice_text(
     value: str, *, max_characters: int = MAX_VOICE_PROFILE_LINE_CHARACTERS
 ) -> str:
@@ -986,7 +1087,6 @@ def _complete_voice_settings_with(
     schema = response_schema or voice_profile_schema()
     for _attempt in range(2):
         raw = complete_with_schema(complete, system, retry_prompt, 384, schema)
-        settings: dict[str, str] | None = None
         try:
             settings = validate_voice_settings(raw)
             compile_voice_direction(settings)
@@ -1007,6 +1107,42 @@ def _complete_voice_settings_with(
                 max_characters=max_prompt_characters,
             )
     raise CastContractError("Voice profile validation failed: " + " | ".join(failures))
+
+
+def _complete_audition_line_with(
+    complete: JsonCompletion,
+    target: Mapping[str, Any],
+    settings: Mapping[str, str],
+    *,
+    language: str | None,
+    evidence_policy: VoiceEvidencePolicy | None = None,
+    system: str = AUDITION_LINE_SYSTEM,
+    validator: AuditionLineValidator | None = None,
+    response_schema: JsonSchema | None = None,
+) -> str | None:
+    """Generate optional audition text without allowing failure to alter a valid profile."""
+
+    try:
+        raw = complete_with_schema(
+            complete,
+            system,
+            _audition_line_prompt(
+                target,
+                settings,
+                language=language,
+                evidence_policy=evidence_policy,
+            ),
+            512,
+            response_schema or audition_line_schema(),
+        )
+        if not isinstance(raw, Mapping) or set(raw) != {"auditionLine"}:
+            raise CastContractError(
+                "Audition-line completion must contain exactly auditionLine"
+            )
+        validate = validator or validate_audition_line
+        return validate(raw.get("auditionLine"))
+    except Exception:
+        return None
 
 
 def _complete_validated_decision(
@@ -1691,8 +1827,6 @@ def _proposal_from_decision(
         "aliases": aliases,
         "competingLabels": possible,
         "reason": _decision_reason(category, aliases, possible),
-        "voiceProfile": None,
-        "auditionLine": None,
         "reviewRequired": material,
         "sourceSpellings": list(dossier.get("sourceSpellings", [])),
     }
