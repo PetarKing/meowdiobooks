@@ -26,6 +26,7 @@ def profile_checkpoint_key(
     language: str,
     profiler_revision: str,
     include_narrator: bool,
+    generate_audition_lines: bool = False,
 ) -> str:
     """Bind a checkpoint to every input that can change Luna's profile output."""
 
@@ -57,6 +58,10 @@ def profile_checkpoint_key(
             key=lambda row: str(row["characterId"]),
         ),
     }
+    # Preserve the existing no-line checkpoint key while ensuring the opt-in path can
+    # never restore a profile created without audition lines.
+    if generate_audition_lines:
+        payload["generateAuditionLines"] = True
     return hashlib.sha256(canonical_json(payload)).hexdigest()
 
 
