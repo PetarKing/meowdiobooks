@@ -29,6 +29,7 @@ def _key(**changes):
         "language": "english",
         "profiler_revision": "luna-profile-v2",
         "include_narrator": True,
+        "generate_audition_lines": False,
     }
     arguments.update(changes)
     return profile_checkpoint_key(**arguments)
@@ -70,6 +71,7 @@ def test_profile_checkpoint_round_trips_only_the_exact_complete_profile_set(tmp_
         ("language", "french"),
         ("profiler_revision", "luna-profile-v3"),
         ("include_narrator", False),
+        ("generate_audition_lines", True),
         (
             "identities",
             [
@@ -83,6 +85,18 @@ def test_profile_checkpoint_round_trips_only_the_exact_complete_profile_set(tmp_
 )
 def test_profile_checkpoint_key_invalidates_every_profile_input(field, value):
     assert _key(**{field: value}) != _key()
+
+
+def test_profile_checkpoint_key_preserves_legacy_no_line_key():
+    assert profile_checkpoint_key(
+        proposal_revision="proposal-1",
+        dialogue_revision="dialogue-1",
+        review_revision="review-1",
+        identities=IDENTITIES,
+        language="english",
+        profiler_revision="luna-profile-v2",
+        include_narrator=True,
+    ) == _key(generate_audition_lines=False)
 
 
 def test_profile_checkpoint_ignores_corrupt_or_relabelled_payloads(tmp_path):

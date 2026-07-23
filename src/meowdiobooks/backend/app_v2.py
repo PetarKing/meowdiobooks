@@ -822,6 +822,7 @@ def create_app_v2(
                     language=language,
                     profiler_revision=voice_profiler_revision,
                     include_narrator=include_narrator_profile,
+                    generate_audition_lines=generate_voice_audition_lines,
                 )
                 expected_profile_ids = {
                     str(row["characterId"]) for row in profile_targets
