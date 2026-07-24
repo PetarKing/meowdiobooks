@@ -2183,6 +2183,7 @@ describe('v2 wizard', () => {
   })
 
   it('reopens an accepted cast as recovery work without flashing the processing overlay', async () => {
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const editable = {
       ...base.cast!, revision: 'cast-editable', phase: 'audition-review' as const,
     }
@@ -2191,12 +2192,16 @@ describe('v2 wizard', () => {
 
     await open()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    expect(screen.getByText(/only the replacement can generate new audio/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
     fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
 
     expect(await screen.findByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
     expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', {})
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(
+      'previous voices can no longer generate new audio',
+    ))
   })
 
   it('reuses previously accepted auditions after a Review-only change', async () => {

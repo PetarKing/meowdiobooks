@@ -765,7 +765,10 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             "Brisk, dry, and quietly amused"
             in regenerated_candidate["identities"][0]["voiceDirection"]
         )
-        assert len(regenerated_candidate["identities"][0]["voiceCandidates"]) == 3
+        assert len(regenerated_candidate["identities"][0]["voiceCandidates"]) == 1
+        assert not (
+            package / "voices" / alice_id / f"{original_alice_revision}.wav"
+        ).exists()
         stale_decisions = [
             {
                 "characterId": row["characterId"],
@@ -790,6 +793,20 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         )
         assert (
             _accept(client, book_id, "cast", regenerated["revision"], stale_decisions).status_code
+            == 409
+        )
+        current_decisions = [
+            {
+                "characterId": row["characterId"],
+                "voiceRevision": row["voicePreviewRevision"],
+            }
+            for row in [
+                regenerated_candidate["narrator"],
+                *regenerated_candidate["identities"],
+            ]
+        ]
+        assert (
+            _accept(client, book_id, "cast", regenerated["revision"], current_decisions).status_code
             == 200
         )
 
@@ -843,7 +860,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         assert render_calls[0]["chapters"][0]["segments"][0]["effectiveSpeaker"] == "Alicia"
         assert (
             render_calls[0]["chapters"][0]["segments"][0]["voiceRevision"]
-            == candidate["identities"][0]["voicePreviewRevision"]
+            == regenerated_candidate["identities"][0]["voicePreviewRevision"]
         )
         assert render_calls[0]["sourceCoverage"] == {"status": "exact", "sourceSpanCount": 1}
 
