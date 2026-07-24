@@ -50,6 +50,12 @@ preset selects `m4b-high`. The original `POST /api/books/{book_id}/exports/m4b` 
 high-quality-M4B compatibility route and rejects non-M4B presets. Existing Library records without
 preset or media-type metadata are treated as `m4b-high` exports.
 
+Object-backed compositions may provide `on_library_exported`, resolve Library availability with
+`library_export_available`, and set `retain_local_library_exports=False`. In that mode, the export
+hook must durably persist the audio and cover before returning. Core commits the Library record only
+after that hook succeeds, then removes the local audio and cover. The Library remains indexed through
+the composition's availability resolver. Local mode retains its filesystem-backed behavior.
+
 ## Dependency
 
 Audiobook export requires the `ffmpeg` executable on `PATH`. FFmpeg is optional for import, review, voice
@@ -80,9 +86,9 @@ Before invoking FFmpeg, the backend validates:
 
 FFmpeg writes into a request-scoped temporary directory. The response is offered only after every
 encoder exits successfully, produces a non-empty artifact, and the file is copied atomically into the
-Library. Temporary packaging files are then removed. Generated WAV revisions and successful Library
-artifacts are never deleted by export cleanup. Failed exports leave all chapter audio untouched and
-publish no partial package.
+Library. Temporary packaging files are then removed. Local mode retains successful Library artifacts.
+An object-backed composition may evict the local copy only after its durable export hook and Library
+store both commit. Failed exports leave all chapter audio untouched and publish no partial package.
 
 ## Explicit non-goals
 
