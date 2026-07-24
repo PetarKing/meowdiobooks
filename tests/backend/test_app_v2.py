@@ -4,10 +4,12 @@ from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 from reportlab.pdfgen.canvas import Canvas
 
 from meowdiobooks.backend.app_v2 import (
+    _commit_library_export,
     _expand_cast_label_mapping,
     create_app_v2,
 )
@@ -111,6 +113,116 @@ def test_delete_book_removes_working_assets_but_preserves_library_export(tmp_pat
         assert not (data_dir / "packages" / book_id).exists()
         assert export_path.read_bytes() == b"finished-audiobook"
         assert client.get("/api/library").json()[0]["id"] == item.id
+
+
+def test_object_backed_library_lists_without_a_local_export(tmp_path: Path):
+    database = tmp_path / "database"
+    library = JsonStore(database / "library.json", LibraryExport)
+    item = LibraryExport(
+        book_id="book-1",
+        title="Durable audiobook",
+        author="Maou",
+        filename="Durable audiobook.m4b",
+        file_path=str(tmp_path / "missing-local-copy.m4b"),
+        chapter_count=1,
+        chapter_titles=["Chapter 1"],
+        size_bytes=1024,
+    )
+    library.put(item)
+
+    app = create_app_v2(
+        tmp_path / "workspace",
+        store_factory=lambda name, model: JsonStore(database / f"{name}.json", model),
+        library_export_available=lambda export: export.id == item.id,
+    )
+
+    with TestClient(app) as client:
+        assert client.get("/api/library").json()[0]["id"] == item.id
+
+
+def test_object_backed_library_evicts_only_after_hook_and_store_commit(tmp_path: Path):
+    audio_source = tmp_path / "assembled.m4b"
+    cover_source = tmp_path / "assembled.png"
+    audio_source.write_bytes(b"audio")
+    cover_source.write_bytes(b"cover")
+    audio_destination = tmp_path / "library" / "book.m4b"
+    cover_destination = tmp_path / "covers" / "book.png"
+    audio_destination.parent.mkdir()
+    cover_destination.parent.mkdir()
+    library = JsonStore(tmp_path / "library.json", LibraryExport)
+    item = LibraryExport(
+        book_id="book-1",
+        title="Durable audiobook",
+        author="Maou",
+        filename=audio_destination.name,
+        file_path=str(audio_destination),
+        cover_path=str(cover_destination),
+        chapter_count=1,
+        size_bytes=len(b"audio"),
+    )
+    events: list[str] = []
+
+    def persist(_item: LibraryExport, audio: Path, cover: Path) -> None:
+        assert audio.read_bytes() == b"audio"
+        assert cover.read_bytes() == b"cover"
+        assert library.get(item.id) is None
+        events.append("durable")
+
+    _commit_library_export(
+        item,
+        audio_source=audio_source,
+        cover_source=cover_source,
+        audio_destination=audio_destination,
+        cover_destination=cover_destination,
+        library=library,
+        on_library_exported=persist,
+        retain_local=False,
+    )
+
+    assert events == ["durable"]
+    assert library.get(item.id) == item
+    assert not audio_destination.exists()
+    assert not cover_destination.exists()
+
+
+def test_object_backed_library_keeps_no_entry_when_durable_hook_fails(tmp_path: Path):
+    audio_source = tmp_path / "assembled.m4b"
+    cover_source = tmp_path / "assembled.png"
+    audio_source.write_bytes(b"audio")
+    cover_source.write_bytes(b"cover")
+    audio_destination = tmp_path / "library" / "book.m4b"
+    cover_destination = tmp_path / "covers" / "book.png"
+    audio_destination.parent.mkdir()
+    cover_destination.parent.mkdir()
+    library = JsonStore(tmp_path / "library.json", LibraryExport)
+    item = LibraryExport(
+        book_id="book-1",
+        title="Failed audiobook",
+        author="Maou",
+        filename=audio_destination.name,
+        file_path=str(audio_destination),
+        chapter_count=1,
+        size_bytes=len(b"audio"),
+    )
+
+    def fail(_item: LibraryExport, _audio: Path, _cover: Path) -> None:
+        raise RuntimeError("S3 unavailable")
+
+    with pytest.raises(RuntimeError, match="S3 unavailable"):
+        _commit_library_export(
+            item,
+            audio_source=audio_source,
+            cover_source=cover_source,
+            audio_destination=audio_destination,
+            cover_destination=cover_destination,
+            library=library,
+            on_library_exported=fail,
+            retain_local=False,
+        )
+
+    assert library.get(item.id) is None
+    assert not audio_destination.exists()
+    assert not cover_destination.exists()
 
 
 def test_delete_book_is_blocked_during_active_processing(tmp_path):

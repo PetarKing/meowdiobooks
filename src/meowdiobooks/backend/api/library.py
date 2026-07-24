@@ -19,12 +19,14 @@ def create_library_router(
     require_export: Callable[[str], tuple[LibraryExport, Path]],
     package_for: Callable[[str], Path],
     payload_for: Callable[..., dict[str, object]],
+    export_available: Callable[[LibraryExport], bool] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api/library")
+    is_available = export_available or (lambda item: Path(item.file_path).is_file())
 
     @router.get("")
     def list_library_exports() -> list[dict[str, object]]:
-        items = [item for item in library.all() if Path(item.file_path).is_file()]
+        items = [item for item in library.all() if is_available(item)]
         items.sort(key=lambda item: item.created_at, reverse=True)
         return [payload_for(item, package=package_for(item.book_id)) for item in items]
 

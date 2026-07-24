@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import logging
 import os
 import shutil
 import subprocess
@@ -173,6 +174,51 @@ from .workflow.commands import (
 from .workflow.runner import WorkflowRunner
 from .workflow.defaults import PUBLIC_WORKFLOW
 from .workspace import BookWorkspace
+
+logger = logging.getLogger(__name__)
+
+
+def _commit_library_export(
+    item: LibraryExport,
+    *,
+    audio_source: Path,
+    cover_source: Path,
+    audio_destination: Path,
+    cover_destination: Path,
+    library: ModelStore[LibraryExport],
+    on_library_exported: Callable[[LibraryExport, Path, Path], None] | None,
+    retain_local: bool,
+) -> None:
+    """Publish an export, then evict local copies only after all durable commits succeed."""
+
+    temporary_audio = audio_destination.with_name(
+        f".{audio_destination.name}.{uuid4().hex}.tmp"
+    )
+    temporary_cover = cover_destination.with_name(
+        f".{cover_destination.name}.{uuid4().hex}.tmp"
+    )
+    try:
+        shutil.copy2(audio_source, temporary_audio)
+        shutil.copy2(cover_source, temporary_cover)
+        os.replace(temporary_audio, audio_destination)
+        os.replace(temporary_cover, cover_destination)
+        if on_library_exported is not None:
+            on_library_exported(item, audio_destination, cover_destination)
+        library.put(item)
+    except (OSError, RuntimeError):
+        temporary_audio.unlink(missing_ok=True)
+        temporary_cover.unlink(missing_ok=True)
+        audio_destination.unlink(missing_ok=True)
+        cover_destination.unlink(missing_ok=True)
+        raise
+
+    if retain_local:
+        return
+    for path in (audio_destination, cover_destination):
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            logger.exception("Could not evict committed Library artifact %s", path)
 
 
 def _directory_size(path: Path) -> int:
@@ -444,6 +490,8 @@ def create_app_v2(
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_book_deleting: Callable[[Book], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
+    library_export_available: Callable[[LibraryExport], bool] | None = None,
+    retain_local_library_exports: bool = True,
     chapter_audio_source: ChapterAudioSource | None = None,
     job_preflight: Callable[[], None] | None = None,
     on_cast_voice_revisions_changed: (
@@ -457,10 +505,16 @@ def create_app_v2(
     after active-work checks and before local state is removed; raising aborts deletion so hosted
     compositions can retry durable cleanup. Chapter audio is local and durable by default; hosted
     compositions may provide a context-managed source that materializes an exact revision only
-    while an export consumes it.
+    while an export consumes it. Local Library files are retained by default. Object-backed
+    compositions may provide an availability resolver and disable local export retention after
+    their export hook and model store both commit successfully.
     """
 
     root = Path(data_dir)
+    if not retain_local_library_exports and on_library_exported is None:
+        raise ValueError(
+            "Disabling local Library retention requires a durable export hook"
+        )
     repo_root = application_root()
     voice_auditioner = voice_auditioner or generate_cast_previews
     voice_sample_auditioner = voice_sample_auditioner or _local_voice_sample_auditioner
@@ -1843,7 +1897,6 @@ def create_app_v2(
             ) from error
         library_root.mkdir(parents=True, exist_ok=True)
         destination = _available_library_path(library_root, filename)
-        temporary_destination = destination.with_name(f".{destination.name}.{uuid4().hex}.tmp")
         chapter_positions = [
             chapter_order.index(chapter.chapter_id) + 1 for chapter in export_chapters
         ]
@@ -1863,30 +1916,29 @@ def create_app_v2(
         )
         library_cover_root.mkdir(parents=True, exist_ok=True)
         cover_destination = library_cover_root / f"{item.id}{cover.suffix.lower() or '.jpg'}"
-        temporary_cover = cover_destination.with_name(
-            f".{cover_destination.name}.{uuid4().hex}.tmp"
-        )
         item.cover_path = str(cover_destination)
         try:
-            shutil.copy2(output, temporary_destination)
-            shutil.copy2(cover, temporary_cover)
-            os.replace(temporary_destination, destination)
-            os.replace(temporary_cover, cover_destination)
-            if on_library_exported is not None:
-                on_library_exported(item, destination, cover_destination)
-            library.put(item)
+            _commit_library_export(
+                item,
+                audio_source=output,
+                cover_source=cover,
+                audio_destination=destination,
+                cover_destination=cover_destination,
+                library=library,
+                on_library_exported=on_library_exported,
+                retain_local=retain_local_library_exports,
+            )
         except (OSError, RuntimeError) as error:
-            temporary_destination.unlink(missing_ok=True)
-            temporary_cover.unlink(missing_ok=True)
-            destination.unlink(missing_ok=True)
-            cover_destination.unlink(missing_ok=True)
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(
                 status_code=500,
                 detail="The audiobook was created but could not be saved to your Library",
             ) from error
         shutil.rmtree(work, ignore_errors=True)
-        if "application/json" in request.headers.get("accept", ""):
+        if (
+            not retain_local_library_exports
+            or "application/json" in request.headers.get("accept", "")
+        ):
             return JSONResponse(
                 _library_export_payload(item, package=package),
                 status_code=status.HTTP_201_CREATED,
@@ -2520,6 +2572,7 @@ def create_app_v2(
             require_library_export,
             package_for,
             _library_export_payload,
+            library_export_available,
         ).routes
     )
     app.router.routes.extend(create_jobs_router(jobs, queue, require_book).routes)
