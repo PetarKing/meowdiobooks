@@ -1666,9 +1666,10 @@ def test_review_only_change_reuses_a_current_whole_audition_pack(tmp_path):
     assert rebased["auditionPackRefreshRequired"] is False
 
 
-def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
+def test_audio_recipe_or_model_refresh_reuses_language_bound_profiles(tmp_path):
     recipe = {"version": "1"}
     profile_calls = 0
+    profile_languages: list[str] = []
     audition_batches: list[list[str]] = []
     audition_lines: list[dict[str, str]] = []
     narrator_audition_line = (
@@ -1680,6 +1681,16 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
         "I kept the silver key, although nobody thought to ask me why. Tomorrow I will "
         "cross the square, unlock the weathered garden door, and discover which promise "
         "has been waiting there."
+    )
+    french_narrator_audition_line = (
+        "La nuit descendait doucement sur le port tandis que les dernières lanternes "
+        "vacillaient le long du quai. Au-delà de la digue, une cloche patiente marquait "
+        "l'heure et chaque fenêtre sombre semblait garder un secret."
+    )
+    french_alice_audition_line = (
+        "J'ai gardé la clé d'argent, même si personne ne songeait à me demander pourquoi. "
+        "Demain, je traverserai la place, ouvrirai la vieille porte du jardin et découvrirai "
+        "quelle promesse m'y attend."
     )
 
     proposal = {
@@ -1705,6 +1716,8 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
     def profile(_repo, identities, *_args, **_kwargs):
         nonlocal profile_calls
         profile_calls += 1
+        language = str(_kwargs.get("language") or "")
+        profile_languages.append(language)
         settings = {
             "presentation": "unspecified",
             "age": "adult",
@@ -1715,12 +1728,22 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
             "accent": "unspecified",
             "description": "Stable reviewed direction.",
         }
+        narrator_line = (
+            french_narrator_audition_line
+            if language == "french"
+            else narrator_audition_line
+        )
+        alice_line = (
+            french_alice_audition_line
+            if language == "french"
+            else alice_audition_line
+        )
         return {
-            "narrator": {**settings, "auditionLine": narrator_audition_line},
+            "narrator": {**settings, "auditionLine": narrator_line},
             **{
                 str(row["characterId"]): {
                     **settings,
-                    "auditionLine": alice_audition_line,
+                    "auditionLine": alice_line,
                 }
                 for row in identities
             },
@@ -1764,10 +1787,16 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
                     "id": "balanced",
                     "label": "Balanced",
                     "recipeVersion": recipe["version"],
-                    "supportedLanguages": ["english"],
-                }
+                    "supportedLanguages": ["english", "french"],
+                },
+                {
+                    "id": "studio",
+                    "label": "Studio",
+                    "recipeVersion": "5",
+                    "supportedLanguages": ["english", "french"],
+                },
             ],
-            voice_languages=lambda _root, _model: ["english"],
+            voice_languages=lambda _root, _model: ["english", "french"],
             default_voice_model="balanced",
             voice_candidate_policy={
                 "enabled": False,
@@ -1826,12 +1855,48 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
         refreshed_candidate = client.get(
             f"/api/books/{book_id}/stages/cast/candidates/{refreshed['revision']}"
         ).json()
+        switched = _process(
+            client,
+            book_id,
+            "cast",
+            {
+                "proposalRevision": refreshed["revision"],
+                "voiceModel": "studio",
+                "language": "english",
+            },
+        )
+        switched_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{switched['revision']}"
+        ).json()
+        translated = _process(
+            client,
+            book_id,
+            "cast",
+            {
+                "proposalRevision": switched["revision"],
+                "voiceModel": "studio",
+                "language": "french",
+            },
+        )
+        translated_candidate = client.get(
+            f"/api/books/{book_id}/stages/cast/candidates/{translated['revision']}"
+        ).json()
 
     refreshed_voices = [refreshed_candidate["narrator"], *refreshed_candidate["identities"]]
+    switched_voices = [switched_candidate["narrator"], *switched_candidate["identities"]]
+    translated_voices = [
+        translated_candidate["narrator"],
+        *translated_candidate["identities"],
+    ]
     assert refreshed_candidate["auditionPackRecipeVersion"] == "2"
     assert refreshed_candidate["auditionPackRefreshRequired"] is False
-    assert profile_calls == 1
+    assert switched_candidate["voiceModel"] == "studio"
+    assert translated_candidate["language"] == "french"
+    assert profile_calls == 2
+    assert profile_languages == ["english", "french"]
     assert audition_batches == [
+        ["narrator", first_candidate["identities"][0]["characterId"]],
+        ["narrator", first_candidate["identities"][0]["characterId"]],
         ["narrator", first_candidate["identities"][0]["characterId"]],
         ["narrator", first_candidate["identities"][0]["characterId"]],
     ]
@@ -1844,10 +1909,21 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
     assert [row["auditionLine"] for row in refreshed_voices] == [
         row["auditionLine"] for row in first_voices
     ]
-    assert audition_lines[0] == audition_lines[1] == {
+    assert [row["auditionLine"] for row in switched_voices] == [
+        row["auditionLine"] for row in first_voices
+    ]
+    assert audition_lines[0] == audition_lines[1] == audition_lines[2] == {
         "narrator": narrator_audition_line,
         first_candidate["identities"][0]["characterId"]: alice_audition_line,
     }
+    assert audition_lines[3] == {
+        "narrator": french_narrator_audition_line,
+        first_candidate["identities"][0]["characterId"]: french_alice_audition_line,
+    }
+    assert [row["auditionLine"] for row in translated_voices] == [
+        french_narrator_audition_line,
+        french_alice_audition_line,
+    ]
     assert all(str(row["voicePreviewRevision"]).startswith("2-") for row in refreshed_voices)
     assert not {row["voicePreviewRevision"] for row in first_voices} & {
         candidate["revision"] for row in refreshed_voices for candidate in row["voiceCandidates"]
