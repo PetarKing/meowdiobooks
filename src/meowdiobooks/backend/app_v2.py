@@ -983,6 +983,16 @@ def create_app_v2(
                     )
                 except CastContractError:
                     row.pop("auditionLine", None)
+            for row in finalized["identities"]:
+                previous = matched.get(str(row["characterId"]))
+                if previous is None:
+                    continue
+                try:
+                    row["auditionLine"] = validate_audition_line(
+                        previous.get("auditionLine")
+                    )
+                except CastContractError:
+                    row.pop("auditionLine", None)
             desired_settings_by_id = {
                 str(row["characterId"]): row.get("voiceSettings", {})
                 for row in finalized["identities"]
@@ -1056,9 +1066,14 @@ def create_app_v2(
                 narrator_settings = validate_voice_settings(
                     narrator_profile, fallback_category="narrator"
                 )
+                narrator_line_source = (
+                    previous_narrator
+                    if same_selection and isinstance(previous_narrator, dict)
+                    else narrator_profile
+                )
                 try:
                     narrator_audition_line = validate_audition_line(
-                        narrator_profile.get("auditionLine")
+                        narrator_line_source.get("auditionLine")
                     )
                 except CastContractError:
                     narrator_audition_line = None

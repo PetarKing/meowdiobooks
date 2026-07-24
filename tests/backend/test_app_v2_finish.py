@@ -1670,6 +1670,17 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
     recipe = {"version": "1"}
     profile_calls = 0
     audition_batches: list[list[str]] = []
+    audition_lines: list[dict[str, str]] = []
+    narrator_audition_line = (
+        "Night settled quietly over the harbour while the last lanterns flickered along "
+        "the quay. Beyond the breakwater, a patient bell marked the hour, and every "
+        "darkened window seemed to guard a secret."
+    )
+    alice_audition_line = (
+        "I kept the silver key, although nobody thought to ask me why. Tomorrow I will "
+        "cross the square, unlock the weathered garden door, and discover which promise "
+        "has been waiting there."
+    )
 
     proposal = {
         "status": "ready",
@@ -1704,10 +1715,22 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
             "accent": "unspecified",
             "description": "Stable reviewed direction.",
         }
-        return {"narrator": settings, **{str(row["characterId"]): settings for row in identities}}
+        return {
+            "narrator": {**settings, "auditionLine": narrator_audition_line},
+            **{
+                str(row["characterId"]): {
+                    **settings,
+                    "auditionLine": alice_audition_line,
+                }
+                for row in identities
+            },
+        }
 
     def audition(_repo, _package, _book_id, characters, report, _language, _model):
         audition_batches.append([str(row["id"]) for row in characters])
+        audition_lines.append(
+            {str(row["id"]): str(row["previewLine"]) for row in characters}
+        )
         for row in characters:
             revision = f"{recipe['version']}-{row['id']}-{len(audition_batches)}"
             row.update(
@@ -1753,6 +1776,7 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
                 "max_voices": 1,
                 "extra_candidates": 1,
             },
+            generate_voice_audition_lines=True,
         )
     ) as client:
         book_id = client.post(
@@ -1817,6 +1841,13 @@ def test_changed_recipe_refreshes_the_whole_pack_without_reprofiling(tmp_path):
     assert [row["voiceSettings"] for row in refreshed_voices] == [
         row["voiceSettings"] for row in first_voices
     ]
+    assert [row["auditionLine"] for row in refreshed_voices] == [
+        row["auditionLine"] for row in first_voices
+    ]
+    assert audition_lines[0] == audition_lines[1] == {
+        "narrator": narrator_audition_line,
+        first_candidate["identities"][0]["characterId"]: alice_audition_line,
+    }
     assert all(str(row["voicePreviewRevision"]).startswith("2-") for row in refreshed_voices)
     assert not {row["voicePreviewRevision"] for row in first_voices} & {
         candidate["revision"] for row in refreshed_voices for candidate in row["voiceCandidates"]
