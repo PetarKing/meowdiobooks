@@ -9,7 +9,8 @@ in the [`wizard/`](wizard/README.md) specifications.
 
 1. Imported source bytes are immutable. Different bytes create a different book ID.
 2. Every accepted phase consumes exact accepted upstream revisions.
-3. Phase results are immutable JSON artifacts. Reruns append revisions; they never overwrite history.
+3. Phase results are immutable JSON artifacts. Reruns append metadata revisions; they never overwrite
+   history. Large voice binaries follow the current-Cast retention rule below.
 4. One atomic stage-pointer map identifies the active artifact for each completed phase.
 5. Source text and source ranges remain evidence. AI returns decisions keyed to supplied IDs, not
    rewritten source.
@@ -48,8 +49,9 @@ artifacts remain in their phase directories. Each chapter audio directory has a 
 pointer because chapters are generated and regenerated independently; it is not a second wizard-stage
 pointer map.
 
-`preview/` and failed-job temporary directories are disposable. Source, immutable artifacts, accepted
-voice references and published chapter revisions are durable.
+`preview/` and failed-job temporary directories are disposable. Source, immutable artifact metadata,
+the current Cast's voice references and published chapter revisions are durable. Superseded Cast
+metadata remains inspectable, but its voice WAVs are not retained.
 
 ## Common artifact header
 
@@ -148,7 +150,7 @@ Cast references accepted Dialogue and Review revisions. It contains:
 - durable character/group IDs;
 - complete literal-label-to-character-ID mapping and alias lineage;
 - one narrator identity;
-- immutable voice candidates;
+- immutable voice-candidate metadata for audit and current-Cast voice binaries for playback;
 - editable voice settings and their exact compiled VoiceDesign direction per candidate;
 - line counts used to order Cast/Voice review without changing identity authority;
 - one accepted voice revision, reference WAV and exact matching transcript for every dedicated playable
@@ -165,6 +167,14 @@ Fuzzy similarity and model proposals never perform a material merge automaticall
 decisions block auditions. Missing or unaccepted narrator/character voices and incomplete group voice
 routes block later phases. Layered routing never changes label, alias, or identity semantics. One Cast
 revision never mixes auditions from different recipe versions.
+
+The product has one usable Cast voice set per book. Regenerating one cast member replaces that
+member's editable audition set instead of appending another reusable generation lineage. While a
+complete replacement Cast remains a draft, the last accepted Cast stays usable. Accepting the
+replacement atomically makes it the only Cast allowed to drive new generation and deletes voice WAVs
+that are unreachable from it. Superseded Cast JSON remains inspectable, but its previews may be
+unavailable and it cannot be reactivated for generation. Previously generated chapters and Library
+exports are independent outputs and are never deleted by this replacement.
 
 ## Enrichment artifact
 
@@ -242,9 +252,10 @@ Stale audio remains playable and inspectable until a replacement chapter revisio
 ## Durable inspection
 
 After completion, the book exposes active revisions and immutable history for every phase, including
-source evidence, decisions, candidate voices, accepted aliases, recording scripts, render metadata,
-fallbacks and previous chapter audio revisions. Candidate and accepted status must be explicit; history
-must never use an ambiguous “accepted-or-candidate” state.
+source evidence, decisions, candidate-voice metadata, accepted aliases, recording scripts, render
+metadata, fallbacks and previous chapter audio revisions. Only the current Cast's voice binaries are
+retained or generation-eligible. Candidate and accepted status must be explicit; history must never
+use an ambiguous “accepted-or-candidate” state.
 
 ## Compatibility
 

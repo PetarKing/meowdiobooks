@@ -26,6 +26,8 @@ const editionErrorKeys = new Set([
   "errors.aiUnavailable",
   "errors.bookProcessingActive",
   "errors.deleteWorkingData",
+  "errors.tenantStorageLimit",
+  "errors.globalStorageCapacity",
 ]);
 
 export function localizeErrorMessage(value: string, t: TFunction) {

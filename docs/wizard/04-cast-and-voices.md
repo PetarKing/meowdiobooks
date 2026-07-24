@@ -25,6 +25,12 @@ invalidate the whole cast. **Reclassify from Dialogue** explicitly reruns label
 classification from the accepted Dialogue and Review without overwriting the previously accepted Cast
 revision. The new candidate must still be accepted. A Dialogue change also requires fresh classification.
 
+Changing Cast or voices creates a replacement, not a second durable generation configuration. The
+last accepted Cast remains usable while the replacement is only a draft. Once the user accepts the
+replacement, only its voices may drive new generation; superseded voice WAVs are deleted while their
+lightweight artifact metadata remains available for audit. Regenerating one cast member replaces that
+member's current audition set. Existing generated chapters and Library exports remain available.
+
 The complete audition pack pins one recipe version for its selected voice model. The same registered
 version reuses the pack. A changed or legacy-missing version preserves reviewed identities, mappings,
 settings, directions and routes, but requires a complete pack refresh; one Cast revision never mixes

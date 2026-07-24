@@ -136,6 +136,7 @@ from .languages import (
 )
 from .queue import JobQueue
 from .resources import SleepInhibitor, require_free_disk
+from .voice_retention import cast_voice_revisions, prune_voice_files
 from .voice_sharing import VoiceSharingPolicy, plan_shared_voices
 from .voice_profile_checkpoint import (
     profile_checkpoint_key,
@@ -444,6 +445,10 @@ def create_app_v2(
     on_book_deleting: Callable[[Book], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
     chapter_audio_source: ChapterAudioSource | None = None,
+    job_preflight: Callable[[], None] | None = None,
+    on_cast_voice_revisions_changed: (
+        Callable[[Path, frozenset[str]], None] | None
+    ) = None,
 ) -> FastAPI:
     """Create the v2 API with explicit provider seams for local or hosted composition.
 
@@ -470,6 +475,9 @@ def create_app_v2(
     voice_models = voice_models or voice_model_capabilities
     chapter_audio_source = chapter_audio_source or (
         lambda _book_id, _chapter_id, _revision, expected: nullcontext(expected)
+    )
+    retain_cast_voice_revisions = (
+        on_cast_voice_revisions_changed or prune_voice_files
     )
     registry = load_model_registry(repo_root)
     default_voice_id = default_voice_model or registry.default_voice_id
@@ -498,7 +506,9 @@ def create_app_v2(
     library_cover_root = root / "library-covers"
     queue = JobQueue(
         jobs,
-        before_run=lambda _job: require_free_disk(root),
+        before_run=lambda _job: (
+            job_preflight() if job_preflight is not None else require_free_disk(root)
+        ),
         activity=SleepInhibitor,
     )
     runner = WorkflowRunner(PUBLIC_WORKFLOW)
@@ -514,6 +524,18 @@ def create_app_v2(
 
     def workspace_for(book_id: str) -> BookWorkspace:
         return BookWorkspace.under(root, book_id)
+
+    def write_cast_candidate(
+        package: Path, payload: dict[str, Any]
+    ) -> tuple[Path, dict[str, Any]]:
+        path, artifact = write_artifact(package, "cast", payload, publish=False)
+        keep = set(cast_voice_revisions(artifact))
+        try:
+            keep.update(cast_voice_revisions(read_artifact(package, "cast")))
+        except ValueError:
+            pass
+        retain_cast_voice_revisions(package, frozenset(keep))
+        return path, artifact
 
     def current_voice_recipe_version(model_id: str) -> str:
         return _voice_recipe_version(voice_models(repo_root), model_id)
@@ -707,7 +729,7 @@ def create_app_v2(
                     default_voice_model=default_voice_id,
                 )
             if reusable is not None:
-                path, artifact = write_artifact(package, "cast", reusable, publish=False)
+                path, artifact = write_cast_candidate(package, reusable)
                 report(100, "Existing cast and auditions ready for review")
                 return _candidate_result(book.id, WizardStage.CAST, path, artifact)
             report(2, "Building contextual identity dossiers")
@@ -779,6 +801,17 @@ def create_app_v2(
                         fallback_category=str(target.get("category", "character")),
                     ),
                 }
+                for key in (
+                    "acceptedVoiceRevision",
+                    "previewUrl",
+                    "referenceAudio",
+                    "referenceMode",
+                    "referenceText",
+                    "voiceCandidates",
+                    "voicePreviewRevision",
+                    "voiceRevision",
+                ):
+                    character.pop(key, None)
                 try:
                     character["previewLine"] = validate_audition_line(
                         target.get("auditionLine")
@@ -807,7 +840,7 @@ def create_app_v2(
                     "narrator": updated if character_id == "narrator" else proposal.get("narrator"),
                     "identities": identities,
                 }
-                path, artifact = write_artifact(package, "cast", body, publish=False)
+                path, artifact = write_cast_candidate(package, body)
                 report(100, "Voice audition ready for review")
                 return _candidate_result(book.id, WizardStage.CAST, path, artifact)
 
@@ -1109,7 +1142,7 @@ def create_app_v2(
                 ],
                 "identityDecisions": raw_decisions,
             }
-        path, artifact = write_artifact(package, "cast", body, publish=False)
+        path, artifact = write_cast_candidate(package, body)
         report(100, "Cast candidate ready for review")
         return _candidate_result(book.id, WizardStage.CAST, path, artifact)
 
@@ -2204,7 +2237,7 @@ def create_app_v2(
             "identities": identities,
         }
         try:
-            _path, artifact = write_artifact(package, "cast", body, publish=False)
+            _path, artifact = write_cast_candidate(package, body)
         except Exception:
             output.unlink(missing_ok=True)
             reference_output.unlink(missing_ok=True)
@@ -2286,7 +2319,7 @@ def create_app_v2(
             "narrator": updated if character_id == "narrator" else candidate.get("narrator"),
             "identities": identities,
         }
-        _path, artifact = write_artifact(package, "cast", body, publish=False)
+        _path, artifact = write_cast_candidate(package, body)
         return artifact
 
     @app.post("/api/books/{book_id}/stages/{stage}/accept")
@@ -2447,6 +2480,11 @@ def create_app_v2(
         book.stage = parsed
         book.updated_at = utc_now()
         books.put(book)
+        if parsed == WizardStage.CAST:
+            retain_cast_voice_revisions(
+                package_for(book_id),
+                cast_voice_revisions(workspace_for(book_id).read("cast")),
+            )
         return book.model_dump(mode="json")
 
     app.router.routes.extend(create_media_router(root, require_book, package_for).routes)

@@ -1280,8 +1280,16 @@ export default function App({
     const hasPreviousCast = Boolean(snapshot?.cast)
       || (snapshot?.history.cast?.some((row) => row.status === "superseded") ?? false);
 
+    function beginCastReplacement() {
+      if (!window.confirm(t(
+        "Changing the cast or voices creates a replacement. After you accept it, the previous voices can no longer generate new audio. Existing generated audio and Library exports stay available. Continue?",
+      ))) return;
+      if (current?.revision === snapshot?.cast?.revision) setCastCandidate(undefined);
+      setRevisingStages([...new Set([...revisingStages, "cast"])]);
+    }
+
     function reclassifyCast() {
-      if (!window.confirm(t("Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Your accepted cast stays unchanged."))) return;
+      if (!window.confirm(t("Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Once you accept the replacement, only its voices can generate new audio."))) return;
       void processCandidate("cast", { forceReclassify: true }).then((candidate) => {
         const cast = candidate as unknown as CastArtifact;
         setCastCandidate(cast);
@@ -1313,7 +1321,7 @@ export default function App({
       if (cast.language && supported.includes(cast.language)) setLanguage(cast.language);
       else if (cast.detectedLanguage && supported.includes(cast.detectedLanguage)) setLanguage(cast.detectedLanguage);
     }).catch((reason) => setError(message(reason)))}>{t(hasPreviousCast ? "Review cast & voices" : "Find characters")} →</button></StageLaunch></>;
-    if (completed.includes("cast") && !revising) { const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean); return <AcceptedSummary stage="cast" step={t("Step 4")} title={t("Cast and voices ready")} revision={snapshot?.activeArtifacts.cast} onRevise={() => { if (current.revision === snapshot?.cast?.revision) setCastCandidate(undefined); setRevisingStages([...new Set([...revisingStages, "cast"])]); }}><span><b>{voices.length}</b><small>{t("Assigned voices")}</small></span><span><b>{t(snapshot?.voiceSelection.language ?? "—")}</b><small>{t("Audition language")}</small></span><span><b>{snapshot?.voiceModels.find((row) => row.id === snapshot.voiceSelection.modelId)?.label ?? snapshot?.voiceSelection.modelId ?? "—"}</b><small>{t("Voice model")}</small></span></AcceptedSummary>; }
+    if (completed.includes("cast") && !revising) { const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean); return <AcceptedSummary stage="cast" step={t("Step 4")} title={t("Cast and voices ready")} revision={snapshot?.activeArtifacts.cast} onRevise={beginCastReplacement} note={t("Changing the cast or voices creates a replacement. Once accepted, only the replacement can generate new audio. Existing generated audio and Library exports stay available.")}><span><b>{voices.length}</b><small>{t("Assigned voices")}</small></span><span><b>{t(snapshot?.voiceSelection.language ?? "—")}</b><small>{t("Audition language")}</small></span><span><b>{snapshot?.voiceModels.find((row) => row.id === snapshot.voiceSelection.modelId)?.label ?? snapshot?.voiceSelection.modelId ?? "—"}</b><small>{t("Voice model")}</small></span></AcceptedSummary>; }
     if (current.phase === "identity-review" || editingCast || current.auditionPackRefreshRequired) {
       const confirmationLabels = strongConfirmationLabelsForCast(current, identityDecisions);
       const pendingConfirmations = confirmationLabels.filter((label) => !resolvedLabels.includes(label));
@@ -1425,6 +1433,9 @@ export default function App({
           }).catch((reason) => setError(message(reason))).finally(() => setDeletingVoiceRevision(undefined));
         }}
         onRegenerate={(characterId, voiceSettings) => {
+          if (!window.confirm(t(
+            "Regenerating replaces this cast member’s current audition set. Existing generated audio and Library exports stay available. Continue?",
+          ))) return;
           setRegeneratingCharacterId(characterId);
           void processCandidate("cast", { proposalRevision: current.revision, characterId, voiceSettings }).then((candidate) => {
             const cast = candidate as unknown as CastArtifact;
@@ -1953,10 +1964,10 @@ function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, busy, o
   </>;
 }
 
-function AcceptedSummary({ stage, step, title, receipt, onRevise, children }: { stage: Exclude<WizardStage, "import">; step: string; title: string; revision?: unknown; receipt?: string; onRevise: () => void; children: ReactNode }) {
+function AcceptedSummary({ stage, step, title, receipt, note, onRevise, children }: { stage: Exclude<WizardStage, "import">; step: string; title: string; revision?: unknown; receipt?: string; note?: string; onRevise: () => void; children: ReactNode }) {
   const { t } = useTranslation();
   const actions = <div className="accepted-summary-badges"><Tag tone="good">{t("Complete")}</Tag>{receipt && <span className="accepted-cost-receipt" title={t("Estimated API cost from provider-reported usage")}>{receipt}</span>}</div>;
-  return <><PageTitle stage={stage} step={step} title={title} /><Panel actions={actions} title={t("Accepted settings")}><div className="accepted-summary">{children}</div><div className="summary-note">{t("Your accepted version stays active while you prepare changes. Nothing is replaced until you approve the new result.")}</div><div className="summary-actions"><span>{t("Accepted and ready for the next steps")}</span><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></Panel></>;
+  return <><PageTitle stage={stage} step={step} title={title} /><Panel actions={actions} title={t("Accepted settings")}><div className="accepted-summary">{children}</div><div className="summary-note">{note ?? t("Your accepted version stays active while you prepare changes. Nothing is replaced until you approve the new result.")}</div><div className="summary-actions"><span>{t("Accepted and ready for the next steps")}</span><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></Panel></>;
 }
 
 function formatApiCost(value: number) {

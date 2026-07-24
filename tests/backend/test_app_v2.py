@@ -155,6 +155,35 @@ def test_delete_book_aborts_before_local_state_when_durable_cleanup_fails(tmp_pa
         assert (data_dir / "packages" / book_id).is_dir()
 
 
+def test_composition_can_replace_the_default_job_resource_preflight(tmp_path):
+    class HostedCapacityError(RuntimeError):
+        public_message = "Hosted capacity is temporarily unavailable."
+
+    checks = 0
+
+    def reject_job() -> None:
+        nonlocal checks
+        checks += 1
+        raise HostedCapacityError("private capacity diagnostic")
+
+    app = create_app_v2(tmp_path, job_preflight=reject_job)
+    with TestClient(app) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("alice.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+
+        queued = client.post(
+            f"/api/books/{book_id}/stages/extract/process",
+            json={"settings": {"method": "native"}},
+        )
+        finished = _wait(client, queued.json()["id"])
+
+        assert checks == 1
+        assert finished["status"] == "failed"
+        assert finished["error"] == HostedCapacityError.public_message
+        assert "private capacity diagnostic" not in finished["error"]
+
+
 def test_cast_mapping_does_not_restore_a_model_alias_detached_during_review():
     finalized = {"labelToCharacterId": {"Cecilus": "cec", "Cecilus Segmunt": "seg"}}
     proposal = {

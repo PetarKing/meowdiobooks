@@ -19,8 +19,9 @@ Semantic candidate phases follow this visible lifecycle:
 4. **Process** — progress describes real work units and estimated remaining scope.
 5. **Result review** — the produced artifact is inspectable before acceptance.
 6. **Accept** — an immutable revision and active pointer are published atomically.
-7. **Revisit** — accepted settings, evidence, result, provenance and superseded revisions remain
-   inspectable after completion.
+7. **Revisit** — accepted settings, evidence, result, provenance and superseded metadata revisions
+   remain inspectable after completion. Cast voice binaries are retained only for the current usable
+   Cast; generated chapters and exports retain their own independent history.
 
 A failed or interrupted job publishes nothing and leaves the last accepted revision active. PDF intake,
 Extract, Generate and Export use narrower variants because they do not publish semantic model candidates:
