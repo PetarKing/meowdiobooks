@@ -866,19 +866,26 @@ def create_app_v2(
                     "Select a language supported by the selected voice-audition model"
                 )
             current_recipe_version = current_voice_recipe_version(model_id)
-            same_selection = (
+            same_language = (
                 phase == "audition-review"
-                and model_id == str(proposal.get("voiceModel", default_voice_id))
                 and language == normalize_language(proposal.get("language", "english"))
+            )
+            same_selection = (
+                same_language
+                and model_id == str(proposal.get("voiceModel", default_voice_id))
             )
             recipe_is_current = (
                 str(proposal.get("auditionPackRecipeVersion", "")) == current_recipe_version
             )
-            matched = _reuse_unchanged_cast_voices(finalized, proposal) if same_selection else {}
+            matched = _reuse_unchanged_cast_voices(finalized, proposal) if same_language else {}
             reused: dict[str, dict[str, Any]] = {}
             for character_id, row in matched.items():
                 route = row.get("voiceRoute")
-                if isinstance(route, dict) and route.get("kind") == "layered":
+                if (
+                    same_selection
+                    and isinstance(route, dict)
+                    and route.get("kind") == "layered"
+                ):
                     layered = deepcopy(row)
                     for key in (
                         "acceptedVoiceRevision",
@@ -892,7 +899,11 @@ def create_app_v2(
                     ):
                         layered.pop(key, None)
                     reused[character_id] = layered
-                elif recipe_is_current and _has_complete_audition_pack(row):
+                elif (
+                    same_selection
+                    and recipe_is_current
+                    and _has_complete_audition_pack(row)
+                ):
                     reused[character_id] = row
             affected = [
                 row
@@ -904,7 +915,7 @@ def create_app_v2(
                 for row in finalized["identities"]
                 if str(row["characterId"]) not in matched
             ]
-            include_narrator_profile = not same_selection
+            include_narrator_profile = not same_language
             profiles: dict[str, dict[str, str]] = {}
             if profile_targets or include_narrator_profile:
                 checkpoint_key = profile_checkpoint_key(
@@ -983,6 +994,16 @@ def create_app_v2(
                     )
                 except CastContractError:
                     row.pop("auditionLine", None)
+            for row in finalized["identities"]:
+                previous = matched.get(str(row["characterId"]))
+                if previous is None:
+                    continue
+                try:
+                    row["auditionLine"] = validate_audition_line(
+                        previous.get("auditionLine")
+                    )
+                except CastContractError:
+                    row.pop("auditionLine", None)
             desired_settings_by_id = {
                 str(row["characterId"]): row.get("voiceSettings", {})
                 for row in finalized["identities"]
@@ -1048,7 +1069,7 @@ def create_app_v2(
             if not reusable_narrator:
                 narrator_profile = (
                     deepcopy(previous_narrator.get("voiceSettings"))
-                    if same_selection
+                    if same_language
                     and isinstance(previous_narrator, dict)
                     and isinstance(previous_narrator.get("voiceSettings"), dict)
                     else profiles.get("narrator", default_voice_settings("narrator"))
@@ -1056,9 +1077,14 @@ def create_app_v2(
                 narrator_settings = validate_voice_settings(
                     narrator_profile, fallback_category="narrator"
                 )
+                narrator_line_source = (
+                    previous_narrator
+                    if same_language and isinstance(previous_narrator, dict)
+                    else narrator_profile
+                )
                 try:
                     narrator_audition_line = validate_audition_line(
-                        narrator_profile.get("auditionLine")
+                        narrator_line_source.get("auditionLine")
                     )
                 except CastContractError:
                     narrator_audition_line = None
