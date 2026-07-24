@@ -316,6 +316,13 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
         ).json()
         book_id = imported["book"]["id"]
         package = tmp_path / "packages" / book_id
+        snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+        voice_model = snapshot["voiceSelection"]["modelId"]
+        voice_recipe_version = next(
+            row["recipeVersion"]
+            for row in snapshot["voiceModels"]
+            if row["id"] == voice_model
+        )
         _, cast = write_artifact(
             package,
             "cast",
@@ -324,6 +331,8 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
                 "phase": "audition-review",
                 "status": "needs-voice-review",
                 "language": "english",
+                "voiceModel": voice_model,
+                "auditionPackRecipeVersion": voice_recipe_version,
                 "narrator": {
                     "characterId": "narrator",
                     "name": "Narrator",
