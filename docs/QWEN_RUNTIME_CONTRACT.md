@@ -54,12 +54,14 @@ For local text work, the application starts one pinned `llama.cpp` server for th
 - `enable_thinking: false`;
 - JSON response mode for JSON contracts.
 
-When the user explicitly selects a remote Dialogue profile, the application sends the selected bounded
-passages directly to that profile instead. The configured credential remains server-side and is not
-written to artifacts or sent to the browser. Remote Dialogue uses two differently framed checks and
-retains a character assignment only when both answers agree and have literal support in the supplied
-passage. Cast, voice design, generation and every non-Dialogue phase remain on their configured local
-runtimes.
+When the user explicitly selects a remote Dialogue profile, the application runs **Dual pass with
+tools**: bounded eight-page scenes go to independent low- and medium-reasoning passes, and meaningful
+disagreements receive selective high-reasoning adjudication. Evidence tools can inspect a target,
+read immediately before or after its scene, retrieve wider target context, and search the rest of the
+book. Tool outputs are bounded source excerpts. Consequently, a complete run may transmit text from
+any part of the book even though no single request contains the whole book. The configured credential
+remains server-side and is not written to artifacts or sent to the browser. Cast, voice design,
+generation and every non-Dialogue phase remain on their configured local runtimes.
 
 Malformed transport or response syntax is retried at most three times. A temporary `503` is retried
 within the readiness deadline. A persistent transport failure aborts the candidate job; it does not

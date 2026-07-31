@@ -259,9 +259,15 @@ def remote_usage_cost(config: RemoteTextModelConfig, usage: Mapping[str, Any]) -
         if isinstance(prompt_details, Mapping)
         else 0
     )
-    uncached = max(0, prompt - cached)
+    cache_write = (
+        int(prompt_details.get("cache_write_tokens", 0) or 0)
+        if isinstance(prompt_details, Mapping)
+        else 0
+    )
+    uncached = max(0, prompt - cached - cache_write)
     return (
         uncached * config.input_usd_per_million_tokens
         + cached * config.cached_input_usd_per_million_tokens
+        + cache_write * config.cache_write_input_usd_per_million_tokens
         + completion * config.output_usd_per_million_tokens
     ) / 1_000_000
