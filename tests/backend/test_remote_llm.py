@@ -79,7 +79,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
     }
     assert result["text"] == "T001|D|Alice"
     assert result["usage"]["input_tokens"] == 100
-    assert remote_usage_cost(config, result["usage"]) == pytest.approx(0.000142)
+    assert remote_usage_cost(config, result["usage"]) == pytest.approx(0.0000284)
     assert observed == [
         (
             config,
@@ -97,7 +97,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
             },
         )
     ]
-    assert config.pricing_version == "openai-gpt-5.6-luna-2026-07-18"
+    assert config.pricing_version == "openai-gpt-5.6-luna-2026-07-30"
 
 
 def test_luna_uses_native_strict_structured_outputs_when_schema_is_supplied(monkeypatch):
@@ -152,6 +152,22 @@ def test_luna_uses_native_strict_structured_outputs_when_schema_is_supplied(monk
             "schema": schema,
         }
     }
+
+
+def test_luna_prices_cache_write_tokens_separately():
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    assert config is not None
+
+    usage = {
+        "input_tokens": 1_000,
+        "input_tokens_details": {
+            "cached_tokens": 200,
+            "cache_write_tokens": 300,
+        },
+        "output_tokens": 100,
+    }
+
+    assert remote_usage_cost(config, usage) == pytest.approx(0.000299)
 
 
 def test_usage_observer_sees_provider_usage_before_invalid_output_retry(monkeypatch):

@@ -97,8 +97,9 @@ PDF → extracted text → dialogue attribution → character reconciliation →
   editable transcript draft, and a generated audition of the same line used to compare designed voices.
 - Prepares one faithful final recording script from the accepted upstream revisions when Generate first needs it.
 - Publishes complete versioned WAV chapters atomically, packages current chapters as M4B or MP3, and keeps completed exports in a local Library.
-- Keeps the book and model inference on the Mac by default; optional remote Dialogue sends only the
-  selected passages to the provider configured by the user.
+- Keeps the book and model inference on the Mac by default. When the user selects remote Dialogue,
+  bounded eight-page scenes and on-demand evidence excerpts are sent to the configured provider;
+  across a complete run, those excerpts may cover text from anywhere in the book.
 
 After local PDF intake, the guided workflow is **Extract → Dialogue → Review → Cast & Voices →
 Enrichment (currently pass-through) → Generate → Export**. See the
@@ -124,7 +125,7 @@ local set is roughly 14 GB.
 | Step / use case | Route | Default model | Compatible configuration |
 |---|---|---|---|
 | Dialogue attribution, cast identity classification and voice suggestions | Local | Qwen3.5 9B Q4_K_M through pinned `llama.cpp` | A registry entry using the supported `llama_cpp` engine and the same validated prompt/output contracts |
-| Large Dialogue reviews, when explicitly selected | Remote, optional | `gpt-5.6-luna` through the configured OpenAI Responses profile | An OpenAI-compatible Chat Completions or Responses profile with the required bounded-response contract; only selected Dialogue passages leave the computer |
+| Large Dialogue reviews, when explicitly selected | Remote, optional | `gpt-5.6-luna` through the configured OpenAI Responses profile | An OpenAI Responses profile supporting strict JSON schemas, function tools, and the bounded evidence contract |
 | Designed voice auditions | Local | [`mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) | A compatible MLX-Audio VoiceDesign checkpoint paired with a Base renderer and an explicitly validated language list |
 | Voice-sample transcript draft (STT) | Local | [`mlx-community/Qwen3-ASR-0.6B-4bit`](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-4bit) with automatic language detection | A compatible MLX-Audio Qwen3-ASR checkpoint implementing the same editable text/language result; a future Linux adapter can preserve this boundary |
 | Voice-cloned audition | Local | [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit) with the uploaded reference WAV and corrected transcript | A compatible Base checkpoint supporting transcript-conditioned `ref_audio` + `ref_text` cloning |
@@ -132,7 +133,8 @@ local set is roughly 14 GB.
 
 Voice cloning does not use a separate synthesis model: Qwen3-ASR proposes editable words, then the
 same Qwen3-TTS Base renderer used for chapters clones the corrected audio/text reference. VoiceDesign,
-Base TTS and STT remain local. Only the optional remote Dialogue route sends bounded text externally.
+Base TTS and STT remain local. The optional remote Dialogue route sends bounded scene and evidence
+text externally and may inspect any part of the book while resolving a difficult speaker.
 
 ## Run locally
 

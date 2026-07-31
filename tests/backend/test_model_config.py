@@ -24,11 +24,14 @@ def test_default_registry_preserves_current_models_and_all_supported_languages()
     assert text.model_path == ".local/models/qwen35-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
     assert remote is not None
     assert remote.engine == "openai_responses"
-    assert remote.input_usd_per_million_tokens == 1.0
-    assert remote.cached_input_usd_per_million_tokens == 0.1
-    assert remote.output_usd_per_million_tokens == 6.0
-    assert remote.max_targets_per_batch == 6
-    assert remote.max_concurrent_batches == 6
+    assert remote.input_usd_per_million_tokens == 0.2
+    assert remote.cached_input_usd_per_million_tokens == 0.02
+    assert remote.cache_write_input_usd_per_million_tokens == 0.25
+    assert remote.output_usd_per_million_tokens == 1.2
+    assert remote.policy == "dual-pass-with-tools-v1"
+    assert remote.max_targets_per_batch == 8
+    assert remote.max_concurrent_batches == 8
+    assert remote.estimated_usd_per_target == 0.00092
     assert voice.audition_path == "models/qwen_1_7b_voice_design"
     assert voice.renderer_path == "models/qwen_1_7b_base_4bit"
     assert voice.recipe_version == "1"
@@ -87,7 +90,7 @@ def test_dialogue_routing_preview_uses_model_display_cost_and_benchmark_config(t
         "domain": "api.openai.com",
         "credentialConfigured": False,
         "apiKeyEnvironmentVariable": "OPENAI_API_KEY",
-        "estimatedCostUsd": 0.68,
-        "falseNamesReductionPercent": 85,
-        "speakerRecallImprovementPercent": 272,
+        "estimatedCostUsd": 0.86,
+        "falseNamesReductionPercent": 91,
+        "speakerRecallImprovementPercent": 373,
     }

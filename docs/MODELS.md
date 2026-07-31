@@ -113,8 +113,19 @@ the environment variable named by `api_key_env` and is never written to an artif
 browser. Display names, provider domain, estimated per-target cost, and benchmark comparison all come
 from the same model registry.
 
-The current remote policy runs two differently framed ordered-passage checks. A Character name is
-kept only when both checks agree exactly and the name appears in the supplied passage. Provider,
-transport, parsing, or agreement failures never silently fall back to a weaker Character guess.
-When the checks disagree but return one or more context-supported names, the turn stays with the
-narrator and those names are preserved only as review suggestions.
+The current remote policy is **Dual pass with tools**. It divides the book into bounded eight-page
+scenes and batches at most `max_targets_per_batch` source-owned targets. A fast low-reasoning pass and
+an independent medium-reasoning pass run in parallel. The stronger pass can inspect a target's local
+turn sequence, retrieve wider target context, read immediately before or after the scene, and search
+outside the scene for character evidence. Tool results are bounded, source-grounded excerpts rather
+than raw workflow JSON.
+
+Harmless surface differences such as a short name versus the same full name are reconciled only by
+the controller and are never exposed as an alias map. Meaningful disagreements go to a selective
+high-reasoning adjudicator with the same evidence tools. The controller validates complete target
+coverage and the shared Dialogue artifact contract before publishing; invalid transport or model
+output aborts the candidate rather than silently falling back to a weaker guess.
+
+Selecting this route authorizes the configured provider to receive the initial bounded scenes and
+any evidence excerpts requested by the model. Across a complete run, the provider may therefore see
+text from anywhere in the book even though no request contains the entire book.

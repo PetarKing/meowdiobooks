@@ -53,6 +53,7 @@ class RemoteTextModelConfig:
     policy: str
     input_usd_per_million_tokens: float
     cached_input_usd_per_million_tokens: float
+    cache_write_input_usd_per_million_tokens: float
     output_usd_per_million_tokens: float
     max_targets_per_batch: int
     max_concurrent_batches: int
@@ -299,6 +300,12 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         raise ModelConfigError(
             f"Unsupported reasoning_effort for remote text model {model_id}: {reasoning_effort}"
         )
+    input_price = _non_negative_number(row, "input_usd_per_million_tokens")
+    cache_write_price = (
+        _non_negative_number(row, "cache_write_input_usd_per_million_tokens")
+        if "cache_write_input_usd_per_million_tokens" in row
+        else input_price
+    )
     return RemoteTextModelConfig(
         id=model_id,
         display_name=_string(row, "display_name"),
@@ -309,10 +316,11 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         pricing_version=_string(row, "pricing_version"),
         reasoning_effort=reasoning_effort,
         policy=_string(row, "policy"),
-        input_usd_per_million_tokens=_non_negative_number(row, "input_usd_per_million_tokens"),
+        input_usd_per_million_tokens=input_price,
         cached_input_usd_per_million_tokens=_non_negative_number(
             row, "cached_input_usd_per_million_tokens"
         ),
+        cache_write_input_usd_per_million_tokens=cache_write_price,
         output_usd_per_million_tokens=_non_negative_number(row, "output_usd_per_million_tokens"),
         max_targets_per_batch=_positive_int(row, "max_targets_per_batch"),
         max_concurrent_batches=_positive_int(row, "max_concurrent_batches"),
