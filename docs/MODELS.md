@@ -129,3 +129,23 @@ output aborts the candidate rather than silently falling back to a weaker guess.
 Selecting this route authorizes the configured provider to receive the initial bounded scenes and
 any evidence excerpts requested by the model. Across a complete run, the provider may therefore see
 text from anywhere in the book even though no request contains the entire book.
+
+### Optional remote request admission
+
+The shared core owns the provider-neutral admission seam; the application composition owns its
+policy. `create_app_v2(remote_request_admission=callback)` forwards the callback into all remote
+Dialogue passes, evidence-tool rounds, adjudications, and transport retries. Custom completion
+adapters can pass the same callback as `request_admission` to `remote_chat_completion`.
+
+The callback receives `(RemoteTextModelConfig, RemoteRequestMetadata)` immediately before each
+physical remote request. Metadata contains `model`, `payloadBytes` (the exact serialized UTF-8 JSON
+body length), `maximumOutputTokens` (the request's positive integer output bound), and `attempt`
+(one-based within a transport call). It contains no source text or credential. Payload bytes are an input-size bound, not a measured tokenizer count;
+output limits include whatever token classes the selected provider counts toward its output cap.
+
+Returning admits that request; raising prevents it. Admission exceptions propagate unchanged and
+are never treated as transport errors or retried. Every actual retry requires a new admission.
+Callbacks may be invoked concurrently and must implement their own thread-safe policy. The core
+neither reserves resources nor reconciles admission decisions against usage. Usage observers remain
+independent and retain their existing contract. With no callback, valid requests behave as before;
+nonpositive, missing, or noninteger output bounds are rejected before any request is sent.

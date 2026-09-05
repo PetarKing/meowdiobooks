@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 from .model_config import RemoteTextModelConfig
 
@@ -23,6 +23,43 @@ class RemoteModelUnavailableError(RuntimeError):
 
 
 RemoteUsageObserver = Callable[[RemoteTextModelConfig, Mapping[str, Any]], None]
+
+
+class RemoteRequestMetadata(TypedDict):
+    """Request bounds exposed without source text, credentials, or transport details."""
+
+    model: str
+    payloadBytes: int
+    maximumOutputTokens: int
+    attempt: int
+
+
+RemoteRequestAdmission = Callable[[RemoteTextModelConfig, RemoteRequestMetadata], None]
+
+
+def admit_remote_request(
+    config: RemoteTextModelConfig,
+    admission: RemoteRequestAdmission | None,
+    *,
+    payload_bytes: int,
+    max_output_tokens: object,
+    attempt: int,
+) -> None:
+    """Validate finite request bounds and let a composition deny a physical request.
+
+    Call outside transport exception handling on every attempt, including retries.
+    Admission exceptions propagate unchanged and must never trigger a provider retry.
+    """
+
+    if type(max_output_tokens) is not int or max_output_tokens <= 0:
+        raise ValueError("Remote requests require a positive integer maximum output token count")
+    if admission is not None:
+        admission(config, {
+            "model": config.model,
+            "payloadBytes": payload_bytes,
+            "maximumOutputTokens": max_output_tokens,
+            "attempt": attempt,
+        })
 
 
 def configured_api_key(repo_root: Path, variable: str) -> str | None:
@@ -57,6 +94,7 @@ def remote_chat_completion(
     max_completion_tokens: int = 4096,
     usage_observer: RemoteUsageObserver | None = None,
     response_schema: Mapping[str, Any] | None = None,
+    request_admission: RemoteRequestAdmission | None = None,
 ) -> dict[str, Any]:
     """Run one bounded remote request without persisting the credential or source passage."""
 
@@ -108,6 +146,13 @@ def remote_chat_completion(
                 "Content-Type": "application/json",
             },
             method="POST",
+        )
+        admit_remote_request(
+            config,
+            request_admission,
+            payload_bytes=len(encoded),
+            max_output_tokens=max_completion_tokens,
+            attempt=attempt,
         )
         try:
             raw_response = urllib.request.urlopen(request, timeout=600).read()

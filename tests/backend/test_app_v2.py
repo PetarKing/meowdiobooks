@@ -1148,3 +1148,42 @@ def test_hosted_store_factory_replaces_only_mutable_collection_storage(tmp_path:
     assert created == ["books", "jobs", "library"]
     assert app.state.books.path == tmp_path / "database" / "books.json"
     assert app.state.jobs.path == tmp_path / "database" / "jobs.json"
+
+
+def test_composition_admission_reaches_remote_dialogue_before_network(tmp_path, monkeypatch):
+    class RequestDenied(OSError):
+        public_message = "Remote processing is unavailable."
+
+    pages = [{"page": 1, "text": 'Alice waited. "Who is there?"', "warnings": []}]
+    monkeypatch.setattr(
+        "meowdiobooks.backend.app_v2.extract_full_document",
+        lambda _source, _cache, _method, _report: pages,
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        "urllib.request.urlopen", lambda *_args, **_kwargs: pytest.fail("network used")
+    )
+    admitted = []
+
+    def deny(config, metadata):
+        admitted.append((config, metadata))
+        raise RequestDenied("private admission diagnostic")
+
+    with TestClient(create_app_v2(tmp_path, remote_request_admission=deny)) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+        extraction = _process(client, book_id, "extract", {"method": "native"})
+        _accept(client, book_id, "extract", extraction["revision"])
+        queued = client.post(
+            f"/api/books/{book_id}/stages/dialogue/process",
+            json={"settings": {"strategy": "fill-gaps", "attributionRoute": "remote"}},
+        )
+        assert queued.status_code == 202, queued.text
+        finished = _wait(client, queued.json()["id"])
+
+    assert admitted
+    assert all(metadata["maximumOutputTokens"] == 8_000 for _, metadata in admitted)
+    assert all(metadata["attempt"] == 1 for _, metadata in admitted)
+    assert finished["status"] == "failed"
+    assert finished["error"] == RequestDenied.public_message
