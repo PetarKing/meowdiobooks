@@ -59,7 +59,7 @@ def _response(target_ids, speaker="?", *, classification="D", usage=True):
 def _install_speakers(monkeypatch, speakers):
     calls = []
 
-    def factory(_config, effort, _observer):
+    def factory(_config, effort, _observer, *, request_admission=None):
         def call(payload):
             calls.append((effort, payload))
             return _response(_target_ids(payload), speakers[effort])
@@ -189,7 +189,7 @@ def test_stronger_pass_can_read_beyond_scene_with_model_shaped_output(monkeypatc
     calls = []
     medium_requests = 0
 
-    def factory(_config, effort, _observer):
+    def factory(_config, effort, _observer, *, request_admission=None):
         def call(payload):
             nonlocal medium_requests
             calls.append((effort, payload))

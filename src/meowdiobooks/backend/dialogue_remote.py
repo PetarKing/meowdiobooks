@@ -30,6 +30,7 @@ from .dialogue_attribution import (
     attribution_summary,
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
+from .remote_llm import RemoteRequestAdmission, admit_remote_request
 
 
 POLICY_ID = "dual-pass-with-tools-v1"
@@ -557,6 +558,7 @@ def run_dialogue_remote(
     report: RemoteReporter | None = None,
     attribution_targets: Sequence[str] = ("open-speakers", "unlabelled-candidates"),
     usage_observer: UsageObserver | None = None,
+    request_admission: RemoteRequestAdmission | None = None,
 ) -> dict[str, Any]:
     """Run the selected dialogue policy and return the shared Dialogue artifact contract."""
 
@@ -577,7 +579,9 @@ def run_dialogue_remote(
         max_workers=config.max_concurrent_batches,
     )
     calls = {
-        effort: _responses_api_call(config, effort, usage_observer)
+        effort: _responses_api_call(
+            config, effort, usage_observer, request_admission=request_admission
+        )
         for effort in ("low", "medium", "high")
     }
     notify = report or (lambda _progress, _message=None: None)
@@ -901,6 +905,8 @@ def _responses_api_call(
     config: RemoteTextModelConfig,
     reasoning_effort: str,
     usage_observer: UsageObserver | None,
+    *,
+    request_admission: RemoteRequestAdmission | None = None,
 ) -> ApiCall:
     api_key = os.environ.get(config.api_key_env, "").strip()
     if not api_key:
@@ -920,7 +926,7 @@ def _responses_api_call(
         }
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         last_error = ""
-        for delay in (2, 5, 10, 0):
+        for attempt, delay in enumerate((2, 5, 10, 0), 1):
             request = urllib.request.Request(
                 endpoint,
                 data=encoded,
@@ -929,6 +935,13 @@ def _responses_api_call(
                     "Content-Type": "application/json",
                 },
                 method="POST",
+            )
+            admit_remote_request(
+                config,
+                request_admission,
+                payload_bytes=len(encoded),
+                max_output_tokens=payload.get("max_output_tokens"),
+                attempt=attempt,
             )
             try:
                 with urllib.request.urlopen(request, timeout=600) as response:

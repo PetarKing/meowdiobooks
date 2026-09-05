@@ -116,7 +116,7 @@ from .models import (
 )
 from .model_config import dialogue_routing_preview, load_model_registry
 from .voice_candidates import VoiceCandidatePolicy
-from .remote_llm import RemoteUsageObserver
+from .remote_llm import RemoteRequestAdmission, RemoteUsageObserver
 from .structured_output import JsonCompletion, complete_with_schema, strict_object_schema
 from .m4b import (
     FFmpegUnavailableError,
@@ -478,6 +478,7 @@ def create_app_v2(
     generate_voice_audition_lines: bool = False,
     enricher: Callable[..., dict[str, Any]] | None = None,
     remote_usage_observer: RemoteUsageObserver | None = None,
+    remote_request_admission: RemoteRequestAdmission | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
@@ -715,6 +716,7 @@ def create_app_v2(
                     report,
                     attribution_targets,
                     usage_observer=remote_usage_observer,
+                    request_admission=remote_request_admission,
                 )
             else:
                 raise DialogueContractError(f"Unknown Dialogue attribution route: {route}")
