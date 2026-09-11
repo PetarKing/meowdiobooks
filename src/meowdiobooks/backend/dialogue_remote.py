@@ -30,7 +30,7 @@ from .dialogue_attribution import (
     attribution_summary,
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
-from .remote_llm import RemoteRequestAdmission, admit_remote_request
+from .remote_llm import RemoteRequestAdmission, _observe_remote_call, admit_remote_request
 
 
 POLICY_ID = "dual-pass-with-tools-v1"
@@ -936,7 +936,7 @@ def _responses_api_call(
                 },
                 method="POST",
             )
-            admit_remote_request(
+            completion = admit_remote_request(
                 config,
                 request_admission,
                 payload_bytes=len(encoded),
@@ -945,30 +945,50 @@ def _responses_api_call(
             )
             try:
                 with urllib.request.urlopen(request, timeout=600) as response:
-                    result = json.loads(response.read())
-                if usage_observer is not None:
-                    usage = result.get("usage")
-                    usage_observer(
-                        config,
-                        {
-                            "outcome": "response",
-                            "attempt": 1,
-                            "model": str(result.get("model") or config.model),
-                            "usage": usage if isinstance(usage, Mapping) else {},
-                            "ambiguousBillable": not bool(usage),
-                            "httpStatus": 200,
-                        },
-                    )
-                return result
+                    raw_response = response.read()
             except urllib.error.HTTPError as error:
                 detail = error.read().decode("utf-8", errors="replace")[:2_000]
                 last_error = f"HTTP {error.code}: {detail}"
+                _observe_remote_call(
+                    config, usage_observer, completion=completion,
+                    outcome="http-error", attempt=attempt,
+                    ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                    http_status=error.code,
+                )
                 if error.code not in {429, 500, 502, 503, 504} or not delay:
                     break
-            except (OSError, urllib.error.URLError, json.JSONDecodeError) as error:
+            except (OSError, urllib.error.URLError) as error:
                 last_error = f"{type(error).__name__}: {error}"
+                _observe_remote_call(
+                    config, usage_observer, completion=completion,
+                    outcome="transport-error", attempt=attempt, ambiguous_billable=True,
+                )
                 if not delay:
                     break
+            else:
+                try:
+                    result = json.loads(raw_response)
+                    if not isinstance(result, Mapping):
+                        raise ValueError("Response must be an object")
+                except (ValueError, TypeError) as error:
+                    last_error = f"{type(error).__name__}: {error}"
+                    _observe_remote_call(
+                        config, usage_observer, completion=completion,
+                        outcome="invalid-response", attempt=attempt, ambiguous_billable=True,
+                    )
+                    if not delay:
+                        break
+                else:
+                    usage = result.get("usage")
+                    _observe_remote_call(
+                        config, usage_observer, completion=completion,
+                        outcome="response", attempt=attempt,
+                        model=str(result.get("model") or config.model),
+                        reported_model=result.get("model"),
+                        usage=usage if isinstance(usage, Mapping) else {},
+                        ambiguous_billable=not bool(usage), http_status=200,
+                    )
+                    return result
             time.sleep(delay)
         raise DialogueContractError(f"Luna request failed: {last_error}")
 
