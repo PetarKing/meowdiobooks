@@ -12,6 +12,7 @@ from typing import Any
 
 import pdfplumber
 from pypdf import PdfReader
+from pypdf.errors import PyPdfError
 
 from meowdiobooks.util import sha256_bytes
 
@@ -30,12 +31,17 @@ def inspect_source(path: Path) -> tuple[str, int]:
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
         raise ValueError(f"Unsupported file type: {suffix or 'missing extension'}")
-    if path.read_bytes()[:5] != b"%PDF-":
+    with path.open("rb") as source:
+        signature = source.read(5)
+    if signature != b"%PDF-":
         raise ValueError("The uploaded file is not a valid PDF")
-    reader = PdfReader(path)
-    if reader.is_encrypted:
-        raise ValueError("Encrypted PDFs are not supported yet")
-    return "pdf", len(reader.pages)
+    try:
+        reader = PdfReader(path)
+        if reader.is_encrypted:
+            raise ValueError("Encrypted PDFs are not supported yet")
+        return "pdf", len(reader.pages)
+    except PyPdfError as error:
+        raise ValueError("The uploaded PDF is malformed or exceeds safe parsing limits") from error
 
 
 def pdf_metadata(path: Path) -> dict[str, str]:

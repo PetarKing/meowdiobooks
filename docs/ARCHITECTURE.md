@@ -26,6 +26,23 @@ the selected local adapter returns editable text plus an optional detected langu
 is published as an artifact. The current adapter is MLX-Audio on Apple Silicon. A Linux adapter may
 implement the same function and HTTP/gateway response without changing Cast UI or accepted voice data.
 
+### Untrusted PDF parsing
+
+The September 2026 parser repair pins pypdf 6.18.1, pdfplumber 0.11.10 (pdfminer.six 20260107),
+and lxml 6.1.3 in both application and workflow distributions. The shared parser dependency stack
+belongs here so every composition receives the same fixes. Keeping the old parsers behind upload-size
+checks was insufficient: an 87-byte PDF with an oversized trailer recovery range exceeded a three-second
+probe deadline. The patched pypdf rejects that input in approximately 0.6 seconds on the review machine.
+The regression runs in a killable subprocess and verifies HTTP 422, no imported book, and rejected-source
+cleanup; normal metadata and both native/layout text extraction are also tested.
+
+Import checks only five signature bytes before parsing. Parser-specific failures become a stable
+validation error instead of an unhandled server error. This removes unnecessary signature buffering
+and known vulnerable parser versions; it does not provide a general CPU/memory sandbox for arbitrary
+PDF extraction. Companion deployments must consume a new immutable release to adopt the repair.
+The dependency rationale also includes pdfminer's
+[removal of unsafe pickle-based CMap loading](https://github.com/pdfminer/pdfminer.six/releases/tag/20251230).
+
 ## Authority and publication
 
 The backend is authoritative for accepted state. The browser may prepare settings and decisions, but
