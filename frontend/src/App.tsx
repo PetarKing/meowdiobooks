@@ -403,13 +403,12 @@ export default function App({
     const id = localStorage.getItem("meowdiobooks.activeJob");
     if (!id) return;
     setBusy(true);
-    void runJob({ id, status: "running" })
-      .then((job) => {
-        const bookId = typeof job.result?.bookId === "string"
-          ? job.result.bookId
-          : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
-        return bookId ? hydrate(bookId) : undefined;
-      })
+    void runJob({ id, status: "running" }, async (job) => {
+      const bookId = typeof job.result?.bookId === "string"
+        ? job.result.bookId
+        : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
+      if (bookId) await restoreBookView(bookId);
+    })
       .catch((reason) => setError(message(reason)))
       .finally(() => setBusy(false));
   // Reattach once per gateway; hydrate and runJob intentionally consume the current app state.
@@ -529,7 +528,7 @@ export default function App({
     return next;
   }
 
-  async function runJob(initial: Job): Promise<Job> {
+  async function runJob(initial: Job, onSettled?: (job: Job) => Promise<void>): Promise<Job> {
     let current = initial;
     let consecutivePollFailures = 0;
     setActiveJob(current);
@@ -563,6 +562,8 @@ export default function App({
     }
     localStorage.removeItem("meowdiobooks.activeJob");
     setActiveJob(undefined);
+    // Reattachment must restore saved book context even when the worker failed.
+    if (onSettled) await onSettled(current);
     if (current.status !== "succeeded") throw new Error(current.error ?? `Job ${current.status}`);
     setProgress(100);
     return current;
@@ -692,17 +693,22 @@ export default function App({
     }
   }
 
+  async function restoreBookView(bookId: string) {
+    const next = await hydrate(bookId);
+    const pages = await gateway.getRepresentativePages(bookId);
+    setRepresentatives(pages);
+    setExtractionPreview(await gateway.previewExtraction(bookId, pages[0]?.page ?? 1, method));
+    setStage(routeStage(nextStage(next.book.completedStages), next));
+    navigateProduct("create");
+    setHome(false);
+  }
+
   async function openBook(local: LocalBook) {
     setOpeningBookId(local.id);
     setBusy(true);
     setError(undefined);
     try {
-      const next = await hydrate(local.id);
-      const pages = await gateway.getRepresentativePages(local.id);
-      setRepresentatives(pages);
-      setExtractionPreview(await gateway.previewExtraction(local.id, pages[0]?.page ?? 1, method));
-      setStage(routeStage(nextStage(next.book.completedStages), next));
-      setHome(false);
+      await restoreBookView(local.id);
     } catch (reason) {
       setError(message(reason));
     } finally {
