@@ -3087,16 +3087,61 @@ describe('v2 wizard', () => {
     expect(document.querySelector('audio')).not.toBeInTheDocument()
   })
 
-  it('reattaches to a persisted local job', async () => {
+  it.each(['result', 'payload'] as const)('opens the completed persisted job book from its %s after refresh', async (context) => {
     localStorage.setItem('meowdiobooks.activeJob', 'job-1')
     vi.mocked(wizardApi.getJob).mockResolvedValue({
-      id: 'job-1', status: 'succeeded', payload: { book_id: 'book-1' }, result: {},
+      id: 'job-1', status: 'succeeded',
+      payload: context === 'payload' ? { book_id: 'book-1' } : {},
+      result: context === 'result' ? { bookId: 'book-1' } : {},
     })
     vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
     vi.mocked(wizardApi.prepareRecordingScript).mockResolvedValue(base.recordingScript!)
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
     render(<App />)
-    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('job-1'))
-    await waitFor(() => expect(wizardApi.getBookSnapshot).toHaveBeenCalledWith('book-1'))
+    expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
+    expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it.each(['succeeded', 'failed'] as const)('restores the saved Cast candidate for a %s reattached job', async (status) => {
+    const candidate: CastArtifact = {
+      revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
+      detectedLanguage: 'english',
+    }
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1' },
+      cast: undefined, enrichment: undefined, recordingScript: undefined, generatedChapters: [],
+      pendingCandidates: { cast: { revision: 'cast-proposal-1' } },
+      recoverableStages: status === 'failed' ? { cast: {
+        attempt: 2, message: 'Completed voices are saved.', modelId: 'qwen',
+        language: 'english', proposalRevision: 'cast-proposal-1',
+      } } : undefined,
+    }
+    localStorage.setItem('meowdiobooks.activeJob', 'cast-job')
+    window.history.replaceState({}, '', '/library')
+    vi.mocked(wizardApi.getJob).mockResolvedValue({
+      id: 'cast-job', kind: 'v2:cast', status, payload: { book_id: 'book-1' },
+      error: status === 'failed' ? 'Provider interrupted; completed voices are saved.' : undefined,
+    })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue(candidate)
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
+    render(<App />)
+    expect(await screen.findByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
+    expect(screen.getByText('Step 4 · Cast & voices')).toBeInTheDocument()
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-proposal-1')
+    expect(window.location.pathname).toBe('/')
+    if (status === 'failed') {
+      expect(await screen.findByRole('alert')).toHaveTextContent('Provider interrupted; completed voices are saved.')
+      expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
+    }
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 })
