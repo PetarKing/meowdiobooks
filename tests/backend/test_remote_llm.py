@@ -87,6 +87,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
                 "outcome": "response",
                 "attempt": 1,
                 "model": "gpt-5.6-luna",
+                "reportedModel": "gpt-5.6-luna",
                 "usage": {
                     "input_tokens": 100,
                     "input_tokens_details": {"cached_tokens": 20},

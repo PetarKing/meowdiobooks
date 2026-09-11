@@ -34,7 +34,12 @@ class RemoteRequestMetadata(TypedDict):
     attempt: int
 
 
-RemoteRequestAdmission = Callable[[RemoteTextModelConfig, RemoteRequestMetadata], None]
+# Versioned capability for hosted compositions consuming immutable releases.
+REMOTE_REQUEST_COMPLETION_VERSION = 1
+RemoteRequestCompletion = Callable[[Mapping[str, Any]], None]
+RemoteRequestAdmission = Callable[
+    [RemoteTextModelConfig, RemoteRequestMetadata], RemoteRequestCompletion | None
+]
 
 
 def admit_remote_request(
@@ -44,17 +49,19 @@ def admit_remote_request(
     payload_bytes: int,
     max_output_tokens: object,
     attempt: int,
-) -> None:
+) -> RemoteRequestCompletion | None:
     """Validate finite request bounds and let a composition deny a physical request.
 
     Call outside transport exception handling on every attempt, including retries.
     Admission exceptions propagate unchanged and must never trigger a provider retry.
+    An optional returned callback receives this physical request's final outcome.
+    Completion exceptions also propagate without retrying already-performed work.
     """
 
     if type(max_output_tokens) is not int or max_output_tokens <= 0:
         raise ValueError("Remote requests require a positive integer maximum output token count")
     if admission is not None:
-        admission(config, {
+        return admission(config, {
             "model": config.model,
             "payloadBytes": payload_bytes,
             "maximumOutputTokens": max_output_tokens,
@@ -147,7 +154,7 @@ def remote_chat_completion(
             },
             method="POST",
         )
-        admit_remote_request(
+        completion = admit_remote_request(
             config,
             request_admission,
             payload_bytes=len(encoded),
@@ -162,6 +169,7 @@ def remote_chat_completion(
             _observe_remote_call(
                 config,
                 usage_observer,
+                completion=completion,
                 outcome="http-error",
                 attempt=attempt,
                 ambiguous_billable=error.code in {408, 500, 502, 503, 504},
@@ -174,6 +182,7 @@ def remote_chat_completion(
             _observe_remote_call(
                 config,
                 usage_observer,
+                completion=completion,
                 outcome="transport-error",
                 attempt=attempt,
                 ambiguous_billable=True,
@@ -188,6 +197,7 @@ def remote_chat_completion(
                 _observe_remote_call(
                     config,
                     usage_observer,
+                    completion=completion,
                     outcome="invalid-response",
                     attempt=attempt,
                     ambiguous_billable=True,
@@ -205,10 +215,12 @@ def remote_chat_completion(
             _observe_remote_call(
                 config,
                 usage_observer,
+                completion=completion,
                 outcome="response",
                 attempt=attempt,
                 ambiguous_billable=not bool(usage),
                 model=model,
+                reported_model=response.get("model") if isinstance(response, Mapping) else None,
                 usage=usage if isinstance(usage, Mapping) else {},
             )
             try:
@@ -258,20 +270,22 @@ def _observe_remote_call(
     model: str | None = None,
     usage: Mapping[str, Any] | None = None,
     http_status: int | None = None,
+    completion: RemoteRequestCompletion | None = None,
+    reported_model: str | None = None,
 ) -> None:
-    if observer is None:
-        return
-    observer(
-        config,
-        {
-            "outcome": outcome,
-            "attempt": attempt,
-            "model": model or config.model,
-            "usage": dict(usage or {}),
-            "ambiguousBillable": ambiguous_billable,
-            "httpStatus": http_status,
-        },
-    )
+    event = {
+        "outcome": outcome,
+        "attempt": attempt,
+        "model": model or config.model,
+        "reportedModel": reported_model,
+        "usage": dict(usage or {}),
+        "ambiguousBillable": ambiguous_billable,
+        "httpStatus": http_status,
+    }
+    if completion is not None:
+        completion(event)
+    if observer is not None:
+        observer(config, event)
 
 
 def _responses_output_text(response: Mapping[str, Any]) -> str:
