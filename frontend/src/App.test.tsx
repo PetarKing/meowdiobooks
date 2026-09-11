@@ -567,10 +567,13 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.cancelJob).toHaveBeenCalledWith('generate-job'))
     expect(within(dialog).getByRole('button', { name: 'Canceling…' })).toBeDisabled()
     finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
-    expect(document.querySelector('.topbar')).not.toHaveAttribute('inert')
-    expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
-    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    // The dialog disappears during commit; the passive effect then restores scrolling.
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument()
+      expect(document.querySelector('.topbar')).not.toHaveAttribute('inert')
+      expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
+      expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    })
   })
 
   it('keeps resumed generation status compact and updates remaining time from live progress', async () => {
