@@ -151,8 +151,6 @@ def render_plan_audio(
                     "renderer": {
                         "model": "qwen-1.7b-base-4bit",
                         "language": language,
-                        "stateConsumed": False,
-                        "ambienceConsumed": False,
                     },
                 }
                 write_json(staging / "metadata.json", receipt)

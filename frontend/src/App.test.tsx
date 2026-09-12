@@ -24,14 +24,13 @@ const faithfulSummary = {
 }
 
 const base: WizardSnapshot = {
-  book: { id: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'alice.pdf', pageCount: 120, completedStages: ['import', 'extract', 'dialogue', 'review', 'cast', 'enrich'] },
-  activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1', cast: 'c1', enrichment: 'n1', script: 's1' },
+  book: { id: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'alice.pdf', pageCount: 120, completedStages: ['import', 'extract', 'dialogue', 'review', 'cast'] },
+  activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1', cast: 'c1', script: 's1' },
   dialogue: { regexes: [{ id: 'quotes', label: 'Curly quotes', pattern: '“(?<text>.+?)”', priority: 1, enabled: true, builtIn: true, matchCount: 12, examples: [{ spanId: 's1', page: 2, source: '“Wait,”', spokenText: 'Wait,', speakerStatus: 'unlabelled', origin: 'quotes' }] }], openSpeakerPatterns: ['^\\?+$'], summary: { totalTurns: 12, explicitTurns: 0, openSpeakerTurns: 0, unlabeledCandidates: 12, conflicts: 0 }, examples: [] },
   warnings: [], boundaryCandidates: [], reviewInspection: { decisions: [], boundaryDecisions: [], consequences: {}, history: [] },
   cast: { revision: 'c1', phase: 'accepted', dossiers: [], proposals: [], narrator: { characterId: 'narrator', name: 'Narrator', voicePreviewRevision: 'voice-rev-1', previewUrl: '/n.wav' }, identities: [] },
   voiceModels: [{ id: 'qwen', label: 'Qwen', supportedLanguages: ['english'] }], voiceSelection: { modelId: 'qwen', language: 'english' },
-  enrichment: { revision: 'n1', status: 'skipped' },
-  recordingScript: { revision: 's1', status: 'ready', sourceCoverage: { status: 'exact' }, entries: [{ chapterId: 'chapter-1' }], summary: faithfulSummary, inputRevisions: { dialogue: 'd1', review: 'r1', cast: 'c1', enrichment: 'n1' } },
+  recordingScript: { revision: 's1', status: 'ready', sourceCoverage: { status: 'exact' }, entries: [{ chapterId: 'chapter-1' }], summary: faithfulSummary, inputRevisions: { dialogue: 'd1', review: 'r1', cast: 'c1' } },
   chapters: [{ id: 'chapter-1', title: 'Down the Rabbit-Hole', startPage: 1, endPage: 12 }],
   generatedChapters: [{ chapterId: 'chapter-1', revision: 'audio-1', audioUrl: '/chapter.wav', audioSeconds: 11, current: true, staleReasons: [], segments: [{ id: 'seg-1', characterId: 'alice', text: 'Wait.', sourceSpanId: 's1' }], inputRevisions: { dialogue: 'd1', cast: 'c1' } }],
   history: {},
@@ -106,16 +105,12 @@ describe('v2 wizard', () => {
     expect(preview).toHaveBeenCalledTimes(1)
   })
 
-  it('keeps Player visible but disables its unavailable navigation', async () => {
-    window.history.replaceState({}, "", "/player")
+  it('shows only released product navigation', async () => {
     render(<App />)
-
-    expect(screen.getByRole('button', { name: /Player Coming soon/ })).toBeDisabled()
-    expect(screen.getByRole('heading', { name: 'Your audiobook, ready to listen.' })).toBeInTheDocument()
-    expect(screen.getByText(/Coming soon: chapter playback and listening progress/)).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Back to creating →' }))
-    expect(screen.getByRole('heading', { name: /Every book has/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Player/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Coming soon/)).not.toBeInTheDocument()
   })
 
   it('shows persisted M4B exports in a top-level local Library', async () => {
@@ -184,7 +179,7 @@ describe('v2 wizard', () => {
     resolveLibrary([])
     await screen.findByRole('heading', { name: 'No audiobooks yet.' })
 
-    expect(screen.getByRole('button', { name: /Player Coming soon/ })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /Player/ })).not.toBeInTheDocument()
     expect(window.location.pathname).toBe('/library')
     fireEvent.click(screen.getByRole('button', { name: 'Create' }))
     expect(window.location.pathname).toBe('/')
@@ -194,14 +189,14 @@ describe('v2 wizard', () => {
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
   })
 
-  it('renders the seven visible phases and resumes at Generate', async () => {
+  it('renders the six visible phases and resumes at Generate', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
     expect(within(nav).queryByText('Import')).not.toBeInTheDocument()
-    for (const label of ['Extract','Dialogue','Review','Cast & voices','Enrich','Generate','Export']) expect(within(nav).getByText(label)).toBeInTheDocument()
+    for (const label of ['Extract','Dialogue','Review','Cast & voices','Generate','Export']) expect(within(nav).getByText(label)).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: 'Generate Complete' })).toHaveClass('done')
     expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
-    expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
+    expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
   })
 
   it('names the actual prerequisite for every locked workflow stage', async () => {
@@ -216,8 +211,7 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: 'Dialogue Complete Extract first' })).toBeDisabled()
     expect(within(nav).getByRole('button', { name: 'Review Complete Dialogue first' })).toBeDisabled()
     expect(within(nav).getByRole('button', { name: 'Cast & voices Complete Review first' })).toBeDisabled()
-    expect(within(nav).getByRole('button', { name: 'Enrich Complete Cast & voices first' })).toBeDisabled()
-    expect(within(nav).getByRole('button', { name: 'Generate Complete Enrich first' })).toBeDisabled()
+    expect(within(nav).getByRole('button', { name: 'Generate Complete Cast & voices first' })).toBeDisabled()
     expect(within(nav).getByRole('button', { name: 'Export Generate audio first' })).toBeDisabled()
   })
 
@@ -237,7 +231,7 @@ describe('v2 wizard', () => {
   })
 
   it('lets an embedding shell insert a custom step and replace the header without copying the public app', async () => {
-    const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
+    const journey = publicJourney.insertAfter('cast', { id: 'soundscape', label: 'Soundscape' })
 
     await open(base, undefined, undefined, undefined, {
       journey,
@@ -251,7 +245,7 @@ describe('v2 wizard', () => {
   })
 
   it('names the active mobile step and respects a custom journey length', async () => {
-    const journey = publicJourney.insertAfter('enrich', { id: 'soundscape', label: 'Soundscape' })
+    const journey = publicJourney.insertAfter('cast', { id: 'soundscape', label: 'Soundscape' })
 
     await open(base, undefined, undefined, undefined, {
       journey,
@@ -259,12 +253,12 @@ describe('v2 wizard', () => {
     })
 
     const progress = screen.getByRole('status', { name: 'Workflow progress' })
-    expect(progress).toHaveTextContent('Step 7 of 8 · Generate')
-    expect(progress).toHaveTextContent('7 / 8')
+    expect(progress).toHaveTextContent('Step 6 of 7 · Generate')
+    expect(progress).toHaveTextContent('6 / 7')
 
     fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
-    expect(progress).toHaveTextContent('Step 6 of 8 · Soundscape')
-    expect(progress).toHaveTextContent('6 / 8')
+    expect(progress).toHaveTextContent('Step 5 of 7 · Soundscape')
+    expect(progress).toHaveTextContent('5 / 7')
   })
 
   it('collapses the wizard rail without changing the active stage', async () => {
@@ -282,7 +276,7 @@ describe('v2 wizard', () => {
     expect(workspace).toHaveClass('rail-collapsed')
     expect(screen.getByRole('button', { name: 'Expand sidebar' })).toHaveAttribute('aria-expanded', 'false')
     expect(localStorage.getItem('meowdiobooks.sidebarCollapsed')).toBe('true')
-    expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
+    expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: 'Cast & voices Complete' })).toHaveAttribute('title', 'Cast & voices · Complete')
   })
 
@@ -784,7 +778,7 @@ describe('v2 wizard', () => {
   it('keeps Export available when current chapter audio survives backward navigation', async () => {
     await open({
       ...base,
-      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review', 'cast', 'enrich'] as WizardStage[] },
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review', 'cast'] as WizardStage[] },
     })
 
     const exportButton = within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export').closest('button')!
@@ -801,7 +795,6 @@ describe('v2 wizard', () => {
       ['Dialogue', 'Choose who reads each line.'],
       ['Review', 'Review the text before recording.'],
       ['Cast & voices', 'Match the characters and their voices.'],
-      ['Enrich', 'Enrichment is coming soon.'],
       ['Generate', 'Generate and listen to your chapters.'],
       ['Export', 'Export your audiobook.'],
     ] as const
@@ -1096,7 +1089,6 @@ describe('v2 wizard', () => {
       activeArtifacts: {},
       dialogue: undefined,
       cast: undefined,
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -1970,7 +1962,6 @@ describe('v2 wizard', () => {
       activeArtifacts: { extraction: 'e1' },
       dialogue: undefined,
       cast: undefined,
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2107,7 +2098,6 @@ describe('v2 wizard', () => {
           proposalRevision: 'cast-proposal-1',
         },
       },
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2129,7 +2119,6 @@ describe('v2 wizard', () => {
         revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
         detectedLanguage: 'english',
       },
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2158,7 +2147,6 @@ describe('v2 wizard', () => {
         revision: 'cast-proposal-1', phase: 'identity-review', dossiers: [], proposals: [],
         detectedLanguage: 'english',
       },
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2214,7 +2202,6 @@ describe('v2 wizard', () => {
       activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r2' },
       history: { cast: [{ revision: 'c1', status: 'superseded' }] },
       cast: undefined,
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2278,7 +2265,6 @@ describe('v2 wizard', () => {
       activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r2', cast: 'c1' },
       history: { cast: [{ revision: 'c1', status: 'superseded' }] },
       cast: undefined,
-      enrichment: undefined,
       recordingScript: undefined,
       generatedChapters: [],
     }
@@ -2957,7 +2943,8 @@ describe('v2 wizard', () => {
     expect(screen.queryByText(/will use default audition/)).not.toBeInTheDocument()
   })
 
-  it('accepts directly without a warning when every voice has an approved revision', async () => {
+  it('opens Generate directly after approving the cast and preparing its recording script', async () => {
+    vi.mocked(wizardApi.acceptStage).mockResolvedValue(undefined)
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import','extract','dialogue','review'] },
@@ -2976,72 +2963,18 @@ describe('v2 wizard', () => {
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
+    vi.mocked(wizardApi.getBookSnapshot)
+      .mockResolvedValueOnce({ ...base, recordingScript: undefined })
+      .mockResolvedValue(base)
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'auditions-3', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
     ]))
-    expect(screen.queryByText(/will use default audition/)).not.toBeInTheDocument()
-  })
-
-  it('marks Enrich coming soon and only offers the non-enriched path', async () => {
-    const snapshot = {
-      ...base,
-      book: { ...base.book, completedStages: ['import','extract','dialogue','review','cast'] as WizardStage[] },
-      dialogue: { ...base.dialogue!, summary: { ...base.dialogue!.summary, totalTurns: 1600, aiAttributed: 240 } },
-      cast: {
-        ...base.cast!,
-        narrator: { ...base.cast!.narrator!, lineCount: 1000 },
-        identities: [{ characterId: 'alice', name: 'Alice', lineCount: 600, voicePreviewRevision: 'alice-voice', previewUrl: '/alice.wav' }],
-      },
-      chapters: [{ ...base.chapters[0], estimatedCharacters: 162000 }],
-      enrichment: undefined, recordingScript: undefined, generatedChapters: [],
-    }
-    await open(snapshot)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Enrich'))
-    expect(screen.queryByRole('heading', { name: 'Look what you’ve already built.' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Your book is ready for audio.' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Coming soon: bring the player to life.' })).toBeInTheDocument()
-    expect(screen.getByText('1,600')).toBeInTheDocument()
-    expect(screen.getByText(/240 attributed with AI/)).toBeInTheDocument()
-    expect(screen.getByText(/2 AI auditions/)).toBeInTheDocument()
-    expect(screen.getByText('2', { selector: '.enrichment-stats b' })).toBeInTheDocument()
-    expect(screen.getByText('≈ 3 hr')).toBeInTheDocument()
-    expect(screen.getByText('Scene effects')).toBeInTheDocument()
-    expect(screen.getByText('Character states')).toBeInTheDocument()
-    expect(screen.getByText('Character avatars')).toBeInTheDocument()
-    expect(screen.getByText('These features are not available yet.')).toBeInTheDocument()
-    expect(screen.getByText(/Continue to prepare your recording script/)).toBeInTheDocument()
-    const skippedEnrichment = {
-      revision: 'enrichment-skipped-1', status: 'skipped' as const, dialogueRevisionId: 'd1', castRevisionId: 'c1',
-    }
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'enrich-job', status: 'queued' })
-    vi.mocked(wizardApi.getJob).mockResolvedValue({
-      id: 'enrich-job', status: 'succeeded', result: { revision: skippedEnrichment.revision },
-    })
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue(skippedEnrichment)
-    let finishAcceptance!: () => void
-    vi.mocked(wizardApi.acceptStage).mockImplementation(() => new Promise((resolve) => {
-      finishAcceptance = () => resolve(undefined)
-    }))
-    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({
-      ...snapshot,
-      book: { ...snapshot.book, completedStages: [...snapshot.book.completedStages, 'enrich'] },
-      activeArtifacts: { ...snapshot.activeArtifacts, enrichment: skippedEnrichment.revision, script: base.recordingScript!.revision },
-      enrichment: skippedEnrichment,
-      recordingScript: base.recordingScript,
-    })
-    fireEvent.click(screen.getByRole('button', { name: 'Continue to Generate →' }))
-    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'enrich', { skip: true }))
-    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'enrich', skippedEnrichment.revision, []))
-    const transitionDialog = screen.getByRole('dialog', { name: 'Local processing' })
-    expect(transitionDialog).toHaveTextContent('Opening Generate')
-    expect(transitionDialog.querySelector('.enrichment-transition-modal')).not.toBeNull()
-    expect(within(transitionDialog).queryByRole('button', { name: 'Cancel queued job' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Continued without enrichment' })).not.toBeInTheDocument()
-    finishAcceptance()
     expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
-    expect(screen.queryByText('Add decorators')).not.toBeInTheDocument()
+    expect(wizardApi.prepareRecordingScript).toHaveBeenCalledTimes(1)
+    expect(wizardApi.prepareRecordingScript).toHaveBeenCalledWith('book-1')
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(screen.queryByText(/will use default audition/)).not.toBeInTheDocument()
   })
 
   it('reuses the cached final script when Generate opens again', async () => {
@@ -3101,7 +3034,7 @@ describe('v2 wizard', () => {
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
-    expect(screen.getByText('Step 6 · Generate')).toBeInTheDocument()
+    expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
@@ -3115,7 +3048,7 @@ describe('v2 wizard', () => {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
       activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r1' },
-      cast: undefined, enrichment: undefined, recordingScript: undefined, generatedChapters: [],
+      cast: undefined, recordingScript: undefined, generatedChapters: [],
       pendingCandidates: { cast: { revision: 'cast-proposal-1' } },
       recoverableStages: status === 'failed' ? { cast: {
         attempt: 2, message: 'Completed voices are saved.', modelId: 'qwen',

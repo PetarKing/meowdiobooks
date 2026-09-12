@@ -9,7 +9,6 @@ import os
 import shutil
 import subprocess
 import tempfile
-from concurrent.futures import ThreadPoolExecutor
 from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, nullcontext
 from copy import deepcopy
 from pathlib import Path
@@ -73,15 +72,6 @@ from .cast_service import (
     validate_voice_settings,
 )
 from .chapters import ChapterContractError, compile_reviewed_chapters, detect_chapter_candidates
-from .decorators import (
-    EnrichmentOptions,
-    EnrichmentValidationError,
-    RANGE_DECORATOR_KINDS,
-    STATE_VALUES,
-    plan_enrichment,
-    skipped_enrichment,
-    validate_enrichment_output,
-)
 from .dialogue import (
     DialogueContractError,
     dialogue_progression_blockers,
@@ -117,7 +107,6 @@ from .models import (
 from .model_config import dialogue_routing_preview, load_model_registry
 from .voice_candidates import VoiceCandidatePolicy
 from .remote_llm import RemoteRequestAdmission, RemoteUsageObserver
-from .structured_output import JsonCompletion, complete_with_schema, strict_object_schema
 from .m4b import (
     FFmpegUnavailableError,
     M4BChapter,
@@ -127,7 +116,6 @@ from .m4b import (
     export_filename,
     package_audio_export,
 )
-from .local_llm import complete_json, qwen_server
 from .languages import (
     infer_language,
     normalize_language,
@@ -167,7 +155,6 @@ from .workflow.commands import (
     ExtractBook,
     GenerateChapters,
     RunDialogue,
-    RunEnrichment,
     RunReview,
     command_for_stage,
 )
@@ -236,136 +223,11 @@ def _directory_size(path: Path) -> int:
     return total
 
 
-def _run_enrichment_qwen(
-    repo_root: Path,
-    turns: list[dict[str, Any]],
-    plan: dict[str, Any],
-    report,
-) -> dict[str, Any]:
-    """Run bounded decorator windows and return one mechanically complete result."""
-
-    with qwen_server(repo_root) as base:
-        return run_enrichment_with_completion(
-            turns,
-            plan,
-            lambda system, prompt, max_tokens: complete_json(
-                base, system, prompt, max_tokens=max_tokens
-            ),
-            report,
-        )
-
-
-def run_enrichment_with_completion(
-    turns: list[dict[str, Any]],
-    plan: dict[str, Any],
-    complete: JsonCompletion,
-    report,
-    *,
-    max_workers: int = 1,
-) -> dict[str, Any]:
-    """Run provider-neutral decorator windows through the shared enrichment contract."""
-
-    if max_workers < 1:
-        raise EnrichmentValidationError("Enrichment completion concurrency must be positive")
-
-    by_id = {str(row["id"]): row for row in turns}
-    state_rows: list[dict[str, Any]] = []
-    range_rows: list[dict[str, Any]] = []
-    windows = list(plan["windows"])
-    system = (
-        "Decorate an accepted audiobook transcript. Never change IDs, speakers, identities, or text. "
-        "Return strict JSON with turnStates and rangeDecorators only. State must be one of: neutral, "
-        "happy, sad, angry, afraid, surprised, disgusted, embarrassed, determined, confused, pained, tender."
-    )
-
-    def enrich(window: dict[str, Any]) -> Mapping[str, Any]:
-        owner_ids = [str(value) for value in window["ownerTurnIds"]]
-        payload = {
-            "options": plan["options"],
-            "ownerTurnIds": owner_ids,
-            "contextOnlyTurnIds": window["contextTurnIds"],
-            "turns": [by_id[str(value)] for value in window["inputTurnIds"]],
-            "output": {
-                "turnStates": [{"turnId": "owner ID", "state": "allowed state"}],
-                "rangeDecorators": [
-                    {
-                        "kind": "ambience|effect",
-                        "startTurnId": "owner ID",
-                        "endTurnId": "owner ID",
-                        "value": "brief descriptor",
-                    }
-                ],
-            },
-        }
-        result = complete_with_schema(
-            complete,
-            system,
-            json.dumps(payload, ensure_ascii=False),
-            5000,
-            _enrichment_schema(owner_ids, plan["options"]),
-        )
-        if not isinstance(result, Mapping):
-            raise EnrichmentValidationError("Enrichment completion must return one JSON object")
-        return result
-
-    if max_workers == 1:
-        completed = [enrich(window) for window in windows]
-    else:
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            completed = list(executor.map(enrich, windows))
-    for index, result in enumerate(completed, 1):
-        state_rows.extend(result.get("turnStates", []))
-        range_rows.extend(result.get("rangeDecorators", []))
-        report(
-            5 + index / max(len(windows), 1) * 90, f"Enriched window {index} of {len(windows)}"
-        )
-    return {"turnStates": state_rows, "rangeDecorators": range_rows}
-
-
-def _enrichment_schema(
-    owner_ids: list[str], options: Mapping[str, Any]
-) -> dict[str, Any]:
-    enabled_kinds = []
-    if options.get("ambience"):
-        enabled_kinds.append("ambience")
-    if options.get("effects"):
-        enabled_kinds.append("effect")
-    range_kinds = enabled_kinds or list(RANGE_DECORATOR_KINDS)
-    return strict_object_schema(
-        "transcript_enrichment",
-        {
-            "turnStates": {
-                "type": "array",
-                "items": strict_object_schema(
-                    "turn_state",
-                    {
-                        "turnId": {"type": "string", "enum": owner_ids},
-                        "state": {"type": "string", "enum": list(STATE_VALUES)},
-                    },
-                ),
-            },
-            "rangeDecorators": {
-                "type": "array",
-                "items": strict_object_schema(
-                    "range_decorator",
-                    {
-                        "kind": {"type": "string", "enum": range_kinds},
-                        "startTurnId": {"type": "string", "enum": owner_ids},
-                        "endTurnId": {"type": "string", "enum": owner_ids},
-                        "value": {"type": "string"},
-                    },
-                ),
-            },
-        },
-    )
-
-
 _STAGE_KIND = {
     WizardStage.EXTRACT: "extraction",
     WizardStage.DIALOGUE: "dialogue",
     WizardStage.REVIEW: "review",
     WizardStage.CAST: "cast",
-    WizardStage.ENRICH: "enrichment",
 }
 # Backward-compatible test seam; new code imports the projection by its public name.
 _generated_chapters = generated_chapters
@@ -476,7 +338,6 @@ def create_app_v2(
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
     voice_profiler_revision: str = "meowdiobooks.voice-profile.v2",
     generate_voice_audition_lines: bool = False,
-    enricher: Callable[..., dict[str, Any]] | None = None,
     remote_usage_observer: RemoteUsageObserver | None = None,
     remote_request_admission: RemoteRequestAdmission | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
@@ -525,7 +386,6 @@ def create_app_v2(
     voice_profiler = voice_profiler or suggest_voice_settings
     if not voice_profiler_revision.strip():
         raise ValueError("Voice-profiler revision must not be blank")
-    enricher = enricher or _run_enrichment_qwen
     voice_languages = voice_languages or supported_voice_languages
     voice_models = voice_models or voice_model_capabilities
     chapter_audio_source = chapter_audio_source or (
@@ -1228,45 +1088,6 @@ def create_app_v2(
         report(100, "Cast candidate ready for review")
         return _candidate_result(book.id, WizardStage.CAST, path, artifact)
 
-    def process_enrichment(command: RunEnrichment, report) -> dict[str, object]:
-        book = require_book(command.book_id)
-        package = package_for(book.id)
-        dialogue = read_artifact(package, "dialogue")
-        review = read_artifact(package, "review")
-        cast = read_artifact(package, "cast")
-        settings = command.settings.model_dump(
-            mode="json", exclude_none=True, exclude_unset=True
-        )
-        revision = uuid4().hex
-        if bool(settings.get("skip", False)):
-            result = skipped_enrichment(dialogue["revision"], cast["revision"])
-        else:
-            turns = _enrichment_turns(_dialogue_with_chapters(dialogue, review), cast)
-            options = EnrichmentOptions(
-                state=bool(settings.get("state", True)),
-                ambience=bool(settings.get("ambience", False)),
-                effects=bool(settings.get("effects", False)),
-                max_input_tokens=int(settings.get("maxInputTokens", 8000)),
-                max_output_rows=int(settings.get("maxOutputRows", 400)),
-                overlap_turns=int(settings.get("overlapTurns", 2)),
-            )
-            plan = plan_enrichment(turns, options)
-            report(2, f"Enrichment will run {len(plan['windows'])} bounded windows")
-            output = enricher(repo_root, turns, plan, report)
-            result = validate_enrichment_output(
-                turns,
-                plan,
-                output,
-                dialogue_revision_id=dialogue["revision"],
-                cast_revision_id=cast["revision"],
-            )
-            result["plan"] = plan
-        path, artifact = write_artifact(
-            package, "enrichment", {**result, "revision": revision}, publish=False
-        )
-        report(100, "Enrichment candidate ready for review")
-        return _candidate_result(book.id, WizardStage.ENRICH, path, artifact)
-
     def ensure_recording_script(book_id: str) -> dict[str, Any]:
         """Return the current cached script, rebuilding only when accepted inputs changed."""
 
@@ -1276,19 +1097,15 @@ def create_app_v2(
         dialogue = read_artifact(package, "dialogue")
         review = read_artifact(package, "review")
         cast = read_artifact(package, "cast")
-        enrichment = (
-            read_artifact(package, "enrichment") if "enrichment" in active else None
-        )
         if "script" in active:
             cached = read_artifact(package, "script")
-            if recording_script_matches(cached, dialogue, review, cast, enrichment):
+            if recording_script_matches(cached, dialogue, review, cast):
                 return cached
         script = build_recording_script(
             _dialogue_with_chapters(dialogue, review),
             review,
             cast,
             revision=uuid4().hex,
-            enrichment=enrichment,
         )
         path, script = write_artifact(package, "script", script, publish=False)
         _publish_with_invalidation(package, "script", path)
@@ -1304,11 +1121,6 @@ def create_app_v2(
         review = read_artifact(package, "review")
         cast = read_artifact(package, "cast")
         recording_script = ensure_recording_script(book.id)
-        enrichment = (
-            read_artifact(package, "enrichment")
-            if "enrichment" in active_artifacts(package)
-            else None
-        )
         chapter_ids = [str(value) for value in settings.get("chapterIds", [])]
         report(1, "Preparing the selected chapters")
         plan = compile_render_plan(
@@ -1316,7 +1128,6 @@ def create_app_v2(
             cast,
             recording_script,
             chapter_ids,
-            enrichment=enrichment,
         )
         results = chapter_renderer(
             repo_root,
@@ -1354,7 +1165,6 @@ def create_app_v2(
         "dialogue": process_dialogue,
         "review": process_review,
         "cast": process_cast,
-        "enrich": process_enrichment,
         "generate": process_generation,
     }.items():
         runner.register_stage(stage_id, handler)
@@ -1527,7 +1337,7 @@ def create_app_v2(
         package = package_for(book_id)
         active = active_artifacts(package)
         current = {}
-        for kind in ("extraction", "dialogue", "review", "cast", "enrichment", "script"):
+        for kind in ("extraction", "dialogue", "review", "cast", "script"):
             if kind in active:
                 current[kind] = read_artifact(package, kind)
         dialogue = current.get("dialogue", {})
@@ -1629,7 +1439,6 @@ def create_app_v2(
                 "language": visible_cast.get("language"),
             },
             "recoverableStages": recoverable_stages,
-            "enrichment": current.get("enrichment", {}),
             "recordingScript": current.get("script", {}),
             "chapters": current.get("script", {}).get("chapters")
             or review.get("chapters", []),
@@ -1639,7 +1448,6 @@ def create_app_v2(
                     "dialogue": current.get("dialogue", {}).get("revision"),
                     "review": current.get("review", {}).get("revision"),
                     "cast": current.get("cast", {}).get("revision"),
-                    "enrichment": current.get("enrichment", {}).get("revision"),
                     "script": current.get("script", {}).get("revision"),
                 },
             ),
@@ -1652,7 +1460,7 @@ def create_app_v2(
                     )
                     for row in artifact_history(package, kind)
                 ]
-                for kind in ("extraction", "dialogue", "review", "cast", "enrichment", "script")
+                for kind in ("extraction", "dialogue", "review", "cast", "script")
             },
         }
 
@@ -1774,7 +1582,6 @@ def create_app_v2(
 
         package = package_for(book.id)
         try:
-            active = active_artifacts(package)
             dialogue = read_artifact(package, "dialogue")
             review = read_artifact(package, "review")
             recording_script = ensure_recording_script(book.id)
@@ -1784,10 +1591,6 @@ def create_app_v2(
                 "cast": str(read_artifact(package, "cast")["revision"]),
                 "script": str(recording_script["revision"]),
             }
-            if "enrichment" in active:
-                current_revisions["enrichment"] = str(
-                    read_artifact(package, "enrichment")["revision"]
-                )
         except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as error:
             raise HTTPException(
                 status_code=409,
@@ -2447,19 +2250,6 @@ def create_app_v2(
                     raise CastContractError(
                         "Resolve identities and generate auditions before acceptance"
                     )
-            if parsed == WizardStage.ENRICH:
-                dialogue = read_artifact(package_for(book_id), "dialogue")
-                cast = read_artifact(package_for(book_id), "cast")
-                if candidate.get("dialogueRevisionId") != dialogue.get("revision") or candidate.get(
-                    "castRevisionId"
-                ) != cast.get("revision"):
-                    raise EnrichmentValidationError(
-                        "Enrichment candidate references superseded Dialogue or Cast"
-                    )
-                if candidate.get("status") not in {"complete", "skipped"}:
-                    raise EnrichmentValidationError(
-                        "Enrichment is not complete or explicitly skipped"
-                    )
             if parsed == WizardStage.REVIEW:
                 warning_decisions = [row for row in body.decisions if row.get("occurrenceIds")]
                 boundary_decisions = [row for row in body.decisions if row.get("boundaryId")]
@@ -2539,7 +2329,6 @@ def create_app_v2(
             CastContractError,
             ChapterContractError,
             DialogueContractError,
-            EnrichmentValidationError,
             ValueError,
             RuntimeError,
             ReviewContractError,
@@ -2743,24 +2532,6 @@ def _candidate(package: Path, kind: str, revision: str) -> dict[str, Any]:
     if candidate is None:
         raise ValueError(f"{kind.title()} candidate not found")
     return candidate
-
-
-def _enrichment_turns(dialogue: dict[str, Any], cast: dict[str, Any]) -> list[dict[str, Any]]:
-    mapping = {str(key): value for key, value in cast.get("labelToCharacterId", {}).items()}
-    turns = []
-    for span in dialogue.get("spans", []):
-        label = span.get("resolvedSpeakerLabel") or span.get("sourceSpeakerLabel")
-        identity_id = mapping.get(str(label)) if label is not None else None
-        turns.append(
-            {
-                "id": str(span["id"]),
-                "chapterId": str(span.get("chapterId") or "chapter-1"),
-                "text": str(span.get("text", span.get("source", ""))),
-                "speakerId": str(label) if label is not None else None,
-                "identityId": identity_id,
-            }
-        )
-    return turns
 
 
 def _dialogue_with_chapters(dialogue: dict[str, Any], review: dict[str, Any]) -> dict[str, Any]:

@@ -24,7 +24,6 @@ def build_recording_script(
     cast: Mapping[str, Any],
     *,
     revision: str,
-    enrichment: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the one faithful script used to slice chapter generation work."""
 
@@ -43,13 +42,6 @@ def build_recording_script(
         )
     if str(cast.get("reviewRevision", review_revision)) != review_revision:
         raise RecordingScriptContractError("Cast does not reference the accepted Review revision")
-    if enrichment and (
-        str(enrichment.get("dialogueRevisionId", dialogue_revision)) != dialogue_revision
-        or str(enrichment.get("castRevisionId", cast_revision)) != cast_revision
-    ):
-        raise RecordingScriptContractError(
-            "Enrichment does not reference the accepted Dialogue and Cast"
-        )
     malformed = malformed_playable_spans(dialogue)
     if malformed:
         raise RecordingScriptContractError(
@@ -89,7 +81,6 @@ def build_recording_script(
         "dialogue": dialogue_revision,
         "review": review_revision,
         "cast": cast_revision,
-        "enrichment": _revision(enrichment, "Enrichment") if enrichment else None,
     }
     summary = _summary(spans, retained, cast)
     return {
@@ -274,7 +265,6 @@ def recording_script_matches(
     dialogue: Mapping[str, Any],
     review: Mapping[str, Any],
     cast: Mapping[str, Any],
-    enrichment: Mapping[str, Any] | None,
 ) -> bool:
     """Return whether a cached script pins the currently accepted inputs."""
 
@@ -282,7 +272,6 @@ def recording_script_matches(
         "dialogue": str(dialogue.get("revision") or ""),
         "review": str(review.get("revision") or ""),
         "cast": str(cast.get("revision") or ""),
-        "enrichment": str(enrichment.get("revision") or "") if enrichment else None,
     }
     return (
         not malformed_playable_spans(dialogue)

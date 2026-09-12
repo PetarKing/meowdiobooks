@@ -56,16 +56,6 @@ class CastSettings(CommandModel):
     narratorDirection: str | None = None
 
 
-class EnrichmentSettings(CommandModel):
-    skip: bool = False
-    state: bool = True
-    ambience: bool = False
-    effects: bool = False
-    maxInputTokens: int = Field(default=8000, ge=1)
-    maxOutputRows: int = Field(default=400, ge=1)
-    overlapTurns: int = Field(default=2, ge=0)
-
-
 class GenerationSettings(CommandModel):
     chapterIds: list[str] = Field(min_length=1)
     language: str | None = None
@@ -103,18 +93,13 @@ class BuildCast(WorkflowCommandBase):
     settings: CastSettings = Field(default_factory=CastSettings)
 
 
-class RunEnrichment(WorkflowCommandBase):
-    kind: Literal["v2:enrich"] = "v2:enrich"
-    settings: EnrichmentSettings = Field(default_factory=EnrichmentSettings)
-
-
 class GenerateChapters(WorkflowCommandBase):
     kind: Literal["v2:generate"] = "v2:generate"
     settings: GenerationSettings
 
 
 WorkflowCommand = Annotated[
-    ExtractBook | RunDialogue | RunReview | BuildCast | RunEnrichment | GenerateChapters,
+    ExtractBook | RunDialogue | RunReview | BuildCast | GenerateChapters,
     Field(discriminator="kind"),
 ]
 def command_for_stage(

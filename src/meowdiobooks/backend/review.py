@@ -1114,9 +1114,9 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
         "sourcePreserved": True,
         "requiresNewUpstreamRevision": action in _UPSTREAM_ACTIONS,
         "downstreamInvalidation": (
-            ["dialogue", "review", "cast", "enrichment", "script", "generate"]
+            ["dialogue", "review", "cast", "script", "generate"]
             if action == "rerun-extraction"
-            else ["review", "cast", "enrichment", "script", "generate"]
+            else ["review", "cast", "script", "generate"]
             if action == "rerun-dialogue"
             else ["generate"]
             if action in {"exclude", "narrate"}

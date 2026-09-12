@@ -79,7 +79,6 @@ def test_custom_composition_can_insert_and_remove_an_optional_stage():
 
     assert definition.stage("ambient").artifact_kind == "ambient-plan"
     assert definition.artifacts.downstream("cast") == (
-        "enrichment",
         "script",
         "ambient-plan",
     )
@@ -149,3 +148,15 @@ def test_workspace_publication_invalidates_active_downstream_without_deleting_hi
     assert workspace.active() == {"extraction": str(replacement)}
     assert [row["revision"] for row in workspace.history("dialogue")] == ["d1"]
     assert workspace.source("book.pdf") == Path(tmp_path) / "packages/book-1/source/book.pdf"
+
+
+def test_public_workflow_goes_directly_from_cast_to_generate():
+    assert [stage.id for stage in PUBLIC_WORKFLOW.stages] == [
+        "import", "extract", "dialogue", "review", "cast", "generate"
+    ]
+    assert PUBLIC_WORKFLOW.stage("generate").prerequisites == ("cast",)
+    assert PUBLIC_ARTIFACTS.downstream("cast") == ("script",)
+    with pytest.raises(ValueError, match="Unknown workflow command"):
+        command_from_job("v2:enrich", {"book_id": "book-1", "settings": {"skip": True}})
+    with pytest.raises(ValueError):
+        PUBLIC_ARTIFACTS.spec("enrichment")

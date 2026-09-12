@@ -924,19 +924,9 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
                 "dialogue": "dialogue-1",
                 "review": "review-1",
                 "cast": "cast-2",
-                "enrichment": "enrich-1",
             },
         }
         write_artifact(package, "script", {**script_payload, "revision": "script-1"}, publish=False)
-        write_artifact(
-            package,
-            "enrichment",
-            {
-                "revision": "enrich-1",
-                "status": "skipped",
-                "downstream": {"affectsSynthesizedSpeech": False},
-            },
-        )
         write_artifact(package, "script", {**script_payload, "revision": "script-2"})
         render = package / "audio" / "opening-matter" / "render-1"
         render.mkdir(parents=True)
@@ -953,7 +943,6 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
                         "cast": "cast-1",
                         "script": "script-1",
                     },
-                    "renderer": {"stateConsumed": False, "ambienceConsumed": False},
                 }
             )
         )
@@ -1187,3 +1176,20 @@ def test_composition_admission_reaches_remote_dialogue_before_network(tmp_path, 
     assert all(metadata["attempt"] == 1 for _, metadata in admitted)
     assert finished["status"] == "failed"
     assert finished["error"] == RequestDenied.public_message
+
+
+def test_removed_enrichment_api_is_rejected_and_snapshot_omits_it(tmp_path):
+    with TestClient(create_app_v2(tmp_path)) as client:
+        imported = client.post(
+            "/api/books/import",
+            files={"file": ("book.pdf", _pdf(), "application/pdf")},
+        )
+        assert imported.status_code == 201
+        book_id = imported.json()["book"]["id"]
+        base = f"/api/books/{book_id}/stages/enrich"
+        assert client.post(f"{base}/process", json={"settings": {"skip": True}}).status_code == 422
+        assert client.post(f"{base}/accept", json={"revision": "removed"}).status_code == 422
+        assert client.get(f"{base}/candidates/removed").status_code == 422
+        snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+        assert "enrichment" not in snapshot
+        assert "enrichment" not in snapshot["history"]

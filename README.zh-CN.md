@@ -97,7 +97,7 @@ PDF → 提取文本 → 对话归属判定 → 角色统一 → 声音选角 �
   发送给用户配置的服务商。
 
 导入本地 PDF 后，引导流程依次为 **提取（Extract）→ 对话（Dialogue）→ 审核（Review）→
-角色与声音（Cast & Voices）→ 增强（Enrichment，目前仅为直通步骤）→ 生成（Generate）→ 导出（Export）**。
+角色与声音（Cast & Voices）→ 生成（Generate）→ 导出（Export）**。
 具体阶段行为请参阅[工作流程指南](docs/wizard/README.md)。
 
 ## Alpha 范围

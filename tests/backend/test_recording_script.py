@@ -48,23 +48,17 @@ def _upstream():
         "labelToCharacterId": {"Alice": "alice"},
         "identities": [{"characterId": "alice", "name": "Alice"}],
     }
-    enrichment = {
-        "revision": "enrichment-1",
-        "dialogueRevisionId": "dialogue-1",
-        "castRevisionId": "cast-1",
-    }
-    return dialogue, review, cast, enrichment
+    return dialogue, review, cast
 
 
 def test_builds_one_faithful_source_linked_script_from_accepted_inputs():
-    dialogue, review, cast, enrichment = _upstream()
+    dialogue, review, cast = _upstream()
 
     script = build_recording_script(
         dialogue,
         review,
         cast,
         revision="script-1",
-        enrichment=enrichment,
     )
 
     assert script["status"] == "ready"
@@ -72,18 +66,17 @@ def test_builds_one_faithful_source_linked_script_from_accepted_inputs():
         "dialogue": "dialogue-1",
         "review": "review-1",
         "cast": "cast-1",
-        "enrichment": "enrichment-1",
     }
     assert all(row["kind"] == "source" for row in script["entries"])
     assert script["sourceCoverage"]["sourceSpanIds"] == ["s1", "s2", "s3"]
     assert script["summary"]["retainedSpans"] == 3
     assert script["summary"]["emptyChapterIds"] == []
     assert recording_script_blockers(script) == []
-    assert recording_script_matches(script, dialogue, review, cast, enrichment)
+    assert recording_script_matches(script, dialogue, review, cast)
 
 
 def test_review_exclusions_become_explicit_omissions_and_empty_chapters():
-    dialogue, review, cast, _enrichment = _upstream()
+    dialogue, review, cast = _upstream()
     dialogue["spans"][2].update(
         reviewAction="exclude",
         reviewOccurrenceId="warning:s3",
@@ -102,19 +95,20 @@ def test_review_exclusions_become_explicit_omissions_and_empty_chapters():
     assert script["summary"]["emptyChapterIds"] == ["chapter-2"]
 
 
-def test_cache_match_requires_every_current_input_revision():
-    dialogue, review, cast, enrichment = _upstream()
+@pytest.mark.parametrize("changed_input", ["dialogue", "review", "cast"])
+def test_cache_match_requires_every_current_input_revision(changed_input):
+    dialogue, review, cast = _upstream()
     script = build_recording_script(
-        dialogue, review, cast, revision="script-1", enrichment=enrichment
+        dialogue, review, cast, revision="script-1"
     )
 
-    enrichment["revision"] = "enrichment-2"
+    {"dialogue": dialogue, "review": review, "cast": cast}[changed_input]["revision"] = "changed"
 
-    assert not recording_script_matches(script, dialogue, review, cast, enrichment)
+    assert not recording_script_matches(script, dialogue, review, cast)
 
 
 def test_superseded_or_blocked_inputs_fail_closed():
-    dialogue, review, cast, enrichment = _upstream()
+    dialogue, review, cast = _upstream()
     review["canStartCast"] = False
     with pytest.raises(RecordingScriptContractError, match="progression blockers"):
         build_recording_script(dialogue, review, cast, revision="script")
@@ -124,16 +118,9 @@ def test_superseded_or_blocked_inputs_fail_closed():
     with pytest.raises(RecordingScriptContractError, match="accepted Review"):
         build_recording_script(dialogue, review, cast, revision="script")
 
-    cast["reviewRevision"] = "review-1"
-    enrichment["castRevisionId"] = "cast-old"
-    with pytest.raises(RecordingScriptContractError, match="accepted Dialogue and Cast"):
-        build_recording_script(
-            dialogue, review, cast, revision="script", enrichment=enrichment
-        )
-
 
 def test_malformed_dialogue_is_rejected_and_invalidates_cached_script():
-    dialogue, review, cast, _enrichment = _upstream()
+    dialogue, review, cast = _upstream()
     dialogue["spans"][1].update({"spokenStart": 4, "spokenEnd": 3})
 
     with pytest.raises(RecordingScriptContractError, match="invalid text range"):
@@ -143,7 +130,7 @@ def test_malformed_dialogue_is_rejected_and_invalidates_cached_script():
     script = build_recording_script(dialogue, review, cast, revision="script-good")
     dialogue["spans"][1].update({"spokenStart": 4, "spokenEnd": 3})
 
-    assert not recording_script_matches(script, dialogue, review, cast, None)
+    assert not recording_script_matches(script, dialogue, review, cast)
 
     dialogue["spans"][1].update({"spokenStart": 0, "spokenEnd": 6})
     script["entries"][0]["text"] = ""

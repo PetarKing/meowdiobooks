@@ -12,7 +12,6 @@ def mount_local_frontend(app: FastAPI, static_root: Path) -> None:
         return
 
     @app.get("/library", include_in_schema=False)
-    @app.get("/player", include_in_schema=False)
     def frontend_product_view() -> FileResponse:
         return FileResponse(static_root / "index.html")
 

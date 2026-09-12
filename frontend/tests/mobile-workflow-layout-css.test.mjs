@@ -33,18 +33,13 @@ describe('responsive layout stylesheet guards', () => {
     expect(rule('.extraction-choices', tabletStyles)).toMatch(/grid-template-columns\s*:\s*repeat\(2,minmax\(0,1fr\)\)/)
   })
 
-  it('declares narrow-phone artwork and bottom-navigation badge overrides', () => {
+  it('declares narrow-phone artwork overrides', () => {
     expect(rule('.library-head', narrowPhoneStyles)).toMatch(/grid-template-columns\s*:\s*minmax\(0,1fr\) 76px/)
     expect(rule('.library-head-copy h1', narrowPhoneStyles)).toMatch(/font-size\s*:\s*33px/)
-    expect(rule('.product-soon')).toMatch(/right\s*:\s*2px/)
-    expect(rule('.product-soon')).toMatch(/left\s*:\s*auto/)
-    expect(rule('.product-soon')).toMatch(/top\s*:\s*2px/)
   })
 
   it('declares reduced decorative heights for short phone viewports', () => {
     expect(rule('.welcome-hero', shortPhoneStyles)).toMatch(/min-height\s*:\s*340px/)
-    expect(rule('.coming-soon-art', shortPhoneStyles)).toMatch(/min-height\s*:\s*190px/)
-    expect(rule('.coming-soon-art', shortPhoneStyles)).toMatch(/max-height\s*:\s*220px/)
   })
 
   it('keeps form controls readable without triggering iOS focus zoom', () => {
@@ -75,9 +70,8 @@ describe('responsive layout stylesheet guards', () => {
     expect(mobileStyles).not.toMatch(/\.cast-audio-settings\s*\{[^}]*88vw/)
   })
 
-  it('stacks enrichment previews instead of clipping a horizontal card', () => {
-    expect(rule('.future-feature-grid')).toMatch(/grid-template-columns\s*:\s*1fr/)
-    expect(mobileStyles).not.toMatch(/\.future-feature-grid article\s*\{[^}]*min-width\s*:\s*82%/)
+  it('uses two columns for the released mobile product areas', () => {
+    expect(rule('.product-tabs')).toMatch(/grid-template-columns\s*:\s*repeat\(2,minmax\(0,1fr\)\)/)
   })
 
   it('gives odd accepted-summary metrics a complete final row', () => {

@@ -5,7 +5,6 @@ from .commands import (
     ExtractBook,
     GenerateChapters,
     RunDialogue,
-    RunEnrichment,
     RunReview,
 )
 from .definition import StageSpec, WorkflowDefinition
@@ -44,13 +43,6 @@ PUBLIC_WORKFLOW = WorkflowDefinition(
             command_kind="v2:cast",
             command_model=BuildCast,
             artifact_kind="cast",
-        ),
-        StageSpec(
-            "enrich",
-            prerequisites=("cast",),
-            command_kind="v2:enrich",
-            command_model=RunEnrichment,
-            artifact_kind="enrichment",
         ),
         StageSpec(
             "generate",

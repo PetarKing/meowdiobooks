@@ -11,7 +11,8 @@ describe("JourneyDefinition", () => {
         label: "Sample",
         completionStage: "cast",
       })
-      .remove("enrich");
+      .insertAfter("custom-sample", { id: "temporary", label: "Temporary" })
+      .remove("temporary");
 
     expect(extended.steps.map((step) => step.id)).toEqual([
       "extract",
@@ -22,7 +23,7 @@ describe("JourneyDefinition", () => {
       "generate",
       "export",
     ]);
-    expect(publicJourney.steps.map((step) => step.id)).toContain("enrich");
+    expect(publicJourney.steps.map((step) => step.id)).not.toContain("custom-sample");
   });
 
   it("supports replacing a custom view at one explicit step", () => {
@@ -45,9 +46,16 @@ describe("JourneyDefinition", () => {
     expect(extended.steps.slice(0, 3).map((step) => step.id)).toEqual([
       "prepare",
       "cast",
-      "enrich",
+      "generate",
     ]);
     expect(extended.next(["import", "extract", "dialogue"])).toBe(0);
+  });
+
+  it("opens Generate immediately after cast approval", () => {
+    expect(publicJourney.steps.map((step) => step.id)).toEqual([
+      "extract", "dialogue", "review", "cast", "generate", "export",
+    ]);
+    expect(publicJourney.next(["import", "extract", "dialogue", "review", "cast"])).toBe(4);
   });
 
   it("rejects non-contiguous groups", () => {

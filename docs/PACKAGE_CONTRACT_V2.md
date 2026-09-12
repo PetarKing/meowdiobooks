@@ -15,8 +15,8 @@ in the [`wizard/`](wizard/README.md) specifications.
 5. Source text and source ranges remain evidence. AI returns decisions keyed to supplied IDs, not
    rewritten source.
 6. A failed or incomplete job publishes nothing. The last accepted artifacts remain active.
-7. Rendering consumes a cached recording script compiled from accepted Dialogue, Review, Cast and
-   optional Enrichment artifacts. It never reparses the PDF or reruns dialogue regexes.
+7. Rendering consumes a cached recording script compiled from accepted Dialogue, Review and Cast
+   artifacts. It never reparses the PDF or reruns dialogue regexes.
 
 ## Package layout
 
@@ -33,7 +33,6 @@ in the [`wizard/`](wizard/README.md) specifications.
       dialogue/<revision>.json
       review/<revision>.json
       cast/<revision>.json
-      enrichment/<revision>.json
       script/<revision>.json
     voices/<character-id>/<voice-revision>.wav
     audio/<chapter-id>/
@@ -89,8 +88,8 @@ The Extraction revision is the only source text later phases may consume. It rec
 - available layout, reading-order and boundary evidence.
 
 Concatenating blocks for a page must reproduce that accepted page text exactly. Changing Extraction
-invalidates Dialogue, Review, Cast, Enrichment and the cached recording script. Existing audio remains preserved but becomes
-stale relative to the new active chain.
+invalidates Dialogue, Review, Cast and the cached recording script. Existing audio remains preserved
+but becomes stale relative to the new active chain.
 
 ## Dialogue artifact
 
@@ -176,23 +175,10 @@ that are unreachable from it. Superseded Cast JSON remains inspectable, but its 
 unavailable and it cannot be reactivated for generation. Previously generated chapters and Library
 exports are independent outputs and are never deleted by this replacement.
 
-## Enrichment artifact
-
-Enrichment is optional and references accepted Dialogue and Cast revisions. It is either an explicit
-skip or a complete decorator result containing:
-
-- one optional bounded `state` per supplied turn ID;
-- optional ambience/effect descriptors over validated turn ranges;
-- the bounded processing plan and workload estimate.
-
-Enrichment cannot change source text, span boundaries, speakers, identities or voices. Current TTS does
-not consume state, ambience or effects; they are presentation metadata and do not invalidate existing
-synthesized speech.
-
 ## Recording script artifact
 
-The recording script references exact Dialogue, Review, Cast and optional Enrichment revisions. It is
-prepared automatically on first entry to Generate and reused while all four inputs match.
+The recording script references exact Dialogue, Review and Cast revisions. It is prepared automatically
+on first entry to Generate and reused while all three inputs match.
 
 It faithfully owns every accepted source span exactly once. Review exclusions become explicit
 `omission` entries; every other dialogue and narration span becomes a `source` entry in original order.
@@ -202,19 +188,18 @@ the active script pointer; immutable prior scripts remain available for audio-st
 
 ## Render plan and chapter audio
 
-Generate compiles selected chapters from the active recording script and accepted Cast/optional
-Enrichment artifacts. A render segment records:
+Generate compiles selected chapters from the active recording script and accepted Cast artifact.
+A render segment records:
 
 - source span and recording-script entry IDs;
 - final TTS text;
 - effective character or narrator;
 - explicit fallback reason, if any;
 - accepted voice revision, reference WAV and transcript-conditioning or speaker-embedding mode;
-- optional state metadata;
 - joint/mix grouping metadata where supported.
 
 Compilation validates exact source-span ownership and accepted voice readiness. Contiguous narration
-may coalesce only when source order, effective voice, fallback and state are compatible.
+may coalesce only when source order, effective voice and fallback are compatible.
 
 Each completed chapter revision pins all input artifact revisions, language, renderer/model identity,
 sample rate, segment metadata and omissions. Audio is written into a staging directory and becomes
@@ -230,9 +215,8 @@ cancellation wins over a concurrent successful return. Cancellation and failure 
 phase artifacts.
 
 Dialogue output must contain exactly one valid result for every focused unresolved/unlabelled target
-ID and no result for context-only IDs. Enrichment output must contain exactly one valid result for each
-requested owner ID. Missing, duplicate, invented or malformed rows fail validation. TTS retries are
-bounded; exhausted retries fail the chapter revision.
+ID and no result for context-only IDs. Missing, duplicate, invented or malformed rows fail validation.
+TTS retries are bounded; exhausted retries fail the chapter revision.
 
 ## Invalidation
 
@@ -240,11 +224,10 @@ Moving an active pointer removes active downstream pointers but never deletes im
 
 | Accepted change | Invalidates active |
 |---|---|
-| Extraction | Dialogue, Review, Cast, Enrichment and recording script; generated audio becomes stale |
-| Dialogue | Review, Cast, Enrichment and recording script; generated audio becomes stale |
-| Review | Cast, Enrichment and recording script; generated audio becomes stale |
-| Cast identity or voice | Enrichment and recording script; affected audio becomes stale |
-| Enrichment | Recording script only; audio is unchanged while decorators have no audio consumer |
+| Extraction | Dialogue, Review, Cast and recording script; generated audio becomes stale |
+| Dialogue | Review, Cast and recording script; generated audio becomes stale |
+| Review | Cast and recording script; generated audio becomes stale |
+| Cast identity or voice | Recording script; affected audio becomes stale |
 | Recording script | Generated audio becomes stale only when its effective entries change |
 
 Stale audio remains playable and inspectable until a replacement chapter revision succeeds.

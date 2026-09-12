@@ -863,7 +863,6 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         completed_book = client.get(f"/api/books/{book_id}").json()
         assert completed_book["stage"] == "generate"
         assert completed_book["accepted_stage_revisions"][-1]["stage"] == "generate"
-        assert "enrichment" not in active_artifacts(package)
         assert active_artifacts(package)["script"].endswith(f"/{script_revision}.json")
         assert render_calls[0]["chapters"][0]["segments"][0]["text"] == "Hello"
         assert render_calls[0]["chapters"][0]["segments"][0]["effectiveSpeaker"] == "Alicia"
@@ -1359,7 +1358,6 @@ def test_tts_v2_atomically_publishes_metadata_from_compiled_segment(tmp_path, mo
     ]
     assert metadata["segments"][1]["skipped"] == "no-speakable-text"
     assert metadata["segments"][1]["file"] is None
-    assert metadata["renderer"]["stateConsumed"] is False
     assert not list((package / "audio/chapter-1").glob("*.staging"))
     assert not stale_staging.exists()
 
@@ -1447,13 +1445,6 @@ def test_generated_audio_history_stays_playable_and_reports_stale_inputs(tmp_pat
     assert rows[0]["segments"][0]["sourceSpanIds"] == ["span-1"]
     assert rows[0]["revisions"][0]["revision"] == "audio-1"
 
-    decorator_only = _generated_chapters(
-        package,
-        {"dialogue": "d1", "cast": "c1", "enrichment": "new-decorators", "script": None},
-    )
-    assert decorator_only[0]["current"] is True
-    assert decorator_only[0]["staleReasons"] == []
-
 
 def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(tmp_path):
     package = tmp_path / "package"
@@ -1491,26 +1482,18 @@ def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(t
         "status": "ready",
         "entries": [{"id": "entry-1", "kind": "source", "text": "Hello."}],
         "sourceCoverage": {"status": "exact", "sourceSpanIds": ["span-1"]},
-        "inputRevisions": {"cast": "cast-1", "enrichment": None},
+        "inputRevisions": {"cast": "cast-1"},
     }
     new_script = {
         **old_script,
         "revision": "script-2",
-        "inputRevisions": {"cast": "cast-2", "enrichment": "enrich-1"},
+        "inputRevisions": {"cast": "cast-2"},
     }
     for kind, artifact in (
         ("cast", old_cast),
         ("cast", new_cast),
         ("script", old_script),
         ("script", new_script),
-        (
-            "enrichment",
-            {
-                "revision": "enrich-1",
-                "status": "skipped",
-                "downstream": {"affectsSynthesizedSpeech": False},
-            },
-        ),
     ):
         write_artifact(package, kind, artifact, publish=False)
 
@@ -1524,12 +1507,10 @@ def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(t
                 "revision": "audio-1",
                 "audioSeconds": 1.0,
                 "segments": [],
-                "renderer": {"stateConsumed": False, "ambienceConsumed": False},
                 "inputRevisions": {
                     "dialogue": "dialogue-1",
                     "review": "review-1",
                     "cast": "cast-1",
-                    "enrichment": None,
                     "script": "script-1",
                 },
             }
@@ -1545,7 +1526,6 @@ def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(t
             "dialogue": "dialogue-1",
             "review": "review-1",
             "cast": "cast-2",
-            "enrichment": "enrich-1",
             "script": "script-2",
         },
     )

@@ -124,15 +124,9 @@ PUBLIC_ARTIFACTS = ArtifactRegistry(
             requires=("dialogue", "review"),
         ),
         ArtifactSpec(
-            "enrichment",
-            "meowdiobooks.enrichment.v2",
-            requires=("dialogue", "cast"),
-        ),
-        ArtifactSpec(
             "script",
             "meowdiobooks.script.v2",
             requires=("dialogue", "review", "cast"),
-            optional=("enrichment",),
         ),
     )
 )

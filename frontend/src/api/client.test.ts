@@ -273,7 +273,7 @@ describe('HttpWizardApi', () => {
         accepted_stage_revisions: [
           { stage: 'import', revision: 1 }, { stage: 'extract', revision: 1 },
           { stage: 'dialogue', revision: 1 }, { stage: 'review', revision: 2 },
-          { stage: 'cast', revision: 1 }, { stage: 'enrich', revision: 1 },
+          { stage: 'cast', revision: 1 },
         ],
       },
       activeArtifacts: { extraction: 'e1', dialogue: 'd1', review: 'r2' },

@@ -390,7 +390,7 @@ def _clean_source_spellings(value: object) -> list[str]:
 
 
 def cast_progression_blockers(cast_revision: Mapping[str, Any]) -> list[str]:
-    """Return deterministic reasons Cast cannot advance to Enrichment or Generate."""
+    """Return deterministic reasons Cast cannot advance to Generate."""
     blockers = []
     identities = [row for row in cast_revision.get("identities", []) if isinstance(row, Mapping)]
     by_id = {str(row.get("characterId", "")): row for row in identities}

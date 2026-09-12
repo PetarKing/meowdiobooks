@@ -19,7 +19,6 @@ Extract
   -> Dialogue
   -> Review
   -> Cast & Voices
-  -> Enrichment (optional)
   -> Generate
   -> Export
 ```
@@ -49,11 +48,9 @@ Before the wizard, **PDF intake** stores the exact PDF bytes and hash. **No AI.*
    editable voice settings. VoiceDesign produces designed auditions; alternatively, Qwen3-ASR drafts
    an uploaded sample's transcript for user correction and Qwen Base produces a cloned audition. The
    user accepts exact WAV/reference revisions.
-5. **Enrichment** currently publishes an explicit skipped revision. Its bounded state/scene contract is
-   implemented for future evaluation but is not enabled in the product UI.
-6. **Generate** prepares or reuses one cached final recording script, deterministically resolves its
+5. **Generate** prepares or reuses one cached final recording script, deterministically resolves its
    accepted text and voices, then Qwen Base synthesizes selected chapter audio.
-7. **Export** packages selected current chapter WAVs as a high-quality M4B, smaller M4B, or ordered
+6. **Export** packages selected current chapter WAVs as a high-quality M4B, smaller M4B, or ordered
    MP3 chapter ZIP with export-only title, author and cover settings. **No AI.**
 
 At no point can a model silently change the PDF, source ranges, durable character IDs or accepted
@@ -64,7 +61,6 @@ voice revisions. Detailed prompt/input/output examples live in each linked phase
 ```text
 Deterministic only:  PDF intake → Extract → Review → recording-script/render-plan compilation → Export
 Optional text AI:   Dialogue attribution
-Future text AI:     Enrichment contract (not enabled in the current UI)
 Required in Cast:   label classification → voice suggestion → VoiceDesign or sample-cloned audition
 Optional in Cast:   Qwen3-ASR editable transcript draft for an uploaded sample
 Required in audio:  Qwen Base synthesis during Generate
@@ -102,15 +98,13 @@ failure routes to upstream recovery rather than becoming an eighth warning categ
    one-sided relationships for user review. A Review-only change reuses the accepted Cast by default;
    the user can explicitly reclassify from accepted Dialogue without overwriting the previously accepted
    Cast revision. The new candidate must still be accepted.
-10. Enrichment is optional, separately versioned and incapable of changing text, dialogue boundaries,
-    speakers or identities. Its one turn-level state represents both emotion and avatar state.
-11. Generate owns one faithful final recording script. It is prepared on first entry, cached by exact
-    Dialogue/Review/Cast/Enrichment revisions, and rebuilt only when those inputs change.
-12. Generation is transactional and chapter-scoped. Failed replacement work never deletes the last
+10. Generate owns one faithful final recording script. It is prepared on first entry, cached by exact
+    Dialogue/Review/Cast revisions, and rebuilt only when those inputs change.
+11. Generation is transactional and chapter-scoped. Failed replacement work never deletes the last
     playable chapter revision.
-13. Export never generates speech. It packages only explicitly selected current chapter WAVs, and its
+12. Export never generates speech. It packages only explicitly selected current chapter WAVs, and its
     metadata overrides never modify the PDF, chapter audio or accepted artifacts.
-14. The clean implementation has no legacy analysis renderer, source reparsing, compatibility data or
+13. The clean implementation has no legacy analysis renderer, source reparsing, compatibility data or
     silent fallback to obsolete artifacts.
 
 ## Dialogue processing
@@ -144,8 +138,7 @@ Every span retains:
 - dialogue or narration role;
 - explicit, AI, user-corrected or unresolved speaker status;
 - nullable durable character ID after Cast reconciliation;
-- accepted narrator/group fallback;
-- optional enrichment revision and state.
+- accepted narrator/group fallback.
 
 ## AI context and output
 
@@ -188,6 +181,5 @@ durable source ownership.
 - [02 — Dialogue](wizard/02-dialogue.md)
 - [03 — Review](wizard/03-review.md)
 - [04 — Cast & Voices](wizard/04-cast-and-voices.md)
-- [05 — Enrichment](wizard/05-enrichment.md)
-- [06 — Generate](wizard/06-generate.md)
-- [07 — Export](wizard/07-export.md)
+- [05 — Generate](wizard/06-generate.md)
+- [06 — Export](wizard/07-export.md)

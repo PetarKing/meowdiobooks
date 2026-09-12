@@ -141,7 +141,8 @@ def test_explicit_frontend_build_is_served_at_root(tmp_path) -> None:
     (frontend / "index.html").write_text("<h1>Meowdiobooks v2</h1>")
 
     with TestClient(create_app(tmp_path / "data", frontend_dist=frontend)) as client:
-        responses = [client.get(path) for path in ("/", "/library", "/player")]
+        responses = [client.get(path) for path in ("/", "/library")]
+        assert client.get("/player").status_code == 404
 
     assert all(response.status_code == 200 for response in responses)
     assert all("Meowdiobooks v2" in response.text for response in responses)

@@ -17,7 +17,6 @@ class WizardStage(StrEnum):
     DIALOGUE = "dialogue"
     REVIEW = "review"
     CAST = "cast"
-    ENRICH = "enrich"
     GENERATE = "generate"
 
 

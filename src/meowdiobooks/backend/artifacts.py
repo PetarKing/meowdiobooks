@@ -16,7 +16,6 @@ from .contracts.artifacts import (
     Artifact,
     CastArtifact,
     DialogueArtifact,
-    EnrichmentArtifact,
     ExtractionArtifact,
     RecordingScriptArtifact,
     ReviewArtifact,
@@ -69,10 +68,6 @@ def read_artifact(package: Path, kind: Literal["review"]) -> ReviewArtifact: ...
 
 @overload
 def read_artifact(package: Path, kind: Literal["cast"]) -> CastArtifact: ...
-
-
-@overload
-def read_artifact(package: Path, kind: Literal["enrichment"]) -> EnrichmentArtifact: ...
 
 
 @overload

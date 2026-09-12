@@ -34,7 +34,6 @@ on a later revision.
 | Clone one audition from a voice sample | One Base TTS call | Normalized WAV, the user-entered exact sample transcript, the same deterministic audition line and selected language | One playable audition WAV plus its retained speaker-reference WAV and transcript |
 | Delete one audition | 0 | Nothing | A new Cast draft without that candidate; at least one audition is always retained |
 | Accept Cast | 0 | Nothing | Nothing |
-| Enrichment, when enabled | One text call per bounded transcript window | Accepted turn IDs, text, identities, context and enabled options | Turn states and optional ambience/effect ranges keyed to supplied IDs |
 | Recording-script preparation | 0 | Nothing | Faithful, source-linked entries cached by exact accepted input revisions |
 | Generate | One or more Base TTS calls per render unit | Accepted spoken text; language; reference WAV; its exact matching transcript | Audio samples |
 
@@ -73,8 +72,6 @@ Operation-level semantic validation is separate:
 - Cast identity classification retries an invalid three-field object at most three logical attempts.
 - Voice-profile suggestion retries an invalid eight-field object once, then uses a conservative
   deterministic profile for that cast member.
-- Enrichment receives generic syntax retries, then its complete output is validated transactionally.
-  A semantic contract failure aborts that candidate rather than partially publishing it.
 
 ## Dialogue attribution
 
@@ -141,7 +138,7 @@ long-form storytelling rather than automatically becoming an acted protagonist v
 the same editable eight-field voice contract and audition gate.
 
 When a hosted OpenAI Responses adapter is selected, the provider also receives a strict JSON Schema for
-Dialogue attribution, Cast discovery and adjudication, voice profiles, and Enrichment. The schema owns
+Dialogue attribution, Cast discovery and adjudication, and voice profiles. The schema owns
 shape, required fields and fixed enums. Existing application validators continue to own semantic rules
 such as exact target coverage, ordering, uniqueness, evidence support and text-length budgets. Local
 Qwen keeps its JSON response mode and the same validators.
@@ -219,9 +216,6 @@ the exact audition transcript. Sample-cloned auditions retain the uploaded refer
 matching transcript. Base does not receive the Cast controls or VoiceDesign instruction: their audible
 result is embodied in a generated reference, while an upload supplies its speaker identity directly.
 
-Current Enrichment state, ambience and effect metadata are not consumed by Base TTS. The UI and
-artifacts must not claim otherwise.
-
 ## Revision and failure rules
 
 - Model output is always a candidate until explicitly accepted where review is required.
@@ -239,5 +233,4 @@ artifacts must not claim otherwise.
 - Dialogue prompts and validation: `src/meowdiobooks/backend/dialogue_ai.py`
 - Cast identity and voice-profile prompts: `src/meowdiobooks/backend/cast_service.py`
 - VoiceDesign generation: `src/meowdiobooks/backend/audio.py`
-- Enrichment calls: `src/meowdiobooks/backend/app_v2.py`
 - Base TTS rendering: `src/meowdiobooks/backend/tts_v2.py`

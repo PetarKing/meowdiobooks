@@ -4,7 +4,7 @@
 
 Produce the authoritative, source-anchored narration/dialogue transcript. Deterministic formats own
 structural separation; Qwen only attributes detected dialogue whose speaker remains unresolved. This
-phase does not finalize character identity, generate voices or add enrichment.
+phase does not finalize character identity, generate voices.
 
 ## Phase contract
 
