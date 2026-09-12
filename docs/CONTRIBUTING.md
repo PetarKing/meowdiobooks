@@ -15,7 +15,7 @@ account submitting the Contribution. Maintainers must not merge a pull request w
 acceptance. If an employer or another entity owns the work, the contributor must provide evidence
 of authorization or arrange a separate corporate agreement before merge.
 
-Before a substantial change, open an issue that states:
+Before a substantial change without an existing maintainer request or approval, open an issue that states:
 
 - the user problem and expected value;
 - the proposed scope and affected contracts;
@@ -23,8 +23,25 @@ Before a substantial change, open an issue that states:
 - the test and real-book verification strategy;
 - new dependencies or architecture impact.
 
-New services, databases or tables, caches, cross-service dependencies, network inference, and new
-runtime dependencies require maintainer approval before implementation.
+An explicit maintainer request or approval, including approval in the current working session,
+authorizes its stated implementation scope; do not require a second issue or approval for the same
+decision. New services, databases or tables, caches, cross-service dependencies, network inference,
+and runtime dependencies outside that scope require maintainer approval before adoption. Isolated,
+reversible prototypes may proceed within existing authorization, without affecting deployed systems,
+user data, or external resources beyond that authorization.
+
+## Git and working state
+
+Synchronize the branch needed for the contribution and preserve unrelated local changes. Inspect
+relevant branch and worktree state before integration or cleanup. Push only changes in the authorized
+scope; an ahead local `main` is not permission to push unrelated commits. Preserve a checkout that
+someone else is using instead of switching it merely to finish cleanup.
+
+Remove task-created branches or worktrees only after proving their work is preserved. A clean branch
+contained in `origin/main` can be removed; after a squash, rebase, or cherry-pick, use `git cherry` to
+check patch equivalence. Never discard unique commits or uncommitted files to manufacture a clean
+status. Preserve them with an explicit handoff and report the remaining state. Follow the
+[release runbook](WORKFLOW-RELEASE.md) when publishing workflow assets.
 
 ## AI-assisted contributions
 
@@ -53,12 +70,13 @@ include a reproducible verification record appropriate to its risk:
 
 - Record the commands, environments, scenarios, and results. Attach or link evidence that a reviewer
   can inspect; an agent's statement that something works is not evidence by itself.
-- For user-visible or end-to-end workflow changes, include before-and-after screenshots and a short
-  screen recording of the affected flow. If visual evidence is genuinely inapplicable, say why and
-  provide the corresponding logs, output comparisons, benchmarks, or other inspectable artifacts.
-- If the available agent can operate a browser or inspect images, have it exercise the complete
-  affected flow in addition to running automated tests, including relevant error, retry, and
-  recovery paths. Otherwise, the contributor must perform the equivalent manual check.
+- Choose evidence that can reveal failures in the changed behavior: before-and-after screenshots for
+  static presentation, recordings for interaction or timing, and logs, output comparisons or
+  benchmarks for nonvisual contracts. A change does not require every evidence format.
+- For workflow behavior changes, exercise the affected real flow, including relevant error, retry,
+  and recovery paths, using browser-capable agents or equivalent manual checks. Scale the breadth to
+  the risk; a static copy edit does not require replaying an unrelated book-generation journey.
+  Repeat or broaden checks when new changes, failures, or unresolved risks justify it.
 - For extraction, review, attribution, casting, generation, or export changes, run the relevant
   [public-domain evaluation samples](../SampleBooks/public-domain-evaluation/README.md). Expand the
   matrix with appropriately licensed or synthetic sources when language, layout, dialogue density,

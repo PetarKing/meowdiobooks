@@ -5,9 +5,6 @@
 *.pem
 *.key
 
-# Local agent instructions
-AGENTS.md
-
 # Operating-system metadata
 .DS_Store
 

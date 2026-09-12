@@ -4,6 +4,9 @@ Maintainers attach the Python wheel from `release/python` and the tarball produc
 `npm pack ./frontend` to one immutable GitHub Release. Consumers pin the tag, commit, filenames, and
 SHA-256 digests; neither asset is intended for a public package registry.
 
+For candidate selection, verification, publication, and handoff, follow the
+[workflow release runbook](../docs/WORKFLOW-RELEASE.md).
+
 Build both assets and their checksum manifest with:
 
 ```bash
