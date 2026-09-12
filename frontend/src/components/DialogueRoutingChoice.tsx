@@ -61,12 +61,12 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
               <Benefit>{t("Free to run")}</Benefit>
             </ul></span>
             <span className="dialogue-route-section caution"><b>{t("Trade-offs")}</b><ul>
-              <Tradeoff>{t("Can assign the wrong Character")}</Tradeoff>
-              <Tradeoff>{t("May use the Narrator when a Character likely spoke")}</Tradeoff>
+              <Tradeoff>{t("May choose the wrong character")}</Tradeoff>
+              <Tradeoff>{t("May miss a character and use Narrator")}</Tradeoff>
             </ul></span>
           </button>
           {selected === "local" && <button type="button" className="dialogue-route-proceed" onClick={() => onChoose("local")}>
-            {t("Proceed with {{model}}", { model: routing.local.displayName })} <i aria-hidden="true">→</i>
+            {t("Use {{model}}", { model: routing.local.displayName })} <i aria-hidden="true">→</i>
           </button>}
         </article>
 
@@ -78,9 +78,9 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
             </span>
             <strong className="dialogue-route-price">{money(remote?.estimatedCostUsd ?? 0)}</strong>
             <span className="dialogue-route-section good"><b>{t("Benefits")}</b><ul>
-              <Benefit>{remote?.falseNamesReductionPercent == null ? t("Likely to make far fewer speaker mistakes") : t("≈{{count}}% fewer false names", { count: remote.falseNamesReductionPercent })}</Benefit>
-              <Benefit>{remote?.speakerRecallImprovementPercent == null ? t("Likely to identify more real speakers") : t("≈{{count}}% better speaker recall", { count: remote.speakerRecallImprovementPercent })}</Benefit>
-              <Benefit>{t("Likely much faster for a long book")}</Benefit>
+              <Benefit>{remote?.falseNamesReductionPercent == null ? t("Likely fewer speaker mistakes") : t("≈{{count}}% fewer incorrect names", { count: remote.falseNamesReductionPercent })}</Benefit>
+              <Benefit>{remote?.speakerRecallImprovementPercent == null ? t("Likely to find more speakers") : t("≈{{count}}% more speakers identified", { count: remote.speakerRecallImprovementPercent })}</Benefit>
+              <Benefit>{t("Likely faster for long books")}</Benefit>
             </ul></span>
             <span className="dialogue-route-section caution"><b>{t("Trade-offs")}</b><ul>
               <Tradeoff>{t("dialogue.remotePrivacyTradeoff", { ns: "edition" })}</Tradeoff>
@@ -88,7 +88,7 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
             </ul></span>
           </button>
           {selected === "remote" && remote?.credentialConfigured && <button type="button" className="dialogue-route-proceed remote" onClick={() => onChoose("remote")}>
-            {t("Proceed with {{model}}", { model: remote.displayName })} <i aria-hidden="true">→</i>
+            {t("Use {{model}}", { model: remote.displayName })} <i aria-hidden="true">→</i>
           </button>}
         </article>
       </div>

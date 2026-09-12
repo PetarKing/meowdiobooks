@@ -278,7 +278,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
       <div className="dialogue-result-intro">
         <span className="dialogue-hero-mark" aria-hidden="true">✦</span>
         <div><small>{t("Step 2 · Dialogue")}</small><h1>{t("Your transcript is ready")}</h1></div>
-        <span className="dialogue-result-status">{t("Safe to accept")}</span>
+        <span className="dialogue-result-status">{t("Ready to review")}</span>
       </div>
       <DialogueComposition dialogue={{ ...result, readerAssignments }} />
       <div className="dialogue-review-views" role="tablist" aria-label={t("Dialogue review views")}>
@@ -323,11 +323,11 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
       {reviewComplete ? <div className="dialogue-review-complete">
         <span aria-hidden="true">✦</span>
         <b>{t("Review complete")}</b>
-        <p>{t("Your choices are saved. You can accept the result or inspect every AI check.")}</p>
+        <p>{t("Accept your choices below, or inspect all AI checks.")}</p>
         <button type="button" className="ghost" onClick={reviewAgain}>{t("Review again")}</button>
       </div> : currentReviewRow ? <>
         <div className="dialogue-review-position">
-          <div><b>{t("Line {{current}} of {{count}}", { current: currentReviewIndex + 1, count: reviewRows.length })}</b><span>{t("Only lines AI could not assign safely · easiest choices first")}</span></div>
+          <div><b>{t("Line {{current}} of {{count}}", { current: currentReviewIndex + 1, count: reviewRows.length })}</b><span>{t("Uncertain lines · suggested speakers first")}</span></div>
           <nav className="dialogue-review-navigation" aria-label={t("Guided dialogue review")}>
             <button className="ghost compact" disabled={currentReviewIndex === 0} onClick={() => { setReviewIndex(currentReviewIndex - 1); setEditingSpanId(undefined); }}>← {t("Previous")}</button>
             <button className="primary compact" onClick={nextReviewCard}>{t("Next")} →</button>
@@ -335,7 +335,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
           <span className="dialogue-review-meter" aria-hidden="true"><i style={{ width: `${checkedReviewCount / reviewRows.length * 100}%` }} /></span>
         </div>
         <div className="dialogue-review-examples dialogue-guided-example">{renderOutcomeCard(currentReviewRow, true)}</div>
-      </> : <div className="empty-dialogue"><b>{t("Every line has a reader")}</b><span>{t("You can accept this result now, or inspect all AI choices if you wish.")}</span></div>}
+      </> : <div className="empty-dialogue"><b>{t("Every line has a reader")}</b><span>{t("Accept the result or check the AI assignments.")}</span></div>}
     </section>}
 
     {view === "all" && <section className="dialogue-all-assignments" aria-label={t("AI checks")}>
@@ -488,8 +488,8 @@ function reviewPriority(row: DialogueExample) {
 function reviewReason(row: DialogueExample) {
   const suggestions = row.suggestedSpeakers?.length ?? 0;
   if (suggestions >= 2) return { title: "Two possible readers", short: "two possible readers", detail: "AI could not safely choose between them." };
-  if (suggestions === 1) return { title: "One possible reader", short: "one possible reader", detail: "AI found a likely match, but not enough evidence to assign it automatically." };
-  return { title: "No supported reader", short: "no supported reader", detail: "AI found no safe character match, so this stays with Narrator for now." };
+  if (suggestions === 1) return { title: "One possible reader", short: "one possible reader", detail: "AI found a possible speaker. Please confirm." };
+  return { title: "No supported reader", short: "no supported reader", detail: "No clear speaker was found. Narrator reads this line for now." };
 }
 
 function prioritizeNarrator(assignments: DialogueReaderAssignment[]) {

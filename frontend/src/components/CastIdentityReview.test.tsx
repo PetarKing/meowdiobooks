@@ -311,7 +311,7 @@ describe("CastIdentityReview", () => {
     expect(narratorDialog).toHaveTextContent("Permanent primary");
     expect(within(narratorDialog).queryByLabelText("Narrator voice direction")).not.toBeInTheDocument();
     expect(within(narratorDialog).queryByLabelText("Narrator voice model")).not.toBeInTheDocument();
-    expect(narratorDialog).toHaveTextContent("configured with the other voices in the next phase");
+    expect(narratorDialog).toHaveTextContent("Choose the narrator voice in the next step");
     expect(within(narratorDialog).queryByRole("group", { name: "Book language" })).not.toBeInTheDocument();
     fireEvent.click(within(narratorDialog).getByRole("button", { name: "Pop out to cast" }));
     expect(screen.getByRole("button", { name: "Inspect Emilia" })).toBeInTheDocument();

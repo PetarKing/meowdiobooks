@@ -215,7 +215,7 @@ describe("CastVoiceReview", () => {
       merchant.style.getPropertyValue("--shared-voice-accent"),
     );
     expect(guard).toHaveTextContent("shared voice");
-    expect(screen.getByText(/Brief roles may share a voice to reduce generation time and cost/)).toBeInTheDocument();
+    expect(screen.getByText(/Brief roles may share a voice to save time and cost/)).toBeInTheDocument();
 
     fireEvent.click(guard);
     expect(within(screen.getByRole("dialog", { name: "Guard voice" })).getByText("Shared voice")).toBeInTheDocument();
@@ -256,7 +256,7 @@ describe("CastVoiceReview", () => {
     expect(notes).toHaveAttribute("maxlength", "180");
     fireEvent.change(notes, { target: { value: "" } });
     expect(within(dialog).getByRole("button", { name: "Generate new audition →" })).toBeEnabled();
-    expect(dialog).toHaveTextContent("Settings affect only the next audition");
+    expect(dialog).toHaveTextContent("Settings apply to the next audition");
     fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
     expect(onRegenerate).toHaveBeenCalledWith("many", expect.objectContaining({ pace: "measured" }));
   });
