@@ -6,8 +6,9 @@
 
 <!--
 List the commands, environments, scenarios, and results. Link inspectable artifacts.
-For user-visible or end-to-end changes, attach before/after screenshots and a short screen
-recording.
+Choose evidence appropriate to the changed behavior: before/after screenshots for static
+presentation, recordings for interaction or timing, and output/API comparisons for contracts.
+Exercise affected real flows and relevant error/retry/recovery paths for workflow behavior changes.
 For regression-sensitive book processing, include the public-domain sample matrix and before/after
 comparisons. Write "Not applicable" only with a reason.
 -->
