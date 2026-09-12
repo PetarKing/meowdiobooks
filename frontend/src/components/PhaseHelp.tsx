@@ -23,73 +23,73 @@ type GuideStage = Exclude<WizardStage, "import"> | "export";
 
 const guides: Record<GuideStage, PhaseGuide> = {
   extract: {
-    number: "01", label: "Extract", title: "Choose the reader, not the prettiest preview.",
-    intro: "The parser's job is to recover clean reading order. Compare the original page with the text beside it and look for sequence mistakes. A new extraction replaces the accepted source only after the complete book succeeds.",
-    route: ["Start with LiteParse", "Check the representative pages", "Switch only when reading order breaks"],
+    number: "01", label: "Extract", title: "Check the reading order.",
+    intro: "Compare the PDF with the extracted text. Check for missing or out-of-order passages. Your accepted text is replaced only when the full extraction succeeds.",
+    route: ["Start with LiteParse", "Compare the sample pages", "Try another parser if needed"],
     moves: [
-      { cue: "A→B", title: "Follow the reading order", detail: "Columns, captions, headings, and footnotes should arrive in the order a narrator would read them." },
+      { cue: "A→B", title: "Follow the reading order", detail: "Columns, captions, headings, and footnotes should follow the reading order." },
       { cue: "≠", title: "Ignore cosmetic differences", detail: "Line wrapping does not matter. Missing, duplicated, or scrambled text does." },
-      { cue: "▦", title: "Use layout-aware sparingly", detail: "It is the slower fallback for pages whose structure defeats the simpler parsers." },
+      { cue: "▦", title: "Try layout-aware for complex pages", detail: "Use it if other parsers scramble the text. It takes longer." },
     ],
   },
   dialogue: {
-    number: "02", label: "Dialogue", title: "Let certainty lead; use AI for the gaps.",
-    intro: "Clear speaker labels stay fixed. You choose whether uncertain dialogue gets a bounded AI guess or the narrator. After AI runs, filter its choices and correct only the misses.",
-    route: ["Check detected formats", "Choose AI scope—or narrator", "Filter results; correct only misses"],
+    number: "02", label: "Dialogue", title: "Choose who reads each line.",
+    intro: "Keep known speakers. Let AI suggest speakers for uncertain dialogue, or use Narrator. Review and correct the results before accepting.",
+    route: ["Check detected formats", "Choose AI suggestions or Narrator", "Review the results"],
     moves: [
       { cue: "“…”", title: "Explicit speakers stay locked", detail: "AI does not reinterpret dialogue that already has a clear speaker label." },
-      { cue: "?→AI", title: "Scope the uncertain parts", detail: "Only the selected unresolved groups are sent for speaker attribution." },
-      { cue: "✎", title: "Correct only what is wrong", detail: "Choose a character or Narrator. Internal transcript segmentation stays out of the decision." },
+      { cue: "?→AI", title: "Choose what AI checks", detail: "AI checks only the uncertain dialogue you select." },
+      { cue: "✎", title: "Correct only what is wrong", detail: "Assign a character or Narrator to any line that needs correcting." },
     ],
   },
   review: {
-    number: "03", label: "Review", title: "Decide once, with the evidence in view.",
-    intro: "Review groups similar issues so you can make consistent decisions without inspecting the whole manuscript line by line. Use the recommendation when examples agree; inspect the exceptions when they do not.",
-    route: ["Approve real chapter starts", "Inspect a representative occurrence", "Apply one decision to its warning group"],
+    number: "03", label: "Review", title: "Review the text before recording.",
+    intro: "Similar issues are grouped together. Check the examples, then choose how each group should be read.",
+    route: ["Approve real chapter starts", "Check the highlighted examples", "Choose an action for each group"],
     moves: [
       { cue: "▰", title: "Only the highlight changes", detail: "The surrounding text is context. It remains untouched." },
-      { cue: "1×N", title: "Choices apply as a group", detail: "A resolution affects the matching flagged spans shown by that warning." },
-      { cue: "✓", title: "Nothing changes early", detail: "Your accepted version stays active until every required decision is complete." },
+      { cue: "1×N", title: "Choices apply as a group", detail: "Your choice applies to every highlighted occurrence in the group." },
+      { cue: "✓", title: "Nothing changes early", detail: "Changes take effect when you complete and accept the review." },
     ],
   },
   cast: {
-    number: "04", label: "Cast & voices", title: "Shape the cast with your hands—and your ears.",
-    intro: "First decide who is who. Click a cast card to inspect its evidence, then audition each resulting role. Approving a voice keeps that exact audition—not merely the newest one.",
-    route: ["Resolve uncertain identities", "Generate and compare auditions", "Approve a voice or group route"],
+    number: "04", label: "Cast & voices", title: "Match the characters and their voices.",
+    intro: "Merge names that refer to the same character, then compare voice auditions. Approving a voice saves the audition you selected.",
+    route: ["Resolve uncertain identities", "Generate and compare auditions", "Approve individual or layered voices"],
     moves: [
-      { cue: "A → B", title: "Drag people together", detail: "Drop one cast member onto another to merge their source labels into one identity." },
-      { cue: "A → N", title: "Route a role to Narrator", detail: "Drop a cast member onto Narrator when those dialogue lines should use the narrator voice." },
-      { cue: "▶︎ A+B", title: "Approve voices or routes", detail: "Keep useful audition history; a group may instead reuse confirmed character voices together." },
+      { cue: "A → B", title: "Merge matching characters", detail: "Drag one cast member onto another to combine their names into one character." },
+      { cue: "A → N", title: "Use Narrator for a role", detail: "Drop a cast member onto Narrator when those dialogue lines should use the narrator voice." },
+      { cue: "▶︎ A+B", title: "Choose a group voice", detail: "Give a group its own voice, or combine approved character voices." },
     ],
   },
   enrich: {
-    number: "05", label: "Enrich", title: "A deliberate pause, for now.",
-    intro: "This is the future home for performance enrichment. Today it is an honest pass-through: continuing changes nothing.",
-    route: ["Review the production recap", "See what is planned", "Continue with the original approved performance"],
+    number: "05", label: "Enrich", title: "Enrichment is coming soon.",
+    intro: "Enrichment is not available yet. Continue to Generate with your approved text and voices.",
+    route: ["Review the production recap", "See what is planned", "Continue to Generate"],
     moves: [
       { cue: "0", title: "Zero book changes", detail: "No text, speaker, identity, voice, or audio is modified in this phase." },
-      { cue: "✓", title: "Your decisions carry forward", detail: "The accepted transcript and cast remain the authority downstream." },
+      { cue: "✓", title: "Keep your approved choices", detail: "Later stages use your approved transcript and cast." },
       { cue: "→", title: "Safe to continue", detail: "Generate will prepare the final recording script from everything you approved." },
     ],
   },
   generate: {
-    number: "06", label: "Generate", title: "Render only what you are ready to hear.",
-    intro: "The first visit prepares one final script from your approved text, speakers, and voices. Then choose chapters, create their audio, and listen before moving on. If an approved input would change a chapter, its earlier audio becomes stale.",
+    number: "06", label: "Generate", title: "Generate and listen to your chapters.",
+    intro: "Generate uses your approved text and voices. Choose chapters, create their audio, and listen. If later edits affect a chapter, its audio is marked Stale.",
     route: ["Select the chapters you want", "Generate chapter audio", "Listen; regenerate anything marked Stale"],
     moves: [
-      { cue: "☑", title: "Generate selectively", detail: "You do not need to render the entire book to test the production." },
-      { cue: "🔒", title: "Uses approved choices", detail: "Audio uses the cached recording script built from your transcript, cast, and voices." },
+      { cue: "☑", title: "Generate selectively", detail: "Try one chapter before generating the whole book." },
+      { cue: "🔒", title: "Uses approved choices", detail: "The recording script uses your approved transcript, cast, and voices." },
       { cue: "↻", title: "Stale audio stays playable", detail: "Listen for comparison, then regenerate it before export so the chapter matches your current choices." },
     ],
   },
   export: {
-    number: "07", label: "Export", title: "Bundle the chapters you want to share.",
-    intro: "Export takes current chapter WAVs and packages the selected set as a high-quality M4B, a smaller M4B, or ordered MP3 chapters. You can override the title, author, and cover without changing the PDF or generated audio.",
+    number: "07", label: "Export", title: "Export your audiobook.",
+    intro: "Choose finished chapters, book details, and a format: high-quality M4B, smaller M4B, or MP3 chapters. Title, author, and cover changes apply only to this export.",
     route: ["Choose finished chapters", "Confirm the book details", "Choose a format and create it in your Library"],
     moves: [
-      { cue: "☑", title: "Your chapter set", detail: "A partial export is fine. Only the selected current WAVs are included, in book order." },
-      { cue: "Aa", title: "Export-only metadata", detail: "Title, author, and cover edits apply only to this export, not the source book." },
-      { cue: "M4B", title: "Audiobook-ready choices", detail: "Both M4Bs preserve chapter navigation; MP3 export provides one widely compatible file per chapter in a ZIP." },
+      { cue: "☑", title: "Your chapter set", detail: "Export any finished chapters. They stay in book order." },
+      { cue: "Aa", title: "Book details for this export", detail: "Title, author, and cover edits apply only to this export, not the source book." },
+      { cue: "M4B", title: "Audiobook-ready choices", detail: "M4B keeps chapter navigation in one file. MP3 gives you a ZIP with one file per chapter." },
     ],
   },
 };
@@ -152,10 +152,10 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
       <div className="phase-help-body">
         <section className="phase-help-reading" aria-labelledby={`${titleId}-overview`}>
           <span className="eyebrow">{t("What this phase does")}</span>
-          <h3 id={`${titleId}-overview`}>{t("The useful version")}</h3>
+          <h3 id={`${titleId}-overview`}>{t("Overview")}</h3>
           <p>{t(guide.intro)}</p>
           <div className="phase-help-path">
-            <strong>{t("Best way through")}</strong>
+            <strong>{t("Steps")}</strong>
             <ol>{guide.route.map((step) => <li key={step}>{t(step)}</li>)}</ol>
           </div>
         </section>

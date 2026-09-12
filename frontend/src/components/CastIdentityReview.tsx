@@ -475,7 +475,7 @@ export function CastIdentityReview({
 
   return <div className="cast-workbench">
     <div className="cast-toolbar">
-      <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use its voice.")}</small></div>
+      <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
       <div className="cast-toolbar-actions">
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
         <details>
@@ -533,7 +533,7 @@ export function CastIdentityReview({
       </header>
       <div className="cast-inspector-grid narrator-inspector-grid">
         <aside className="cast-member-controls">
-          <section className="narrator-rule"><b>{t("Narrator routing")}</b><small>{t("Drag cast members onto Narrator when their dialogue should use the narrator voice. Narrator itself cannot be dragged into the cast. Its audition is configured with the other voices in the next phase.")}</small></section>
+          <section className="narrator-rule"><b>{t("Narrator routing")}</b><small>{t("Drag a cast member onto Narrator to use the narrator voice. Narrator cannot be merged into another character. Choose the narrator voice in the next step.")}</small></section>
         </aside>
         <div className="cast-aliases-and-lines">
           <div className="cast-section-heading"><div><small>{t("Dialogue fallback")}</small><h3>{t("Labels assigned to Narrator")}</h3></div><span>{t("{{count}} assigned", { count: narratorAssignments?.labels.length ?? 0 })}</span></div>

@@ -411,10 +411,10 @@ export function CastVoiceReview({
             : t("All voices approved")}</b>
         {requiredCount > 0 && <small className="cast-required-help">{t("Red cards marked Required must be reviewed before you can continue.")}</small>}
         {defaultReadyCount > 0 && <small>{defaultReadyCount === 1
-          ? t("1 default audition is ready. Review it individually, or continue to approve it.")
-          : t("{{count}} default auditions are ready. Review them individually, or continue to approve them together.", { count: defaultReadyCount })}</small>}
+          ? t("Listen first, or continue to approve the ready audition.")
+          : t("Listen first, or continue to approve {{count}} ready auditions together.", { count: defaultReadyCount })}</small>}
         <small>{t("Open a cast member to preview and tune their voice.")}</small>
-        {sharedGroupColors.size > 0 && <small className="shared-voice-help">{t("Brief roles may share a voice to reduce generation time and cost. Open any character to generate or choose a different audition.")}</small>}
+        {sharedGroupColors.size > 0 && <small className="shared-voice-help">{t("Brief roles may share a voice to save time and cost. Open a character to choose another.")}</small>}
       </div>
       <div className="voice-cast-toolbar-meta">
         <span>{cast.language ? t(cast.language) : "—"}</span>
@@ -479,7 +479,7 @@ export function CastVoiceReview({
         <div className="voice-inspector-body">
           {inspected.category === "group" && <section className="voice-route-section">
             <div className="cast-section-heading"><div><small>{t("Group voice")}</small><h3>{t("How should this group sound?")}</h3></div></div>
-            <p className="voice-route-help">{t("Keep one dedicated performance, or layer voices already in this cast. This changes audio routing only; source labels and identities stay untouched.")}</p>
+            <p className="voice-route-help">{t("Use one voice or layer existing cast voices. Character names and identities stay unchanged.")}</p>
             <div className="voice-route-choices" role="radiogroup" aria-label={t("Group voice route")}>
               <button type="button" role="radio" aria-checked={inspectedRoute.kind === "dedicated"} className={inspectedRoute.kind === "dedicated" ? "selected" : ""} onClick={() => onRouteChange(inspected.characterId, { kind: "dedicated" })}>
                 <span>{inspectedRoute.kind === "dedicated" ? "●" : "○"}</span><b>{t("Dedicated group voice")}</b><small>{t("Use one audition made for {{name}}.", { name: inspected.name })}</small>
@@ -535,7 +535,7 @@ export function CastVoiceReview({
               </div></fieldset>
             </div>
             <div className="voice-regenerate-footer">
-              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings affect only the next audition; earlier auditions remain available below.")}</small>
+              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings apply to the next audition. Earlier auditions stay available below.")}</small>
               <button
                 type="button"
                 className="ghost regenerate-voice-action"
