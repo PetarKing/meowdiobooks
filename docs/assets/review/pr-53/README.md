@@ -1,5 +1,8 @@
 # PR 53 recovery evidence
 
+Historical evidence from July 2026. The recorded Enrich phase was removed before release; the current
+workflow goes directly from Cast & Voices to Generate.
+
 The [recovery walkthrough](./recovery-walkthrough.mp4) uses a sanitized,
 synthetic one-page book and records:
 

@@ -168,9 +168,6 @@ def verify_book(
     ]
     _accept(client, book_id, "cast", cast_auditions["revision"], voice_decisions)
 
-    enrichment = _process(client, book_id, "enrich", {"skip": True})
-    _accept(client, book_id, "enrich", enrichment["revision"])
-
     snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
     chapters = list(snapshot["chapters"])
     selected = min(chapters, key=lambda row: int(row.get("estimatedCharacters", 0)))

@@ -102,7 +102,7 @@ PDF → extracted text → dialogue attribution → character reconciliation →
   across a complete run, those excerpts may cover text from anywhere in the book.
 
 After local PDF intake, the guided workflow is **Extract → Dialogue → Review → Cast & Voices →
-Enrichment (currently pass-through) → Generate → Export**. See the
+Generate → Export**. See the
 [workflow guide](docs/wizard/README.md) for the exact phase behavior.
 
 ## Alpha scope

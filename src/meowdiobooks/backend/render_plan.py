@@ -17,8 +17,6 @@ def compile_render_plan(
     cast: Mapping[str, Any],
     recording_script: Mapping[str, Any],
     chapter_ids: Sequence[str],
-    *,
-    enrichment: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Compile selected chapters without regexes, source reparsing, or model calls."""
 
@@ -52,7 +50,6 @@ def compile_render_plan(
         str(label): character_id
         for label, character_id in cast.get("labelToCharacterId", {}).items()
     }
-    state_by_span = _states(enrichment)
     segments_by_chapter: dict[str, list[dict[str, Any]]] = {value: [] for value in selected}
     omissions: list[dict[str, Any]] = []
     repaired_line_hyphenations = 0
@@ -103,7 +100,6 @@ def compile_render_plan(
                     voice,
                     source_ids,
                     fallback=fallback,
-                    state=state_by_span.get(str(anchor["id"])),
                     mix_group=mix_group,
                 )
             )
@@ -130,7 +126,6 @@ def compile_render_plan(
             "dialogue": dialogue_revision,
             "review": inputs.get("review"),
             "cast": cast_revision,
-            "enrichment": inputs.get("enrichment"),
             "script": script_revision,
         },
         "selectedChapterIds": selected,
@@ -361,7 +356,6 @@ def _segment(
     source_ids: Sequence[str],
     *,
     fallback: str | None,
-    state: str | None,
     mix_group: str | None = None,
 ) -> dict[str, Any]:
     segment = {
@@ -379,7 +373,6 @@ def _segment(
         "referenceMode": voice["referenceMode"],
         "fallback": fallback,
         "mixGroupId": mix_group,
-        "state": state,
     }
     if "voiceSettings" in voice:
         segment["voiceSettings"] = deepcopy(voice["voiceSettings"])
@@ -421,18 +414,7 @@ def _safe_narration_pair(
         and left.get("fallback") == right.get("fallback")
         and left.get("mixGroupId") is None
         and right.get("mixGroupId") is None
-        and left.get("state") == right.get("state")
     )
-
-
-def _states(enrichment: Mapping[str, Any] | None) -> dict[str, str]:
-    if enrichment is None:
-        return {}
-    return {
-        str(row.get("turnId") or row.get("spanId")): str(row.get("state"))
-        for row in enrichment.get("turnStates", [])
-        if row.get("turnId") or row.get("spanId")
-    }
 
 
 def _revision(artifact: Mapping[str, Any], label: str) -> str:

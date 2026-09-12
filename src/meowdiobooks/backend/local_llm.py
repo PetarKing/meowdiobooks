@@ -1,4 +1,4 @@
-"""Small, pinned llama.cpp client for local wizard enrichment."""
+"""Small, pinned llama.cpp client for local wizard text decisions."""
 
 from __future__ import annotations
 

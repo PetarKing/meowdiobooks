@@ -62,18 +62,8 @@ const guides: Record<GuideStage, PhaseGuide> = {
       { cue: "▶︎ A+B", title: "Choose a group voice", detail: "Give a group its own voice, or combine approved character voices." },
     ],
   },
-  enrich: {
-    number: "05", label: "Enrich", title: "Enrichment is coming soon.",
-    intro: "Enrichment is not available yet. Continue to Generate with your approved text and voices.",
-    route: ["Review the production recap", "See what is planned", "Continue to Generate"],
-    moves: [
-      { cue: "0", title: "Zero book changes", detail: "No text, speaker, identity, voice, or audio is modified in this phase." },
-      { cue: "✓", title: "Keep your approved choices", detail: "Later stages use your approved transcript and cast." },
-      { cue: "→", title: "Safe to continue", detail: "Generate will prepare the final recording script from everything you approved." },
-    ],
-  },
   generate: {
-    number: "06", label: "Generate", title: "Generate and listen to your chapters.",
+    number: "05", label: "Generate", title: "Generate and listen to your chapters.",
     intro: "Generate uses your approved text and voices. Choose chapters, create their audio, and listen. If later edits affect a chapter, its audio is marked Stale.",
     route: ["Select the chapters you want", "Generate chapter audio", "Listen; regenerate anything marked Stale"],
     moves: [
@@ -83,7 +73,7 @@ const guides: Record<GuideStage, PhaseGuide> = {
     ],
   },
   export: {
-    number: "07", label: "Export", title: "Export your audiobook.",
+    number: "06", label: "Export", title: "Export your audiobook.",
     intro: "Choose finished chapters, book details, and a format: high-quality M4B, smaller M4B, or MP3 chapters. Title, author, and cover changes apply only to this export.",
     route: ["Choose finished chapters", "Confirm the book details", "Choose a format and create it in your Library"],
     moves: [

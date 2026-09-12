@@ -8,7 +8,7 @@ speech or changes an accepted source, cast, recording script, or render.
 
 ## User contract
 
-Wizard Step 7, **Export**, unlocks after at least one chapter finishes successfully in Generate.
+Wizard Step 6, **Export**, unlocks after at least one chapter finishes successfully in Generate.
 
 - The export contains exactly the current chapter revisions selected in Export.
 - Chapters are ordered by the accepted book structure, not by request or completion order.

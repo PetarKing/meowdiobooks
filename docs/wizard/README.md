@@ -41,7 +41,6 @@ Extract, Generate and Export use narrower variants because they do not publish s
 | [Dialogue](02-dialogue.md) | Accepted extraction → narration/dialogue spans | **OPTIONAL AI** — only selected unresolved turns |
 | [Review](03-review.md) | Accepted Dialogue + warnings → explicit warning decisions | **NO AI** |
 | [Cast & Voices](04-cast-and-voices.md) | Literal labels → reviewed identities + accepted designed or cloned voice references | **AI REQUIRED** — text classification, voice suggestions and auditions; optional ASR draft for uploaded samples |
-| [Enrichment](05-enrichment.md) | Accepted transcript/cast → explicit skipped revision; future state/range metadata contract | **CURRENTLY SKIP-ONLY** |
 | [Generate](06-generate.md) | Accepted artifacts → cached recording script → chapter WAVs | **AI REQUIRED** — TTS synthesis only |
 | [Export](07-export.md) | Selected current chapter WAVs → M4B or MP3 chapter ZIP | **NO AI** |
 

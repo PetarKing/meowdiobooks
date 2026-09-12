@@ -57,16 +57,6 @@ class CastArtifact(ArtifactHeader):
     labelToCharacterId: NotRequired[dict[str, str]]
 
 
-class EnrichmentArtifact(ArtifactHeader):
-    kind: Literal["enrichment"]
-    dialogueRevisionId: NotRequired[str]
-    castRevisionId: NotRequired[str]
-    status: NotRequired[Literal["complete", "skipped"]]
-    plan: NotRequired[dict[str, object]]
-    turnStates: NotRequired[list[dict[str, object]]]
-    rangeDecorators: NotRequired[list[dict[str, object]]]
-
-
 class RecordingScriptArtifact(ArtifactHeader):
     kind: Literal["script"]
     status: NotRequired[Literal["ready"]]
@@ -81,6 +71,5 @@ Artifact = (
     | DialogueArtifact
     | ReviewArtifact
     | CastArtifact
-    | EnrichmentArtifact
     | RecordingScriptArtifact
 )

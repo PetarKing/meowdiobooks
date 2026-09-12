@@ -1,4 +1,4 @@
-# Phase 6 — Generate
+# Phase 5 — Generate
 
 ## Purpose
 
@@ -8,7 +8,7 @@ chapters and produce versioned playable audio.
 ## Phase contract
 
 ```text
-Input:  selected chapter IDs + accepted Dialogue/Review/Cast/optional Enrichment revisions
+Input:  selected chapter IDs + accepted Dialogue/Review/Cast revisions
 Work:   prepare/reuse cached recording script → compile render plan → synthesize accepted render units
 Output: versioned chapter WAV + segment metadata and pinned input revisions
 Gate:   complete chapter and metadata validate before atomic publication
@@ -20,7 +20,7 @@ Base receives only the accepted render text and that exact voice reference. It i
 ## AI use — REQUIRED TTS MODEL
 
 Generate uses Qwen Base for speech synthesis. It uses no text LLM, prompt-based speaker analysis,
-identity inference or enrichment. Recording-script and render-plan compilation are deterministic.
+or identity inference. Recording-script and render-plan compilation are deterministic.
 
 ## User sees
 
@@ -66,7 +66,7 @@ revision, fallbacks, renderer model/language and pinned artifact revisions.
 
 After submit, the application:
 
-1. loads the accepted Dialogue, Review, Cast and optional Enrichment revisions;
+1. loads the accepted Dialogue, Review and Cast revisions;
 2. reuses the cached recording script when its exact input revisions match, otherwise prepares and
    atomically publishes a new script before synthesis;
 3. validates exact chapter coverage, every dedicated voice and every layered group's member routes;
@@ -87,8 +87,7 @@ Failed chapters retain the prior playable revision. Successful chapters can be r
 newer accepted settings. Generate never bundles chapters or creates the portable audiobook file.
 
 As soon as one current chapter is playable, the separate [Export phase](07-export.md) unlocks. Export
-chooses and packages WAV revisions without changing them. A future player remains a separate
-consumption surface rather than another wizard phase; see the [roadmap](../ROADMAP.md).
+chooses and packages WAV revisions without changing them.
 
 ## Artifact and gate
 

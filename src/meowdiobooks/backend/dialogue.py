@@ -2,7 +2,7 @@
 
 The module deliberately has no model, storage, or web dependencies.  It turns an
 accepted extraction into source-anchored candidates and an exact narration/dialogue
-partition.  Later phases may enrich or reconcile identities, but must not reparse the
+partition.  Later phases may reconcile identities, but must not reparse the
 source.
 """
 

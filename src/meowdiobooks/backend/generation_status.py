@@ -78,10 +78,6 @@ def chapter_audio_stale_reasons(
         pinned_revision = pinned.get(kind)
         if str(pinned_revision or "") == str(current_revision):
             continue
-        if kind == "enrichment" and _non_audible_enrichment_change(
-            package, metadata, str(current_revision)
-        ):
-            continue
         if kind in {"cast", "script"} and _render_artifacts_equivalent(
             package,
             kind,
@@ -92,18 +88,6 @@ def chapter_audio_stale_reasons(
             continue
         reasons.append(f"{kind}:{pinned_revision}->{current_revision}")
     return reasons
-
-
-def _non_audible_enrichment_change(
-    package: Path, metadata: dict[str, Any], current_revision: str
-) -> bool:
-    renderer = metadata.get("renderer", {})
-    if renderer.get("stateConsumed") is True or renderer.get("ambienceConsumed") is True:
-        return False
-    current = _artifact_revision(package, "enrichment", current_revision)
-    return current is None or bool(
-        current.get("downstream", {}).get("affectsSynthesizedSpeech") is False
-    )
 
 
 def _render_artifacts_equivalent(

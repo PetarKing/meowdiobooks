@@ -17,7 +17,6 @@ import type {
   DialogueStructuralIssue,
   DialogueStructuralResolution,
   DialogueStrategy,
-  EnrichmentArtifact,
   ExtractionMethod,
   ExtractionPreview,
   Job,
@@ -77,7 +76,6 @@ import {
 import {
   averageGenerationMultiplier,
   chapterDuration,
-  estimatedListeningTime,
   generationDuration,
   generationSample,
   longChapterSplitSeconds,
@@ -187,10 +185,7 @@ function ProductTabIcon({ view }: { view: ProductView }) {
   if (view === "create") {
     return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m15 4 5 5L9 20l-5-5L15 4Z" /><path d="m14 5 5 5M6 4v3M4.5 5.5h3M18 16v4M16 18h4" /></svg>;
   }
-  if (view === "library") {
-    return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5h5v14H4zM10 5.5h5v14h-5zM16.5 5l3.5-.8 2.6 13.6-3.5.8z" /></svg>;
-  }
-  return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z" /></svg>;
+  return <svg className="product-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 5.5h5v14H4zM10 5.5h5v14h-5zM16.5 5l3.5-.8 2.6 13.6-3.5.8z" /></svg>;
 }
 
 export default function App({
@@ -232,7 +227,6 @@ export default function App({
   const [cancelRequestPending, setCancelRequestPending] = useState(false);
   const [extractionTransition, setExtractionTransition] = useState(false);
   const [reviewTransition, setReviewTransition] = useState(false);
-  const [enrichmentTransition, setEnrichmentTransition] = useState(false);
   const [generationInProgress, setGenerationInProgress] = useState(false);
   const [generationRun, setGenerationRun] = useState<GenerationRun>();
   const [generationSamples, setGenerationSamples] = useState<GenerationSample[]>([]);
@@ -283,7 +277,6 @@ export default function App({
   const [deletingVoiceRevision, setDeletingVoiceRevision] = useState<string>();
   const [confirmDefaultVoices, setConfirmDefaultVoices] = useState(false);
 
-  const [enrichmentCandidate, setEnrichmentCandidate] = useState<EnrichmentArtifact>();
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [chapterFilter, setChapterFilter] = useState<"all" | "pending" | "generated">("all");
   const [listeningChapterId, setListeningChapterId] = useState<string>();
@@ -330,7 +323,6 @@ export default function App({
     if (stageId === "dialogue") return Boolean(dialogueCandidate) && !editingAcceptedDialogue;
     if (stageId === "review") return Boolean(reviewCandidate);
     if (stageId === "cast") return Boolean(castCandidate && castCandidate.revision !== snapshot?.cast?.revision);
-    if (stageId === "enrich") return Boolean(enrichmentCandidate && enrichmentCandidate.revision !== snapshot?.enrichment?.revision);
     return false;
   };
 
@@ -442,7 +434,7 @@ export default function App({
   async function hydrate(bookId: string) {
     let next = await gateway.getBookSnapshot(bookId);
     if (
-      next.book.completedStages.includes("enrich")
+      next.book.completedStages.includes("cast")
       && !next.recordingScript
       && !next.dialogueRecovery
     ) {
@@ -503,7 +495,6 @@ export default function App({
       recoverableCast && recoverableCast.proposalRevision === restoredCast?.revision
     );
     setCastGenerationPaused(resumeMatchesProposal);
-    setEnrichmentCandidate(next.enrichment);
     setListeningChapterId(undefined);
     const model = (
       resumeMatchesProposal ? recoverableCast?.modelId : undefined
@@ -602,23 +593,6 @@ export default function App({
     } finally {
       setBusy(false);
       setProcessingOverlaySuppressed(false);
-    }
-  }
-
-  async function continueWithoutEnrichment() {
-    setEnrichmentTransition(true);
-    setProcessMessage("Saving your production");
-    setProgress(0);
-    try {
-      const candidate = await processCandidate("enrich", { skip: true }, false);
-      setEnrichmentCandidate(candidate as unknown as EnrichmentArtifact);
-      setProcessMessage("Opening Generate");
-      setProgress(100);
-      await acceptCandidate("enrich", candidate);
-    } catch (reason) {
-      setError(message(reason));
-    } finally {
-      setEnrichmentTransition(false);
     }
   }
 
@@ -883,7 +857,6 @@ export default function App({
     dialogue: DialogueStage(),
     review: ReviewStage(),
     cast: CastStage(),
-    enrich: <EnrichmentStage key="enrich" />,
     generate: <GenerateStage key="generate" />,
     export: ExportStage(),
   };
@@ -910,7 +883,7 @@ export default function App({
         ? builtinViews[activeJourneyStep.builtin]
         : null;
 
-  const view = productView === "create" ? createView : productView === "library" ? LibraryView() : <ComingSoonView />;
+  const view = productView === "create" ? createView : LibraryView();
   const showWizard = productView === "create" && !home;
   const dialogueProcessing = dialogueLaunchPending || activeJob?.kind === "v2:dialogue";
   const generationReady = readyChapterCount(generationRun, activeJob, progress);
@@ -956,7 +929,6 @@ export default function App({
         <nav className="product-tabs" aria-label={t("Product areas")}>
           <button className={productView === "create" ? "active" : ""} onClick={() => navigateProduct("create")}><ProductTabIcon view="create" /><span className="product-tab-label">{t("Create")}</span></button>
           <button className={productView === "library" ? "active" : ""} aria-label={libraryExports.length ? t("Library, {{count}} audiobooks", { count: libraryExports.length }) : t("Library")} onClick={() => navigateProduct("library")}><ProductTabIcon view="library" /><span className="product-tab-label">{t("Library")}</span>{libraryExports.length > 0 && <small className="product-count" aria-hidden="true">{libraryExports.length}</small>}</button>
-          <button className={productView === "player" ? "active" : ""} disabled><ProductTabIcon view="player" /><span className="product-tab-label">{t("Player")}</span><small className="product-soon">{t("Coming soon")}</small></button>
         </nav>
         <div className="topbar-actions">
           <LanguageToggle />
@@ -984,7 +956,7 @@ export default function App({
       </main>
     </div>
     {dialogueRouteChoiceOpen && dialogue.routing && <DialogueRoutingChoice routing={dialogue.routing} onChoose={runDialogueTranscript} onClose={() => setDialogueRouteChoiceOpen(false)} />}
-    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition || enrichmentTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} aria-modal="true"><div className={`process-modal ${enrichmentTransition ? "enrichment-transition-modal" : ""} ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition || enrichmentTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : enrichmentTransition ? t("Keeping your approved work intact and opening Generate…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{showCancelActiveJob && !enrichmentTransition && !dialogueProcessing && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}</div></div>}
+    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition) && <div className="process-overlay" role="dialog" aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} aria-modal="true"><div className={`process-modal ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{showCancelActiveJob && !dialogueProcessing && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}</div></div>}
     {uploadingCharacterId && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="voice-clone-progress-title"><div className="process-modal"><span className="eyebrow">{t("processing.contextLabel", { ns: "edition" })}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("voiceClone.progressDescription", { ns: "edition" })}</p></div></div>}
     {generationInProgress && <div className="process-overlay generation-overlay" role="dialog" aria-modal="true" aria-labelledby="generation-progress-title">
       <div ref={generationModalRef} className="process-modal generation-modal" tabIndex={-1}>
@@ -1034,21 +1006,6 @@ export default function App({
 
   function LibrarySkeleton() {
     return <div className="library-grid library-skeleton-grid" aria-label={t("Loading audiobooks")} aria-busy="true">{[1, 2].map((item) => <article key={item} className="library-book library-skeleton" aria-hidden="true"><div className="library-cover" /><div className="library-book-copy"><span className="skeleton-line title" /><span className="skeleton-line author" /><div className="library-chapters"><span className="skeleton-line chapter" /></div><div className="library-meta"><span className="skeleton-line meta" /><span className="skeleton-line meta" /></div></div><div className="library-actions"><span /><span /></div></article>)}</div>;
-  }
-
-  function ComingSoonView() {
-    return <section className="coming-soon-page">
-      <div className="coming-soon-art"><img src={heroArtwork} alt="" /></div>
-      <div className="coming-soon-copy">
-        <span className="eyebrow">{t("Coming soon")}</span>
-        <h1>{t("Your audiobook, ready to listen.")}</h1>
-        <p>{t("player.description", { ns: "edition" })}</p>
-        <div className="coming-soon-points">
-          <span>✓ {t("A dedicated listening page")}</span><span>✓ {t("Chapter navigation and progress")}</span><span>✓ {t("player.remoteAccessPoint", { ns: "edition" })}</span>
-        </div>
-        <button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button>
-      </div>
-    </section>;
   }
 
   function ExtractStage() {
@@ -1483,49 +1440,6 @@ export default function App({
     </>;
   }
 
-  function EnrichmentStage() {
-    const revising = revisingStages.includes("enrich");
-    const current = enrichmentCandidate ?? (revising ? undefined : snapshot?.enrichment);
-    if (current && completed.includes("enrich") && !revising) return <AcceptedSummary stage="enrich" step={t("Step 5 · Coming soon")} title={t("Continued without enrichment")} revision={snapshot?.activeArtifacts.enrichment} onRevise={() => { setEnrichmentCandidate(undefined); setRevisingStages([...new Set([...revisingStages, "enrich"])]); }}><span><b>{t("Skipped")}</b><small>{t("Current behavior")}</small></span><span><b>0</b><small>{t("Book changes")}</small></span><span><b>{t("Ready")}</b><small>{t("For generation")}</small></span></AcceptedSummary>;
-    if (current) return <><PageTitle stage="enrich" step={t("Step 5 · Enrich")} title={t("Continue with the original performance.")} copy={t("No text, speaker, identity, voice, or audio will change.")} /><StageLaunch><button className="primary" onClick={() => void acceptCandidate("enrich", current)}>{t("Continue")} →</button></StageLaunch></>;
-    const voices = [snapshot?.cast?.narrator, ...(snapshot?.cast?.identities ?? [])].filter((voice): voice is CastVoice => Boolean(voice));
-    const auditions = voices.reduce((total, voice) => total + (voice.voiceCandidates?.length ?? (voice.voicePreviewRevision ? 1 : 0)), 0);
-    const castProfiles = snapshot?.cast?.proposals.length ?? 0;
-    const castMetric = voices.length || castProfiles;
-    const characters = (snapshot?.chapters ?? []).reduce((total, chapter) => total + (chapter.estimatedCharacters ?? 0), 0);
-    const turns = snapshot?.dialogue?.summary.totalTurns ?? voices.reduce((total, voice) => total + (voice.lineCount ?? 0), 0);
-    const aiAttributed = snapshot?.dialogue?.summary.aiAttributed;
-    return <section className="enrichment-celebration" aria-labelledby="enrichment-recap-title">
-        <div className="enrichment-recap">
-          <StepEyebrow stage="enrich">{t("Step 5 · Your production so far")}</StepEyebrow>
-          <h2 id="enrichment-recap-title">{t("Your book is ready for audio.")}</h2>
-          <p>{t("Your transcript and cast are ready. Next, generate your chapters.")}</p>
-          <div className="enrichment-stats" aria-label={t("Production summary")}>
-            <span><b>{turns.toLocaleString(uiLocale)}</b><small>{t("Spoken lines")}</small><em>{aiAttributed === undefined ? t("AI attribution not recorded") : t("{{count}} attributed with AI", { count: aiAttributed.toLocaleString(uiLocale) })}</em></span>
-            <span><b>{castMetric.toLocaleString(uiLocale)}</b><small>{t(voices.length ? "Voices cast" : "Cast roles shaped")}</small><em>{voices.length ? t("{{count}} AI auditions", { count: auditions.toLocaleString(uiLocale) }) : t("AI-assisted profiles")}</em></span>
-            <span><b>{(snapshot?.chapters.length ?? 0).toLocaleString(uiLocale)}</b><small>{t("Chapters prepared")}</small><em>{characters ? t("{{count}} characters to perform", { count: characters.toLocaleString(uiLocale) }) : t("Length estimate pending")}</em></span>
-            <span className="runtime"><b>{estimatedListeningTime(characters, t)}</b><small>{t("Estimated audiobook")}</small><em>{t("Based on the prepared script")}</em></span>
-          </div>
-        </div>
-        <div className="enrichment-future">
-          <div className="enrichment-future-copy">
-            <span className="eyebrow">{t("Enrichment preview")}</span>
-            <h2>{t("Coming soon: bring the player to life.")}</h2>
-            <p><b>{t("These features are not available yet.")}</b> {t("Planned features include sound effects and visuals for your audiobook.")}</p>
-            <div className="future-feature-grid" aria-label={t("Coming soon features")}>
-              <article><header><span>01</span><small>{t("Coming soon")}</small></header><div className="scene-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></div><b>{t("Scene effects")}</b><small>{t("Ambient sounds and dramatic effects during playback.")}</small></article>
-              <article><header><span>02</span><small>{t("Coming soon")}</small></header><div className="character-states" aria-hidden="true"><span>{t("calm")}</span><span>{t("tense")}</span><span>{t("joy")}</span></div><b>{t("Character states")}</b><small>{t("Expressions and animations that follow each line’s emotion.")}</small></article>
-              <article><header><span>03</span><small>{t("Coming soon")}</small></header><div className="avatar-stack" aria-hidden="true"><span><img src={brandMark} alt="" /></span><span><img src={brandMark} alt="" /></span><span><img src={brandMark} alt="" /></span></div><b>{t("Character avatars")}</b><small>{t("A recognizable face for each voice.")}</small></article>
-            </div>
-          </div>
-        </div>
-        <div className="enrichment-ready">
-          <div><span className="enrichment-spark" aria-hidden="true">✓</span><span><b>{t("Your approved choices stay unchanged.")}</b><small>{t("Continue to prepare your recording script.")}</small></span></div>
-          <button className="primary" disabled={busy} onClick={() => void continueWithoutEnrichment()}>{t("Continue to Generate")} →</button>
-        </div>
-      </section>;
-  }
-
   function DialogueRecoveryStage() {
     const recovery = snapshot?.dialogueRecovery;
     if (!recovery) return null;
@@ -1602,7 +1516,7 @@ export default function App({
           {coverUrl && <img src={coverUrl} alt="" />}
         </div>
         <div className="generate-hero-copy">
-          <StepEyebrow stage="generate">{t("Step 6 · Generate")}</StepEyebrow>
+          <StepEyebrow stage="generate">{t("Step 5 · Generate")}</StepEyebrow>
           <h1>{t("Bring every chapter to life.")}</h1>
           <p>{t("Each selected chapter becomes its own audio track to review before export.")}</p>
         </div>
@@ -1704,7 +1618,7 @@ export default function App({
     return <>
       <section className="export-hero">
         <div className="export-hero-art" aria-hidden="true"><span className="export-vinyl">♪</span>{coverUrl && <img src={coverUrl} alt="" />}</div>
-        <div><StepEyebrow stage="export">{t("Step 7 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose finished chapters, check the book details, and pick a format.")}</p></div>
+        <div><StepEyebrow stage="export">{t("Step 6 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose finished chapters, check the book details, and pick a format.")}</p></div>
       </section>
 
       {!playableChapters.length ? <section className="export-empty"><span aria-hidden="true">♪</span><h2>{t("Generate a chapter first.")}</h2><p>{t("Generate current chapter audio before exporting.")}</p><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></section> : <>

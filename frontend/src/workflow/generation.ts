@@ -1,4 +1,3 @@
-import type { TFunction } from "i18next";
 import type { Job } from "../api/contracts";
 import appI18n from "../i18n";
 
@@ -27,14 +26,6 @@ export interface GenerationRun {
 export interface GenerationSample {
   finishedAt: number;
   multiplier: number;
-}
-
-export function estimatedListeningTime(characterCount: number, t: TFunction) {
-  if (!characterCount) return t("Estimate pending");
-  const minutes = Math.max(1, Math.round(characterCount / 15 / 60));
-  if (minutes < 60) return t("≈ {{count}} min", { count: minutes });
-  const hours = minutes / 60;
-  return t("≈ {{count}} hr", { count: hours < 10 ? hours.toFixed(1).replace(".0", "") : Math.round(hours) });
 }
 
 export function chapterDuration(seconds?: number, estimated = true) {

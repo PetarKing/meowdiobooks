@@ -2,7 +2,7 @@ import type { WizardStage } from "../api/contracts";
 
 export type WizardStep = Exclude<WizardStage, "import"> | "export";
 export type JourneyStepId = string;
-export type ProductView = "create" | "library" | "player";
+export type ProductView = "create" | "library";
 
 export interface JourneyStep {
   id: JourneyStepId;
@@ -95,7 +95,6 @@ export class JourneyDefinition {
 export const productPaths: Record<ProductView, string> = {
   create: "/",
   library: "/library",
-  player: "/player",
 };
 
 export const sidebarPreferenceKey = "meowdiobooks.sidebarCollapsed";
@@ -105,7 +104,6 @@ export const publicJourney = new JourneyDefinition([
   { id: "dialogue", label: "Dialogue", builtin: "dialogue", completionStage: "dialogue" },
   { id: "review", label: "Review", builtin: "review", completionStage: "review" },
   { id: "cast", label: "Cast & voices", builtin: "cast", completionStage: "cast" },
-  { id: "enrich", label: "Enrich", builtin: "enrich", completionStage: "enrich" },
   { id: "generate", label: "Generate", builtin: "generate" },
   { id: "export", label: "Export", builtin: "export" },
 ]);
@@ -114,7 +112,6 @@ export const stages = publicJourney.steps;
 
 export function productViewFromPath(pathname: string): ProductView {
   if (pathname === productPaths.library) return "library";
-  if (pathname === productPaths.player) return "player";
   return "create";
 }
 

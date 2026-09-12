@@ -30,16 +30,11 @@ books and computers without losing its source-linked workflow.
 - Continue improving English and Chinese handling, then validate additional languages supported by the
   selected voice pipeline.
 
-## Hosted companion and listening
+## Hosted companion
 
 - A hosted companion is planned for people who prefer managed setup and compute. It will build on a
   fixed public release rather than replacing the local open-source workflow. Scope and timing are not
   yet committed.
-- A richer character-aware player remains planned product direction after chapter and segment timing
-  contracts are stable.
-- Optional creative enrichment may later add per-scene or per-turn performance direction. The faithful,
-  unembellished audiobook remains the default path.
-
 ## How quality changes are made
 
 Product changes are checked against redistributable public-domain samples and regression tests. The

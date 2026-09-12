@@ -13,7 +13,7 @@ used to develop and verify the alpha.
 | Work | Runtime | Lifecycle |
 |---|---|---|
 | Dialogue speaker decisions | Qwen3.5 GGUF locally, or the configured OpenAI-compatible remote model when explicitly selected | Local processing starts and stops `llama-server`; remote processing sends only the selected source passages |
-| Cast and optional Enrichment text decisions | Qwen3.5 GGUF through `llama.cpp` | Meowdiobooks starts `llama-server` for the operation and stops it afterward |
+| Cast text decisions | Qwen3.5 GGUF through `llama.cpp` | Meowdiobooks starts `llama-server` for the operation and stops it afterward |
 | Voice auditions | Qwen3-TTS VoiceDesign through MLX-Audio | Loaded inside the Python process for the audition job |
 | Chapter audio | Qwen3-TTS Base through MLX-Audio | Loaded inside the Python process for the generation job |
 | Voice-sample transcript draft | Qwen3-ASR 0.6B 4-bit through MLX-Audio | Loaded for one draft, with automatic language detection, then released |

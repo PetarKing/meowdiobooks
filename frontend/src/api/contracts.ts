@@ -4,14 +4,13 @@ export type WizardStage =
   | "dialogue"
   | "review"
   | "cast"
-  | "enrich"
   | "generate";
 
 export type ExtractionMethod = "liteparse" | "native" | "layout";
 export type DialogueStrategy = "fill-gaps" | "narrate";
 export type DialogueAttributionTarget = "open-speakers" | "unlabelled-candidates";
 export type DialogueAttributionRoute = "local" | "remote";
-export type ArtifactKind = "extraction" | "dialogue" | "review" | "cast" | "enrichment" | "script";
+export type ArtifactKind = "extraction" | "dialogue" | "review" | "cast" | "script";
 
 export interface LocalBook {
   id: string;
@@ -346,14 +345,6 @@ export interface CastArtifact {
   }>;
 }
 
-export interface EnrichmentArtifact {
-  revision: string;
-  status: "complete" | "skipped";
-  plan?: { windows?: unknown[]; workload?: Record<string, unknown>; options?: Record<string, unknown> };
-  turnStates?: Array<Record<string, unknown>>;
-  rangeDecorators?: Array<Record<string, unknown>>;
-}
-
 export interface RecordingScriptArtifact {
   revision: string;
   status: "ready";
@@ -443,7 +434,6 @@ export interface WizardSnapshot {
     language?: string;
     proposalRevision?: string;
   }>>;
-  enrichment?: EnrichmentArtifact;
   recordingScript?: RecordingScriptArtifact;
   chapters: Chapter[];
   generatedChapters: GeneratedChapterArtifact[];
@@ -528,16 +518,6 @@ export interface CastProcessSettings {
   narratorDirection?: string;
 }
 
-export interface EnrichmentProcessSettings {
-  skip?: boolean;
-  state?: boolean;
-  ambience?: boolean;
-  effects?: boolean;
-  maxInputTokens?: number;
-  maxOutputRows?: number;
-  overlapTurns?: number;
-}
-
 export interface GenerationProcessSettings {
   chapterIds: string[];
   language?: string;
@@ -548,7 +528,6 @@ export interface StageSettings {
   dialogue: DialogueSettings;
   review: Record<never, never>;
   cast: CastProcessSettings;
-  enrich: EnrichmentProcessSettings;
   generate: GenerationProcessSettings;
 }
 
@@ -584,7 +563,6 @@ export interface StageCandidate {
   dialogue: RawDialogueCandidate;
   review: ReviewCandidate;
   cast: CastArtifact;
-  enrich: EnrichmentArtifact;
   generate: ArtifactCandidate;
 }
 

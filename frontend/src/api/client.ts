@@ -91,7 +91,6 @@ export class HttpWizardApi implements WorkflowGateway {
       ["dialogue", "dialogue"],
       ["review", "review"],
       ["cast", "cast"],
-      ["enrichment", "enrich"],
     ];
     for (const [kind, stage] of activeStageKinds) {
       if (activeArtifacts[kind]) completedStages.push(stage);
@@ -141,7 +140,6 @@ export class HttpWizardApi implements WorkflowGateway {
       cast: hasRevision(raw.cast) ? raw.cast as unknown as WizardSnapshot["cast"] : undefined,
       voiceModels: Array.isArray(raw.voiceModels) ? raw.voiceModels as WizardSnapshot["voiceModels"] : [],
       voiceSelection: raw.voiceSelection as WizardSnapshot["voiceSelection"] ?? {},
-      enrichment: hasRevision(raw.enrichment) ? raw.enrichment as unknown as WizardSnapshot["enrichment"] : undefined,
       recordingScript: hasRevision(raw.recordingScript)
         ? raw.recordingScript as unknown as WizardSnapshot["recordingScript"]
         : undefined,
