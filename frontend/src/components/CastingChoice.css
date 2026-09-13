@@ -70,3 +70,9 @@
 .casting-footer > .primary { min-height:48px; min-width:160px; }
 
 @media (max-width:380px) { .casting-footer { gap:12px; padding:12px; } .casting-footer > .primary { min-width:136px; padding-inline:16px; } }
+/* Keep the initial choices freestanding; only reuse needs a content surface. */
+.casting-choice:not(:has(.reuse-open)) { border:0; background:transparent; }
+.casting-choice:not(:has(.reuse-open)) > .casting-options { padding:0; }
+.casting-choice:not(:has(.reuse-open)) > .casting-footer { margin-top:24px; border:0; border-top:1px solid var(--line); border-radius:0; padding-inline:0; background:transparent; }
+.reuse-open .casting-radio { display:inline; }
+.reuse-open .casting-option-heading { justify-content:center; gap:10px; }
