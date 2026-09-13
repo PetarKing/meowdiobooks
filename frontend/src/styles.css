@@ -934,12 +934,14 @@ main { width: 100%; max-width: 1360px; padding: 46px 52px 40px; margin: auto; }
 /* Voice design is a focused phase after cast identity review. */
 main:has(.voice-design-screen) { margin-block:0; }
 .voice-design-screen .page-title { text-align:left; max-width:none; }
-.voice-design-screen { width:min(100%, 920px); margin:0 auto; }
-.voice-design-back { margin:0 0 18px; padding-left:0; border:0; background:transparent; }
+.voice-design-screen { width:min(100%, 780px); margin:0 auto; }
+.voice-design-back { margin:0 0 24px; padding:0; min-height:32px; border:0; background:transparent; font-size:14px; font-weight:500; color:var(--muted); }
 .voice-design-language { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:24px 0 30px; padding:0 0 24px; border-bottom:1px solid var(--line); }
 .voice-design-language label { color:var(--ink); font-size:15px; font-weight:600; }
 .voice-design-language p { margin:6px 0 0; color:var(--muted); font-size:12px; }
-.voice-design-language select { min-width:220px; padding:12px 16px; border:1px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); font:inherit; }
-.voice-design-action { display:flex; justify-content:flex-end; margin:24px 0; }
-.voice-design-action .primary { min-width:180px; }
-@media (max-width:600px) { .voice-design-language { align-items:stretch; flex-direction:column; gap:16px; padding:0 0 20px; } .voice-design-language select { min-width:0; width:100%; } .voice-design-action .primary { width:100%; } }
+@media (max-width:600px) { .voice-design-language { align-items:stretch; flex-direction:column; gap:16px; padding:0 0 20px; } }
+
+.voice-design-screen .page-title h1 { font-weight:400; font-size:34px; letter-spacing:-.02em; margin:0; }
+.voice-design-screen .page-title .step-eyebrow { display:none; }
+.voice-design-language { gap:20px; }
+.voice-design-language p { font-size:13px; }

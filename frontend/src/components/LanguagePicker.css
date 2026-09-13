@@ -1,0 +1,16 @@
+.narration-language-picker { position:relative; flex:0 0 200px; width:200px; max-width:100%; color:var(--ink); }
+.narration-language-picker > summary { display:flex; align-items:center; justify-content:space-between; gap:18px; min-height:44px; padding:10px 16px; border:1px solid var(--line); border-radius:10px; background:var(--paper); cursor:pointer; list-style:none; font-size:14px; font-weight:500; }
+.narration-language-picker > summary::-webkit-details-marker { display:none; }
+.narration-language-picker > summary:focus-visible { outline:2px solid var(--poppy); outline-offset:3px; }
+.narration-language-value { display:flex; align-items:center; gap:9px; min-width:0; text-transform:capitalize; }
+.narration-language-value > span:first-child { font-size:21px; line-height:1; }
+.narration-language-chevron { flex:0 0 14px; transition:transform .15s; }
+.narration-language-picker[open] .narration-language-chevron { transform:rotate(180deg); }
+.narration-language-menu { position:absolute; z-index:20; inset:calc(100% + 6px) 0 auto; padding:6px; border:1px solid var(--line); border-radius:12px; background:var(--paper); box-shadow:0 12px 32px #33253b20; max-height:280px; overflow-y:auto; }
+.narration-language-menu .language-flags { display:grid; grid-template-columns:1fr; gap:2px; margin:0; }
+.narration-language-menu .language-flags legend { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.narration-language-menu .language-flags button { width:100%; gap:10px; padding:8px 10px; border:1px solid transparent; background:transparent; text-align:left; }
+.narration-language-menu .language-flags button:hover, .narration-language-menu .language-flags button:focus-visible { background:#eee8f4; }
+.narration-language-menu .language-flags button.selected { border:1px solid var(--poppy); background:#fff5ef; }
+.narration-language-menu .language-flags button small { font-size:14px; }
+@media (max-width:600px) { .narration-language-picker { flex-basis:auto; align-self:flex-start; } }

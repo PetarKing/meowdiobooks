@@ -52,7 +52,7 @@ def validate_source_book_ids(values: object, destination_book_id: str) -> list[s
         raise CastContractError("Source books must be a list of book IDs")
     if len(values) > 100 or len(set(values)) != len(values) or destination_book_id in values:
         raise CastContractError("Select distinct source books other than this book")
-    return list(values)
+    return sorted(values)
 
 
 def _names(row: dict[str, Any]) -> set[str]:
@@ -64,35 +64,27 @@ def _names(row: dict[str, Any]) -> set[str]:
 
 
 def match_exact_voices(
-    targets: list[dict[str, Any]], ordered_source_books: list[dict[str, Any]]
+    targets: list[dict[str, Any]], source_books: list[dict[str, Any]]
 ) -> dict[str, dict[str, str]]:
-    """Resolve unique exact names/aliases, respecting source order and narrator role."""
+    """Resolve only unique names/aliases across the entire selected source pool."""
     matches = {}
     for target in targets:
-        for book in ordered_source_books:
-            candidates = [
-                voice
-                for voice in book.get("voices", [])
-                if (
-                    (target.get("category") == "narrator" and voice.get("category") == "narrator")
-                    or (
-                        target.get("category") != "narrator"
-                        and voice.get("category") == target.get("category")
-                        and bool(_names(target) & _names(voice))
-                    )
+        candidates = [
+            {"bookId": str(book["bookId"]), "characterId": str(voice["characterId"]),
+             "revision": str(voice["revision"])}
+            for book in source_books
+            for voice in book.get("voices", [])
+            if (
+                (target.get("category") == "narrator" and voice.get("category") == "narrator")
+                or (
+                    target.get("category") != "narrator"
+                    and voice.get("category") == target.get("category")
+                    and bool(_names(target) & _names(voice))
                 )
-            ]
-            if len(candidates) == 1:
-                voice = candidates[0]
-                matches[str(target["characterId"])] = {
-                    "bookId": str(book["bookId"]),
-                    "characterId": str(voice["characterId"]),
-                    "revision": str(voice["revision"]),
-                }
-                break
-            if candidates:
-                # Ambiguity in the highest-priority source must not silently pick a later book.
-                break
+            )
+        ]
+        if len(candidates) == 1:
+            matches[str(target["characterId"])] = candidates[0]
     return matches
 
 

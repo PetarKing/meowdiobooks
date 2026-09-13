@@ -42,14 +42,12 @@ export function CastingChoice({ action, gateway, bookId, settings, onSourcesChan
     onReadyChange(ready, ready ? preview?.fingerprint : undefined);
   }, [current, quoteAvailable, error, reuseOpen, selected.length, preview?.fingerprint, onReadyChange]);
 
-  const ordered = preview ? [
-    ...selected.flatMap((id) => preview.sources.filter((source) => source.bookId === id)),
-    ...preview.sources.filter((source) => !selected.includes(source.bookId)),
-  ] : [];
+  const sourceBooks = [...(preview?.sources ?? [])].sort((a, b) => a.title.localeCompare(b.title, i18n.language, { numeric: true }) || a.bookId.localeCompare(b.bookId));
   function changeSources(ids: string[]) {
-    savedSources.current = ids;
+    const selection = [...ids].sort();
+    savedSources.current = selection;
     onReadyChange(false);
-    onSourcesChange(ids);
+    onSourcesChange(selection);
   }
   function chooseModel(id: string) {
     if (reuseOpen) {
@@ -67,12 +65,14 @@ export function CastingChoice({ action, gateway, bookId, settings, onSourcesChan
     onSourcesChange(savedSources.current);
   }
   return <section className="casting-choice" aria-label={t("Casting options")} aria-busy={!current && !error}>
-    <div className={`casting-options${ordered.length ? " has-reuse" : ""}${reuseOpen ? " reuse-open" : ""}`}>
-      {preview?.options?.map((option) => <button type="button" key={option.modelId} aria-pressed={!reuseOpen && settings.voiceModel === option.modelId} className={`casting-option${!reuseOpen && settings.voiceModel === option.modelId ? " selected" : ""}`} onClick={() => chooseModel(option.modelId)}>
+    <div className={`casting-options${sourceBooks.length ? " has-reuse" : ""}${reuseOpen ? " reuse-open" : ""}`}>
+      {preview?.options?.map((option) => {
+        const sentences = t(option.description).match(/[^.!?。！？]+[.!?。！？]?/g) ?? [t(option.description)];
+        return <button type="button" key={option.modelId} aria-pressed={!reuseOpen && settings.voiceModel === option.modelId} className={`casting-option${!reuseOpen && settings.voiceModel === option.modelId ? " selected" : ""}`} onClick={() => chooseModel(option.modelId)}>
         <span className="casting-option-heading"><b>{t(option.label)}</b><span aria-hidden="true" className="casting-radio">{!reuseOpen && settings.voiceModel === option.modelId ? "●" : "○"}</span></span>
-        {!reuseOpen && <span className="casting-option-description">{t(option.description)}</span>}
-      </button>)}
-      {!!ordered.length && <button type="button" className={`casting-option casting-reuse-option${reuseOpen ? " selected" : ""}`} aria-pressed={reuseOpen} onClick={openReuse}>
+        {!reuseOpen && <><span className="casting-option-description">{sentences[0].trim()}</span>{sentences.length > 1 && <small>{sentences.slice(1).join(" ").trim()}</small>}</>}
+      </button>; })}
+      {!!sourceBooks.length && <button type="button" className={`casting-option casting-reuse-option${reuseOpen ? " selected" : ""}`} aria-pressed={reuseOpen} onClick={openReuse}>
         <span className="casting-option-heading"><b>{t("Reuse voices")}</b><span aria-hidden="true" className="casting-radio">{reuseOpen ? "●" : "○"}</span></span>
         {!reuseOpen && <><span className="casting-option-description">{t("Bring familiar voices into this book.")}</span><small>{t("Create new voices where needed.")}</small></>}
       </button>}
@@ -80,16 +80,15 @@ export function CastingChoice({ action, gateway, bookId, settings, onSourcesChan
     {reuseOpen && <div className="casting-reuse">
       <div className="casting-library-heading"><b>{t("Use voices from")}</b><small>{t("{{count}} selected", { count: selected.length })}</small></div>
       <div className="casting-books" tabIndex={0} role="region" aria-label={t("Books with reusable voices")}>
-        {ordered.map((source) => {
-          const rank = selected.indexOf(source.bookId);
-          return <div className={`casting-book${rank >= 0 ? " selected" : ""}`} key={source.bookId}>
-            <label><span className="casting-book-spine" aria-hidden="true" /><span className="casting-book-title" title={source.title}>{source.title}</span><small>{t("{{count}} voices", { count: source.voiceCount })}</small><input type="checkbox" checked={rank >= 0} onChange={() => changeSources(rank >= 0 ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /></label>
-            {rank > 0 && <button type="button" className="ghost compact" aria-label={t("Move {{title}} up", { title: source.title })} title={t("Higher books win matching names")} onClick={() => { const ids = [...selected]; [ids[rank - 1], ids[rank]] = [ids[rank], ids[rank - 1]]; changeSources(ids); }}>↑</button>}
+        {sourceBooks.map((source) => {
+          const checked = selected.includes(source.bookId);
+          return <div className={`casting-book${checked ? " selected" : ""}`} key={source.bookId}>
+            <label><span className="casting-book-spine" aria-hidden="true" /><span className="casting-book-title" title={source.title}>{source.title}</span><small>{t("{{count}} voices", { count: source.voiceCount })}</small><input type="checkbox" checked={checked} onChange={() => changeSources(checked ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /></label>
           </div>;
         })}
       </div>
       <div className="casting-match-summary" aria-live="polite">
-        {current && selected.length > 0 ? <><p><span>{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span><span aria-hidden="true"> · </span><span>{t("Up to {{count}} new voices", { count: preview!.remainingVoiceCount })}</span></p><small>{t("Top book wins. AI checks other names when you continue.")}</small></> : <small>{t(selected.length ? "Checking exact matches…" : "Choose books to keep familiar voices.")}</small>}
+        {current && selected.length > 0 ? <><p><span>{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span><span aria-hidden="true"> · </span><span>{t("Up to {{count}} new voices", { count: preview!.remainingVoiceCount })}</span></p><small>{t("AI checks for more matches when you continue.")}</small></> : <small>{t(selected.length ? "Checking exact matches…" : "Choose books to keep familiar voices.")}</small>}
       </div>
       <div className="casting-remainder"><span>{t("For new voices")}</span><div className="casting-quality" role="group" aria-label={t("Casting for new voices")}>{preview?.options?.map((option) => <button key={option.modelId} type="button" aria-pressed={settings.voiceModel === option.modelId} onClick={() => { if (settings.voiceModel !== option.modelId) { onReadyChange(false); onModelChange(option.modelId); } }}>{t(option.label)}</button>)}</div></div>
       {activeOption && <p className="casting-quality-description">{t(activeOption.description)}</p>}

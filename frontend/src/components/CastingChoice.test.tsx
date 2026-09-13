@@ -52,17 +52,18 @@ describe("CastingChoice", () => {
     expect(screen.getByText("€1.75").closest("button")).toBeNull();
     expect(screen.getByText("Up to 4 new voices")).toBeInTheDocument();
     expect(screen.queryByText(/\d+ AI matches/)).not.toBeInTheDocument();
-    expect(screen.getByText("Top book wins. AI checks other names when you continue.")).toBeInTheDocument();
+    expect(screen.getByText("AI checks for more matches when you continue.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
   });
-  it("toggles books and changes source priority", async () => {
+  it("toggles books without reordering controls or moving rows", async () => {
     const fetchPreview = vi.fn().mockResolvedValue(preview);
     render(<Harness fetchPreview={fetchPreview} />);
     fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
-    fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The second book/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Move The second book up" }));
-    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: ["two", "one"] })));
+    fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
+    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: ["one", "two"] })));
+    expect(screen.getAllByRole("checkbox")[0]).toHaveAccessibleName(/The first book/);
+    expect(screen.queryByRole("button", { name: /Move .* up/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: /The second book/ }));
     await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: ["one"] })));
   });

@@ -7,7 +7,7 @@ from meowdiobooks.backend.voice_reuse import (
 )
 
 
-def test_exact_matching_order_aliases_unicode_narrator_and_ambiguity():
+def test_exact_matching_pool_aliases_unicode_narrator_and_ambiguity():
     targets = [
         dict(characterId="a", name="Ａｌｉｃｅ", category="character"),
         dict(characterId="narrator", name="Narrator", category="narrator"),
@@ -21,7 +21,9 @@ def test_exact_matching_order_aliases_unicode_narrator_and_ambiguity():
     )
     second = dict(bookId="second", voices=[{**voice, "revision": "later"}])
     matches = match_exact_voices(targets, [first, second])
-    assert matches["a"]["bookId"] == "first"
+    assert "a" not in matches
+    assert matches == match_exact_voices(targets, [second, first])
+    assert match_exact_voices(targets, [first])["a"]["bookId"] == "first"
     assert matches["narrator"]["characterId"] == "n"
     assert (
         match_exact_voices(
@@ -66,3 +68,8 @@ def test_stale_proposal_rejected_before_casting():
     for dialogue, review in [("changed", "review"), ("dialogue", "changed")]:
         with pytest.raises(CastContractError):
             validate_cast_proposal_inputs(proposal, {"revision": dialogue}, {"revision": review})
+
+
+def test_source_selection_is_canonical_regardless_of_input_order():
+    assert validate_source_book_ids(["z", "a"], "dest") == ["a", "z"]
+    assert validate_source_book_ids(["a", "z"], "dest") == ["a", "z"]

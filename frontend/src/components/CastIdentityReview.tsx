@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { CastArtifact, CastDossier, CastProposal } from "../api/contracts";
 import { strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
 import "./CastIdentityReview.css";
+import { languageFlags as flags, LanguageFlags } from "./LanguagePicker";
 
 interface CastGroup {
   key: string;
@@ -47,10 +48,7 @@ const NARRATOR_KEY = "narrator";
 const DRAG_SCROLL_EDGE_PX = 96;
 const DRAG_SCROLL_MIN_PX_PER_SECOND = 160;
 const DRAG_SCROLL_MAX_PX_PER_SECOND = 1050;
-const flags: Record<string, string> = {
-  english: "🇬🇧", chinese: "🇨🇳", german: "🇩🇪", italian: "🇮🇹", portuguese: "🇵🇹",
-  spanish: "🇪🇸", japanese: "🇯🇵", korean: "🇰🇷", french: "🇫🇷", russian: "🇷🇺",
-};
+
 
 function comparisonKey(value: string) {
   return value.trim().toLocaleLowerCase();
@@ -566,10 +564,6 @@ export function CastIdentityReview({
   </div>;
 }
 
-function LanguageFlags({ languages, language, onChange }: { languages: string[]; language: string; onChange: (language: string) => void }) {
-  const { t } = useTranslation();
-  return <fieldset className="language-flags"><legend>{t("Book language")}</legend>{languages.map((row) => <button type="button" key={row} className={language === row ? "selected" : ""} aria-pressed={language === row} title={t(row)} onClick={() => onChange(row)}><span>{flags[row] ?? "🌐"}</span><small>{t(row)}</small></button>)}</fieldset>;
-}
 
 function InspectorShell({ label, closing, onClose, onClosed, children }: { label: string; closing: boolean; onClose: () => void; onClosed: () => void; children: React.ReactNode }) {
   return <div className={`cast-inspector-backdrop ${closing ? "closing" : ""}`} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className={`cast-inspector ${closing ? "closing" : ""}`} aria-label={label} onAnimationEnd={(event) => { if (event.target === event.currentTarget && closing) onClosed(); }}>{children}</section></div>;

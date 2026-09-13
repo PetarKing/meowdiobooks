@@ -1,4 +1,5 @@
 const zhCN: Record<string, string> = {
+  "AI checks for more matches when you continue.": "继续后由 AI 查找更多匹配。",
   "Initial voice creation. Includes an allowance.": "首次创建声音，已预留余量。",
   "For new voices. Includes an allowance.": "仅含新声音，已预留余量。",
   "estimated": "预估",
@@ -40,9 +41,6 @@ const zhCN: Record<string, string> = {
   "Casting options": "选角方式",
   "Reuse voices": "复用声音",
   "{{count}} exact matches": "{{count}} 个精确匹配",
-  "Move {{title}} up": "上移《{{title}}》",
-  "Higher books win matching names": "同名角色优先使用上方书籍",
-  "Top book wins. AI checks other names when you continue.": "按书籍顺序优先匹配。继续后由 AI 检查其他名称。",
   "Create remaining voices": "创建其余声音",
   "Create voices": "创建声音",
   "Up to {{count}} new voices": "最多 {{count}} 个新声音",

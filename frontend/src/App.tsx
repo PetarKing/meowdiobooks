@@ -38,6 +38,7 @@ import type {
 } from "./api/contracts";
 import { Choice, Panel, Tag } from "./components/Ui";
 import { strongConfirmationLabelsForCast, type IdentityDecision } from "./castIdentity";
+import { NarrationLanguagePicker } from "./components/LanguagePicker";
 import { CastingChoice } from "./components/CastingChoice";
 import { CastIdentityReview } from "./components/CastIdentityReview";
 import { CastVoiceReview } from "./components/CastVoiceReview";
@@ -1320,11 +1321,8 @@ export default function App({
           <button className="ghost voice-design-back" onClick={() => { updateCastingPreview(false); setDesigningVoices(false); }}>← {t("Back to cast")}</button>
           <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Design the voices")} />
           <div className="voice-design-language">
-            <div><label htmlFor="narration-language">{t("Narration language")}</label><p>{t("The language your audiobook will be spoken in.")}</p></div>
-            <select id="narration-language" value={narrationLanguageConfirmed ? language : ""} onChange={(event) => { setCastGenerationPaused(false); setLanguage(event.target.value); setNarrationLanguageConfirmed(Boolean(event.target.value)); }}>
-              <option value="" disabled>{t("Choose language")}</option>
-              {languages.map((id) => <option key={id} value={id}>{t(id).charAt(0).toLocaleUpperCase() + t(id).slice(1)}</option>)}
-            </select>
+            <div><label>{t("Narration language")}</label><p>{t("The language your audiobook will be spoken in.")}</p></div>
+            <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
           </div>
           <CastingChoice gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onSourcesChange={(ids) => { setCastGenerationPaused(false); setCastingSources({ bookId: book.id, ids }); }} onModelChange={changeCastingModel} action={<button className="primary" disabled={!castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
         </section>;
