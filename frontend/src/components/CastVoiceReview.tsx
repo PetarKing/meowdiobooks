@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import type { CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
+import type { CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
 import { suggestedMemberIds } from "../voiceRoutes";
 
 interface Props {
@@ -15,6 +15,8 @@ interface Props {
   onRegenerate: (characterId: string, settings: VoiceSettings) => void;
   onTranscribe?: (file: File) => Promise<VoiceSampleTranscript>;
   onUpload?: (characterId: string, file: File, referenceText: string) => void;
+  loadSourceVoices?: () => Promise<CastingPreview>;
+  onReuseVoice?: (characterId: string, source: SourceVoice) => void;
   onDelete?: (characterId: string, revision: string) => void;
   regeneratingCharacterId?: string;
   uploadingCharacterId?: string;
@@ -183,7 +185,7 @@ function audioTime(seconds: number) {
 }
 
 export function CastVoiceReview({
-  bookId, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
+  bookId, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
 }: Props) {
   const { t } = useTranslation();
   const voices = useMemo(
@@ -545,6 +547,7 @@ export function CastVoiceReview({
                 {t(regeneratingCharacterId === inspected.characterId ? "Creating audition…" : "Generate new audition →")}
               </button>
             </div></>}
+            {loadSourceVoices && onReuseVoice && <ExistingVoiceChoice key={inspected.characterId} load={loadSourceVoices} busy={regeneratingCharacterId === inspected.characterId} onChoose={(source) => onReuseVoice(inspected.characterId, source)} />}
             {auditionSource === "sample" && onUpload && <div className="voice-sample-panel">
               <div><b>{t("Generate this line in the sampled voice")}</b><p>{t("voiceSample.help", { ns: "edition" })}</p></div>
               {!sampleFile && <label className={`voice-sample-upload ${uploadingCharacterId === inspected.characterId ? "busy" : ""}`}>
@@ -619,4 +622,29 @@ function VoiceSelect<K extends keyof Pick<VoiceSettings, "presentation" | "age" 
 }) {
   const { t } = useTranslation();
   return <label>{title}<span className="voice-select-control"><select aria-label={title} value={value} onChange={(event) => onChange(event.target.value as VoiceSettings[K])}>{values.map((option) => <option key={option} value={option}>{t(label(option))}</option>)}</select><span aria-hidden="true">{t(label(value))}</span></span><input type="hidden" name={field} value={value} /></label>;
+}
+
+
+function ExistingVoiceChoice({ load, busy, onChoose }: { load: () => Promise<CastingPreview>; busy: boolean; onChoose: (source: SourceVoice) => void }) {
+  const { t } = useTranslation();
+  const [sources, setSources] = useState<CastingPreview["sources"]>();
+  const [loading, setLoading] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const [selection, setSelection] = useState("");
+  function fetchSources() {
+    setLoading(true); setFailed(false);
+    void load().then((result) => setSources(result.sources)).catch(() => setFailed(true)).finally(() => setLoading(false));
+  }
+  return <details className="existing-voice-choice" onToggle={(event) => { if (event.currentTarget.open && !sources && !loading && !failed) fetchSources(); }}>
+    <summary>{t("Use a voice from another book")}</summary>
+    {loading && <small role="status">{t("Loading voices…")}</small>}
+    {failed && <div role="alert">{t("Couldn’t load voices.")} <button type="button" onClick={fetchSources}>{t("Retry")}</button></div>}
+    {sources && (sources.some((source) => source.voices?.length) ? <div className="joined-control">
+      <select aria-label={t("Existing voice")} value={selection} onChange={(event) => setSelection(event.target.value)} disabled={busy}>
+        <option value="">{t("Choose a voice")}</option>
+        {sources.map((source) => <optgroup key={source.bookId} label={source.title}>{source.voices?.map((voice) => <option key={`${voice.characterId}:${voice.revision}`} value={JSON.stringify({ bookId: source.bookId, characterId: voice.characterId, revision: voice.revision })}>{voice.name}</option>)}</optgroup>)}
+      </select>
+      <button type="button" disabled={!selection || busy} onClick={() => onChoose(JSON.parse(selection) as SourceVoice)}>{t(busy ? "Copying…" : "Use voice")}</button>
+    </div> : <small>{t("No compatible voices in other books.")}</small>)}
+  </details>;
 }

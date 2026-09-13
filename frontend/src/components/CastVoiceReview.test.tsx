@@ -58,6 +58,21 @@ const cast: CastArtifact = {
 };
 
 describe("CastVoiceReview", () => {
+  it("offers an optional source voice picker only when opened", async () => {
+    const load = vi.fn().mockResolvedValue({ sources: [{ bookId: "earlier", title: "Earlier book", voiceCount: 1, voices: [{ characterId: "different", name: "Different name", revision: "v1" }] }], exactMatchCount: 0, remainingVoiceCount: 3, totalVoiceCount: 3 });
+    const reuse = vi.fn();
+    render(<CastVoiceReview bookId="book" cast={cast} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={vi.fn()} loadSourceVoices={load} onReuseVoice={reuse} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+    expect(load).not.toHaveBeenCalled();
+    const details = screen.getByText("Use a voice from another book").closest("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    const select = await screen.findByRole("combobox", { name: "Existing voice" });
+    fireEvent.change(select, { target: { value: JSON.stringify({ bookId: "earlier", characterId: "different", revision: "v1" }) } });
+    fireEvent.click(screen.getByRole("button", { name: "Use voice" }));
+    expect(reuse).toHaveBeenCalledWith("many", { bookId: "earlier", characterId: "different", revision: "v1" });
+  });
+
   it("drafts an editable transcript and uses a compact player before submission", async () => {
     const onUpload = vi.fn();
     const onTranscribe = vi.fn().mockResolvedValue({ text: "An imperfect automatic draft.", language: "English" });

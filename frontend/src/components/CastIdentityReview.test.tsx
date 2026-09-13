@@ -123,7 +123,7 @@ describe("CastIdentityReview", () => {
     expect(screen.getByLabelText("Voice model")).toHaveValue("qwen-audio-3");
     const languageGroup = screen.getByRole("group", { name: "Book language" });
     expect(within(languageGroup).getAllByRole("button")).toHaveLength(supportedLanguages.length);
-    expect(within(languageGroup).getByRole("button", { name: "🇵🇹 portuguese" })).toBeInTheDocument();
+    expect(within(languageGroup).getByRole("button", { name: "portuguese" })).toBeInTheDocument();
   });
 
   it("blocks only material grouping decisions and keeps possible matches informational", () => {

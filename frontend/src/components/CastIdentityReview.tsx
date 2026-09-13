@@ -12,6 +12,7 @@ import { useTranslation } from "react-i18next";
 import type { CastArtifact, CastDossier, CastProposal } from "../api/contracts";
 import { strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
 import "./CastIdentityReview.css";
+import { languageFlags as flags, LanguageFlags } from "./LanguagePicker";
 
 interface CastGroup {
   key: string;
@@ -38,6 +39,8 @@ interface Props {
   language: string;
   onVoiceModelChange: (modelId: string) => void;
   onLanguageChange: (language: string) => void;
+  hideVoiceModel?: boolean;
+  hideVoiceSettings?: boolean;
   onReclassify?: () => void;
 }
 
@@ -45,10 +48,7 @@ const NARRATOR_KEY = "narrator";
 const DRAG_SCROLL_EDGE_PX = 96;
 const DRAG_SCROLL_MIN_PX_PER_SECOND = 160;
 const DRAG_SCROLL_MAX_PX_PER_SECOND = 1050;
-const flags: Record<string, string> = {
-  english: "🇬🇧", chinese: "🇨🇳", german: "🇩🇪", italian: "🇮🇹", portuguese: "🇵🇹",
-  spanish: "🇪🇸", japanese: "🇯🇵", korean: "🇰🇷", french: "🇫🇷", russian: "🇷🇺",
-};
+
 
 function comparisonKey(value: string) {
   return value.trim().toLocaleLowerCase();
@@ -219,7 +219,7 @@ function useDragAutoScroll(active: boolean) {
 
 export function CastIdentityReview({
   cast, decisions, setDecisions, resolvedLabels, setResolvedLabels, voiceModels, voiceModel,
-  language, onVoiceModelChange, onLanguageChange, onReclassify,
+  language, onVoiceModelChange, onLanguageChange, onReclassify, hideVoiceModel, hideVoiceSettings,
 }: Props) {
   const { t } = useTranslation();
   const allGroups = useMemo(
@@ -478,13 +478,13 @@ export function CastIdentityReview({
       <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
       <div className="cast-toolbar-actions">
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
-        <details>
-          <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")} · {selectedModel?.label ?? t("Choose voice model")}</summary>
+        {!hideVoiceSettings && <details>
+          <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
           <div className="cast-audio-settings">
-            <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+            {!hideVoiceModel && <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>}
             <LanguageFlags languages={selectedModel?.supportedLanguages ?? []} language={language} onChange={onLanguageChange} />
           </div>
-        </details>
+        </details>}
       </div>
     </div>
 
@@ -564,10 +564,6 @@ export function CastIdentityReview({
   </div>;
 }
 
-function LanguageFlags({ languages, language, onChange }: { languages: string[]; language: string; onChange: (language: string) => void }) {
-  const { t } = useTranslation();
-  return <fieldset className="language-flags"><legend>{t("Book language")}</legend>{languages.map((row) => <button type="button" key={row} className={language === row ? "selected" : ""} aria-pressed={language === row} title={t(row)} onClick={() => onChange(row)}><span>{flags[row] ?? "🌐"}</span><small>{t(row)}</small></button>)}</fieldset>;
-}
 
 function InspectorShell({ label, closing, onClose, onClosed, children }: { label: string; closing: boolean; onClose: () => void; onClosed: () => void; children: React.ReactNode }) {
   return <div className={`cast-inspector-backdrop ${closing ? "closing" : ""}`} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className={`cast-inspector ${closing ? "closing" : ""}`} aria-label={label} onAnimationEnd={(event) => { if (event.target === event.currentTarget && closing) onClosed(); }}>{children}</section></div>;
