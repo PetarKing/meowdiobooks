@@ -2090,12 +2090,79 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.queryByLabelText('Voice model')).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByRole('switch', { name: 'Reuse voices from other books' }))
+    expect(wizardApi.previewCasting).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    expect(screen.getByRole('heading', { name: 'Design the voices' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Cast members' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Cast structure is ready')).not.toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'english' } })
+    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
+    expect(screen.getByRole('region', { name: 'Cast members' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('english')
+    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
     fireEvent.click(screen.getByRole('checkbox', { name: /Earlier book/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(await screen.findByRole('checkbox', { name: /Earlier book/ })).toBeChecked()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
     expect(wizardApi.processStage).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({ sourceBookIds: ['earlier'], castingPreviewFingerprint: 'preview-bound' })))
+  })
+
+  it('allows reuse as the only cast edit and clears it when those edits are cancelled', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      castingPreviewAvailable: true,
+      cast: { ...base.cast!, phase: 'audition-review', language: 'english', voiceModel: 'qwen' },
+    }
+    vi.mocked(wizardApi.previewCasting!).mockResolvedValue({
+      sources: [{ bookId: 'earlier', title: 'Earlier book', voiceCount: 2 }],
+      fingerprint: 'edit-reuse', exactMatchCount: 1, totalVoiceCount: 1, remainingVoiceCount: 0, currency: 'EUR',
+      options: [{ modelId: 'qwen', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 0 }],
+    })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
+    expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('checkbox', { name: /Earlier book/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel cast edits' }))
+    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
+    expect(screen.getByRole('checkbox', { name: /Earlier book/ })).not.toBeChecked()
+    expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeDisabled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('resumes enhanced voice design with the saved explicit language', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      castingPreviewAvailable: true,
+      cast: { revision: 'cp-resume', phase: 'identity-review', dossiers: [], proposals: [], detectedLanguage: 'english' },
+      voiceModels: [{ id: 'qwen', label: 'Studio', supportedLanguages: ['english', 'french'] }],
+      recoverableStages: { cast: { attempt: 1, message: 'Saved', proposalRevision: 'cp-resume', modelId: 'qwen', language: 'french' } },
+    }
+    vi.mocked(wizardApi.previewCasting!).mockResolvedValue({
+      sources: [], fingerprint: 'resumed', exactMatchCount: 0, totalVoiceCount: 1, remainingVoiceCount: 1, currency: 'EUR',
+      options: [{ modelId: 'qwen', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 100 }],
+    })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    expect(screen.getByRole('heading', { name: 'Design the voices' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('french')
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeEnabled())
+    expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ language: 'french' }))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
   it('restores a failed cast model and offers to continue saved voice generation', async () => {

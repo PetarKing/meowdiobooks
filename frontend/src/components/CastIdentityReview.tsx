@@ -39,6 +39,7 @@ interface Props {
   onVoiceModelChange: (modelId: string) => void;
   onLanguageChange: (language: string) => void;
   hideVoiceModel?: boolean;
+  hideVoiceSettings?: boolean;
   onReclassify?: () => void;
 }
 
@@ -220,7 +221,7 @@ function useDragAutoScroll(active: boolean) {
 
 export function CastIdentityReview({
   cast, decisions, setDecisions, resolvedLabels, setResolvedLabels, voiceModels, voiceModel,
-  language, onVoiceModelChange, onLanguageChange, onReclassify, hideVoiceModel,
+  language, onVoiceModelChange, onLanguageChange, onReclassify, hideVoiceModel, hideVoiceSettings,
 }: Props) {
   const { t } = useTranslation();
   const allGroups = useMemo(
@@ -479,13 +480,13 @@ export function CastIdentityReview({
       <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
       <div className="cast-toolbar-actions">
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
-        <details>
+        {!hideVoiceSettings && <details>
           <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
           <div className="cast-audio-settings">
             {!hideVoiceModel && <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>}
             <LanguageFlags languages={selectedModel?.supportedLanguages ?? []} language={language} onChange={onLanguageChange} />
           </div>
-        </details>
+        </details>}
       </div>
     </div>
 

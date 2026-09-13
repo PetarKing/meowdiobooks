@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CastingPreview, CastProcessSettings, WorkflowGateway } from "../api/contracts";
 import "./CastingChoice.css";
 
 interface Props {
+  action?: ReactNode;
   gateway: WorkflowGateway;
   bookId: string;
   settings: CastProcessSettings;
@@ -12,66 +13,89 @@ interface Props {
   onReadyChange: (ready: boolean, fingerprint?: string) => void;
 }
 
-export function CastingChoice({ gateway, bookId, settings, onSourcesChange, onModelChange, onReadyChange }: Props) {
+export function CastingChoice({ action, gateway, bookId, settings, onSourcesChange, onModelChange, onReadyChange }: Props) {
   const { t, i18n } = useTranslation();
   const [result, setResult] = useState<{ key: string; preview: CastingPreview }>();
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
-  const [reuseEnabled, setReuseEnabled] = useState(false);
-  const [search, setSearch] = useState("");
+  const [reuseOpen, setReuseOpen] = useState(!!settings.sourceBookIds?.length);
+  const savedSources = useRef(settings.sourceBookIds ?? []);
   const key = JSON.stringify({ bookId, settings });
   const current = result?.key === key;
   const preview = result?.preview;
   const selected = settings.sourceBookIds ?? [];
+  const activeOption = preview?.options?.find((option) => option.modelId === settings.voiceModel);
+  const quoteAvailable = activeOption?.estimatedCostMinor != null && Number.isFinite(activeOption.estimatedCostMinor) && activeOption.estimatedCostMinor >= 0 && !!preview?.currency;
   useEffect(() => {
     let disposed = false;
     setError(false);
-    onReadyChange(false);
     const request = JSON.parse(key) as { bookId: string; settings: CastProcessSettings };
     const timer = window.setTimeout(() => {
       gateway.previewCasting!(request.bookId, request.settings).then((next) => {
-        if (disposed) return;
-        setResult({ key, preview: next });
-        onReadyChange(true, next.fingerprint);
+        if (!disposed) setResult({ key, preview: next });
       }).catch(() => { if (!disposed) setError(true); });
     }, 150);
     return () => { disposed = true; window.clearTimeout(timer); };
-  }, [gateway, key, retry, onReadyChange]);
+  }, [gateway, key, retry]);
+  useEffect(() => {
+    const ready = !!current && quoteAvailable && !error && (!reuseOpen || selected.length > 0);
+    onReadyChange(ready, ready ? preview?.fingerprint : undefined);
+  }, [current, quoteAvailable, error, reuseOpen, selected.length, preview?.fingerprint, onReadyChange]);
 
   const ordered = preview ? [
     ...selected.flatMap((id) => preview.sources.filter((source) => source.bookId === id)),
     ...preview.sources.filter((source) => !selected.includes(source.bookId)),
   ] : [];
-  const reuseOpen = reuseEnabled || selected.length > 0;
-  const visibleBooks = ordered.filter((source) => selected.includes(source.bookId) || source.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
-  function changeSources(ids: string[]) { onReadyChange(false); onSourcesChange(ids); }
+  function changeSources(ids: string[]) {
+    savedSources.current = ids;
+    onReadyChange(false);
+    onSourcesChange(ids);
+  }
+  function chooseModel(id: string) {
+    if (reuseOpen) {
+      savedSources.current = selected;
+      setReuseOpen(false);
+      onSourcesChange([]);
+      onReadyChange(false);
+    }
+    if (settings.voiceModel !== id) { onReadyChange(false); onModelChange(id); }
+  }
+  function openReuse() {
+    if (reuseOpen) return;
+    setReuseOpen(true);
+    onReadyChange(false);
+    onSourcesChange(savedSources.current);
+  }
   return <section className="casting-choice" aria-label={t("Casting options")} aria-busy={!current && !error}>
-    {!!ordered.length && <div className="casting-reuse">
-      <header><label className="casting-reuse-toggle"><span>{t("Reuse voices from other books")}</span><input type="checkbox" role="switch" checked={reuseOpen} onChange={(event) => { setReuseEnabled(event.target.checked); if (!event.target.checked) { changeSources([]); setSearch(""); } }} /><span className="casting-switch" aria-hidden="true" /></label></header>
-      {reuseOpen && <>
-      <div className="casting-library-heading"><small>{t("{{selected}} selected · {{count}} books", { selected: selected.length, count: ordered.length })}</small>{current && selected.length > 0 && <span className="casting-match-count">{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span>}</div>
-      {ordered.length >= 8 && <input className="casting-book-search" type="search" aria-label={t("Search books")} placeholder={t("Search books…")} value={search} onChange={(event) => setSearch(event.target.value)} />}
+    <div className={`casting-options${ordered.length ? " has-reuse" : ""}${reuseOpen ? " reuse-open" : ""}`}>
+      {preview?.options?.map((option) => <button type="button" key={option.modelId} aria-pressed={!reuseOpen && settings.voiceModel === option.modelId} className={`casting-option${!reuseOpen && settings.voiceModel === option.modelId ? " selected" : ""}`} onClick={() => chooseModel(option.modelId)}>
+        <span className="casting-option-heading"><b>{t(option.label)}</b><span aria-hidden="true" className="casting-radio">{!reuseOpen && settings.voiceModel === option.modelId ? "●" : "○"}</span></span>
+        {!reuseOpen && <span className="casting-option-description">{t(option.description)}</span>}
+      </button>)}
+      {!!ordered.length && <button type="button" className={`casting-option casting-reuse-option${reuseOpen ? " selected" : ""}`} aria-pressed={reuseOpen} onClick={openReuse}>
+        <span className="casting-option-heading"><b>{t("Reuse voices")}</b><span aria-hidden="true" className="casting-radio">{reuseOpen ? "●" : "○"}</span></span>
+        {!reuseOpen && <><span className="casting-option-description">{t("Bring familiar voices into this book.")}</span><small>{t("Create new voices where needed.")}</small></>}
+      </button>}
+    </div>
+    {reuseOpen && <div className="casting-reuse">
+      <div className="casting-library-heading"><b>{t("Use voices from")}</b><small>{t("{{count}} selected", { count: selected.length })}</small></div>
       <div className="casting-books" tabIndex={0} role="region" aria-label={t("Books with reusable voices")}>
-        {visibleBooks.map((source) => {
+        {ordered.map((source) => {
           const rank = selected.indexOf(source.bookId);
           return <div className={`casting-book${rank >= 0 ? " selected" : ""}`} key={source.bookId}>
-            <label><input type="checkbox" checked={rank >= 0} onChange={() => changeSources(rank >= 0 ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /><span className="casting-book-rank" aria-hidden="true">{rank >= 0 ? rank + 1 : "—"}</span><span title={source.title}>{source.title}</span></label>
+            <label><span className="casting-book-spine" aria-hidden="true" /><span className="casting-book-title" title={source.title}>{source.title}</span><small>{t("{{count}} voices", { count: source.voiceCount })}</small><input type="checkbox" checked={rank >= 0} onChange={() => changeSources(rank >= 0 ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /></label>
             {rank > 0 && <button type="button" className="ghost compact" aria-label={t("Move {{title}} up", { title: source.title })} title={t("Higher books win matching names")} onClick={() => { const ids = [...selected]; [ids[rank - 1], ids[rank]] = [ids[rank], ids[rank - 1]]; changeSources(ids); }}>↑</button>}
           </div>;
         })}
       </div>
-      <div className="casting-library-footer">{selected.length > 0 ? <small>{t("Top book wins. AI checks other names when you continue.")}</small> : <small>{t("Choose books to keep familiar voices.")}</small>}{visibleBooks.length > 4 && <small className="casting-scroll-cue">{t("Scroll to browse")} ↓</small>}</div>
-      {visibleBooks.length === 0 && <small role="status">{t("No books found.")}</small>}
-      </>}
+      <div className="casting-match-summary" aria-live="polite">
+        {current && selected.length > 0 ? <><p><span>{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span><span aria-hidden="true"> · </span><span>{t("Up to {{count}} new voices", { count: preview!.remainingVoiceCount })}</span></p><small>{t("Top book wins. AI checks other names when you continue.")}</small></> : <small>{t(selected.length ? "Checking exact matches…" : "Choose books to keep familiar voices.")}</small>}
+      </div>
+      <div className="casting-remainder"><span>{t("For new voices")}</span><div className="casting-quality" role="group" aria-label={t("Casting for new voices")}>{preview?.options?.map((option) => <button key={option.modelId} type="button" aria-pressed={settings.voiceModel === option.modelId} onClick={() => { if (settings.voiceModel !== option.modelId) { onReadyChange(false); onModelChange(option.modelId); } }}>{t(option.label)}</button>)}</div></div>
+      {activeOption && <p className="casting-quality-description">{t(activeOption.description)}</p>}
     </div>}
-    <header className="casting-generation-heading"><h3>{t(selected.length ? "Create remaining voices" : "Create voices")}</h3>{current && <small>{t(selected.length ? "Up to {{count}} new voices" : "{{count}} voices · includes Narrator", { count: preview!.remainingVoiceCount })}</small>}</header>
-    <div className="casting-options">
-      {preview?.options?.map((option) => <button type="button" key={option.modelId} aria-pressed={settings.voiceModel === option.modelId} className={`casting-option${settings.voiceModel === option.modelId ? " selected" : ""}`} onClick={() => { if (settings.voiceModel !== option.modelId) { onReadyChange(false); onModelChange(option.modelId); } }}>
-        <span className="casting-option-heading"><b>{t(option.label)}</b><span aria-hidden="true" className="casting-radio">{settings.voiceModel === option.modelId ? "●" : "○"}</span></span>
-        <span>{t(option.description)}</span>
-        {current && option.estimatedCostMinor != null && preview.currency && <strong>{t("≈ {{cost}}", { cost: new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(option.estimatedCostMinor / 100) })}</strong>}
-      </button>)}
-    </div>
-    {error ? <div role="alert" className="casting-preview-error">{t("Couldn’t calculate casting cost.")} <button type="button" className="ghost compact" onClick={() => setRetry((value) => value + 1)}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : <small>{t("Casting only. Audiobook audio is charged separately.")}</small>}
+    <footer className="casting-footer"><div className="casting-estimate" aria-live="polite">
+      {error || (current && !quoteAvailable) ? <div role="alert" className="casting-preview-error">{t("Couldn’t calculate casting cost.")} <button type="button" className="ghost compact" onClick={() => { onReadyChange(false); setRetry((value) => value + 1); }}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : activeOption?.estimatedCostMinor != null && preview?.currency ? <><div><strong>{new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(activeOption.estimatedCostMinor / 100)}</strong><small>{t("estimated")}</small></div><small>{t(reuseOpen ? "For new voices. Includes an allowance." : "Initial voice creation. Includes an allowance.")}</small></> : null}
+    </div>{action}</footer>
   </section>;
 }

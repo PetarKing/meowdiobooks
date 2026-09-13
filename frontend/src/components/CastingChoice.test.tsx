@@ -18,38 +18,38 @@ function Harness({ fetchPreview = vi.fn().mockResolvedValue(preview) }: { fetchP
 }
 
 describe("CastingChoice", () => {
-  it("starts reuse off and clears selected books when switched off", async () => {
+  it("collapses only for reuse and restores cards and saved selections", async () => {
     const fetchPreview = vi.fn().mockResolvedValue(preview);
-    render(<Harness fetchPreview={fetchPreview} />);
-    const toggle = await screen.findByRole("switch");
-    expect(toggle).not.toBeChecked();
-    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    fireEvent.click(toggle);
+    const { container } = render(<Harness fetchPreview={fetchPreview} />);
+    fireEvent.click(await screen.findByRole("button", { name: /Studio/ }));
+    expect(container.querySelector(".reuse-open")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Reuse voices/ }));
+    expect(container.querySelector(".reuse-open")).not.toBeNull();
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
     fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
-    fireEvent.click(toggle);
+    fireEvent.click(screen.getAllByRole("button", { name: /Balanced/ })[0]);
+    expect(container.querySelector(".reuse-open")).toBeNull();
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: [] })));
+    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: [], voiceModel: "balanced" })));
+    fireEvent.click(screen.getByRole("button", { name: /Reuse voices/ }));
+    expect(screen.getByRole("checkbox", { name: /The first book/ })).toBeChecked();
+    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: ["one"] })));
   });
-  it("searches a large library without hiding or losing selected priority", async () => {
+  it("shows a scrollable library without search", async () => {
     render(<Harness fetchPreview={vi.fn().mockResolvedValue({ ...preview, sources: Array.from({ length: 30 }, (_, index) => ({ bookId: String(index), title: `Volume ${index + 1}`, voiceCount: 4 })) })} />);
-    fireEvent.click(await screen.findByRole("switch"));
-    fireEvent.click(screen.getByRole("checkbox", { name: /Volume 1$/ }));
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search books" }), { target: { value: "Volume 25" } });
-    expect(screen.getByRole("checkbox", { name: /Volume 1$/ })).toBeChecked();
-    expect(screen.getByRole("checkbox", { name: /Volume 25$/ })).not.toBeChecked();
-    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
-    fireEvent.click(screen.getByRole("checkbox", { name: /Volume 25$/ }));
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "missing" } });
-    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
-    expect(screen.getByText("2 selected · 30 books")).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(30);
+    expect(screen.getByRole("region", { name: "Books with reusable voices" })).toHaveClass("casting-books");
   });
   it("shows customer prices and only exact matches before proceeding", async () => {
     render(<Harness />);
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
-    fireEvent.click(await screen.findByRole("switch", { name: "Reuse voices from other books" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
     expect(await screen.findByText("3 exact matches")).toBeInTheDocument();
-    expect(screen.getByText("≈ €1.75")).toBeInTheDocument();
+    expect(screen.getAllByText("€1.75")).toHaveLength(1);
+    expect(screen.getByText("€1.75").closest("button")).toBeNull();
     expect(screen.getByText("Up to 4 new voices")).toBeInTheDocument();
     expect(screen.queryByText(/\d+ AI matches/)).not.toBeInTheDocument();
     expect(screen.getByText("Top book wins. AI checks other names when you continue.")).toBeInTheDocument();
@@ -58,7 +58,7 @@ describe("CastingChoice", () => {
   it("toggles books and changes source priority", async () => {
     const fetchPreview = vi.fn().mockResolvedValue(preview);
     render(<Harness fetchPreview={fetchPreview} />);
-    fireEvent.click(await screen.findByRole("switch", { name: "Reuse voices from other books" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The second book/ }));
     fireEvent.click(screen.getByRole("button", { name: "Move The second book up" }));
@@ -79,11 +79,23 @@ describe("CastingChoice", () => {
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
     await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
   });
+  it.each([undefined, -1, Number.NaN])("blocks generation without a usable estimate (%s)", async (cost) => {
+    render(<Harness fetchPreview={vi.fn().mockResolvedValue({ ...preview, options: [{ ...preview.options![0], estimatedCostMinor: cost }] })} />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+  it("blocks generation if the selected model is no longer available", async () => {
+    render(<Harness fetchPreview={vi.fn().mockResolvedValue({ ...preview, options: [preview.options![1]] })} />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Balanced/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+  });
   it("discards old previews after source changes", async () => {
     let resolveOld!: (value: CastingPreview) => void;
     const fetchPreview = vi.fn().mockResolvedValueOnce(preview).mockImplementationOnce(() => new Promise<CastingPreview>((resolve) => { resolveOld = resolve; })).mockResolvedValue(preview);
     render(<Harness fetchPreview={fetchPreview} />);
-    fireEvent.click(await screen.findByRole("switch", { name: "Reuse voices from other books" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
     await waitFor(() => expect(fetchPreview).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole("checkbox", { name: /The second book/ }));
