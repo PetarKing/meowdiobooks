@@ -48,8 +48,8 @@ describe("CastingChoice", () => {
     fireEvent.click(await screen.findByRole("button", { name: /Reuse voices/ }));
     fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
     expect(await screen.findByText("3 exact matches")).toBeInTheDocument();
-    expect(screen.getAllByText("€1.75")).toHaveLength(1);
-    expect(screen.getByText("€1.75").closest("button")).toBeNull();
+    expect(screen.getAllByText("≈ €1.75")).toHaveLength(1);
+    expect(screen.getByText("≈ €1.75").closest("button")).toBeNull();
     expect(screen.getByText("Up to 4 new voices")).toBeInTheDocument();
     expect(screen.queryByText(/\d+ AI matches/)).not.toBeInTheDocument();
     expect(screen.getByText("AI checks for more matches when you continue.")).toBeInTheDocument();

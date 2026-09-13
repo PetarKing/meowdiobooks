@@ -1,4 +1,5 @@
 const zhCN: Record<string, string> = {
+  "Estimated cost": "预估费用",
   "AI checks for more matches when you continue.": "继续后由 AI 查找更多匹配。",
   "Initial voice creation. Includes an allowance.": "首次创建声音，已预留余量。",
   "For new voices. Includes an allowance.": "仅含新声音，已预留余量。",

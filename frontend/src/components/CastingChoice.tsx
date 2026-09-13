@@ -78,12 +78,12 @@ export function CastingChoice({ action, gateway, bookId, settings, onSourcesChan
       </button>}
     </div>
     {reuseOpen && <div className="casting-reuse">
-      <div className="casting-library-heading"><b>{t("Use voices from")}</b><small>{t("{{count}} selected", { count: selected.length })}</small></div>
+      <div className="casting-library-heading"><b>{t("Use voices from")}</b></div>
       <div className="casting-books" tabIndex={0} role="region" aria-label={t("Books with reusable voices")}>
         {sourceBooks.map((source) => {
           const checked = selected.includes(source.bookId);
           return <div className={`casting-book${checked ? " selected" : ""}`} key={source.bookId}>
-            <label><span className="casting-book-spine" aria-hidden="true" /><span className="casting-book-title" title={source.title}>{source.title}</span><small>{t("{{count}} voices", { count: source.voiceCount })}</small><input type="checkbox" checked={checked} onChange={() => changeSources(checked ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /></label>
+            <label><span className="casting-book-spine" aria-hidden="true" /><span className="casting-book-title" title={source.title}>{source.title}</span><input type="checkbox" checked={checked} onChange={() => changeSources(checked ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /></label>
           </div>;
         })}
       </div>
@@ -94,7 +94,7 @@ export function CastingChoice({ action, gateway, bookId, settings, onSourcesChan
       {activeOption && <p className="casting-quality-description">{t(activeOption.description)}</p>}
     </div>}
     <footer className="casting-footer"><div className="casting-estimate" aria-live="polite">
-      {error || (current && !quoteAvailable) ? <div role="alert" className="casting-preview-error">{t("Couldn’t calculate casting cost.")} <button type="button" className="ghost compact" onClick={() => { onReadyChange(false); setRetry((value) => value + 1); }}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : activeOption?.estimatedCostMinor != null && preview?.currency ? <><div><strong>{new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(activeOption.estimatedCostMinor / 100)}</strong><small>{t("estimated")}</small></div><small>{t(reuseOpen ? "For new voices. Includes an allowance." : "Initial voice creation. Includes an allowance.")}</small></> : null}
+      {error || (current && !quoteAvailable) ? <div role="alert" className="casting-preview-error">{t("Couldn’t calculate casting cost.")} <button type="button" className="ghost compact" onClick={() => { onReadyChange(false); setRetry((value) => value + 1); }}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : activeOption?.estimatedCostMinor != null && preview?.currency ? <div aria-label={t("Estimated cost")}><strong>≈ {new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(activeOption.estimatedCostMinor / 100)}</strong></div> : null}
     </div>{action}</footer>
   </section>;
 }

@@ -32,7 +32,7 @@
 .casting-quality button { border: 0; border-radius: 5px; background: transparent; color: var(--muted); padding: 8px 12px; cursor: pointer; font: inherit; }
 .casting-quality button[aria-pressed="true"] { background: var(--lavender); color: var(--plum); }
 .casting-quality-description { font-size: 13px; color: var(--muted); margin: 10px 0 0; }
-.casting-estimate { margin-top: 24px; min-height: 60px; }
+.casting-estimate { margin-top: 24px; min-height: 44px; }
 .casting-estimate > div { display: flex; align-items: baseline; gap: 8px; }
 .casting-estimate strong { font-size: 26px; font-weight: 600; }
 .casting-loading { font-size: 13px; color: var(--muted); }
