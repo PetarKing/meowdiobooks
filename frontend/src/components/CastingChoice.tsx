@@ -17,6 +17,8 @@ export function CastingChoice({ gateway, bookId, settings, onSourcesChange, onMo
   const [result, setResult] = useState<{ key: string; preview: CastingPreview }>();
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
+  const [reuseEnabled, setReuseEnabled] = useState(false);
+  const [search, setSearch] = useState("");
   const key = JSON.stringify({ bookId, settings });
   const current = result?.key === key;
   const preview = result?.preview;
@@ -40,12 +42,17 @@ export function CastingChoice({ gateway, bookId, settings, onSourcesChange, onMo
     ...selected.flatMap((id) => preview.sources.filter((source) => source.bookId === id)),
     ...preview.sources.filter((source) => !selected.includes(source.bookId)),
   ] : [];
+  const reuseOpen = reuseEnabled || selected.length > 0;
+  const visibleBooks = ordered.filter((source) => selected.includes(source.bookId) || source.title.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()));
   function changeSources(ids: string[]) { onReadyChange(false); onSourcesChange(ids); }
   return <section className="casting-choice" aria-label={t("Casting options")} aria-busy={!current && !error}>
     {!!ordered.length && <div className="casting-reuse">
-      <header><h3>{t("Reuse voices")}</h3>{current && selected.length > 0 && <span className="casting-match-count">{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span>}</header>
-      <div className="casting-books">
-        {ordered.map((source) => {
+      <header><label className="casting-reuse-toggle"><span>{t("Reuse voices from other books")}</span><input type="checkbox" role="switch" checked={reuseOpen} onChange={(event) => { setReuseEnabled(event.target.checked); if (!event.target.checked) { changeSources([]); setSearch(""); } }} /><span className="casting-switch" aria-hidden="true" /></label></header>
+      {reuseOpen && <>
+      <div className="casting-library-heading"><small>{t("{{selected}} selected · {{count}} books", { selected: selected.length, count: ordered.length })}</small>{current && selected.length > 0 && <span className="casting-match-count">{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span>}</div>
+      {ordered.length >= 8 && <input className="casting-book-search" type="search" aria-label={t("Search books")} placeholder={t("Search books…")} value={search} onChange={(event) => setSearch(event.target.value)} />}
+      <div className="casting-books" tabIndex={0} role="region" aria-label={t("Books with reusable voices")}>
+        {visibleBooks.map((source) => {
           const rank = selected.indexOf(source.bookId);
           return <div className={`casting-book${rank >= 0 ? " selected" : ""}`} key={source.bookId}>
             <label><input type="checkbox" checked={rank >= 0} onChange={() => changeSources(rank >= 0 ? selected.filter((id) => id !== source.bookId) : [...selected, source.bookId])} /><span className="casting-book-rank" aria-hidden="true">{rank >= 0 ? rank + 1 : "—"}</span><span title={source.title}>{source.title}</span></label>
@@ -53,7 +60,9 @@ export function CastingChoice({ gateway, bookId, settings, onSourcesChange, onMo
           </div>;
         })}
       </div>
-      {selected.length > 0 && <small>{t("Top book wins. AI checks other names when you continue.")}</small>}
+      <div className="casting-library-footer">{selected.length > 0 ? <small>{t("Top book wins. AI checks other names when you continue.")}</small> : <small>{t("Choose books to keep familiar voices.")}</small>}{visibleBooks.length > 4 && <small className="casting-scroll-cue">{t("Scroll to browse")} ↓</small>}</div>
+      {visibleBooks.length === 0 && <small role="status">{t("No books found.")}</small>}
+      </>}
     </div>}
     <header className="casting-generation-heading"><h3>{t(selected.length ? "Create remaining voices" : "Create voices")}</h3>{current && <small>{t(selected.length ? "Up to {{count}} new voices" : "{{count}} voices · includes Narrator", { count: preview!.remainingVoiceCount })}</small>}</header>
     <div className="casting-options">
