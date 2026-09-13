@@ -842,8 +842,8 @@ def create_app_v2(
                         layered.pop(key, None)
                     reused[character_id] = layered
                 elif (
-                    same_selection
-                    and recipe_is_current
+                    ((same_selection and recipe_is_current)
+                     or row.get("reusedVoiceSnapshot") is True)
                     and _has_complete_audition_pack(row)
                 ):
                     reused[character_id] = row
@@ -1029,9 +1029,9 @@ def create_app_v2(
                 characters.append(character)
             previous_narrator = imported.get("narrator") or proposal.get("narrator")
             reusable_narrator = "narrator" in imported or (
-                same_selection
-                and recipe_is_current
-                and isinstance(previous_narrator, dict)
+                isinstance(previous_narrator, dict)
+                and ((same_selection and recipe_is_current)
+                     or (same_language and previous_narrator.get("reusedVoiceSnapshot") is True))
                 and _has_complete_audition_pack(previous_narrator)
             )
             if not reusable_narrator:

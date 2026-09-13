@@ -2022,6 +2022,7 @@ def test_layered_voice_preview_mixes_exact_audition_revisions(tmp_path):
 def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(tmp_path):
     from meowdiobooks.backend.cast_service import default_voice_settings
     calls = []
+    recipe = ["1"]
 
     class Reuse:
         def preview(self, book_id, package, targets, source_ids, language, model_id):
@@ -2065,7 +2066,12 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
         pytest.fail('Imported voices must not be profiled or generated')
     with TestClient(create_app_v2(tmp_path, cast_proposer=lambda *_: proposal,
                                  voice_profiler=forbidden, voice_auditioner=forbidden,
-                                 cast_voice_reuse=Reuse())) as client:
+                                 cast_voice_reuse=Reuse(),
+                                 default_voice_model="snapshot-test",
+                                 voice_models=lambda *_: [
+                                     {"id": model, "recipeVersion": recipe[0]}
+                                     for model in ("snapshot-test", "snapshot-new")],
+                                 voice_languages=lambda *_: ["english"])) as client:
         book_id = client.post('/api/books/import', files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()['book']['id']
         _seed_reviewed_transcript(tmp_path, book_id)
         identity = _process(client, book_id, 'cast', {})
@@ -2099,3 +2105,18 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
         accepted = read_artifact(tmp_path / 'packages' / book_id, 'cast')
         assert accepted['narrator']['reuseProvenance'] == {'bookId': 'source'}
         assert accepted['identities'][0]['acceptedVoiceRevision'].startswith('imported-')
+
+        # Imported identities retain their own recipe and survive new casting defaults,
+        # even after source selection is cleared because the source book was deleted.
+        recipe[0] = "2"
+        upgraded = _process(client, book_id, 'cast', {
+            'proposalRevision': reopened['revision'], 'sourceBookIds': [],
+            'language': 'english', 'voiceModel': 'snapshot-new',
+        })
+        after = client.get(f"/api/books/{book_id}/stages/cast/candidates/{upgraded['revision']}").json()
+        assert after['auditionPackRecipeVersion'] == '2'
+        assert after['narrator']['voicePreviewRevision'] == recast['narrator']['voicePreviewRevision']
+        assert after['identities'][0]['voicePreviewRevision'] == recast['identities'][0]['voicePreviewRevision']
+        assert after['narrator']['reusedVoiceSnapshot'] is True
+        assert after['identities'][0]['reusedVoiceSnapshot'] is True
+        assert calls == [('preview', ['source']), ('apply', ['source'])]

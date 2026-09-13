@@ -116,7 +116,7 @@ def validated_imported_voices(
             for key, value in by_id[character_id].items()
             if key in {"characterId", "name", "category", "literalLabels", "lineCount"}
         }
-        merged = {**deepcopy(row), **identity, "voiceAccepted": False}
+        merged = {**deepcopy(row), **identity, "voiceAccepted": False, "reusedVoiceSnapshot": True}
         merged.pop("acceptedVoiceRevision", None)
         result[character_id] = merged
     return result
