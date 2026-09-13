@@ -38,6 +38,7 @@ interface Props {
   language: string;
   onVoiceModelChange: (modelId: string) => void;
   onLanguageChange: (language: string) => void;
+  hideVoiceModel?: boolean;
   onReclassify?: () => void;
 }
 
@@ -219,7 +220,7 @@ function useDragAutoScroll(active: boolean) {
 
 export function CastIdentityReview({
   cast, decisions, setDecisions, resolvedLabels, setResolvedLabels, voiceModels, voiceModel,
-  language, onVoiceModelChange, onLanguageChange, onReclassify,
+  language, onVoiceModelChange, onLanguageChange, onReclassify, hideVoiceModel,
 }: Props) {
   const { t } = useTranslation();
   const allGroups = useMemo(
@@ -479,9 +480,9 @@ export function CastIdentityReview({
       <div className="cast-toolbar-actions">
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
         <details>
-          <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")} · {selectedModel?.label ?? t("Choose voice model")}</summary>
+          <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
           <div className="cast-audio-settings">
-            <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>
+            {!hideVoiceModel && <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>}
             <LanguageFlags languages={selectedModel?.supportedLanguages ?? []} language={language} onChange={onLanguageChange} />
           </div>
         </details>

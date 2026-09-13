@@ -45,6 +45,12 @@ class ReviewSettings(CommandModel):
     pass
 
 
+class SourceVoiceSelection(CommandModel):
+    bookId: str = Field(min_length=1, max_length=200)
+    characterId: str = Field(min_length=1, max_length=200)
+    revision: str = Field(min_length=1, max_length=200)
+
+
 class CastSettings(CommandModel):
     proposalRevision: str = ""
     forceReclassify: bool = False
@@ -54,6 +60,9 @@ class CastSettings(CommandModel):
     voiceModel: str | None = None
     language: str | None = None
     narratorDirection: str | None = None
+    sourceBookIds: list[str] = Field(default_factory=list, max_length=100)
+    castingPreviewFingerprint: str | None = Field(default=None, max_length=128)
+    sourceVoice: SourceVoiceSelection | None = None
 
 
 class GenerationSettings(CommandModel):

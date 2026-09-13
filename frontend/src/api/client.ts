@@ -1,5 +1,7 @@
 import type {
   AudioExportOptions,
+  CastingPreview,
+  CastProcessSettings,
   DialogueArtifact,
   DialogueExample,
   DialogueSettings,
@@ -139,6 +141,7 @@ export class HttpWizardApi implements WorkflowGateway {
       },
       cast: hasRevision(raw.cast) ? raw.cast as unknown as WizardSnapshot["cast"] : undefined,
       voiceModels: Array.isArray(raw.voiceModels) ? raw.voiceModels as WizardSnapshot["voiceModels"] : [],
+      castingPreviewAvailable: raw.castingPreviewAvailable === true,
       voiceSelection: raw.voiceSelection as WizardSnapshot["voiceSelection"] ?? {},
       recordingScript: hasRevision(raw.recordingScript)
         ? raw.recordingScript as unknown as WizardSnapshot["recordingScript"]
@@ -205,6 +208,10 @@ export class HttpWizardApi implements WorkflowGateway {
       }
       throw error;
     }
+  }
+
+  previewCasting(bookId: string, settings: CastProcessSettings): Promise<CastingPreview> {
+    return this.request(`/books/${bookId}/cast/reuse-preview`, { method: "POST", body: JSON.stringify(settings) });
   }
 
   prepareRecordingScript(bookId: string): Promise<RecordingScriptArtifact> {

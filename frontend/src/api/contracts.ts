@@ -426,6 +426,7 @@ export interface WizardSnapshot {
   };
   cast?: CastArtifact;
   voiceModels: Array<{ id: string; label: string; recipeVersion?: string; supportedLanguages: string[] }>;
+  castingPreviewAvailable?: boolean;
   voiceSelection: { modelId?: string; language?: string };
   recoverableStages?: Partial<Record<ProcessableStage, {
     attempt: number;
@@ -507,7 +508,22 @@ export interface ExtractionProcessSettings {
   method: ExtractionMethod;
 }
 
+export interface SourceVoice { bookId: string; characterId: string; revision: string }
+
+export interface CastingPreview {
+  fingerprint?: string;
+  sources: Array<{ bookId: string; title: string; voiceCount: number; voices?: Array<{ characterId: string; name: string; revision: string }> }>;
+  exactMatchCount: number;
+  totalVoiceCount: number;
+  remainingVoiceCount: number;
+  currency?: string;
+  options?: Array<{ modelId: string; label: string; description: string; estimatedCostMinor: number | null }>;
+}
+
 export interface CastProcessSettings {
+  castingPreviewFingerprint?: string;
+  sourceVoice?: SourceVoice;
+  sourceBookIds?: string[];
   proposalRevision?: string;
   forceReclassify?: boolean;
   characterId?: string;
@@ -613,6 +629,7 @@ export interface WorkflowGateway {
   previewReviewBulk(bookId: string, revision: string, occurrenceId: string, action: ReviewCapability): Promise<Record<string, unknown>>;
   previewReviewTranscript(bookId: string, revision: string, page: number, policies: ReviewTranscriptPolicy[]): Promise<ReviewTranscriptPreview>;
   processStage<S extends ProcessableStage>(bookId: string, stage: S, settings: StageSettings[S]): Promise<Job>;
+  previewCasting?(bookId: string, settings: CastProcessSettings): Promise<CastingPreview>;
   prepareRecordingScript(bookId: string): Promise<RecordingScriptArtifact>;
   splitRecordingScriptChapter(bookId: string, chapterId: string): Promise<RecordingScriptArtifact>;
   getStageCandidate<S extends ProcessableStage>(bookId: string, stage: S, revision: string): Promise<StageCandidate[S]>;

@@ -29,6 +29,7 @@ from .artifacts import (
 )
 from .api.schemas import (
     AudioExportRequest,
+    CastingPreviewRequest,
     DialoguePreviewRequest,
     ExtractionPreviewRequest,
     ReviewBulkPreviewRequest,
@@ -50,6 +51,12 @@ from .cast import (
     CastContractError,
     cast_progression_blockers,
     finalize_identity_mapping,
+)
+from .voice_reuse import (
+    CastVoiceReuse,
+    validated_imported_voices,
+    validate_source_book_ids,
+    validate_cast_proposal_inputs,
 )
 from .cast_runtime import (
     _apply_cast_line_counts,
@@ -336,6 +343,7 @@ def create_app_v2(
     chapter_renderer: Callable[..., list[dict[str, Any]]] | None = None,
     cast_proposer: Callable[..., dict[str, Any]] | None = None,
     voice_profiler: Callable[..., dict[str, dict[str, str]]] | None = None,
+    cast_voice_reuse: CastVoiceReuse | None = None,
     voice_profiler_revision: str = "meowdiobooks.voice-profile.v2",
     generate_voice_audition_lines: bool = False,
     remote_usage_observer: RemoteUsageObserver | None = None,
@@ -677,6 +685,7 @@ def create_app_v2(
             }
         else:
             proposal = _candidate(package, "cast", proposal_revision)
+            validate_cast_proposal_inputs(proposal, dialogue, review)
             phase = str(proposal.get("phase", ""))
             if phase not in {"identity-review", "audition-review"}:
                 raise CastContractError("Auditions require an editable Cast candidate")
@@ -704,6 +713,23 @@ def create_app_v2(
                 )
                 if target is None:
                     raise CastContractError("Cast voice not found")
+                if settings.get("sourceVoice"):
+                    if cast_voice_reuse is None:
+                        raise CastContractError("Voice reuse is unavailable")
+                    report(2, "Reusing the selected voice")
+                    updated = validated_imported_voices({character_id: cast_voice_reuse.import_voice(
+                        book.id, package, target, settings["sourceVoice"], language, model_id,
+                    )}, [target])[character_id]
+                    body = {
+                        **proposal, "revision": revision, "phase": "audition-review",
+                        "status": "needs-voice-review",
+                        "narrator": updated if character_id == "narrator" else proposal.get("narrator"),
+                        "identities": [updated if str(row.get("characterId")) == character_id else row
+                                       for row in proposal.get("identities", [])],
+                    }
+                    path, artifact = write_cast_candidate(package, body)
+                    report(100, "Reused voice ready for review")
+                    return _candidate_result(book.id, WizardStage.CAST, path, artifact)
                 character = {
                     **target,
                     "id": character_id,
@@ -821,6 +847,32 @@ def create_app_v2(
                     and _has_complete_audition_pack(row)
                 ):
                     reused[character_id] = row
+            source_book_ids = validate_source_book_ids(
+                settings.get("sourceBookIds", proposal.get("sourceBookIds", [])), book.id
+            )
+            imported = {}
+            reuse_selection_unchanged = (
+                same_selection
+                and source_book_ids == proposal.get("sourceBookIds", [])
+            )
+            if source_book_ids and not reuse_selection_unchanged:
+                if cast_voice_reuse is None:
+                    raise CastContractError("Voice reuse is unavailable")
+                report(1, "Matching voices from selected books")
+                targets = [*finalized["identities"], {
+                    "characterId": "narrator", "name": "Narrator", "category": "narrator",
+                    "lineCount": narrator_line_count,
+                }]
+                imported = validated_imported_voices(
+                    cast_voice_reuse.apply(
+                        book.id, package, targets, source_book_ids, language, model_id,
+                        **({"preview_fingerprint": settings["castingPreviewFingerprint"]}
+                           if settings.get("castingPreviewFingerprint") else {}),
+                    ),
+                    targets,
+                )
+                matched.update({key: row for key, row in imported.items() if key != "narrator"})
+                reused.update({key: row for key, row in imported.items() if key != "narrator"})
             affected = [
                 row
                 for row in finalized["identities"]
@@ -831,7 +883,7 @@ def create_app_v2(
                 for row in finalized["identities"]
                 if str(row["characterId"]) not in matched
             ]
-            include_narrator_profile = not same_language
+            include_narrator_profile = not same_language and "narrator" not in imported
             profiles: dict[str, dict[str, str]] = {}
             if profile_targets or include_narrator_profile:
                 checkpoint_key = profile_checkpoint_key(
@@ -975,8 +1027,8 @@ def create_app_v2(
                         }
                     )
                 characters.append(character)
-            previous_narrator = proposal.get("narrator")
-            reusable_narrator = (
+            previous_narrator = imported.get("narrator") or proposal.get("narrator")
+            reusable_narrator = "narrator" in imported or (
                 same_selection
                 and recipe_is_current
                 and isinstance(previous_narrator, dict)
@@ -1083,6 +1135,7 @@ def create_app_v2(
                     for row in finalized["identities"]
                 ],
                 "identityDecisions": raw_decisions,
+                "sourceBookIds": source_book_ids,
             }
         path, artifact = write_cast_candidate(package, body)
         report(100, "Cast candidate ready for review")
@@ -1433,6 +1486,7 @@ def create_app_v2(
                 ],
             },
             "cast": visible_cast,
+            "castingPreviewAvailable": cast_voice_reuse is not None,
             "voiceModels": voice_models(repo_root),
             "voiceSelection": {
                 "modelId": visible_cast.get("voiceModel") or default_voice_id,
@@ -1900,6 +1954,40 @@ def create_app_v2(
             attempt=resumable.attempt + 1 if resumable else 1,
         )
         return job.model_dump(mode="json")
+
+    @app.post("/api/books/{book_id}/cast/reuse-preview")
+    def casting_reuse_preview(book_id: str, body: CastingPreviewRequest) -> dict[str, Any]:
+        require_book(book_id)
+        if cast_voice_reuse is None:
+            raise HTTPException(status_code=404, detail="Voice reuse is unavailable")
+        package = package_for(book_id)
+        try:
+            proposal = _candidate(package, "cast", body.proposalRevision)
+            validate_cast_proposal_inputs(
+                proposal, read_artifact(package, "dialogue"), read_artifact(package, "review")
+            )
+            if proposal.get("phase") not in {"identity-review", "audition-review"}:
+                raise CastContractError("Auditions require an editable Cast candidate")
+            raw = body.identityDecisions
+            if raw is None:
+                raw = proposal.get("identityDecisions", [])
+            decisions = {str(row.get("label", "")): row for row in raw if row.get("label")}
+            finalized = finalize_identity_mapping(proposal.get("proposals", []), decisions)
+            preview_language = normalize_language(body.language or proposal.get("language") or "english")
+            if (proposal.get("phase") == "audition-review"
+                    and preview_language == normalize_language(proposal.get("language", "english"))):
+                _reuse_unchanged_cast_voices(finalized, proposal)
+            targets = [*finalized["identities"], {
+                "characterId": "narrator", "name": "Narrator", "category": "narrator",
+            }]
+            source_ids = validate_source_book_ids(body.sourceBookIds, book_id)
+            model_id = str(body.voiceModel or proposal.get("voiceModel") or default_voice_id)
+            language = normalize_language(body.language or proposal.get("language") or "english")
+            if not language or language not in voice_languages(repo_root, model_id):
+                raise CastContractError("Select a supported voice language")
+            return cast_voice_reuse.preview(book_id, package, targets, source_ids, language, model_id)
+        except (ValueError, CastContractError) as error:
+            raise HTTPException(status_code=422, detail=str(error)) from error
 
     @app.get("/api/books/{book_id}/stages/{stage}/candidates/{revision}")
     def stage_candidate(book_id: str, stage: str, revision: str) -> dict[str, Any]:

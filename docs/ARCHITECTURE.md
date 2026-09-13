@@ -114,3 +114,18 @@ Changes at an architecture boundary must keep these checks green:
 
 When a companion adapter is introduced, it should run the same command/artifact fixtures and frontend
 gateway behavior suite as the local adapters before either package is released.
+
+### Optional cross-book casting
+
+Compositions can supply `cast_voice_reuse` to expose the shared compact Cast chooser. Its `preview`
+method is read-only and returns eligible source books, exact-match counts, casting choices and
+currency-aware estimates. `apply` runs inside Cast generation only after the user continues; the
+composition may use AI for identities not matched exactly. Source book IDs are ordered, so the first
+matching source wins overlaps. The preview fingerprint binds the reviewed selection to application.
+An optional `import_voice` method supports explicit source-voice correction during audition review.
+
+The composition must authorize sources, validate compatibility and copy complete immutable voice
+assets into the destination before returning. Core preserves destination character identity and
+requires normal audition acceptance. Reopening the same selection uses destination snapshots without
+reading the source. The source book is provenance, never an ongoing dependency. AI uncertainty should
+leave a character for ordinary generation rather than introduce a required manual matching phase.

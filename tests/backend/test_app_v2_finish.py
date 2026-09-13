@@ -2017,3 +2017,85 @@ def test_layered_voice_preview_mixes_exact_audition_revisions(tmp_path):
         sample_rate, mixed = wavfile.read(BytesIO(response.content))
         assert sample_rate == 1_000
         np.testing.assert_allclose(mixed, np.array([0.4, 0.4, 0.1], dtype=np.float32))
+
+
+def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(tmp_path):
+    from meowdiobooks.backend.cast_service import default_voice_settings
+    calls = []
+
+    class Reuse:
+        def preview(self, book_id, package, targets, source_ids, language, model_id):
+            calls.append(('preview', source_ids))
+            return {'sources': [{'bookId': 'source', 'title': 'Earlier book', 'voiceCount': 2}],
+                    'exactMatchCount': len(targets), 'remainingVoiceCount': 0,
+                    'totalVoiceCount': len(targets)}
+
+        def apply(self, book_id, package, targets, source_ids, language, model_id, *, preview_fingerprint=None):
+            assert preview_fingerprint == "bound-source-revisions"
+            calls.append(('apply', source_ids))
+            imported = {}
+            for target in targets:
+                cid = target['characterId']
+                revision = f'imported-{cid}'
+                relative = f'voices/{cid}/{revision}.wav'
+                path = package / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b'RIFF-test')
+                imported[cid] = {**target, 'voicePreviewRevision': revision,
+                    'previewUrl': f'/voice/{revision}', 'referenceAudio': relative,
+                    'referenceText': 'A durable independent voice sample.',
+                    'voiceSettings': default_voice_settings(target['category']),
+                    'voiceDirection': 'Clear and natural.',
+                    'voiceCandidates': [{'revision': revision, 'previewUrl': f'/voice/{revision}',
+                                         'referenceAudio': relative, 'referenceText': 'Sample.'}],
+                    'reuseProvenance': {'bookId': 'source'}}
+            self.imported = imported
+            return imported
+
+        def import_voice(self, book_id, package, target, source_voice, language, model_id):
+            assert source_voice == {'bookId': 'source', 'characterId': 'different-name', 'revision': 'selected'}
+            row = dict(self.imported[target['characterId']])
+            row['voiceSettings'] = {**row['voiceSettings'], 'tone': 'bright'}
+            return row
+
+    proposal = {'status': 'ready', 'dossiers': [], 'proposals': [
+        {'label': 'Alice', 'category': 'character', 'canonicalName': 'Alice', 'aliases': [],
+         'competingLabels': [], 'reviewRequired': False, 'reason': 'Explicit label.'}]}
+    def forbidden(*args, **kwargs):
+        pytest.fail('Imported voices must not be profiled or generated')
+    with TestClient(create_app_v2(tmp_path, cast_proposer=lambda *_: proposal,
+                                 voice_profiler=forbidden, voice_auditioner=forbidden,
+                                 cast_voice_reuse=Reuse())) as client:
+        book_id = client.post('/api/books/import', files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()['book']['id']
+        _seed_reviewed_transcript(tmp_path, book_id)
+        identity = _process(client, book_id, 'cast', {})
+        settings = {'proposalRevision': identity['revision'], 'language': 'english', 'sourceBookIds': ['source'], 'castingPreviewFingerprint': 'bound-source-revisions'}
+        preview = client.post(f'/api/books/{book_id}/cast/reuse-preview', json=settings)
+        assert preview.status_code == 200, preview.text
+        assert preview.json()['exactMatchCount'] == 2
+        assert calls == [('preview', ['source'])]
+        result = _process(client, book_id, 'cast', settings)
+        candidate = client.get(f"/api/books/{book_id}/stages/cast/candidates/{result['revision']}").json()
+        assert candidate['sourceBookIds'] == ['source']
+        assert candidate['narrator']['voicePreviewRevision'] == 'imported-narrator'
+        assert candidate['identities'][0]['reuseProvenance'] == {'bookId': 'source'}
+        assert candidate['identities'][0]['voiceAccepted'] is False
+        assert calls == [('preview', ['source']), ('apply', ['source'])]
+        # Reopening the same selection uses only destination snapshots, even if the
+        # source subsequently disappears. The provider is not called again.
+        reopened = _process(client, book_id, 'cast', {**settings, 'proposalRevision': result['revision']})
+        recast = client.get(f"/api/books/{book_id}/stages/cast/candidates/{reopened['revision']}").json()
+        assert calls == [('preview', ['source']), ('apply', ['source'])]
+        manual = _process(client, book_id, 'cast', {
+            'proposalRevision': reopened['revision'], 'characterId': recast['identities'][0]['characterId'],
+            'sourceVoice': {'bookId': 'source', 'characterId': 'different-name', 'revision': 'selected'},
+        })
+        corrected = client.get(f"/api/books/{book_id}/stages/cast/candidates/{manual['revision']}").json()
+        assert corrected['identities'][0]['voiceSettings']['tone'] == 'bright'
+        rows = [recast['narrator'], *recast['identities']]
+        decisions = [{'characterId': row['characterId'], 'voiceRevision': row['voicePreviewRevision']} for row in rows]
+        response = _accept(client, book_id, 'cast', reopened['revision'], decisions)
+        assert response.status_code == 200, response.text
+        accepted = read_artifact(tmp_path / 'packages' / book_id, 'cast')
+        assert accepted['narrator']['reuseProvenance'] == {'bookId': 'source'}
+        assert accepted['identities'][0]['acceptedVoiceRevision'].startswith('imported-')

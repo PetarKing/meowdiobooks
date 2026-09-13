@@ -7,7 +7,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..models import AudioExportPreset
-from ..workflow.commands import RegexProfile
+from ..workflow.commands import CastSettings, RegexProfile
 
 
 class ApiRequest(BaseModel):
@@ -71,3 +71,7 @@ class ReviewTranscriptPreviewRequest(ApiRequest):
     revision: str = Field(min_length=1)
     page: int = Field(ge=1)
     policies: list[ReviewTranscriptPolicyRequest] = Field(default_factory=list)
+
+
+class CastingPreviewRequest(CastSettings):
+    """Use the same identity decisions and source order as the eventual Cast job."""

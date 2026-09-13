@@ -8,7 +8,7 @@ import { publicJourney } from './workflow/navigation'
 
 vi.mock('./api/client', () => ({ wizardApi: {
   importBook: vi.fn(), getBookSnapshot: vi.fn(), previewExtraction: vi.fn(), previewDialogue: vi.fn(),
-  previewReviewBulk: vi.fn(), previewReviewTranscript: vi.fn(),
+  previewCasting: vi.fn(), previewReviewBulk: vi.fn(), previewReviewTranscript: vi.fn(),
   getRepresentativePages: vi.fn(), listBooks: vi.fn(), deleteBook: vi.fn(), acceptStage: vi.fn(), processStage: vi.fn(),
   prepareRecordingScript: vi.fn(), splitRecordingScriptChapter: vi.fn(),
   getJob: vi.fn(), listBookJobs: vi.fn(), cancelJob: vi.fn(), openChapterAudio: vi.fn(), createM4bExport: vi.fn(), createAudioExport: vi.fn(), exportM4b: vi.fn(), getStageCandidate: vi.fn(), transcribeVoiceSample: vi.fn(), uploadVoiceSample: vi.fn(), deleteVoiceAudition: vi.fn(),
@@ -2073,6 +2073,28 @@ describe('v2 wizard', () => {
     fireEvent.click(within(nav).getByText('Cast & voices'))
     expect(screen.getByRole('button', { name: 'Find characters →' }).closest('.stage-launch')).toBeInTheDocument()
     expect(screen.queryByText('Ready when you are')).not.toBeInTheDocument()
+  })
+
+  it('uses host casting choices and submits selected sources only on Continue', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      castingPreviewAvailable: true,
+      cast: { revision: 'cp', phase: 'identity-review', dossiers: [], proposals: [] },
+    }
+    vi.mocked(wizardApi.previewCasting!).mockResolvedValue({
+      sources: [{ bookId: 'earlier', title: 'Earlier book', voiceCount: 2 }],
+      fingerprint: 'preview-bound', exactMatchCount: 1, totalVoiceCount: 1, remainingVoiceCount: 0, currency: 'EUR',
+      options: [{ modelId: 'qwen', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 0 }],
+    })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'failed', error: 'test stop' })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    expect(screen.queryByLabelText('Voice model')).not.toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('checkbox', { name: /Earlier book/ }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({ sourceBookIds: ['earlier'], castingPreviewFingerprint: 'preview-bound' })))
   })
 
   it('restores a failed cast model and offers to continue saved voice generation', async () => {
