@@ -47,6 +47,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Set up Node.js
         uses: actions/setup-node@v6
@@ -66,3 +68,33 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Check Storybook types
+        run: npm run storybook:check
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Storybook browser and accessibility tests
+        run: npm run test-storybook
+
+      - name: Build Storybook
+        run: npm run build-storybook
+
+      - name: Packaged host compatibility
+        run: npm run test:consumer
+
+      - name: Compare accepted source on desktop and phone
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: npm run visual:parity -- "$BASE_REF" /tmp/meowdiobooks-visual-parity
+
+      - name: Upload visual comparison evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: product-visual-parity
+          path: |
+            /tmp/meowdiobooks-visual-parity/report.json
+            /tmp/meowdiobooks-visual-parity/*.png
+          retention-days: 7

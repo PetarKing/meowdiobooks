@@ -175,7 +175,7 @@ describe('v2 wizard', () => {
     render(<App />)
 
     expect(screen.getByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Loading audiobooks')).toHaveAttribute('aria-busy', 'true')
+    expect(screen.getByRole('status', { name: 'Loading audiobooks' })).toHaveAttribute('aria-busy', 'true')
     resolveLibrary([])
     await screen.findByRole('heading', { name: 'No audiobooks yet.' })
 
@@ -195,6 +195,8 @@ describe('v2 wizard', () => {
     expect(within(nav).queryByText('Import')).not.toBeInTheDocument()
     for (const label of ['Extract','Dialogue','Review','Cast & voices','Generate','Export']) expect(within(nav).getByText(label)).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: 'Generate Complete' })).toHaveClass('done')
+    expect(screen.getByRole('complementary', { name: 'Wizard stages' })).toContainElement(nav)
+    expect(screen.getByRole('heading', { level: 2, name: 'Down the Rabbit-Hole' })).toBeInTheDocument()
     expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
   })
@@ -805,6 +807,7 @@ describe('v2 wizard', () => {
       fireEvent.click(help)
       const dialog = screen.getByRole('dialog', { name: guideTitle })
       expect(dialog).toBeInTheDocument()
+      expect(within(dialog).queryByRole('banner')).not.toBeInTheDocument()
       expect(dialog.parentElement?.parentElement).toBe(document.body)
       expect(dialog.closest('.step-eyebrow')).toBeNull()
       expect(dialog.querySelectorAll('.phase-help-path li')).toHaveLength(3)
@@ -1823,11 +1826,11 @@ describe('v2 wizard', () => {
 
     const overview = screen.getByRole('region', { name: 'Dialogue overview' })
     expect(screen.getByText('Your transcript is ready')).toBeInTheDocument()
-    expect(screen.getByLabelText('Dialogue assignment summary').querySelectorAll('i')).toHaveLength(3)
+    expect(screen.getByRole('img', { name: 'Dialogue assignment summary' }).querySelectorAll('i')).toHaveLength(3)
     expect(within(overview).getByText('By reader')).toBeInTheDocument()
     const emilia = within(overview).getByText('Emilia').closest('.dialogue-reader-card') as HTMLElement
     expect(emilia).toHaveTextContent('3')
-    expect(within(emilia).getByLabelText('2 known · 1 AI')).toBeInTheDocument()
+    expect(within(emilia).getByRole('img', { name: '2 known · 1 AI' })).toBeInTheDocument()
     expect(within(overview).queryByText('Rem')).not.toBeInTheDocument()
     fireEvent.click(within(overview).getByRole('button', { name: 'Show 4 more readers ↓' }))
     expect(within(overview).getByText('Rem')).toBeInTheDocument()

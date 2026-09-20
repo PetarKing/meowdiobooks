@@ -1,0 +1,23 @@
+import type { WorkflowModel } from "../app/useWorkflowModel";
+import { Panel, Tag } from "../components/Ui";
+import { PageTitle } from "../pages/shared";
+
+export type DialogueRecoveryPageModel = Pick<WorkflowModel, "busy" | "rebuildDialogueFromRecovery" | "snapshot" | "t">;
+
+export function DialogueRecoveryPage({ model }: { model: DialogueRecoveryPageModel; }) {
+  const { busy, rebuildDialogueFromRecovery, snapshot, t } = model;
+  const recovery = snapshot?.dialogueRecovery;
+  if (!recovery) return null;
+  const recoveryMessage = recovery.page === undefined
+    ? t("This transcript contains an invalid text range. No audio was generated or changed.")
+    : t("This transcript contains an invalid text range on page {{page}}. No audio was generated or changed.", { page: recovery.page });
+  return <>
+    <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Dialogue needs rebuilding")} copy={t("Rebuild the transcript before continuing to review or generate audio.")} />
+    <Panel eyebrow={t("Source safety check")} title={t("No audio was generated or changed")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}>
+      <p className="panel-copy">{recoveryMessage}</p>
+      <p className="dialogue-recovery-note"><b>{t("What happens next")}</b><span>{t("Rebuild Dialogue with your previous settings, review the corrected transcript, and accept it. Review, Cast & voices, and later stages will then need to be completed again.")}</span></p>
+      <div className="dialogue-recovery-actions"><button className="primary" disabled={busy} onClick={() => void rebuildDialogueFromRecovery()}>{busy ? t("Opening Dialogue…") : t("Rebuild Dialogue")} →</button></div>
+    </Panel>
+  </>;
+
+}

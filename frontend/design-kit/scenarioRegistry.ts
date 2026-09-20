@@ -1,0 +1,590 @@
+import type { WizardStage } from "../src/api/contracts";
+
+export type HomeScenarioAction = "open-book-error" | "open-delete-dialog";
+
+export type WorkflowScenarioAction =
+  | "accept-default-cast"
+  | "build-dialogue"
+  | "configure-sample"
+  | "create-sample"
+  | "design-voices"
+  | "export"
+  | "generate-selected"
+  | "open-alice-voice"
+  | "open-existing-voice"
+  | "open-final-review"
+  | "open-identity-inspector"
+  | "open-layered-voice"
+  | "open-new-audition"
+  | "open-player"
+  | "open-split"
+  | "phase-help"
+  | "scan-review";
+
+export type ScenarioStoryAction = HomeScenarioAction | WorkflowScenarioAction;
+
+export type SnapshotVariant =
+  | "default"
+  | "dialogue-results"
+  | "dialogue-routing"
+  | "dialogue-routing-unconfigured"
+  | "dialogue-structural"
+  | "export-long-book"
+  | "generate-split"
+  | "generate-stale"
+  | "review-boundaries"
+  | "review-recovery"
+  | "review-warnings";
+
+export type CastFixtureVariant =
+  | "auditions"
+  | "dense-identities"
+  | "dense-voices"
+  | "identity-inspector"
+  | "identity-review"
+  | "layered"
+  | "layered-confirmed"
+  | "missing-audition"
+  | "voice-design";
+
+export type DialogueFixtureVariant = "conflicts" | "standard";
+
+export type GatewayVariant =
+  | "default"
+  | "dialogue-reconnect"
+  | "dialogue-running"
+  | "empty-books"
+  | "generate-failed"
+  | "generate-running"
+  | "home-error"
+  | "library-error"
+  | "library-loading"
+  | "library-missing-cover"
+  | "library-populated"
+  | "library-refresh-error"
+  | "sample-upload-pending";
+
+export interface ScenarioMetadata {
+  label: string;
+  description: string;
+  completedStages: readonly WizardStage[];
+  snapshotVariant: SnapshotVariant;
+  castFixture: CastFixtureVariant;
+  dialogueFixture: DialogueFixtureVariant;
+  castingPreviewAvailable: boolean;
+  gatewayVariant: GatewayVariant;
+  story:
+    | {
+        surface: "home";
+        actions: readonly HomeScenarioAction[];
+      }
+    | {
+        surface: "library";
+        actions: readonly [];
+        heading?: string;
+      }
+    | {
+        surface: "workflow";
+        actions: readonly WorkflowScenarioAction[];
+        heading: string;
+        acceptedStageLabel?: string;
+      };
+}
+
+const throughImport = ["import"] as const satisfies readonly WizardStage[];
+const throughExtract = [
+  "import",
+  "extract",
+] as const satisfies readonly WizardStage[];
+const throughDialogue = [
+  "import",
+  "extract",
+  "dialogue",
+] as const satisfies readonly WizardStage[];
+const throughReview = [
+  "import",
+  "extract",
+  "dialogue",
+  "review",
+] as const satisfies readonly WizardStage[];
+const throughCast = [
+  "import",
+  "extract",
+  "dialogue",
+  "review",
+  "cast",
+] as const satisfies readonly WizardStage[];
+
+/**
+ * The scenario ID, catalogue copy, data, gateway and entry behavior share one
+ * exhaustive definition. ScenarioId and the public catalogue are derived below.
+ */
+export const scenarioMetadata = {
+  "cast-inspector": {
+    label: "Cast · audition inspector",
+    description: "Audition attempts, settings and generation controls.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["open-alice-voice"],
+      heading: "Choose the cast voices.",
+    },
+  },
+  "cast-missing": {
+    label: "Cast · audition missing",
+    description: "A voice has no playable audition and cannot be accepted.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "missing-audition",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["open-alice-voice"],
+      heading: "Choose the cast voices.",
+    },
+  },
+  "cast-accepted": {
+    label: "Cast · accepted summary",
+    description: "Accepted cast revision with replacement entry point.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Cast and voices ready",
+      acceptedStageLabel: "Cast & voices",
+    },
+  },
+  "extract-accepted": {
+    label: "Extract · accepted summary",
+    description: "Accepted extraction and replace settings action.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Extraction complete",
+      acceptedStageLabel: "Extract",
+    },
+  },
+  "dialogue-accepted": {
+    label: "Dialogue · accepted summary",
+    description: "Accepted transcript and revision action.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Transcript ready",
+      acceptedStageLabel: "Dialogue",
+    },
+  },
+  "review-accepted": {
+    label: "Review · accepted summary",
+    description: "Accepted review and chapter count.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Review complete",
+      acceptedStageLabel: "Review",
+    },
+  },
+  "generate-stale": {
+    label: "Generate · older audio",
+    description: "Older recording plus unavailable empty chapter.",
+    completedStages: throughCast,
+    snapshotVariant: "generate-stale",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Bring every chapter to life.",
+    },
+  },
+  "generate-player": {
+    label: "Generate · chapter player",
+    description: "Listen dialog for generated audio controls.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["open-player"],
+      heading: "Bring every chapter to life.",
+    },
+  },
+  "generate-split": {
+    label: "Generate · split confirmation",
+    description: "Long chapter split explanation and confirmation.",
+    completedStages: throughCast,
+    snapshotVariant: "generate-split",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["open-split"],
+      heading: "Bring every chapter to life.",
+    },
+  },
+  "phase-help": {
+    label: "Help · phase guide",
+    description: "Existing keyboard-accessible phase help overlay.",
+    completedStages: throughImport,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["phase-help"],
+      heading: "Did we read the source correctly?",
+    },
+  },
+  "cast-voices": {
+    label: "Cast · audition review",
+    description:
+      "Representative reusable screen: three generation attempts, selected and unconfirmed voices.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Choose the cast voices.",
+    },
+  },
+  home: {
+    label: "Create · existing books",
+    description: "Import surface and books already in progress.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "home", actions: [] },
+  },
+  import: {
+    label: "Create · empty",
+    description:
+      "Empty import surface; PDF selection is local to this preview.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "empty-books",
+    story: { surface: "home", actions: [] },
+  },
+  "home-error": {
+    label: "Create · book-open error",
+    description:
+      "Failed book snapshot request rendered by the real application.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "home-error",
+    story: { surface: "home", actions: ["open-book-error"] },
+  },
+  "delete-dialog": {
+    label: "Create · delete dialog",
+    description: "Deletion confirmation; any deletion is in memory only.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "home", actions: ["open-delete-dialog"] },
+  },
+  library: {
+    label: "Library · populated",
+    description:
+      "Complete and partial exports; synthetic metadata, no downloadable audio.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "library-populated",
+    story: { surface: "library", actions: [], heading: "Your audiobooks" },
+  },
+  "library-empty": {
+    label: "Library · empty",
+    description: "No exported audiobooks.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "library", actions: [], heading: "Your audiobooks" },
+  },
+  "library-loading": {
+    label: "Library · loading",
+    description: "Deterministically pending cold Library load.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "library-loading",
+    story: { surface: "library", actions: [] },
+  },
+  "library-error": {
+    label: "Library · error",
+    description: "Failed Library request.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "library-error",
+    story: { surface: "library", actions: [] },
+  },
+  extract: {
+    label: "Extract · preview",
+    description: "PDF comparison, extraction choices and warning.",
+    completedStages: throughImport,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Did we read the source correctly?",
+    },
+  },
+  dialogue: {
+    label: "Dialogue · setup",
+    description: "Detection settings and AI attribution choices.",
+    completedStages: throughExtract,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Build the transcript",
+    },
+  },
+  "dialogue-conflicts": {
+    label: "Dialogue · conflicts",
+    description: "Overlapping detection rules requiring a decision.",
+    completedStages: throughExtract,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "conflicts",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Build the transcript",
+    },
+  },
+  "dialogue-results": {
+    label: "Dialogue · results",
+    description:
+      "Draft dialogue results, corrections and attribution evidence.",
+    completedStages: throughExtract,
+    snapshotVariant: "dialogue-results",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Your transcript is ready",
+    },
+  },
+  review: {
+    label: "Review · warnings",
+    description: "Grouped warnings, evidence and consequence choices.",
+    completedStages: throughDialogue,
+    snapshotVariant: "review-warnings",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["scan-review"],
+      heading: "Review the decisions that affect your audiobook.",
+    },
+  },
+  "review-boundaries": {
+    label: "Review · chapters",
+    description: "Chapter heading decision and anchored examples.",
+    completedStages: throughDialogue,
+    snapshotVariant: "review-boundaries",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["scan-review"],
+      heading: "Review the decisions that affect your audiobook.",
+    },
+  },
+  "review-final": {
+    label: "Review · final transcript",
+    description: "Side-by-side source and reader transcript.",
+    completedStages: throughDialogue,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["scan-review", "open-final-review"],
+      heading: "Read it once like a listener.",
+    },
+  },
+  "cast-identities": {
+    label: "Cast · identity review",
+    description: "Ambiguous identity review suggestions and merge workspace.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "identity-review",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Build the cast." },
+  },
+  "cast-dense": {
+    label: "Cast · 60 identities",
+    description:
+      "Dense synthetic ensemble with review suggestions and long labels.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "dense-identities",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Build the cast." },
+  },
+  "cast-voices-dense": {
+    label: "Cast · 60 voices",
+    description: "Dense audition review with confirmed and unconfirmed voices.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "dense-voices",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Choose the cast voices.",
+    },
+  },
+  generate: {
+    label: "Generate · chapters",
+    description:
+      "Prepared script, chapter selections and current generated audio.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Bring every chapter to life.",
+    },
+  },
+  export: {
+    label: "Export · edition",
+    description: "Current chapter selection, cover and export formats.",
+    completedStages: throughCast,
+    snapshotVariant: "default",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["export"],
+      heading: "Package your audiobook.",
+    },
+  },
+  "export-long-book": {
+    label: "Export · 20 chapters",
+    description:
+      "Twenty synthetic generated chapters for reviewing selection density and export settings.",
+    completedStages: throughCast,
+    snapshotVariant: "export-long-book",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: ["export"],
+      heading: "Package your audiobook.",
+    },
+  },
+} as const satisfies Record<string, ScenarioMetadata>;
+
+export type ScenarioId = keyof typeof scenarioMetadata;
+
+/** Public catalogue derived from the same exhaustive source as its fixtures. */
+export const scenarios = Object.entries(scenarioMetadata).map(
+  ([id, { label, description }]) => ({
+    id: id as ScenarioId,
+    label,
+    description,
+  }),
+);
+
+export function metadataFor(id: ScenarioId): ScenarioMetadata {
+  return scenarioMetadata[id];
+}

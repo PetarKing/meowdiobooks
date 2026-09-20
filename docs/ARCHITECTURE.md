@@ -21,6 +21,18 @@ The browser application follows the same split. `App` owns the public local prod
 a `WorkflowGateway`. The default `HttpWizardApi` implements that gateway. Workflow navigation, cast,
 generation, dialogue, review, and presentation logic live outside the composition component.
 
+The frontend page views in `frontend/src/pages` receive typed selections from
+`app/useWorkflowModel`; the model owns workflow state and commands. Page extraction preserves
+the accepted application's existing mount boundaries. Render functions invoked directly by the
+shell remain hook-free; reusable stateful components mount normally inside those views.
+Storybook exercises the same source with deterministic synthetic gateways. It is a development
+surface and is excluded from the consumer package.
+
+`PresentationRoot` owns optional semantic palette values, without changing workflow behavior.
+Its roots cannot nest; full art directions use separate preview frames. The public unlayered
+`product.css` entry is loaded once before host overrides; `App` does not load global CSS as a side
+effect. See [the design-system contract](../frontend/DESIGN_SYSTEM.md) for ownership and compatibility.
+
 Voice-sample transcription is a narrow best-effort boundary: the browser uploads one temporary sample,
 the selected local adapter returns editable text plus an optional detected language, and neither result
 is published as an artifact. The current adapter is MLX-Audio on Apple Silicon. A Linux adapter may

@@ -1,0 +1,10 @@
+/* Public full-product entry. Keep these unlayered, in accepted-main order.
+   Consumers load this once before their own ordinary CSS overrides. */
+@import "../components/LanguagePicker.css";
+@import "../components/CastingChoice.css";
+@import "../components/CastIdentityReview.css";
+@import "../styles.css";
+@import "../media.css";
+@import "../components/dialog-surface.css";
+
+[data-presentation-root] { color: var(--color-ink, var(--ink)); }

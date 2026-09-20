@@ -175,6 +175,17 @@ describe("CastVoiceReview", () => {
     expect(refreshedPreview).not.toBe(originalPreview);
     expect(refreshedPreview).toHaveAttribute("src", "/api/books/book-1/voices/layered/audio?member=subaru%3Asubaru-2&member=cecilus%3Acecilus-1");
     expect(screen.getByRole("button", { name: "Play Subaru & Cecilus preview" })).toBeEnabled();
+
+    const resolvePreview = vi.fn(() => "/host/layered-preview.wav");
+    view.rerender(<CastVoiceReview bookId="book-1" cast={groupCast} selections={{ subaru: "subaru-2", cecilus: "cecilus-1" }} routes={route} layeredVoicePreviewUrl={resolvePreview} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
+    expect(resolvePreview).toHaveBeenCalledWith("book-1", [
+      { characterId: "subaru", revision: "subaru-2" },
+      { characterId: "cecilus", revision: "cecilus-1" },
+    ]);
+    expect(screen.getByText("Combined preview").closest(".voice-route-preview")?.querySelector("audio")).toHaveAttribute("src", "/host/layered-preview.wav");
+    resolvePreview.mockClear();
+    view.rerender(<CastVoiceReview bookId="book-1" cast={groupCast} selections={{}} routes={{ "subaru-cecilus": { kind: "layered", characterIds: ["subaru", "missing"] } }} layeredVoicePreviewUrl={resolvePreview} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
+    expect(resolvePreview).not.toHaveBeenCalled();
   });
 
   it("pins Narrator, orders the cast by line count, and shows counts on tiles", () => {

@@ -1,3 +1,4 @@
+import { InspectorDialog as InspectorShell } from "./Ui";
 import {
   useCallback,
   useEffect,
@@ -564,10 +565,6 @@ export function CastIdentityReview({
   </div>;
 }
 
-
-function InspectorShell({ label, closing, onClose, onClosed, children }: { label: string; closing: boolean; onClose: () => void; onClosed: () => void; children: React.ReactNode }) {
-  return <div className={`cast-inspector-backdrop ${closing ? "closing" : ""}`} onClick={(event) => { if (event.target === event.currentTarget) onClose(); }}><section role="dialog" aria-modal="true" className={`cast-inspector ${closing ? "closing" : ""}`} aria-label={label} onAnimationEnd={(event) => { if (event.target === event.currentTarget && closing) onClosed(); }}>{children}</section></div>;
-}
 
 function EvidenceCard({ label, dossier, proposal, primary = false, action }: { label: string; dossier?: CastDossier; proposal?: CastProposal; primary?: boolean; action?: React.ReactNode }) {
   const { t } = useTranslation();

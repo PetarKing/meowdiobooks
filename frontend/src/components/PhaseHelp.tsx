@@ -133,7 +133,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
 
   const dialog = open ? createPortal(<div className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`phase-help phase-help-${stage}`}>
-      <header className="phase-help-head">
+      <header className="phase-help-head" role="none">
         <div className="phase-help-number" aria-hidden="true">{guide.number}</div>
         <div><span className="eyebrow">{t("A quick guide to {{phase}}", { phase: t(guide.label) })}</span><h2 id={titleId}>{t(guide.title)}</h2></div>
         <button ref={closeRef} type="button" className="phase-help-close" aria-label={t("Close phase guide")} onClick={close}>×</button>

@@ -53,7 +53,7 @@ describe("CastingChoice", () => {
     expect(screen.getByText("Up to 4 new voices")).toBeInTheDocument();
     expect(screen.queryByText(/\d+ AI matches/)).not.toBeInTheDocument();
     expect(screen.getByText("AI checks for more matches when you continue.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
   });
   it("toggles books without reordering controls or moving rows", async () => {
     const fetchPreview = vi.fn().mockResolvedValue(preview);

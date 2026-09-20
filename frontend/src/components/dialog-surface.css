@@ -1,0 +1,2 @@
+/* Focus is placed on the modal surface at entry; controls retain their focus rings. */
+.dialog-surface:focus { outline: 0; }
