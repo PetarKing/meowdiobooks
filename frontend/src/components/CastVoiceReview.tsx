@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useTranslation } from "react-i18next";
-import type { CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
+import type { WorkflowGateway, CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
 import { suggestedMemberIds } from "../voiceRoutes";
 
 interface Props {
   bookId: string;
+  layeredVoicePreviewUrl?: WorkflowGateway["layeredVoicePreviewUrl"];
   cast: CastArtifact;
   selections: Record<string, string>;
   routes: Record<string, VoiceRoute>;
@@ -93,16 +94,20 @@ function layeredPreviewUrl(
   voices: CastVoice[],
   routes: Record<string, VoiceRoute>,
   selections: Record<string, string>,
+  resolvePreview?: WorkflowGateway["layeredVoicePreviewUrl"],
 ) {
   const route = routeFor(voice, routes);
   if (route.kind !== "layered" || route.characterIds.length < 2) return undefined;
   const params = new URLSearchParams();
+  const members: { characterId: string; revision: string }[] = [];
   for (const characterId of route.characterIds) {
     const member = voices.find((candidate) => candidate.characterId === characterId);
     const audition = member ? tilePreviewFor(member, selections) : undefined;
     if (!member || member.category !== "character" || !audition) return undefined;
+    members.push({ characterId, revision: audition.revision });
     params.append("member", `${characterId}:${audition.revision}`);
   }
+  if (resolvePreview) return resolvePreview(bookId, members);
   return `/api/books/${encodeURIComponent(bookId)}/voices/layered/audio?${params.toString()}`;
 }
 
@@ -185,7 +190,7 @@ function audioTime(seconds: number) {
 }
 
 export function CastVoiceReview({
-  bookId, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
+  bookId, layeredVoicePreviewUrl, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
 }: Props) {
   const { t } = useTranslation();
   const voices = useMemo(
@@ -212,7 +217,7 @@ export function CastVoiceReview({
     [sharedGroupColors],
   );
   const previewUrlFor = (voice: CastVoice) => routeFor(voice, routes).kind === "layered"
-    ? layeredPreviewUrl(bookId, voice, voices, routes, selections)
+    ? layeredPreviewUrl(bookId, voice, voices, routes, selections, layeredVoicePreviewUrl)
     : tilePreviewFor(voice, selections)?.previewUrl;
   const routeReady = (voice: CastVoice) => {
     const route = routeFor(voice, routes);

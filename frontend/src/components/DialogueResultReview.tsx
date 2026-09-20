@@ -1,3 +1,4 @@
+import { SourceExcerpt } from "./SourceExcerpt";
 import { useId, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { DialogueArtifact, DialogueExample, DialogueReaderAssignment } from "../api/contracts";
@@ -38,10 +39,10 @@ export function DialogueComposition({ dialogue, compact = false }: { dialogue: D
   ].filter(({ count }) => count > 0);
   return <div className={`dialogue-composition-summary ${compact ? "compact" : ""}`}>
     <strong>{t("{{count}} dialogue lines", { count: counts.total })}</strong>
-    <div className="dialogue-book-composition" aria-label={t("Dialogue assignment summary")}>
+    <div className="dialogue-book-composition" role="img" aria-label={t("Dialogue assignment summary")}>
       {parts.map(({ key, count }) => <i className={key} key={key} style={{ width: `${count / denominator * 100}%` }} />)}
     </div>
-    <div className="dialogue-reader-legend" aria-label={t("Reader assignment legend")}>
+    <div className="dialogue-reader-legend" role="group" aria-label={t("Reader assignment legend")}>
       {parts.map(({ key, count, label }) => <span className={key} key={key}><b>{count}</b>{t(label)}</span>)}
     </div>
   </div>;
@@ -203,7 +204,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
           <small>{t("Source · page {{page}}", { page: row.page })}</small>
           {canExpandContext && <button type="button" className="source-context-toggle" aria-label={t(contextExpanded ? "Show less source context" : "Show more source context")} aria-expanded={contextExpanded} onClick={() => setExpandedContext((current) => ({ ...current, [row.spanId]: !current[row.spanId] }))}><span aria-hidden="true">{contextExpanded ? "−" : "+"}</span>{t(contextExpanded ? "Less context" : "More context")}</button>}
         </div>
-        <div className={`ai-source-evidence ${contextExpanded ? "expanded" : ""}`}>{contextBefore && <p>{contextBefore}</p>}<mark>{row.source}</mark>{contextAfter && <p>{contextAfter}</p>}</div>
+        <SourceExcerpt className={`ai-source-evidence ${contextExpanded ? "expanded" : ""}`} source={row.source} contextBefore={contextBefore} contextAfter={contextAfter} />
       </div>
       <div>
         <div className="dialogue-decision-heading">
@@ -303,7 +304,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
           {visibleReaderAssignments.map((assignment) => <div className={`dialogue-reader-card ${assignment.label === "Narrator" ? "narrator" : ""}`} key={assignment.label}>
             <div><span>{assignment.label === "Narrator" ? t("Narrator") : assignment.label}</span><b>{assignment.total}</b></div>
             <span className="dialogue-reader-track">
-              <span className="dialogue-reader-composition" aria-label={readerBreakdown(assignment, t)} style={{ width: `${assignment.total / largestReaderTotal * 100}%` }}>
+              <span className="dialogue-reader-composition" role="img" aria-label={readerBreakdown(assignment, t)} style={{ width: `${assignment.total / largestReaderTotal * 100}%` }}>
                 {assignment.label === "Narrator"
                   ? <i className="fallback" style={{ width: "100%" }} />
                   : <>

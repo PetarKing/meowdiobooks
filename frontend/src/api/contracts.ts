@@ -619,6 +619,10 @@ export type AcceptanceDecision =
 
 /** Public application boundary. Hosted editions compose around this gateway. */
 export interface WorkflowGateway {
+  /** Optional media resolution for hosts and isolated previews; HTTP remains the default. */
+  sourcePageImageUrl?(bookId: string, page: number): string;
+  libraryCoverImageUrl?(exportId: string): string;
+  layeredVoicePreviewUrl?(bookId: string, members: readonly { characterId: string; revision: string }[]): string;
   listBooks(): Promise<LocalBook[]>;
   deleteBook(bookId: string): Promise<void>;
   getRepresentativePages(bookId: string): Promise<RepresentativePage[]>;

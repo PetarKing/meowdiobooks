@@ -1,0 +1,176 @@
+import type {
+  AcceptanceDecision,
+  ReviewCapability,
+  WizardSnapshot
+} from "../api/contracts";
+import type { WorkflowModel } from "../app/useWorkflowModel";
+import { Panel, Tag } from "../components/Ui";
+import { AcceptedSummary, PageTitle, ReviewTranscriptFinalCheck, StageLaunch } from "../pages/shared";
+import { buildReviewWarningDecisions } from "../reviewDecisions";
+import {
+  message
+} from "../workflow/presentation";
+import {
+  normalizeCandidateWarnings,
+  reviewActionTitle,
+  reviewConsequence,
+  reviewDecisionActions,
+  reviewGuidance,
+  reviewQuestion,
+  reviewWarningLabel,
+} from "../workflow/review";
+
+export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
+
+export function ReviewPage({ model }: { model: ReviewPageModel; }) {
+  const { acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const candidateWarnings = (reviewCandidate ? normalizeCandidateWarnings(reviewCandidate) : snapshot?.warnings ?? []).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
+  const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
+  const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
+  const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
+  const boundary = boundaries[Math.min(activeBoundary, Math.max(0, boundaries.length - 1))];
+  const showingBoundary = boundaries.length > 0 && (activeReviewGroup === "chapters" || candidateWarnings.length === 0);
+  const complete = candidateWarnings.every((row) => Boolean(reviewDecisions[row.id])) && boundaries.every((row) => Boolean(boundaryDecisions[row.id]));
+  const totalGroups = candidateWarnings.length + (boundaries.length ? 1 : 0);
+  const decidedGroups = candidateWarnings.filter((row) => Boolean(reviewDecisions[row.id])).length + (boundaries.length && boundaries.every((row) => Boolean(boundaryDecisions[row.id])) ? 1 : 0);
+  const totalOccurrences = boundaries.length + candidateWarnings.reduce((total, row) => total + row.occurrences.length, 0);
+  const decidedOccurrences = Object.keys(boundaryDecisions).filter((id) => boundaries.some((row) => row.id === id)).length + candidateWarnings.reduce((total, row) => total + (reviewDecisions[row.id] ? row.occurrences.length : 0), 0);
+
+  function revealReviewGroup(group: string) {
+    const target = reviewStripRef.current?.querySelector<HTMLElement>(`[data-review-group="${group}"]`);
+    target?.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
+
+  function openWarning(index: number) {
+    setActiveReviewGroup("warnings");
+    setActiveWarning(index);
+    setActiveOccurrence(0);
+    revealReviewGroup(`warning-${index}`);
+  }
+
+  function openBoundary(index: number) {
+    setActiveReviewGroup("chapters");
+    setActiveBoundary(index);
+    revealReviewGroup("chapters");
+  }
+
+  function chooseBoundaryAction(boundaryId: string, action: "chapter-start" | "not-a-boundary") {
+    const nextDecisions = { ...boundaryDecisions, [boundaryId]: action };
+    setBoundaryDecisions(nextDecisions);
+    if (boundaryDecisions[boundaryId]) return;
+    const indices = [...boundaries.keys()];
+    const nextBoundary = [...indices.slice(activeBoundary + 1), ...indices.slice(0, activeBoundary + 1)].find((index) => !nextDecisions[boundaries[index].id]);
+    if (nextBoundary !== undefined) return setActiveBoundary(nextBoundary);
+    const nextWarning = candidateWarnings.findIndex((row) => !reviewDecisions[row.id]);
+    if (nextWarning >= 0) openWarning(nextWarning);
+  }
+
+  function acceptAllBoundaries() {
+    setBoundaryDecisions(Object.fromEntries(boundaries.map((row) => [row.id, "chapter-start"] as const)));
+    const nextWarning = candidateWarnings.findIndex((row) => !reviewDecisions[row.id]);
+    if (nextWarning >= 0) openWarning(nextWarning);
+  }
+
+  function chooseReviewAction(warningId: string, action: ReviewCapability) {
+    const nextDecisions = { ...reviewDecisions, [warningId]: action };
+    setReviewDecisions(nextDecisions);
+    setActiveOccurrence(0);
+
+    if (reviewDecisions[warningId]) return;
+    const currentIndex = candidateWarnings.findIndex((row) => row.id === warningId);
+    const nextWarning = [
+      ...candidateWarnings.slice(currentIndex + 1),
+      ...candidateWarnings.slice(0, currentIndex),
+    ].find((row) => !nextDecisions[row.id]);
+    if (nextWarning) return openWarning(candidateWarnings.findIndex((row) => row.id === nextWarning.id));
+    const nextBoundary = boundaries.findIndex((row) => !boundaryDecisions[row.id]);
+    if (nextBoundary >= 0) openBoundary(nextBoundary);
+  }
+
+  function scrollReviewGroups(direction: -1 | 1) {
+    reviewStripRef.current?.scrollBy({ left: direction * 280, behavior: "smooth" });
+  }
+  async function acceptReview() {
+    if (!book || !reviewCandidate?.revision) return;
+    setReviewTransition(true);
+    setProcessMessage("Applying review decisions");
+    setProgress(25);
+    try {
+      const decisions: AcceptanceDecision[] = [...await buildReviewWarningDecisions(
+        book.id,
+        String(reviewCandidate.revision),
+        candidateWarnings,
+        reviewDecisions,
+        gateway.previewReviewBulk.bind(gateway),
+      )];
+      setProgress(60);
+      decisions.push(...boundaries.map((row) => ({ boundaryId: row.id, action: boundaryDecisions[row.id] })));
+      await acceptCandidate("review", reviewCandidate, decisions);
+      setProgress(100);
+    } finally {
+      setReviewTransition(false);
+    }
+  }
+  if (!reviewCandidate && completed.includes("review") && !revisingStages.includes("review")) return <AcceptedSummary stage="review" step={t("Step 3")} title={t("Review complete")} revision={snapshot?.activeArtifacts.review} onRevise={() => setRevisingStages([...new Set([...revisingStages, "review"])])}><span><b>{snapshot?.reviewInspection.decisions.length ?? 0}</b><small>{t("Issues resolved")}</small></span><span><b>{snapshot?.chapters.length ?? 0}</b><small>{t("Chapters confirmed")}</small></span><span><b>{t("Ready")}</b><small>{t("For cast & voices")}</small></span></AcceptedSummary>;
+  if (!reviewCandidate) return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("Check for issues")} copy={t("Scan extraction, layout, chapter boundaries and delivery before choosing what happens.")} /><StageLaunch><button className="primary" disabled={busy} onClick={() => void processCandidate("review", {}, false).then((candidate) => { setReviewCandidate(candidate); setReviewDecisions({}); setBoundaryDecisions({}); setActiveBoundary(0); setActiveWarning(0); setActiveOccurrence(0); setActiveReviewGroup(Array.isArray(candidate.boundaryCandidates) && candidate.boundaryCandidates.length ? "chapters" : "warnings"); }).catch((reason) => setError(message(reason)))}>{t("Scan for issues")} →</button></StageLaunch></>;
+  const recovery = reviewCandidate?.recovery;
+  if (recovery) { const recoveryMessage = String(recovery.message ?? "Rebuild Dialogue before continuing."); return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("The transcript needs rebuilding before review.")} copy={t("Extraction completed successfully, but the transcript no longer maps back to every extracted character exactly.")} /><Panel eyebrow={t("Source safety check")} title={t("Nothing was lost or accepted incorrectly")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}><p className="panel-copy">{t(recoveryMessage, { defaultValue: recoveryMessage })}</p><div className="strategy-list two"><button className="strategy-card" onClick={() => { setRevisingStages([...new Set([...revisingStages, "dialogue"])]); setStage(stageIndex("dialogue")); }}><strong>{t("Rebuild Dialogue")}</strong><small>{t("Recommended. Keep the accepted extraction and create a fresh source-exact transcript.")}</small></button><button className="strategy-card" onClick={() => { setRevisingStages([...new Set([...revisingStages, "extract"])]); setStage(stageIndex("extract")); }}><strong>{t("Try another extraction")}</strong><small>{t("Use this only when the extracted words or reading order are themselves wrong.")}</small></button></div></Panel></>; }
+  if (reviewFinalCheck) return <ReviewTranscriptFinalCheck
+    preview={reviewTranscriptPreview}
+    loading={reviewPreviewLoading}
+    page={reviewPreviewPage}
+    pageCount={reviewTranscriptPreview?.pageCount ?? book?.pageCount ?? 1}
+    busy={busy || reviewTransition}
+    onPageChange={setReviewPreviewPage}
+    onBack={() => setReviewFinalCheck(false)}
+    onAccept={() => void acceptReview().catch((reason) => setError(message(reason)))}
+  />;
+  return <>
+    <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Review the decisions that affect your audiobook.")} copy={t("Check the examples and choose what to keep or skip. Changes apply when you accept the review.")} />
+    {totalGroups === 0 ? <section className="review-empty"><span aria-hidden="true">✓</span><h2>{t("No warning groups")}</h2><p>{t("No chapter boundaries or source issues need a decision.")}</p></section> : <>
+      <div className="review-progress-line"><span>{t("{{decided}} of {{total}} review groups decided", { decided: decidedGroups, total: totalGroups })}</span><span>{t("{{decided}} of {{total}} anchored items reviewed", { decided: decidedOccurrences, total: totalOccurrences })}</span></div>
+      <div className="review-group-nav">
+        <button type="button" className="review-scroll-button previous" aria-label={t("Show previous review groups")} onClick={() => scrollReviewGroups(-1)}>‹</button>
+        <nav className="review-strip" aria-label={t("Review groups")} ref={reviewStripRef}>
+          {boundaries.length > 0 && <button data-review-group="chapters" className={[showingBoundary ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
+          {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} className={[!showingBoundary && index === activeWarning ? "active" : "", reviewDecisions[row.id] ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewDecisions[row.id] ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t("{{count}} occurrences · {{severity}}", { count: row.occurrences.length, severity: t(row.severity) })}</small></span></button>)}
+        </nav>
+        <button type="button" className="review-scroll-button next" aria-label={t("Show more review groups")} onClick={() => scrollReviewGroups(1)}>›</button>
+      </div>
+      <div className={["review-workspace", showingBoundary ? "chapter-workspace" : "warning-workspace"].join(" ")}>
+        {showingBoundary && boundary ? <>
+          <section className="review-evidence chapter-review-evidence">
+            <div className="review-group-heading"><span><small>{t("Chapter boundary")}</small><h2>{t("Chapter starts")}</h2><p>{t("Confirm whether this detected heading begins a new audiobook chapter.")}</p></span><Tag tone="good">{t("Structure")}</Tag></div>
+            <div className="occurrence-meta"><b>{t("Heading {{current}} of {{total}}", { current: activeBoundary + 1, total: boundaries.length })}</b><span>{t("Page {{page}}", { page: boundary.page })}</span></div>
+            <div className="chapter-heading-evidence" aria-label={t("Chapter heading evidence")}><span>{t("Candidate heading")}</span><i aria-hidden="true">✦</i><h3>{boundary.source}</h3><p>{t(boundary.reason ?? "Detected from an explicit standalone chapter heading.", { defaultValue: boundary.reason ?? t("Detected from an explicit standalone chapter heading.") })}</p></div>
+            <p className="evidence-help">{t("This sets where the next audio chapter begins. The heading text stays unchanged.")}</p>
+            <div className="warning-nav"><button disabled={activeBoundary === 0} onClick={() => setActiveBoundary(activeBoundary - 1)}>← {t("Previous heading")}</button><button disabled={activeBoundary >= boundaries.length - 1} onClick={() => setActiveBoundary(activeBoundary + 1)}>{t("Next heading")} →</button></div>
+          </section>
+          <aside className="resolution-panel">
+            <div className="review-scope"><b>{t("Applies to this heading only")}</b><small>{boundaries.length === 1 ? t("This is the only detected chapter heading.") : t("The other {{count}} candidates keep a separate decision.", { count: boundaries.length - 1 })}</small></div>
+            <h3>{t("Does this heading start a new chapter?")}</h3>
+            <div className="resolution-options" role="group" aria-label={t("Chapter decision for {{heading}}", { heading: boundary.source })}><button className={boundaryDecisions[boundary.id] === "chapter-start" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "chapter-start")}><b>{t("Start a new chapter")}</b><small>{t("Audio before this heading stays in the previous chapter.")}</small></button><button className={boundaryDecisions[boundary.id] === "not-a-boundary" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "not-a-boundary")}><b>{t("Keep inside the current chapter")}</b><small>{t("This heading will not create a chapter break.")}</small></button></div>
+            {boundaryDecisions[boundary.id] && <div className="review-consequence"><b>{t("Consequence")}</b><span>{t(boundaryDecisions[boundary.id] === "chapter-start" ? "A new audio chapter begins at this exact heading." : "The heading stays inside the current audio chapter.")}</span></div>}
+            {boundaries.length > 1 && !boundaries.every((row) => boundaryDecisions[row.id] === "chapter-start") && <div className="chapter-bulk-choice"><span><b>{t("Same decision for every heading?")}</b><small>{t("Mark all {{count}} detected headings as chapter starts. You can still change any one afterward.", { count: boundaries.length })}</small></span><button className="ghost review-bulk-button" onClick={acceptAllBoundaries}>{t("Mark all {{count}} as chapter starts", { count: boundaries.length })}</button></div>}
+          </aside>
+        </> : warning && occurrence ? <>
+          <section className="review-evidence">
+            <div className="review-group-heading"><span><small>{t("Source issue")}</small><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span><Tag tone={warning.severity === "blocking" ? "rose" : "warn"}>{t(warning.severity)}</Tag></div>
+            <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{t("Page {{page}}", { page: occurrence.page })}</span></div>
+            <div className="source-window" aria-label={t("Manuscript context")}><div className="context-boundary">{t("Text immediately before")}</div>{occurrence.contextBefore ? <p className="context">{occurrence.contextBefore}</p> : <p className="context unavailable">{t("No preceding text in this extraction window.")}</p>}<p className="detected-span"><span>{t("Flagged text")}</span><mark>{occurrence.source || t("No text was extracted here")}</mark></p><div className="context-boundary">{t("Text immediately after")}</div>{occurrence.contextAfter ? <p className="context">{occurrence.contextAfter}</p> : <p className="context unavailable">{t("No following text in this extraction window.")}</p>}</div>
+            <p className="evidence-help">{t("Only the highlighted text changes. Surrounding text stays unchanged.")}</p>
+            <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
+          </section>
+          <aside className="resolution-panel">
+            <div className="review-scope"><b>{t("Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t("Review each example on the left before choosing once.")}</small></div>
+            <h3>{t(reviewQuestion(warning.kind))}</h3>
+            <div className="resolution-options">{warning.availableActions.map((action) => <button key={action} className={reviewDecisions[warning.id] === action ? "selected" : ""} onClick={() => chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, warning))}</b><small>{reviewConsequence(action, warning, t)}</small></button>)}</div>
+            {reviewDecisions[warning.id] && <div className="review-consequence"><b>{t("Consequence")}</b><span>{reviewConsequence(reviewDecisions[warning.id], warning, t)}</span></div>}
+          </aside>
+        </> : null}
+      </div>
+    </>}
+    <div className="phase-action"><span>{t("{{decided}} of {{total}} review groups decided", { decided: decidedGroups, total: totalGroups })}</span><button className="primary" disabled={!complete || busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button></div>
+  </>;
+
+}

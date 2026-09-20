@@ -1,4 +1,64 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { DialogSurface } from "./DialogSurface";
+import { useEffect, useId, useRef, useState, type ComponentPropsWithRef, type ReactNode } from 'react'
+
+export type ButtonProps = ComponentPropsWithRef<"button"> & {
+  variant?: "primary" | "ghost" | "unstyled";
+  compact?: boolean;
+};
+
+/** Shared action control. Unstyled keeps specialized tabs, tiles and icon controls intact. */
+export function Button({
+  variant = "primary",
+  compact = false,
+  className,
+  type = "button",
+  ...props
+}: ButtonProps) {
+  const classes = [
+    variant === "unstyled" ? undefined : variant,
+    compact ? "compact" : undefined,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return <button type={type} className={classes || undefined} {...props} />;
+}
+
+export function InspectorDialog({
+  label,
+  closing,
+  onClose,
+  onClosed,
+  className,
+  children,
+}: {
+  label: string;
+  closing: boolean;
+  onClose: () => void;
+  onClosed: () => void;
+  className?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      className={`cast-inspector-backdrop ${closing ? "closing" : ""}`}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <DialogSurface
+        onDismiss={onClose}
+        className={`cast-inspector ${className ?? ""} ${closing ? "closing" : ""}`}
+        aria-label={label}
+        onAnimationEnd={(event) => {
+          if (event.target === event.currentTarget && closing) onClosed();
+        }}
+      >
+        {children}
+      </DialogSurface>
+    </div>
+  );
+}
 
 export function Panel({ title, eyebrow, children, actions }: { title: string; eyebrow?: string; children: ReactNode; actions?: ReactNode }) {
   return <section className="panel"><header className="panel-head"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h2>{title}</h2></div>{actions}</header>{children}</section>
@@ -26,7 +86,7 @@ export function Choice({ selected, title, text, onClick, badge, detail, detailLa
   }, [clicked])
 
   return <div ref={shellRef} className={`choice-shell ${detail ? 'has-detail' : ''}`}>
-    <button type="button" className={`choice ${selected ? 'selected' : ''}`} onClick={onClick}><span className="choice-title">{title}{badge && <small>{badge}</small>}</span><span>{text}</span></button>
+    <Button variant="unstyled" type="button" className={`choice ${selected ? 'selected' : ''}`} aria-pressed={Boolean(selected)} onClick={onClick}><span className="choice-title">{title}{badge && <small>{badge}</small>}</span><span>{text}</span></Button>
     {detail && <>
       <span className="choice-info">
         <button
@@ -45,7 +105,7 @@ export function Choice({ selected, title, text, onClick, badge, detail, detailLa
           onMouseEnter={() => { setHovered(true); setDismissed(false) }}
           onMouseLeave={() => setHovered(false)}
           onKeyDown={(event) => { if (event.key === 'Escape') { setClicked(false); setDismissed(true) } }}
-        >i</button>
+        ><span aria-hidden="true">i</span></button>
       </span>
       <span id={tooltipId} role="tooltip" className={`choice-tooltip ${detailOpen ? 'visible' : ''}`} aria-hidden={!detailOpen}>{detail}</span>
     </>}
