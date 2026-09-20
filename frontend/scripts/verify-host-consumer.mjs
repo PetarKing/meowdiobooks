@@ -61,7 +61,11 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
     await page.goto(`http://127.0.0.1:${address.port}/${primitive ? '?primitive' : ''}`);
     const button = page.getByTestId('consumer');
     await button.waitFor();
-    const actual = await button.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, radius: getComputedStyle(element).borderRadius }));
+    // Measure cascade endpoints, not a transient colour during stylesheet loading.
+    const actual = await button.evaluate(element => {
+      element.style.transition = 'none';
+      return { background: getComputedStyle(element).backgroundColor, radius: getComputedStyle(element).borderRadius };
+    });
     assert.deepEqual(actual, { background: 'rgb(1, 23, 45)', radius: '3px' });
     const baseline = await button.evaluate(element => {
       const override = [...document.querySelectorAll('style')].find(style => style.dataset.viteDevId?.endsWith('/host.css'));
