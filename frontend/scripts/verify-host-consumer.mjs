@@ -28,7 +28,7 @@ try {
     .replace("from '../locales/edition'", "from 'meowdiobooks-workflow-ui/i18n'");
   await writeFile(path.join(host, 'hostCompatibility.tsx'), contract);
   await writeFile(path.join(host, 'index.html'), '<div id="root"></div><script type="module">import(new URLSearchParams(location.search).has("primitive") ? "/primitive.tsx" : "/main.tsx");</script>');
-  await writeFile(path.join(host, 'host.css'), '.primary { background: rgb(1, 23, 45); border-radius: 3px; }');
+  await writeFile(path.join(host, 'host.css'), '.primary { background: rgb(1, 23, 45); border-radius: 3px; } .primary:hover:not(:disabled) { background: rgb(2, 34, 56); }');
   await writeFile(path.join(host, 'primitive.tsx'), `import React from 'react'; import { createRoot } from 'react-dom/client'; import { Button, PresentationRoot } from 'meowdiobooks-workflow-ui/ui'; import 'meowdiobooks-workflow-ui/product.css'; import './host.css'; createRoot(document.getElementById('root')!).render(<PresentationRoot><Button data-testid="consumer">Standalone consumer</Button></PresentationRoot>);`);
   await writeFile(path.join(host, 'main.tsx'), `
 import React from 'react';
@@ -61,6 +61,9 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
     await page.goto(`http://127.0.0.1:${address.port}/${primitive ? '?primitive' : ''}`);
     const button = page.getByTestId('consumer');
     await button.waitFor();
+    // Headless platforms may initially place the pointer over the top-left control.
+    await page.mouse.move(1000, 600);
+    assert.equal(await button.evaluate(element => element.matches(':hover')), false);
     // Measure cascade endpoints, not a transient colour during stylesheet loading.
     const actual = await button.evaluate(element => {
       element.style.transition = 'none';
@@ -77,8 +80,11 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       return background;
     });
     assert.equal(baseline, 'rgb(237, 102, 89)', 'Canonical product CSS must supply accepted-main primary styling');
+    await button.hover();
+    const hover = await button.evaluate(element => getComputedStyle(element).backgroundColor);
+    assert.equal(hover, 'rgb(2, 34, 56)', 'An equal-specificity host hover rule must also win');
     assert.deepEqual(errors, []);
-    results.push({ consumer: primitive ? 'standalone primitive' : 'App host header', ...actual, baseline, errors });
+    results.push({ consumer: primitive ? 'standalone primitive' : 'App host header', ...actual, baseline, hover, errors });
     await page.close();
   }
   console.log(JSON.stringify({ packedFiles: packed.files.length, hostTypes: 'passed', equalSpecificityOverride: results }, null, 2));
