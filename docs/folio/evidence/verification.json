@@ -78,5 +78,26 @@
     "axe": 0,
     "horizontalOverflow": 0,
     "keyboard": "focus containment, Escape and opener restoration observed; local and remote action focus colors rechecked"
+  },
+  "adaptiveLayout": {
+    "enlargedDesktopFrames": 8,
+    "method": "Synthetic computed-font doubling; native browser zoom unverified",
+    "normalFrames": 16,
+    "normalViewports": [
+      390,
+      1440
+    ],
+    "finalPhoneActionWidth": 324,
+    "workflowBrowserRecheck": {
+      "stories": 40,
+      "passed": true
+    },
+    "consumerRecheck": "passed"
+  },
+  "systemAppearance": {
+    "liveEmulatedPreferenceTransitions": 8,
+    "settledSurfaceAndText": "passed",
+    "reload": "passed",
+    "hostOSSettingsChanged": false
   }
 }

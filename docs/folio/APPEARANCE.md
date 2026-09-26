@@ -66,3 +66,7 @@ node scripts/verify-appearance.mjs
 Component and product Storybook frames support `?appearance=light` and `?appearance=dark` for
 repeatable desktop and phone review. `scripts/review-design.mjs` receives appearance as its sixth
 command argument after preview URL, output directory, story filter and locale.
+
+## Live preference transition follow-up
+
+The isolated [System appearance check](evidence/system-appearance/report.json) exercised eight transitions against `2aeeac9`: System followed live emulated light/dark OS preferences; explicit Light and Dark stayed explicit; Dark persisted after reload; returning to System resumed following the OS preference. The verifier waits for settled background and text colors as well as the appearance attribute and native color scheme. No actual OS setting, user tab preference, provider or production API was changed. Reproduce with `node frontend/scripts/verify-system-appearance.mjs`.

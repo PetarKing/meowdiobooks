@@ -134,7 +134,7 @@
 .chapter-filter-tabs button small, .chapter-filter-tabs button[aria-selected="true"] small { font-size: 10px; color: var(--ink); background: var(--surface-soft); }
 .chapter-library-controls, .chapter-library-controls button { font-size: 11px; }
 .chapter-card-grid { display: flex; flex-direction: column; gap: 0; border-top: 1px solid var(--line); }
-.chapter-card { display: grid; grid-template-columns: 24px 32px minmax(0,1fr) 200px 40px; grid-template-rows: auto; align-items: center; gap: 16px; min-height: 86px; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+.chapter-card { display: grid; grid-template-columns: 24px minmax(32px,max-content) minmax(0,1fr) 200px 40px; grid-template-rows: auto; align-items: center; gap: 16px; min-height: 86px; padding: 14px 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 .chapter-card:hover { background: var(--surface-soft); transform: none; box-shadow: none; }
 .chapter-card.selected, .chapter-card.has-audio.selected { border-color: var(--line); background: var(--blush); box-shadow: inset 3px 0 var(--poppy); }
 .chapter-card.generated, .chapter-card.stale, .chapter-card.unavailable, .chapter-card-grid.has-selection .chapter-card:not(.selected):not(.unavailable) { opacity: 1; filter: none; background: transparent; border-color: var(--line); box-shadow: none; }
@@ -149,14 +149,18 @@
 .track-status.ready { color: var(--green); }
 .track-status.unavailable { color: var(--warning-ink); }
 .chapter-stale-label { font-size: 9px; background: var(--warning-soft); color: var(--warning-ink); border: 0; }
-.chapter-estimates, .chapter-card.generated .chapter-estimates, .chapter-card.stale .chapter-estimates { grid-column: 4; grid-row: 1; height: auto; align-self: center; display: grid; grid-template-columns: 1fr 1fr; margin: 0; padding: 0; border: 0; overflow: visible; background: transparent; }
+.chapter-estimates, .chapter-card.generated .chapter-estimates, .chapter-card.stale .chapter-estimates { grid-column: 4; grid-row: 1; height: auto; align-self: center; display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,5.5em),1fr)); margin: 0; padding: 0; border: 0; overflow: visible; background: transparent; }
 .chapter-estimates div { padding: 0 10px; gap: 5px; }
 .chapter-estimates dt { color: var(--muted); font-size: 9px; }
 .chapter-estimates dd { font: 500 11px var(--font-sans); white-space: normal; }
 .chapter-listen, .chapter-card.stale .chapter-listen { position: static; grid-column: 5; grid-row: 1; width: 34px; height: 34px; border: 1px solid var(--line); border-radius: 50%; background: var(--green-soft); color: var(--green); box-shadow: none; font-size: 11px; }
 .chapter-card.stale .chapter-listen { background: var(--warning-soft); color: var(--warning-ink); }
-.generation-selection { position: sticky; bottom: 12px; z-index: 5; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--paper); box-shadow: 0 8px 26px color-mix(in srgb,var(--ink) 10%,transparent); padding: 16px 20px; margin-top: 20px; gap: 20px; }
+.generation-selection { display: flex; flex-wrap: wrap; position: sticky; bottom: 12px; z-index: 5; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--paper); box-shadow: 0 8px 26px color-mix(in srgb,var(--ink) 10%,transparent); padding: 16px 20px; margin-top: 20px; gap: 20px; }
+.generation-selection-copy { flex: 1 1 190px; }
 .generation-selection-copy b { font-size: 12px; }
+.generation-selection dl { flex-wrap: wrap; max-width: 100%; }
+.generation-selection-actions { flex-wrap: wrap; margin-left: auto; max-width: 100%; }
+.generation-selection-actions .primary, .generation-selection-actions .ghost { white-space: normal; }
 .generation-selection dt { font-size: 9px; }
 .generation-selection dd { font-size: 12px; }
 .chapter-split-button { display: inline-flex; width: auto; min-height: 40px; padding: 8px 12px; gap: 8px; border: 1px solid var(--line); border-radius: 5px; background: var(--paper); color: var(--ink); font-size: 11px; }
@@ -246,8 +250,8 @@
   .chapter-estimates div { padding: 0; }
   .chapter-estimates div + div { padding-left: 10px; }
   .chapter-card h3 { font-size: 14px; }
-  .generation-selection { position: static; grid-template-columns: 1fr; gap: 14px; padding: 16px; }
-  .generation-selection-actions { grid-column: auto; flex-wrap: wrap; }
+  .generation-selection { display: grid; position: static; grid-template-columns: 1fr; gap: 14px; padding: 16px; }
+  .generation-selection-actions { grid-column: auto; flex-wrap: wrap; margin-left: 0; }
   .generation-selection-actions > .primary { width: 100%; }
   .export-sidebar { grid-template-columns: 1fr; }
   .export-preview { grid-column: auto; grid-template-columns: 74px minmax(0,1fr); gap: 16px; padding: 16px; }

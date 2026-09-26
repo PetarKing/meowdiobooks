@@ -127,3 +127,5 @@ html, body { background: var(--canvas, #f4f1eb); }
  .cat-mark { width: 24px; height: 28px; flex-shrink: 0; }
  .cat-mark img { width: 31px; height: 31px; }
 }
+
+.rail nav button strong { white-space: normal; overflow: visible; text-overflow: clip; }
