@@ -486,8 +486,9 @@ export function CastIdentityReview({
 
   return <div ref={workbenchRef} className="cast-workbench">
     <div className="cast-toolbar">
-      <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
+      <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Confirm required source labels before you can continue.")}</small>}<small className="desktop-drag-help">{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
       <div className="cast-toolbar-actions">
+        {remaining > 0 && <button type="button" className="primary compact" onClick={() => { const next = groups.find(group => group.needsReview); if (next) openInspector(next.primaryLabel); }}>{t("Review required identities")} →</button>}
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
         {!hideVoiceSettings && <details>
           <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
@@ -517,7 +518,7 @@ export function CastIdentityReview({
         <span className="cast-atomic-number">N</span><strong>♬</strong><b>{t("Narrator")}</b>
         <small>{t("{{count}} reassigned labels · destination only", { count: narratorAssignments?.labels.length ?? 0 })}</small>
       </button>
-      {visibleGroups.map((group) => { const index = groups.indexOf(group); const suspicious = group.needsReview && group.labels.length > 3; return <button
+      {visibleGroups.slice().sort((left, right) => Number(right.needsReview) - Number(left.needsReview)).map((group) => { const index = groups.indexOf(group); const suspicious = group.needsReview && group.labels.length > 3; return <button
         type="button"
         draggable
         ref={(element) => { tileRefs.current[group.primaryLabel] = element; }}

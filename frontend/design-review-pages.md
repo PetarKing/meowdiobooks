@@ -1,3 +1,5 @@
+> **Historical, rejected candidate.** The user rejected Nocturne on 26 September 2026. These checks do not establish design acceptance. Current work and evidence are in [Folio](../docs/folio/README.md).
+
 # Workflow screen review — Nocturne studio
 
 Reviewed against the neutral foundation (`a9b7922`), 26 September 2026. The objective is a

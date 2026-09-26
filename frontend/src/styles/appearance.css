@@ -1,0 +1,94 @@
+/* Folio appearance is local to each presentation root. Semantic host palette values
+   remain inline and take precedence; consumer styles remain ordinary unlayered CSS. */
+:root, [data-presentation-root] {
+  --folio-canvas: #f4f1eb;
+  --folio-paper: #fffdf8;
+  --folio-soft: #ece8df;
+  --folio-ink: #252b2c;
+  --folio-muted: #626967;
+  --folio-action: #b94630;
+  --folio-action-hover: #9c3725;
+  --folio-border: #d4d1c7;
+  --folio-border-strong: #9d9f96;
+  --folio-success: #286354;
+  --folio-warning: #805710;
+  --folio-danger: #a43538;
+  --action-ink: #fffdf8;
+  --danger-action: #a43538;
+  --danger-action-hover: #84292c;
+  --danger-action-ink: #fffdf8;
+  --inverse-surface: #252b2c;
+  --inverse-ink: #fffdf8;
+  --inverse-muted: #cfd4cc;
+  --cover-start: #40534e;
+  --cover-end: #252b2c;
+  --overlay: rgba(12, 19, 20, .64);
+  --shadow-color: 19 27 28;
+  color-scheme: light;
+}
+[data-presentation-root][data-appearance="dark"] {
+  --folio-canvas: #181e20;
+  --folio-paper: #222a2c;
+  --folio-soft: #2c3536;
+  --folio-ink: #f1eee5;
+  --folio-muted: #b3bdb8;
+  --folio-action: #f0a080;
+  --folio-action-hover: #ffb499;
+  --folio-border: #475353;
+  --folio-border-strong: #758380;
+  --folio-success: #86c7ad;
+  --folio-warning: #e7be78;
+  --folio-danger: #ffaaa6;
+  --action-ink: #252b2c;
+  --danger-action: #ffaaa6;
+  --danger-action-hover: #ffc0bd;
+  --danger-action-ink: #252b2c;
+  --inverse-surface: #111718;
+  --inverse-ink: #f1eee5;
+  --inverse-muted: #b3bdb8;
+  --cover-start: #40534e;
+  --cover-end: #182021;
+  --shadow-color: 0 0 0;
+  color-scheme: dark;
+}
+:root, [data-presentation-root] {
+  --canvas: var(--folio-canvas);
+  --cream: var(--canvas);
+  --paper: var(--color-paper, var(--folio-paper));
+  --surface-raised: var(--paper);
+  --surface-soft: var(--folio-soft);
+  --ink: var(--color-ink, var(--folio-ink));
+  --ink-soft: var(--ink);
+  --muted: var(--color-muted, var(--folio-muted));
+  --poppy: var(--color-action, var(--folio-action));
+  --poppy-dark: var(--color-action-hover, var(--folio-action-hover));
+  --rose: var(--poppy);
+  --rose-dark: var(--poppy-dark);
+  --plum: var(--poppy-dark);
+  --blush: color-mix(in srgb, var(--poppy) 9%, var(--paper));
+  --lavender: var(--blush); /* Legacy public alias retained for host compatibility. */
+  --line: var(--color-border, var(--folio-border));
+  --line-strong: var(--folio-border-strong);
+  --green: var(--color-success, var(--folio-success));
+  --green-soft: color-mix(in srgb, var(--green) 11%, var(--paper));
+  --success-border: color-mix(in srgb, var(--green) 44%, var(--paper));
+  --amber: var(--color-warning, var(--folio-warning));
+  --honey: #e7be78;
+  --warning-ink: var(--amber);
+  --warning-soft: color-mix(in srgb, var(--amber) 11%, var(--paper));
+  --warning-border: color-mix(in srgb, var(--amber) 46%, var(--paper));
+  --danger-ink: var(--folio-danger);
+  --danger-soft: color-mix(in srgb, var(--danger-ink) 9%, var(--paper));
+  --danger-border: color-mix(in srgb, var(--danger-ink) 44%, var(--paper));
+  --highlight: color-mix(in srgb, var(--amber) 16%, var(--paper));
+  --shadow-sm: 0 4px 14px rgb(var(--shadow-color) / .07);
+  --shadow: 0 16px 44px rgb(var(--shadow-color) / .1);
+  --shadow-lg: 0 28px 80px rgb(var(--shadow-color) / .24);
+  --focus: 0 0 0 3px var(--paper), 0 0 0 6px var(--poppy);
+}
+[data-presentation-root] { background: var(--canvas); color: var(--ink); }
+.theme-toggle { display:flex; align-items:center; gap:7px; min-height:38px; color:var(--muted); }
+.theme-toggle svg { width:17px; height:17px; stroke:currentColor; stroke-width:1.5; flex:none; }
+.theme-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.theme-toggle select { min-height:38px; max-width:100px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--ink); font-size:12px; cursor:pointer; }
+@media (max-width:600px) { .theme-toggle { gap:3px; } .theme-toggle svg { display:none; } .theme-toggle select { max-width:78px; font-size:11px; padding:5px 3px; } }

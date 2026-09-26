@@ -1,5 +1,7 @@
 import { type CSSProperties, type ReactNode } from "react";
 import type { AppProps } from "./app/contracts";
+import { useAppearance } from "./app/useAppearance";
+import { ThemeToggle } from "./components/ThemeToggle";
 import { useWorkflowModel } from "./app/useWorkflowModel";
 import brandMark from "./assets/brand/meowdiobooks-mark.png";
 import { DialogSurface } from "./components/DialogSurface";
@@ -38,6 +40,7 @@ function ProductTabIcon({ view }: { view: ProductView; }) {
 
 export default function App(props: AppProps) {
   const model = useWorkflowModel(props);
+  const { appearance, resolvedAppearance, setAppearance } = useAppearance(props.appearance, props.onAppearanceChange);
   const { activeJob, activeJourneyStep, book, bookPendingDeletion, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, completed, deleteBook, deletingBookId, dialogue, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, error, extractionTransition, gateway, generateComplete, generationInProgress, generationReady, generationRemaining, generationRun, hasDraft, home, hydrate, libraryExports, navigateProduct, processMessage, processingOverlaySuppressed, productView, progress, recoveringDownstreamDialogue, renderHeader, reviewTransition, routeStage, runDialogueTranscript, setBookPendingDeletion, setDialogueRouteChoiceOpen, setHome, setStage, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, stage, stageIndex, stages, stepOverrides, t, toggleSidebar, unlockedThrough, uploadingCharacterId } = model;
   // Render-only page functions retain their boundaries; hook-owning pages mount as components.
   const builtinViews: Partial<Record<WizardStep, ReactNode>> = {
@@ -75,7 +78,7 @@ export default function App(props: AppProps) {
 
   const view = productView === "create" ? createView : LibraryPage({ model });
 
-  return <PresentationRoot className="app-shell" palette={props.presentationPalette}>
+  return <PresentationRoot className="app-shell" palette={props.presentationPalette} appearance={resolvedAppearance}>
     {renderHeader ? renderHeader({ productView, libraryCount: libraryExports.length, navigate: navigateProduct }) : <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       <div className="topbar-inner">
         <button className="brand" aria-label={t("Go to Home")} onClick={() => { navigateProduct("create"); setHome(true); }}>
@@ -87,6 +90,7 @@ export default function App(props: AppProps) {
           <button className={productView === "library" ? "active" : ""} aria-current={productView === "library" ? "page" : undefined} aria-label={libraryExports.length ? t("Library, {{count}} audiobooks", { count: libraryExports.length }) : t("Library")} onClick={() => navigateProduct("library")}><ProductTabIcon view="library" /><span className="product-tab-label">{t("Library")}</span>{libraryExports.length > 0 && <small className="product-count" aria-hidden="true">{libraryExports.length}</small>}</button>
         </nav>
         <div className="topbar-actions">
+          <ThemeToggle appearance={appearance} onChange={setAppearance} />
           <LanguageToggle />
           {capabilities.showExecutionBadge && <div className="local-pill"><i /> {t("header.executionBadge", { ns: "edition" })}</div>}
         </div>

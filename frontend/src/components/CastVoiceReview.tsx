@@ -232,12 +232,12 @@ export function CastVoiceReview({
         && route.characterIds.every((id) => voiceById[id]?.category === "character" && Boolean(tilePreviewFor(voiceById[id], selections)))
       : Boolean(approvedRevisionFor(voice, selections));
   };
-  const requiresReview = (voice: CastVoice) => routeFor(voice, routes).kind === "layered" && !routeReady(voice);
+  const requiresReview = (voice: CastVoice) => routeFor(voice, routes).kind === "layered" ? !routeReady(voice) : !tilePreviewFor(voice, selections);
   const [collectionQuery, setCollectionQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const largeCollection = voices.length > 12;
   const visibleVoices = largeCollection ? voices.filter((voice) => collectionMatches(collectionQuery, [voice.name, ...(voice.literalLabels ?? [])])
-    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))) : voices;
+    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))).slice().sort((left, right) => Number(requiresReview(right)) - Number(requiresReview(left))) : voices.slice().sort((left, right) => Number(requiresReview(right)) - Number(requiresReview(left)));
   const selectedCount = voices.filter(routeReady).length;
   const requiredCount = voices.filter(requiresReview).length;
   const defaultReadyCount = voices.length - selectedCount - requiredCount;
@@ -423,22 +423,13 @@ export function CastVoiceReview({
 
   return <div ref={workbenchRef} className="cast-workbench voice-cast-workbench">
     <div className="cast-toolbar voice-cast-toolbar">
-      <div>
-        <b>{requiredCount > 0
-          ? requiredCount === 1 ? t("1 group voice requires review") : t("{{count}} group voices require review", { count: requiredCount })
-          : defaultReadyCount > 0
-            ? defaultReadyCount === 1 ? t("1 voice can be approved when you continue") : t("{{count}} voices can be approved when you continue", { count: defaultReadyCount })
-            : t("All voices approved")}</b>
-        {requiredCount > 0 && <small className="cast-required-help">{t("Red cards marked Required must be reviewed before you can continue.")}</small>}
-        {defaultReadyCount > 0 && <small>{defaultReadyCount === 1
-          ? t("Listen first, or continue to approve the ready audition.")
-          : t("Listen first, or continue to approve {{count}} ready auditions together.", { count: defaultReadyCount })}</small>}
-        <small>{t("Open a cast member to preview and tune their voice.")}</small>
+      <div className="voice-cast-summary-copy">
+        <b>{requiredCount > 0 ? requiredCount === 1 ? t("1 required voice") : t("{{count}} required voices", { count: requiredCount }) : defaultReadyCount > 0 ? defaultReadyCount === 1 ? t("1 voice can be approved when you continue") : t("{{count}} voices can be approved when you continue", { count: defaultReadyCount }) : t("All voices approved")}</b>
+        <small>{requiredCount > 0 ? t("Review required voices before accepting the cast.") : t("Listen first. Ready auditions can be approved together when you continue.")}</small>
         {sharedGroupColors.size > 0 && <small className="shared-voice-help">{t("Brief roles may share a voice to save time and cost. Open a character to choose another.")}</small>}
       </div>
-      <div className="voice-cast-toolbar-meta">
-        <span>{cast.language ? t(cast.language) : "—"}</span>
-      </div>
+      {requiredCount > 0 && <button type="button" className="primary compact" onClick={() => { const next = voices.find(requiresReview); if(next) openInspector(next.characterId); }}>{t("Review required voices")} →</button>}
+      <dl className="cast-receipt"><div><dt>{t("Voice approved")}</dt><dd>{selectedCount}</dd></div><div><dt>{t("Default audition ready")}</dt><dd>{defaultReadyCount}</dd></div><div className={requiredCount ? "required" : ""}><dt>{t("Required")}</dt><dd>{requiredCount}</dd></div><div><dt>{t("Language")}</dt><dd>{cast.language ? t(cast.language) : "—"}</dd></div></dl>
     </div>
 
     {largeCollection && <CollectionToolbar query={collectionQuery} onQueryChange={setCollectionQuery} filter={collectionFilter} onFilterChange={setCollectionFilter} searchLabel={t("Search cast")} filterLabel={t("Show cast")} countLabel={t("{{shown}} of {{total}} cast members shown", { shown: visibleVoices.length, total: voices.length })} clearLabel={t("Clear")} filters={[
@@ -470,8 +461,8 @@ export function CastVoiceReview({
             {required
               ? <span className="cast-tile-required">{t("Required")}</span>
               : <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>}
-            <strong>{isNarrator ? "♬" : initials(voice.name)}</strong>
-            <b>{voice.name}</b>
+            <strong aria-hidden="true">{isNarrator ? "N" : initials(voice.name)}</strong>
+            <b>{voice.name}<em>{t(isNarrator ? "Narrator" : label(voice.category ?? "character"))}</em></b>
             <small>{lineCountLabel(lineCount, t)} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready")}</small>
           </button>
           <button
@@ -480,7 +471,7 @@ export function CastVoiceReview({
             aria-label={t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name })}
             disabled={!previewUrl}
             onClick={() => toggleTilePreview(voice)}
-          >{playing ? "Ⅱ" : "▶"}</button>
+          ><span aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span><span>{t(playing ? "Pause" : "Listen")}</span></button>
         </div>;
       })}
     </section>
@@ -531,9 +522,32 @@ export function CastVoiceReview({
             </div>}
           </section>}
 
+          {inspectedRoute.kind === "dedicated" && <section className="voice-candidates-section">
+            <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
+            <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>
+            <p className="voice-candidates-help">{t("Listen, compare, then approve the audition you want to use.")}</p>
+            <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
+              const applied = candidate.revision === approvedRevision;
+              const selected = candidate.revision === pendingRevision;
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
+                <div className="voice-candidate-actions">
+                  <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
+                    <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
+                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
+                    {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
+                  </button>
+                  {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}
+                </div>
+                <p>{candidateSummary(candidate, t)}</p>
+                {candidate.previewUrl
+                  ? <audio controls preload="metadata" src={candidate.previewUrl} />
+                  : <small className="cast-muted">{t("No playable audio.")}</small>}
+              </article>;
+            })}</div>
+          </section>}
+
           {inspectedRoute.kind === "dedicated" && settings && <section className="voice-settings-section voice-audition-settings">
             <div className="cast-section-heading"><div><small>{t("Audition setup")}</small><h3>{t("Tune and generate")}</h3></div></div>
-            <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>
             {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
               <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><b>{t("Design a voice")}</b><small>{t("Use voice traits and direction.")}</small></button>
               <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the voice reference.")}</small></button>
@@ -559,7 +573,7 @@ export function CastVoiceReview({
               </div></fieldset>
             </div>
             <div className="voice-regenerate-footer">
-              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings apply to the next audition. Earlier auditions stay available below.")}</small>
+              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings apply to the next audition. Earlier auditions remain available.")}</small>
               <button
                 type="button"
                 className="ghost regenerate-voice-action"
@@ -605,28 +619,6 @@ export function CastVoiceReview({
             </div>}
           </section>}
 
-          {inspectedRoute.kind === "dedicated" && <section className="voice-candidates-section">
-            <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
-            <p className="voice-candidates-help">{t("Listen, compare, then approve the audition you want to use.")}</p>
-            <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
-              const applied = candidate.revision === approvedRevision;
-              const selected = candidate.revision === pendingRevision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
-                <div className="voice-candidate-actions">
-                  <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
-                    <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
-                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
-                    {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
-                  </button>
-                  {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}
-                </div>
-                <p>{candidateSummary(candidate, t)}</p>
-                {candidate.previewUrl
-                  ? <audio controls preload="metadata" src={candidate.previewUrl} />
-                  : <small className="cast-muted">{t("No playable audio.")}</small>}
-              </article>;
-            })}</div>
-          </section>}
         </div>
     </InspectorDialog>}
   </div>;

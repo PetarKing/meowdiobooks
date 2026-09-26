@@ -1,3 +1,4 @@
+import { previewAppearance } from './appearance'
 import type { Meta, StoryObj } from '@storybook/react-vite'
 import { Button, PresentationRoot, StepIntro, WorkflowEmpty, WorkflowLaunch } from '../src/ui'
 
@@ -5,7 +6,7 @@ const meta = {
   title: 'Components/Workflow compositions',
   component: StepIntro,
   parameters: { layout: 'padded' },
-  decorators: [(Story) => <PresentationRoot style={{ maxWidth: 960, margin: 'auto', padding: 24 }}><Story /></PresentationRoot>],
+  decorators: [(Story) => <PresentationRoot appearance={previewAppearance()} style={{ maxWidth: 960, margin: 'auto', padding: 24 }}><Story /></PresentationRoot>],
 } satisfies Meta<typeof StepIntro>
 export default meta
 

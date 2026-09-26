@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-/** A shared editorial introduction. Keep the task and its scope ahead of its controls. */
+/** A compact task heading; workflow evidence begins immediately below it. */
 export function StepIntro({ eyebrow, title, copy, className = "" }: {
   eyebrow?: ReactNode;
   title: ReactNode;
@@ -33,7 +33,6 @@ export function WorkflowEmpty({ title, copy, symbol = "✦", children, className
 /** A preparatory stage has one obvious action rather than an empty dashboard. */
 export function WorkflowLaunch({ children }: { children: ReactNode }) {
   return <div className="stage-launch workflow-launch">
-    <div className="workflow-launch-art" aria-hidden="true"><i /><i /><i /><span>✦</span></div>
     <div className="workflow-launch-action">{children}</div>
   </div>;
 }

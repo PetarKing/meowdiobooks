@@ -34,12 +34,13 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
   const pageCount = book?.pageCount ?? 1;
   return <>
     <section className="export-hero">
-      <div className="export-hero-art" aria-hidden="true"><span className="export-vinyl">♪</span>{coverUrl && <img src={coverUrl} alt="" />}</div>
-      <div><StepEyebrow stage="export">{t("Step 6 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose finished chapters, check the book details, and pick a format.")}</p></div>
+
+      <div><StepEyebrow stage="export">{t("Step 6 · Export")}</StepEyebrow><h1>{t("Prepare your audiobook")}</h1><p>{t("Choose finished chapters, check the book details, and pick a format.")}</p></div>
     </section>
 
     {!playableChapters.length ? <WorkflowEmpty className="export-empty" symbol="♪" title={t("Generate a chapter first.")} copy={t("Generate current chapter audio before exporting.")}><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></WorkflowEmpty> : <>
       <section className="export-layout">
+        <div className="export-editor">
         <div className="export-chapter-picker">
           <header><div><span className="eyebrow">{t("Choose audio")}</span><h2>{t("Chapters to include")}</h2></div><div className="chapter-bulk-actions"><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
           <div className="export-chapter-list">{playableChapters.map((row) => {
@@ -50,14 +51,13 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
             const duration = chapterDuration(audio.audioSeconds, false);
             return <label key={row.id} className={selected ? "selected" : ""}>
               <input aria-describedby={`export-chapter-${row.id}-title`} aria-label={t("Chapter {{number}}, {{duration}}", { number: chapterNumber, duration })} type="checkbox" checked={selected} onChange={(event) => setExportChapterIds(event.target.checked ? [...new Set([...exportChapterIds, row.id])] : exportChapterIds.filter((id) => id !== row.id))} />
-              <span className="export-chapter-book" aria-hidden="true"><small>{t("Chapter")}</small><b>{chapterNumber}</b></span>
+              <span className="export-chapter-number" aria-hidden="true">{chapterNumber}</span>
               <span className="export-chapter-copy"><b id={`export-chapter-${row.id}-title`}>{row.title || t("Chapter {{number}}", { number: index + 1 })}</b><span className="export-chapter-duration">{duration}</span></span>
               <i aria-hidden="true">{selected ? "✓" : "+"}</i>
             </label>;
           })}</div>
         </div>
 
-        <div className="export-sidebar">
           <div className="export-metadata">
             <header><span className="eyebrow">{t("Book details")}</span><h2>{t("How it appears in your library")}</h2></header>
             <div className="export-cover-preview">
@@ -73,6 +73,10 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
             <label>{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
             <button type="button" className="text-button export-reset" onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportCover(undefined); setExportCoverPage(1); }}>{t("Reset book details")}</button>
           </div>
+        </div>
+
+        <div className="export-sidebar">
+          <section className="export-preview" aria-label={t("Audiobook preview")}><div className="export-preview-cover">{coverUrl && <img src={coverUrl} alt={t("Audiobook preview cover")} />}</div><div><span className="eyebrow">{t("Audiobook preview")}</span><h2>{exportTitle || book?.title}</h2><p>{exportAuthor || book?.author}</p><small>{t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) })}</small><span className="export-preview-format">{exportChoices.find((choice) => choice.preset === exportPreset)?.title}</span></div></section>
           <section className="export-format" aria-labelledby="export-format-title">
             <header><span className="eyebrow">{t("Output format")}</span><h2 id="export-format-title">{t("Choose your file")}</h2></header>
             <div className="export-format-options" role="radiogroup" aria-label={t("Output format")}>

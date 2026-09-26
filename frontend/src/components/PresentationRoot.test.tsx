@@ -10,6 +10,14 @@ describe('presentation boundary', () => {
     expect(screen.getByTestId('proposal').style.getPropertyValue('--color-action-hover')).toBe('#234567')
   })
 
+  it('keeps light and dark appearances isolated with supplied semantic colors intact', () => {
+    render(<><PresentationRoot data-testid="light" appearance="light">Light</PresentationRoot><PresentationRoot data-testid="dark" appearance="dark" palette={{ ink: '#fafafa', action: '#123456' }}>Dark</PresentationRoot></>)
+    expect(screen.getByTestId('light')).toHaveAttribute('data-appearance', 'light')
+    expect(screen.getByTestId('dark')).toHaveAttribute('data-appearance', 'dark')
+    expect(screen.getByTestId('dark').style.getPropertyValue('--color-action')).toBe('#123456')
+    expect(screen.getByTestId('light').style.getPropertyValue('--color-action')).toBe('')
+  })
+
   it('rejects nesting instead of claiming CSS ancestor isolation', () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {

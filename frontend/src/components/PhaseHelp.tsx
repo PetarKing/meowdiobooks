@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { DialogSurface } from "./DialogSurface";
+import { usePresentationPortalAttributes } from "./presentationContext";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { WizardStage } from "../api/contracts";
@@ -87,6 +88,7 @@ const guides: Record<GuideStage, PhaseGuide> = {
 
 export function PhaseHelp({ stage }: { stage: GuideStage }) {
   const { t } = useTranslation();
+  const presentation = usePresentationPortalAttributes();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -101,7 +103,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
 
   const close = () => setOpen(false);
 
-  const dialog = open ? createPortal(<div className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+  const dialog = open ? createPortal(<div {...presentation} className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <DialogSurface onDismiss={close} initialFocusRef={closeRef} returnFocusRef={triggerRef} aria-labelledby={titleId} className={`phase-help phase-help-${stage}`}>
       <header className="phase-help-head" role="none">
         <div className="phase-help-number" aria-hidden="true">{guide.number}</div>

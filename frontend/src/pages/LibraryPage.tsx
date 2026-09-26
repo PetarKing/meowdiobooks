@@ -1,6 +1,5 @@
 import { libraryCoverImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
-import brandMark from "../assets/brand/meowdiobooks-mark.png";
 import {
   formatFileSize,
   formatLibraryChapters,
@@ -17,8 +16,8 @@ export function LibraryPage({ model }: { model: LibraryPageModel; }) {
   const { gateway, libraryExports, libraryReady, navigateProduct, openLibraryItem, renderLibraryActions, revealLibraryItem, t, uiLocale } = model;
   return <section className="library-page">
     <header className="library-head">
-      <div className="library-head-copy"><span className="eyebrow">{t("The story made it")}</span><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
-      <div className="library-finale" aria-hidden="true"><span className="library-finale-disc">♪</span><span className="library-finale-mark"><img src={brandMark} alt="" /></span></div>
+      <div className="library-head-copy"><span className="eyebrow">{t("Finished editions")}</span><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
+
       <span className="library-count">{!libraryReady ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>
     </header>
     {!libraryReady ? <LibrarySkeleton model={{ t }} /> : libraryExports.length ? <div className="library-grid">{libraryExports.map((item) => <article key={item.id} className="library-book">

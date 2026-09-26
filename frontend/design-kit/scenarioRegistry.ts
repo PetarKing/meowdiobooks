@@ -30,6 +30,7 @@ export type SnapshotVariant =
   | "dialogue-routing-unconfigured"
   | "dialogue-structural"
   | "export-long-book"
+  | "generate-long-book"
   | "generate-split"
   | "generate-stale"
   | "review-boundaries"
@@ -226,7 +227,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "generate-player": {
@@ -241,7 +242,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-player"],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "generate-split": {
@@ -256,7 +257,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-split"],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "phase-help": {
@@ -271,7 +272,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["phase-help"],
-      heading: "Did we read the source correctly?",
+      heading: "Check the extracted text",
     },
   },
   "cast-voices": {
@@ -393,7 +394,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Did we read the source correctly?",
+      heading: "Check the extracted text",
     },
   },
   dialogue: {
@@ -454,7 +455,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["scan-review"],
-      heading: "Review the decisions that affect your audiobook.",
+      heading: "Review your manuscript",
     },
   },
   "review-boundaries": {
@@ -469,7 +470,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["scan-review"],
-      heading: "Review the decisions that affect your audiobook.",
+      heading: "Review your manuscript",
     },
   },
   "review-final": {
@@ -538,7 +539,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   export: {
@@ -553,7 +554,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["export"],
-      heading: "Package your audiobook.",
+      heading: "Prepare your audiobook",
     },
   },
   "export-long-book": {
@@ -569,7 +570,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["export"],
-      heading: "Package your audiobook.",
+      heading: "Prepare your audiobook",
     },
   },
 } as const satisfies Record<string, ScenarioMetadata>;
@@ -577,6 +578,7 @@ const baselineScenarioMetadata = {
 /** Failure and recovery variants use the same real pages and in-memory gateway. */
 export const scenarioMetadata = {
   ...baselineScenarioMetadata,
+  "generate-long-book": { ...baselineScenarioMetadata.generate, label: "Generate · 120 chapters", description: "A long synthetic book for tracklist selection, estimates and listening.", snapshotVariant: "generate-long-book" },
   "library-missing-cover": { ...baselineScenarioMetadata.library, label: "Library · missing cover", description: "A broken cover resolves to the readable production fallback.", gatewayVariant: "library-missing-cover" },
   "library-refresh-error": { ...baselineScenarioMetadata.library, label: "Library · refresh failed", description: "Saved editions remain visible after a failed refresh.", gatewayVariant: "library-refresh-error" },
   "dialogue-running": { ...baselineScenarioMetadata.dialogue, label: "Dialogue · running", description: "Cancelable progress while the transcript is being built.", gatewayVariant: "dialogue-running", story: { ...baselineScenarioMetadata.dialogue.story, actions: ["build-dialogue"] } },

@@ -79,7 +79,7 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       override.sheet.disabled = false;
       return background;
     });
-    assert.equal(baseline, 'rgb(105, 67, 185)', 'Canonical product CSS must supply canonical primary styling');
+    assert.equal(baseline, 'rgb(185, 70, 48)', 'Canonical product CSS must supply canonical primary styling');
     await button.hover();
     const hover = await button.evaluate(element => getComputedStyle(element).backgroundColor);
     assert.equal(hover, 'rgb(2, 34, 56)', 'An equal-specificity host hover rule must also win');

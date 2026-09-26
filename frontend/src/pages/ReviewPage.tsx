@@ -88,9 +88,6 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (nextBoundary >= 0) openBoundary(nextBoundary);
   }
 
-  function scrollReviewGroups(direction: -1 | 1) {
-    reviewStripRef.current?.scrollBy({ left: direction * 280, behavior: "smooth" });
-  }
   async function acceptReview() {
     if (!book || !reviewCandidate?.revision) return;
     setReviewTransition(true);
@@ -127,17 +124,17 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     onAccept={() => void acceptReview().catch((reason) => setError(message(reason)))}
   />;
   return <>
-    <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Review the decisions that affect your audiobook.")} copy={t("Check the examples and choose what to keep or skip. Changes apply when you accept the review.")} />
+    <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Review your manuscript")} copy={t("Check the examples and choose what to keep or skip. Changes apply when you accept the review.")} />
     {totalGroups === 0 ? <WorkflowEmpty className="review-empty" symbol="✓" title={t("No warning groups")} copy={t("No chapter boundaries or source issues need a decision.")} /> : <>
-      <div className="review-progress-line"><span>{t("{{decided}} of {{total}} review groups decided", { decided: decidedGroups, total: totalGroups })}</span><span>{t("{{decided}} of {{total}} anchored items reviewed", { decided: decidedOccurrences, total: totalOccurrences })}</span></div>
-      <div className="review-group-nav">
-        <button type="button" className="review-scroll-button previous" aria-label={t("Show previous review groups")} onClick={() => scrollReviewGroups(-1)}>‹</button>
+
+      <div className="review-desk">
+      <aside className="review-queue" aria-label={t("Decision queue")}>
+        <div className="review-queue-heading"><span className="eyebrow">{t("Decision queue")}</span><b>{t("{{decided}} / {{total}} decided", { decided: decidedGroups, total: totalGroups })}</b><small>{t("{{decided}} of {{total}} anchored items reviewed", { decided: decidedOccurrences, total: totalOccurrences })}</small></div>
         <nav className="review-strip" aria-label={t("Review groups")} ref={reviewStripRef}>
           {boundaries.length > 0 && <button data-review-group="chapters" className={[showingBoundary ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
           {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} className={[!showingBoundary && index === activeWarning ? "active" : "", reviewDecisions[row.id] ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewDecisions[row.id] ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t("{{count}} occurrences · {{severity}}", { count: row.occurrences.length, severity: t(row.severity) })}</small></span></button>)}
         </nav>
-        <button type="button" className="review-scroll-button next" aria-label={t("Show more review groups")} onClick={() => scrollReviewGroups(1)}>›</button>
-      </div>
+      </aside>
       <div className={["review-workspace", showingBoundary ? "chapter-workspace" : "warning-workspace"].join(" ")}>
         {showingBoundary && boundary ? <>
           <section className="review-evidence chapter-review-evidence">
@@ -147,13 +144,13 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <p className="evidence-help">{t("This sets where the next audio chapter begins. The heading text stays unchanged.")}</p>
             <div className="warning-nav"><button disabled={activeBoundary === 0} onClick={() => setActiveBoundary(activeBoundary - 1)}>← {t("Previous heading")}</button><button disabled={activeBoundary >= boundaries.length - 1} onClick={() => setActiveBoundary(activeBoundary + 1)}>{t("Next heading")} →</button></div>
           </section>
-          <aside className="resolution-panel">
+          <section className="resolution-panel">
             <div className="review-scope"><b>{t("Applies to this heading only")}</b><small>{boundaries.length === 1 ? t("This is the only detected chapter heading.") : t("The other {{count}} candidates keep a separate decision.", { count: boundaries.length - 1 })}</small></div>
             <h3>{t("Does this heading start a new chapter?")}</h3>
             <div className="resolution-options" role="group" aria-label={t("Chapter decision for {{heading}}", { heading: boundary.source })}><button aria-pressed={boundaryDecisions[boundary.id] === "chapter-start"} className={boundaryDecisions[boundary.id] === "chapter-start" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "chapter-start")}><b>{t("Start a new chapter")}</b><small>{t("Audio before this heading stays in the previous chapter.")}</small></button><button aria-pressed={boundaryDecisions[boundary.id] === "not-a-boundary"} className={boundaryDecisions[boundary.id] === "not-a-boundary" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "not-a-boundary")}><b>{t("Keep inside the current chapter")}</b><small>{t("This heading will not create a chapter break.")}</small></button></div>
             {boundaryDecisions[boundary.id] && <div className="review-consequence"><b>{t("Consequence")}</b><span>{t(boundaryDecisions[boundary.id] === "chapter-start" ? "A new audio chapter begins at this exact heading." : "The heading stays inside the current audio chapter.")}</span></div>}
             {boundaries.length > 1 && !boundaries.every((row) => boundaryDecisions[row.id] === "chapter-start") && <div className="chapter-bulk-choice"><span><b>{t("Same decision for every heading?")}</b><small>{t("Mark all {{count}} detected headings as chapter starts. You can still change any one afterward.", { count: boundaries.length })}</small></span><button className="ghost review-bulk-button" onClick={acceptAllBoundaries}>{t("Mark all {{count}} as chapter starts", { count: boundaries.length })}</button></div>}
-          </aside>
+          </section>
         </> : warning && occurrence ? <>
           <section className="review-evidence">
             <div className="review-group-heading"><span><small>{t("Source issue")}</small><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span><Tag tone={warning.severity === "blocking" ? "rose" : "warn"}>{t(warning.severity)}</Tag></div>
@@ -162,13 +159,14 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <p className="evidence-help">{t("Only the highlighted text changes. Surrounding text stays unchanged.")}</p>
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
-          <aside className="resolution-panel">
+          <section className="resolution-panel">
             <div className="review-scope"><b>{t("Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t("Review each example on the left before choosing once.")}</small></div>
             <h3>{t(reviewQuestion(warning.kind))}</h3>
             <div className="resolution-options">{warning.availableActions.map((action) => <button key={action} aria-pressed={reviewDecisions[warning.id] === action} className={reviewDecisions[warning.id] === action ? "selected" : ""} onClick={() => chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, warning))}</b><small>{reviewConsequence(action, warning, t)}</small></button>)}</div>
             {reviewDecisions[warning.id] && <div className="review-consequence"><b>{t("Consequence")}</b><span>{reviewConsequence(reviewDecisions[warning.id], warning, t)}</span></div>}
-          </aside>
+          </section>
         </> : null}
+      </div>
       </div>
     </>}
     <div className="phase-action"><span>{t("{{decided}} of {{total}} review groups decided", { decided: decidedGroups, total: totalGroups })}</span><button className="primary" disabled={!complete || busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button></div>

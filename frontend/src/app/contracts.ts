@@ -18,6 +18,9 @@ import {
 } from "../workflow/navigation";
 
 export interface AppProps {
+  /** Optional host-controlled UI preference; does not alter supplied palette values. */
+  appearance?: import('./useAppearance').Appearance;
+  onAppearanceChange?: (appearance: import('./useAppearance').Appearance) => void;
   presentationPalette?: PresentationPalette;
   gateway?: WorkflowGateway;
   journey?: JourneyDefinition;

@@ -59,6 +59,26 @@ const cast: CastArtifact = {
 };
 
 describe("CastVoiceReview", () => {
+  it("routes a missing dedicated audition to generation without treating it as ready", () => {
+    const approve = vi.fn();
+    const regenerate = vi.fn();
+    const missing: CastArtifact = { ...cast, identities: [...cast.identities!, { characterId: "missing", name: "Missing", category: "character", referenceText: "A voice still to be made." }] };
+    render(<CastVoiceReview bookId="book" cast={missing} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={regenerate} />);
+    const board = screen.getByRole("region", { name: "Cast voice auditions" });
+    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Missing voice");
+    expect(screen.getByRole("button", { name: "Play Missing preview" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
+    const dialog = screen.getByRole("dialog", { name: "Missing voice" });
+    expect(within(dialog).queryByRole("button", { name: /Approve Audition/ })).not.toBeInTheDocument();
+    const generate = within(dialog).getByRole("button", { name: "Generate new audition →" });
+    expect(generate).toBeEnabled();
+    expect(approve).not.toHaveBeenCalled();
+    expect(regenerate).not.toHaveBeenCalled();
+    fireEvent.click(generate);
+    expect(regenerate).toHaveBeenCalledWith("missing", expect.objectContaining({ description: "" }));
+    expect(approve).not.toHaveBeenCalled();
+  });
+
   it("searches large ensembles by labels while keeping required review totals visible", () => {
     const ensemble: CastArtifact = { ...cast, identities: [
       ...Array.from({ length: 13 }, (_, index) => ({ ...cast.identities![0], characterId: `member-${index}`, name: index === 0 ? "Émilia" : `Member ${index}`, literalLabels: index === 0 ? ["Moonlight"] : [], voicePreviewRevision: `v-${index}` })),
@@ -66,13 +86,22 @@ describe("CastVoiceReview", () => {
     ] };
     const approve = vi.fn();
     render(<CastVoiceReview bookId="book" cast={ensemble} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
+    const board = screen.getByRole("region", { name: "Cast voice auditions" });
+    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Duet voice");
     const search = screen.getByRole("searchbox", { name: "Search cast" });
     search.focus();
     fireEvent.change(search, { target: { value: "moonLIGHT" } });
     expect(screen.getByRole("button", { name: "Open Émilia voice" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open Duet voice" })).not.toBeInTheDocument();
-    expect(screen.getByText("1 group voice requires review")).toBeInTheDocument();
+    expect(screen.getByText("1 required voice")).toBeInTheDocument();
     expect(screen.getByText("1 of 15 cast members shown")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
+    const requiredDialog = screen.getByRole("dialog", { name: "Duet voice" });
+    expect(requiredDialog).toHaveTextContent("Confirm suggested voices");
+    expect(approve).not.toHaveBeenCalled();
+    fireEvent.keyDown(requiredDialog, { key: "Escape" });
+    fireEvent.animationEnd(requiredDialog);
+
     fireEvent.change(search, { target: { value: "emilia" } });
     expect(screen.getByRole("button", { name: "Open Émilia voice" })).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "required" } });
@@ -224,8 +253,8 @@ describe("CastVoiceReview", () => {
     const groupTile = screen.getByRole("button", { name: "Open Subaru & Cecilus voice" });
     expect(groupTile).toHaveClass("voice-required", "needs-review");
     expect(groupTile).toHaveTextContent("Required");
-    expect(screen.getByText("1 group voice requires review")).toBeInTheDocument();
-    expect(screen.getByText("Red cards marked Required must be reviewed before you can continue.")).toBeInTheDocument();
+    expect(screen.getByText("1 required voice")).toBeInTheDocument();
+    expect(screen.getByText("Review required voices before accepting the cast.")).toBeInTheDocument();
     fireEvent.click(groupTile);
 
     expect(screen.getByText("Subaru + Cecilus")).toBeInTheDocument();

@@ -160,7 +160,7 @@ describe("CastIdentityReview", () => {
     expect(autoGrouped).toHaveClass("auto-grouped");
     expect(autoGrouped).not.toHaveClass("qwen-review");
     expect(autoGrouped).toHaveTextContent("Required · Check this merge");
-    expect(screen.getByText("Red cards marked Required must be confirmed before you can continue.")).toBeInTheDocument();
+    expect(screen.getByText("Confirm required source labels before you can continue.")).toBeInTheDocument();
 
     const possibleMatch = screen.getByRole("button", { name: "Inspect fake Cecilus" });
     expect(possibleMatch).toHaveClass("ready");

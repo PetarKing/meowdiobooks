@@ -1,3 +1,5 @@
+> **Historical, rejected candidate.** The user rejected Nocturne on 26 September 2026. These checks do not establish design acceptance. Current work and evidence are in [Folio](../docs/folio/README.md).
+
 # Product design review
 
 This is the review ledger for the fresh studio direction. A passing automation check proves a specific behavior, not an aesthetic grade. Integrated desktop and phone renders have been independently inspected; this ledger distinguishes those observations from automated checks and production acceptance.

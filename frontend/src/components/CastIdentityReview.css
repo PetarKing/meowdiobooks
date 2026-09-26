@@ -13,27 +13,27 @@
   top: 80px;
   align-items: start;
   padding-top: 14px;
-  background: linear-gradient(to bottom, rgba(51, 37, 59, .34), transparent);
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--inverse-surface) 34.0%, transparent), transparent);
 }
 
 .cast-drag-scroll-cue.down {
   bottom: 0;
   align-items: end;
   padding-bottom: 14px;
-  background: linear-gradient(to top, rgba(51, 37, 59, .34), transparent);
+  background: linear-gradient(to top, color-mix(in srgb, var(--inverse-surface) 34.0%, transparent), transparent);
 }
 
 .cast-drag-scroll-cue span {
   padding: 7px 11px;
-  border: 1px solid rgba(255, 255, 255, .62);
+  border: 1px solid color-mix(in srgb, var(--line) 62.0%, transparent);
   border-radius: 99px;
-  background: rgba(51, 37, 59, .86);
-  color: #fff;
+  background: color-mix(in srgb, var(--inverse-surface) 86.0%, transparent);
+  color: var(--inverse-ink);
   font-size: 13px;
   font-weight: 850;
   letter-spacing: .04em;
   text-transform: uppercase;
-  box-shadow: 0 7px 20px rgba(36, 23, 43, .2);
+  box-shadow: 0 7px 20px rgb(var(--shadow-color) / 0.2);
 }
 
 .cast-merge-undo {
@@ -46,29 +46,29 @@
   gap: 14px;
   max-width: min(420px, calc(100vw - 48px));
   padding: 12px 13px 12px 16px;
-  border: 1px solid rgba(255, 255, 255, .2);
+  border: 1px solid color-mix(in srgb, var(--line) 20.0%, transparent);
   border-radius: 13px;
-  background: rgba(51, 37, 59, .96);
-  color: #fff;
+  background: color-mix(in srgb, var(--inverse-surface) 96.0%, transparent);
+  color: var(--inverse-ink);
   font-size: 13px;
   font-weight: 700;
-  box-shadow: 0 14px 38px rgba(36, 23, 43, .28);
+  box-shadow: 0 14px 38px rgb(var(--shadow-color) / 0.28);
 }
 
 .cast-merge-undo button {
   flex: 0 0 auto;
   padding: 7px 10px;
-  border: 1px solid rgba(255, 255, 255, .38);
+  border: 1px solid color-mix(in srgb, var(--line) 38.0%, transparent);
   border-radius: 8px;
-  background: rgba(255, 255, 255, .12);
-  color: #fff;
+  background: color-mix(in srgb, var(--paper) 12.0%, transparent);
+  color: var(--inverse-ink);
   font-size: 13px;
   font-weight: 850;
   cursor: pointer;
 }
 
 .cast-merge-undo button:hover {
-  background: rgba(255, 255, 255, .22);
+  background: color-mix(in srgb, var(--paper) 22.0%, transparent);
 }
 
 @media (max-width: 600px) {

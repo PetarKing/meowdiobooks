@@ -37,6 +37,7 @@ export const CastInspector: Story = scenario("cast-inspector");
 export const CastMissing: Story = scenario("cast-missing");
 export const CastAccepted: Story = scenario("cast-accepted");
 export const Generate: Story = scenario("generate");
+export const GenerateLongBook: Story = scenario("generate-long-book");
 export const GenerateStale: Story = scenario("generate-stale");
 export const GenerateSplit: Story = scenario("generate-split");
 export const GeneratePlayer: Story = scenario("generate-player");

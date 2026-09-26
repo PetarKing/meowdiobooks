@@ -11,3 +11,7 @@ export type { PresentationPalette, PresentationRootProps } from './components/Pr
 export { StepIntro, WorkflowEmpty, WorkflowLaunch } from './components/WorkflowPage';
 
 export { CollectionToolbar } from "./components/CollectionToolbar";
+
+export { ThemeToggle } from './components/ThemeToggle';
+export { useAppearance } from './app/useAppearance';
+export type { Appearance, ResolvedAppearance } from './app/useAppearance';

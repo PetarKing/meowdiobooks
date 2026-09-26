@@ -197,7 +197,7 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: 'Generate Complete' })).toHaveClass('done')
     expect(screen.getByRole('complementary', { name: 'Wizard stages' })).toContainElement(nav)
     expect(screen.getByRole('heading', { level: 2, name: 'Down the Rabbit-Hole' })).toBeInTheDocument()
-    expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
+    expect(screen.getByText('Record your chapters')).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
   })
 
@@ -294,7 +294,7 @@ describe('v2 wizard', () => {
   it('recommends LiteParse and keeps the extraction previews in one matched comparison row', async () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
 
-    expect(screen.getByRole('heading', { name: 'Did we read the source correctly?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /LiteParse Recommended Fast spatial parser/ })).toHaveClass('selected')
     const comparison = screen.getByText('ORIGINAL PAGE').closest('.compare')
     expect(comparison).toHaveClass('extract-compare')
@@ -399,9 +399,10 @@ describe('v2 wizard', () => {
     expect(screen.getByText('No chapters in this view.')).toBeInTheDocument()
     fireEvent.keyDown(screen.getByRole('tab', { name: 'To make 0' }), { key: 'Home' })
     expect(allTab).toHaveFocus()
-    expect(chapter.querySelector('.chapter-book-mark')).toHaveTextContent('Chapter01')
+    expect(chapter.querySelector('.chapter-track-number')).toHaveTextContent('01')
     expect(chapter.querySelector('img')).not.toBeInTheDocument()
-    expect(document.querySelector('.generate-cover-stack img')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')
+    expect(document.querySelector('.generate-cover-stack')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!).getByText('Playable')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Continue to Export/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /M4B/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Technical details')).not.toBeInTheDocument()
@@ -540,6 +541,26 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('region', { name: 'Generation action' })).not.toHaveTextContent('selected')
     expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeChecked()
+  })
+
+  it('keeps a generation failure beside its retry action and preserves saved audio', async () => {
+    await open({ ...base,
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears', startPage: 13, endPage: 24 }],
+      recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, chapters: [
+        ...faithfulSummary.chapters,
+        { chapterId: 'chapter-2', totalCharacters: 900, retainedCharacters: 900, dialogueSpans: 2, narratorFallbackSpans: 0, retainedPercent: 100, estimatedSeconds: 60, empty: false },
+      ] } },
+    })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-failed', status: 'failed', error: 'Synthesis interrupted; saved tracks are unchanged.' })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    expect(await within(action).findByText('Synthesis interrupted; saved tracks are unchanged.')).toBeVisible()
+    expect(within(action).getByText('Generation needs attention')).toBeInTheDocument()
+    expect(within(action).getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Synthesis interrupted; saved tracks are unchanged.')
   })
 
   it('blocks navigation behind a full-screen chapter generation dialog', async () => {
@@ -751,7 +772,7 @@ describe('v2 wizard', () => {
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
     fireEvent.click(within(nav).getByText('Export').closest('button')!)
 
-    expect(screen.getByRole('heading', { name: 'Package your audiobook.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
     expect(screen.getByLabelText('Title')).toHaveValue('Alice')
     expect(screen.getByLabelText('Author')).toHaveValue('Lewis Carroll')
     expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
@@ -774,6 +795,9 @@ describe('v2 wizard', () => {
     title.focus()
     fireEvent.change(title, { target: { value: 'Alice — Audiobook' } })
     expect(title).toHaveFocus()
+    const preview = screen.getByRole('region', { name: 'Audiobook preview' })
+    expect(within(preview).getByRole('heading', { name: 'Alice — Audiobook' })).toBeInTheDocument()
+    expect(within(preview).getByText('Lewis Carroll')).toBeInTheDocument()
     const coverPage = screen.getByLabelText('PDF cover page')
     fireEvent.change(coverPage, { target: { value: '' } })
     expect(coverPage).toHaveValue(null)
@@ -800,7 +824,7 @@ describe('v2 wizard', () => {
     const exportButton = within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export').closest('button')!
     expect(exportButton).toBeEnabled()
     fireEvent.click(exportButton)
-    expect(screen.getByRole('heading', { name: 'Package your audiobook.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
   })
 
   it('opens a concise, phase-specific guide from every wizard step', async () => {
@@ -2008,7 +2032,7 @@ describe('v2 wizard', () => {
     fireEvent.change(input!, { target: { files: [new File(['pdf'], 'alice.pdf', { type: 'application/pdf' })] } })
     fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
     await screen.findByRole('navigation', { name: 'Wizard stages' })
-    expect(screen.getByRole('heading', { name: 'Did we read the source correctly?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByText('Step 1 · Extract')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Go to Home' }))
 
@@ -2562,7 +2586,7 @@ describe('v2 wizard', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
   })
 
-  it('reviews chapter boundaries and source warnings through one horizontal group workspace', async () => {
+  it('reviews chapter boundaries and source warnings through a semantic queue and focused evidence workspace', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
@@ -2584,8 +2608,8 @@ describe('v2 wizard', () => {
     const groups = await screen.findByRole('navigation', { name: 'Review groups' })
     expect(within(groups).getByRole('button', { name: /Chapter starts/ })).toBeInTheDocument()
     expect(within(groups).getByRole('button', { name: /Repeated page matter/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show previous review groups' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show more review groups' })).toBeInTheDocument()
+    expect(groups.closest('.review-queue')).toBeInTheDocument()
+    expect(screen.getByText('Decision queue')).toBeInTheDocument()
 
     const workspace = document.querySelector('.review-workspace')
     fireEvent.click(within(groups).getByRole('button', { name: /Repeated page matter/ }))
@@ -3079,7 +3103,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'auditions-3', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
     ]))
-    expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledTimes(1)
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledWith('book-1')
     expect(wizardApi.processStage).not.toHaveBeenCalled()
@@ -3089,7 +3113,7 @@ describe('v2 wizard', () => {
   it('reuses the cached final script when Generate opens again', async () => {
     await open()
 
-    expect(screen.getByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(wizardApi.prepareRecordingScript).not.toHaveBeenCalled()
   })
 
@@ -3103,7 +3127,7 @@ describe('v2 wizard', () => {
     await open(unprepared, undefined, undefined, base)
 
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledWith('book-1')
-    expect(screen.getByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(screen.queryByText(/Preparing your final script|Opening Generate/)).not.toBeInTheDocument()
   })
 
@@ -3141,7 +3165,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
     vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()

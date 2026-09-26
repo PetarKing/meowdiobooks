@@ -1,0 +1,44 @@
+{
+  "date": "2026-09-26",
+  "branch": "codex/studio-rebuild",
+  "base": "688d07e (rejected Nocturne retained for history)",
+  "source": "Validated candidate committed on codex/studio-rebuild; no production adoption",
+  "unit": {
+    "files": 24,
+    "tests": 243,
+    "passed": true
+  },
+  "storybook": {
+    "files": 4,
+    "stories": 55,
+    "passed": true
+  },
+  "consumer": {
+    "packedFiles": 76,
+    "hostTypes": "passed",
+    "ordinaryEqualSpecificityOverrides": "passed for standalone primitives and App host"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "warning": "Existing LanguagePicker react-refresh/only-export-components"
+  },
+  "build": "passed; substantial shared JS and lazy Three chunk remain",
+  "rendered": {
+    "finalLight": 14,
+    "finalDark": 8,
+    "darkMatrix": 104,
+    "finalProblems": {
+      "axe": 0,
+      "horizontalOverflow": 0,
+      "runtime": 0
+    }
+  },
+  "manual": "Appearance switch and reload persistence observed; System restored. Independent review documented separately.",
+  "limits": [
+    "Synthetic gateways and silent audition fixtures do not prove provider/audio quality or export persistence.",
+    "User aesthetic acceptance is pending.",
+    "No merge, push, release or deployment."
+  ],
+  "storybookTypes": "passed"
+}

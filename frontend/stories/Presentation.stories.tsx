@@ -23,7 +23,7 @@ export const IsolatedPalette: Story = {
     const baseline = canvas.getByRole('button', { name: 'Baseline action' })
     const proposal = canvas.getByRole('button', { name: 'Proposal action' })
     const host = canvas.getByRole('button', { name: 'Host action' })
-    await expect(getComputedStyle(baseline).backgroundColor).toBe('rgb(105, 67, 185)')
+    await expect(getComputedStyle(baseline).backgroundColor).toBe('rgb(185, 70, 48)')
     await expect(getComputedStyle(proposal).backgroundColor).toBe('rgb(35, 85, 72)')
     await expect(getComputedStyle(host).backgroundColor).toBe('rgb(47, 64, 110)')
     for (const key of ['fontFamily', 'borderRadius', 'padding', 'height'] as const) {
@@ -45,5 +45,24 @@ export const ProductPalette: Story = {
     const action = await within(canvasElement).findByRole('button', { name: /Import PDF/ })
     await expect(getComputedStyle(action).backgroundColor).toBe('rgb(35, 85, 72)')
     await expect(canvasElement.querySelectorAll('[data-presentation-root]').length).toBe(1)
+  },
+}
+
+
+export const AppearanceSiblings: Story = {
+  render: () => <div style={{ display: 'grid', gap: 20, padding: 24 }}>
+    {(['light', 'dark'] as const).map((appearance) => <PresentationRoot key={appearance} appearance={appearance} data-testid={appearance} style={{ padding: 24 }}>
+      <Panel title={`${appearance === 'light' ? 'Paper' : 'Ink'} studio`}><p>Source evidence, listening and publishing share the same appearance.</p><Button>Continue</Button><span className="tag good">Accepted</span><span className="tag warn">Review needed</span><span className="error-note">The source could not be read.</span><audio controls aria-label="Native audio preview" /></Panel>
+    </PresentationRoot>)}
+  </div>,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement)
+    const light = canvas.getByTestId('light')
+    const dark = canvas.getByTestId('dark')
+    await expect(getComputedStyle(light).colorScheme).toBe('light')
+    await expect(getComputedStyle(dark).colorScheme).toBe('dark')
+    await expect(getComputedStyle(within(light).getByRole('button')).backgroundColor).toBe('rgb(185, 70, 48)')
+    await expect(getComputedStyle(within(dark).getByRole('button')).backgroundColor).toBe('rgb(240, 160, 128)')
+    await expect(getComputedStyle(within(dark).getByRole('button')).color).toBe('rgb(37, 43, 44)')
   },
 }

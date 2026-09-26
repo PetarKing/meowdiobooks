@@ -1,3 +1,5 @@
+> **Historical, rejected candidate.** The user rejected Nocturne on 26 September 2026. These checks do not establish design acceptance. Current work and evidence are in [Folio](../folio/README.md).
+
 # Nocturne studio candidate
 
 This branch starts at the neutral foundation `a9b7922`, with no Atelier art-direction commits imported. It is a local design candidate, separate from merge, release and production adoption.

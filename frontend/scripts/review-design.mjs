@@ -9,6 +9,7 @@ const base = process.argv[2] ?? 'http://127.0.0.1:6006';
 const output = path.resolve(process.argv[3] ?? '/tmp/meowdiobooks-design-review');
 const filter = process.argv[4] ? new RegExp(process.argv[4]) : /^(product-accepted-baseline|components-[a-z-]+)--/;
 const locale = process.argv[5] ?? 'en';
+const appearance = process.argv[6] ?? 'light';
 const viewports = process.env.DESIGN_REVIEW_VIEWPORTS ? process.env.DESIGN_REVIEW_VIEWPORTS.split(',').map(size => {
   const [width, height] = size.split('x').map(Number);
   if (!width || !height) throw new Error(`Invalid review viewport: ${size}`);
@@ -27,9 +28,9 @@ try {
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       page.on('response', response => { if (response.status() >= 400) errors.push(`${response.status()} ${response.url()}`); });
-      const result = { story: entry.id, name: entry.name, locale, viewport, errors };
+      const result = { story: entry.id, name: entry.name, locale, appearance, viewport, errors };
       try {
-        await page.goto(`${base}/iframe.html?id=${entry.id}&viewMode=story`);
+        await page.goto(`${base}/iframe.html?id=${entry.id}&viewMode=story&appearance=${appearance}`);
         if (entry.id.startsWith('product-accepted-baseline--')) {
           await page.waitForSelector('[data-scenario-ready]', { timeout: 30000 });
         } else {

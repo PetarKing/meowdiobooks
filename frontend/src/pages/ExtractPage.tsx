@@ -2,7 +2,6 @@ import type {
   ExtractionMethod
 } from "../api/contracts";
 import type { WorkflowModel } from "../app/useWorkflowModel";
-import brandMark from "../assets/brand/meowdiobooks-mark.png";
 import { Choice, Panel, Tag } from "../components/Ui";
 import { AcceptedSummary, PageComparison, StepEyebrow } from "../pages/shared";
 import { methodLabel } from "./helpers";
@@ -14,8 +13,8 @@ export function ExtractPage({ model }: { model: ExtractPageModel; }) {
   const page = extractionPreview?.page ?? 1;
   if (completed.includes("extract") && !revisingStages.includes("extract")) return <AcceptedSummary stage="extract" step={t("Step 1")} title={t("Extraction complete")} revision={snapshot?.activeArtifacts.extraction} onRevise={() => setRevisingStages([...new Set([...revisingStages, "extract"])])}><span><b>{book?.pageCount ?? "—"}</b><small>{t("Pages extracted")}</small></span><span><b>{t(methodLabel(method))}</b><small>{t("Selected parser")}</small></span><span><b>{t("Accepted")}</b><small>{t("Current result")}</small></span></AcceptedSummary>;
   return <><section className="extract-hero">
-    <div className="extract-hero-copy"><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><h1>{t("Did we read the source correctly?")}</h1><p>{t("Compare the sample pages, choose a parser, then extract the full book.")}</p></div>
-    <div className="extract-hero-art" aria-hidden="true"><span className="extract-page-card">PDF</span><span className="extract-spark">✦</span><span className="extract-text-card"><img src={brandMark} alt="" /><i /><i /><i /><i /></span></div>
+    <div className="extract-hero-copy"><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><h1>{t("Check the extracted text")}</h1><p>{t("Compare the sample pages, choose a parser, then extract the full book.")}</p></div>
+
   </section>
     {completed.includes("extract") && <Panel eyebrow={t("Accepted extraction")} title={t("Current extraction")} actions={<Tag tone="good">{t("Accepted")}</Tag>}><p className="panel-copy">{t("Your accepted text stays in use until a new extraction succeeds.")}</p></Panel>}
     <div className="choice-row extraction-choices">{(["liteparse", "native", "layout"] as ExtractionMethod[]).map((id) => {

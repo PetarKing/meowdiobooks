@@ -1,5 +1,6 @@
 /* Public full-product entry. Keep these unlayered, in accepted-main order.
    Consumers load this once before their own ordinary CSS overrides. */
+@import "./appearance.css";
 @import "../components/LanguagePicker.css";
 @import "../components/CastingChoice.css";
 @import "../components/CastIdentityReview.css";
@@ -9,6 +10,7 @@
 @import "./primitives.css";
 
 @import "./pages.css";
+@import "./cast-workbench.css";
 @import "./studio.css";
 
 [data-presentation-root] { color: var(--color-ink, var(--ink)); }

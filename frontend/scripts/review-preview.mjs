@@ -11,6 +11,7 @@ try {
   for (const [label, viewport, motion, fallback] of [
     ['desktop-motion', { width: 1440, height: 1000 }, 'no-preference', false],
     ['phone-reduced', { width: 390, height: 844 }, 'reduce', false],
+    ['phone-no-motion-allocation', { width: 390, height: 844 }, 'no-preference', false],
     ['desktop-no-webgl', { width: 1440, height: 1000 }, 'no-preference', true],
   ]) {
     const page = await browser.newPage({ viewport, reducedMotion: motion });
@@ -42,9 +43,9 @@ try {
       await page.screenshot({ path: `${out}/${label}-error.png` });
       throw error;
     });
-    await page.locator('.studio-art img').evaluate(async image => { await image.decode(); });
+    await page.locator('.folio-installation').waitFor({ state: 'attached' });
     let state;
-    if (motion === 'no-preference' && !fallback) {
+    if (motion === 'no-preference' && !fallback && viewport.width > 600) {
       await page.locator('.sound-field[data-render-state="active"] canvas').waitFor();
       const first = await page.evaluate(() => window.__designFrames);
       await page.waitForTimeout(220);
@@ -66,14 +67,14 @@ try {
       assert(await page.evaluate(() => window.__designFrames) > offscreenFrames, 'Visible hero must resume rendering');
       const buffersBefore = await page.evaluate(() => window.__releasedBuffers);
       await page.emulateMedia({ reducedMotion: 'reduce' });
-      await page.locator('.sound-field[data-render-state="static"]').waitFor();
+      await page.locator('.sound-field[data-render-state="static"]').waitFor({ state: 'attached' });
       assert.equal(await page.locator('.sound-field canvas').count(), 0, 'Reduced motion must release WebGL');
       assert(await page.evaluate(() => window.__releasedBuffers) > buffersBefore, 'Reduced motion must dispose GPU buffers');
       const stopped = await page.evaluate(() => window.__designFrames);
       await page.waitForTimeout(160);
       assert.equal(await page.evaluate(() => window.__designFrames), stopped, 'Reduced motion must stop scheduled rendering');
     } else {
-      await page.locator('.sound-field[data-render-state="static"]').waitFor();
+      await page.locator('.sound-field[data-render-state="static"]').waitFor({ state: 'attached' });
       assert.equal(await page.locator('.sound-field canvas').count(), 0);
       state = 'static';
     }
@@ -98,7 +99,8 @@ try {
     results.push({ label, heroState: state, reducedMotionRelease: label === 'desktop-motion', offscreenScheduling: label === 'desktop-motion' ? 'paused-and-resumed' : 'static', previewNavigationAndReload: 'passed', apiRequests, errors });
     await page.close();
   }
-  const racing = await browser.newPage({ reducedMotion: 'no-preference' });
+  for (const change of ['reduced-motion', 'phone-layout']) {
+  const racing = await browser.newPage({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'no-preference' });
   let unblock;
   let started;
   const blocked = new Promise(resolve => { unblock = resolve; });
@@ -106,13 +108,15 @@ try {
   await racing.route('**/three.js*', async route => { started(); await blocked; await route.continue(); });
   await racing.goto(url, { waitUntil: 'domcontentloaded' });
   await requested;
-  await racing.emulateMedia({ reducedMotion: 'reduce' });
+  if (change === 'reduced-motion') await racing.emulateMedia({ reducedMotion: 'reduce' });
+  else await racing.setViewportSize({ width: 390, height: 844 });
   unblock();
   await racing.waitForLoadState('networkidle');
-  assert.equal(await racing.locator('.sound-field canvas').count(), 0, 'A pending Three.js import must not activate after reduced motion is selected');
+  assert.equal(await racing.locator('.sound-field canvas').count(), 0, `A pending Three.js import must not activate after ${change}`);
   assert.equal(await racing.locator('.sound-field').getAttribute('data-render-state'), 'static');
-  results.push({ label: 'pending-import-reduced-motion', canvasCount: 0, heroState: 'static' });
+  results.push({ label: `pending-import-${change}`, canvasCount: 0, heroState: 'static' });
   await racing.close();
+  }
   await writeFile(`${out}/report.json`, JSON.stringify({ preview: url, generatedAt: new Date().toISOString(), results }, null, 2));
   console.log(JSON.stringify(results, null, 2));
 } finally { await browser.close(); }

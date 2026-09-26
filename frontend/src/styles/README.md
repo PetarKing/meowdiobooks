@@ -6,10 +6,12 @@ host selectors with equal specificity continue to win.
 
 | Source | Owns |
 | --- | --- |
-| `../styles.css` | Public baseline tokens, inherited product geometry and domain controls |
+| `appearance.css` | Root-scoped light/dark visual tokens, host palette fallbacks and native color scheme |
+| `../styles.css` | Public legacy baseline geometry and domain controls; imports appearance defaults |
 | `../media.css` | Inherited media, transcript and recording surfaces |
 | `primitives.css` | Shared Button, Panel, Choice, Tag, SourceExcerpt and language-control presentation |
 | `pages.css` | Workflow compositions and domain page presentation |
+| `cast-workbench.css` | Cast collection and audition inspector geometry |
 | `studio.css` | Application shell, Home, hero art and decorative motion |
 | `../components/*.css` | Existing specialized component styles and dialog focus surface |
 
@@ -32,5 +34,7 @@ page selectors into another direction sheet would increase that debt.
 Validate shared styling changes with focused component stories, representative
 1440px and 390px product renders, and `npm run test:consumer`. A structural cleanup
 that should not alter presentation also needs before/after pixel comparison.
+Browser appearance uses the optional controlled App preference or a local Light/Dark/System choice.
+`PresentationRoot` takes an explicit light/dark appearance for isolated previews.
 Palette customization continues through `PresentationRoot` semantic colors; do
 not increase selector specificity to force an art direction over a host palette.

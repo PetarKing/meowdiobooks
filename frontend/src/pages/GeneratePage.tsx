@@ -1,4 +1,3 @@
-import { sourcePageImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
 import { DialogSurface } from "../components/DialogSurface";
 import { TabList } from "../components/TabList";
@@ -13,10 +12,10 @@ import {
   targetChapterPartSeconds
 } from "../workflow/generation";
 
-export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "chapterFilter" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "setStage" | "snapshot" | "splitChapterId" | "splitLongChapter" | "stageIndex" | "t">;
+export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "error" | "chapterFilter" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "setStage" | "snapshot" | "splitChapterId" | "splitLongChapter" | "stageIndex" | "t">;
 
 export function GeneratePage({ model }: { model: GeneratePageModel; }) {
-  const { gateway, book, busy, chapterFilter, generateChapters, generationEstimatePolicy, generationSamples, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, setStage, snapshot, splitChapterId, splitLongChapter, stageIndex, t } = model;
+  const { busy, error, chapterFilter, generateChapters, generationEstimatePolicy, generationSamples, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, setStage, snapshot, splitChapterId, splitLongChapter, stageIndex, t } = model;
   if (!snapshot?.recordingScript) return null;
   const generated = snapshot?.generatedChapters ?? [];
   const chapters = snapshot?.chapters ?? [];
@@ -39,7 +38,6 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
     return true;
   });
   const visibleAvailableChapterIds = visibleChapters.filter((chapter) => !unavailableChapters.has(chapter.id)).map((chapter) => chapter.id);
-  const coverUrl = book ? sourcePageImageUrl(gateway, book.id, 1) : undefined;
   const filterCounts = {
     all: chapters.length,
     pending: availableChapters.filter((chapter) => !generatedByChapter.get(chapter.id)?.current).length,
@@ -70,14 +68,9 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
   };
   return <>
     <section className="generate-hero">
-      <div className="generate-cover-stack" aria-hidden="true">
-        <span />
-        <span />
-        {coverUrl && <img src={coverUrl} alt="" />}
-      </div>
       <div className="generate-hero-copy">
         <StepEyebrow stage="generate">{t("Step 5 · Generate")}</StepEyebrow>
-        <h1>{t("Bring every chapter to life.")}</h1>
+        <h1>{t("Record your chapters")}</h1>
         <p>{t("Each selected chapter becomes its own audio track to review before export.")}</p>
       </div>
       <div className="generate-hero-state"><dl className="generate-hero-stats">
@@ -114,19 +107,20 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
           <label className="chapter-select">
             <input aria-label={t("Select {{title}}", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} type="checkbox" disabled={unavailable} checked={selected} onChange={(event) => setSelectedChapters(event.target.checked ? [...new Set([...selectedChapters, row.id])] : selectedChapters.filter((id) => id !== row.id))} />
           </label>
-          <div className="chapter-book-mark">
-            <span aria-hidden="true">{t("Chapter")}</span><b aria-hidden="true">{String(chapterNumber).padStart(2, "0")}</b>
-            {playable && <button type="button" className="chapter-listen" aria-label={t(playable.current ? "Listen to {{title}}" : "Listen to {{title}} (older recording)", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} onClick={() => setListeningChapterId(row.id)}>▶</button>}
+          <div className="chapter-track-number">
+            <b aria-hidden="true">{String(chapterNumber).padStart(2, "0")}</b>
           </div>
+          {playable && <button type="button" className="chapter-listen" aria-label={t(playable.current ? "Listen to {{title}}" : "Listen to {{title}} (older recording)", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} onClick={() => setListeningChapterId(row.id)}>▶</button>}
           <div className="chapter-card-body">
             <h3 aria-level={2}>{row.title || t("Chapter {{number}}", { number: chapterNumber })}</h3>
-            <div className="chapter-card-meta">{pageRange && <small>{pageRange}</small>}{playable && !playable.current && <span className="chapter-stale-label">{t("Stale")}</span>}</div>
+            <div className="chapter-card-meta"><span className={`track-status ${playable?.current ? "ready" : unavailable ? "unavailable" : ""}`}>{t(unavailable ? "No audio" : playable?.current ? "Playable" : playable ? "Older recording" : "To make")}</span>{pageRange && <small>{pageRange}</small>}{playable && !playable.current && <span className="chapter-stale-label">{t("Stale")}</span>}</div>
           </div>
-          <dl className="chapter-estimates"><div><dt>{t("Audio")}</dt><dd>{unavailable ? t("No audio") : chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div><div><dt>{t("Make")}</dt><dd>{unavailable ? t("Not needed") : generationDuration(estimatedSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>
+          <dl className="chapter-estimates"><div><dt>{t("Listening")}</dt><dd>{unavailable ? t("No audio") : chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{unavailable ? t("Not needed") : generationDuration(estimatedSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>
         </article>;
       })}</div>
       {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
       {(availableChapters.length > 0 || currentGenerated.length > 0) && <section className="generation-selection" aria-label={t("Generation action")}>
+        {error && <p className="generation-error"><b>{t("Generation needs attention")}</b><span>{t(error, { defaultValue: error })}</span></p>}
         <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
         {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
         <div className="generation-selection-actions">

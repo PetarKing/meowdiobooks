@@ -1,8 +1,6 @@
 /* Shared production controls. Keep ordinary class specificity so consumer CSS wins.
    Values come from PresentationRoot or the product palette; no private host policy. */
 :root {
-  --surface-soft: #f2edfa;
-  --surface-raised: #fffdff;
   --motion-fast: 160ms;
   --motion-ease: cubic-bezier(.2, .7, .2, 1);
 }
@@ -27,7 +25,7 @@
 }
 .primary {
   background: var(--color-action, var(--poppy));
-  color: #fff;
+  color: var(--action-ink);
   box-shadow: 0 4px 12px color-mix(in srgb, var(--color-action, var(--poppy)) 18%, transparent);
 }
 .primary:hover:not(:disabled) {
@@ -49,8 +47,8 @@
   box-shadow: none;
 }
 .ghost:hover:not(:disabled) { background: var(--surface-soft); border-color: var(--color-action, var(--poppy)); box-shadow: none; }
-.danger { background: #9c344b; color: #fff; }
-.danger:hover:not(:disabled) { background: #81283c; }
+.danger { background:var(--danger-action); color:var(--danger-action-ink); }
+.danger:hover:not(:disabled) { background:var(--danger-action-hover); }
 :where(.primary, .secondary, .ghost, .danger):active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 .primary:disabled, .secondary:disabled, .ghost:disabled, .danger:disabled { opacity: .52; box-shadow: none; cursor: not-allowed; transform: none; }
 .primary:focus-visible, .secondary:focus-visible, .ghost:focus-visible, .danger:focus-visible { outline: 3px solid var(--color-action, var(--poppy)); outline-offset: 3px; box-shadow: none; }
@@ -65,8 +63,8 @@
 .panel-inset { background: var(--surface-soft); border-color: transparent; }
 .eyebrow, .overline { color: var(--color-muted, var(--muted)); font-size: 10px; font-weight: 650; letter-spacing: .16em; }
 .tag { max-width: 100%; padding: 5px 9px; border-radius: 6px; font-size: 12px; font-weight: 600; line-height: 1.4; text-transform: none; letter-spacing: 0; background: var(--surface-soft); color: var(--color-muted, var(--muted)); }
-.tag.good { background: var(--green-soft); color: var(--color-success, #35604f); }
-.tag.warn { background: #fff0cf; color: #79510f; }
+.tag.good { background: var(--green-soft); color: var(--color-success, var(--green)); }
+.tag.warn { background: var(--warning-soft); color: var(--warning-ink); }
 .tag.rose { background: var(--lavender); color: var(--color-action-hover, var(--poppy-dark)); }
 
 .choice { min-height: 106px; padding: 20px; gap: 10px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-muted, var(--muted)); background: var(--color-paper, var(--surface-raised)); box-shadow: none; }
@@ -76,13 +74,13 @@
 .choice-title small { padding: 4px 6px; border-radius: 4px; font: 600 11px var(--font-sans); letter-spacing: .04em; background: var(--color-action, var(--poppy)); }
 .choice-info { top: 10px; right: 10px; }
 .choice-info-trigger { width: 32px; height: 32px; border: 1px solid var(--color-border, var(--line)); font-size: 12px; font-weight: 600; background: var(--color-paper, var(--surface-raised)); color: var(--color-muted, var(--muted)); box-shadow: none; }
-.choice-tooltip { top: auto; right: 10px; bottom: calc(100% + 8px); left: 10px; padding: 12px 14px; border-color: transparent; border-radius: 10px; background: var(--color-ink, var(--ink)); color: #fff; font-size: 13px; font-weight: 400; line-height: 1.55; transform: translateY(4px); }
+.choice-tooltip { top: auto; right: 10px; bottom: calc(100% + 8px); left: 10px; padding: 12px 14px; border-color: transparent; border-radius: 10px; background: var(--inverse-surface); color: var(--inverse-ink); font-size: 13px; font-weight: 400; line-height: 1.55; transform: translateY(4px); }
 .choice-tooltip.visible { transform: translateY(0); }
 
 /* Evidence remains literal; emphasis must never hide the surrounding context. */
 .source-excerpt { font-family: var(--font-display); font-size: 17px; line-height: 1.7; color: var(--color-ink, var(--ink)); }
 .source-excerpt p { margin: 0 0 12px; }
-.source-excerpt mark { padding: 2px 4px; border-radius: 3px; background: var(--lavender); color: var(--color-ink, var(--ink)); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+.source-excerpt mark { padding: 2px 4px; border-radius: 3px; background: var(--highlight); color: var(--color-ink, var(--ink)); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .source-excerpt mark + p { margin-top: 12px; }
 
 /* Native tabs, disclosures and audio retain keyboard and browser behavior. */
