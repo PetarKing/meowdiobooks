@@ -1377,7 +1377,19 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
 
-    const dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
+    let dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
+    expect(dialog).toHaveFocus()
+    const closeChoice = within(dialog).getByRole('button', { name: 'Close speaker-check choice' })
+    closeChoice.focus()
+    fireEvent.keyDown(closeChoice, { key: 'Tab', shiftKey: true })
+    expect(within(dialog).getByRole('button', { name: /Luna Runs at api.openai.com/ })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab' })
+    expect(closeChoice).toHaveFocus()
+    fireEvent.keyDown(closeChoice, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '938 dialogue lines need a speaker check' })).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
+    dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
     expect(within(dialog).getByText('Everything stays local')).toBeInTheDocument()
     expect(within(dialog).getByText('May choose the wrong character')).toBeInTheDocument()
     expect(within(dialog).getByText('May miss a character and use Narrator')).toBeInTheDocument()
@@ -3019,20 +3031,11 @@ describe('v2 wizard', () => {
       expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived', 'selected')
     })
 
-    const afterDelete: CastArtifact = {
-      ...uploaded,
-      revision: 'auditions-upload-3',
-      identities: [{
-        ...uploaded.identities![0],
-        voiceCandidates: [uploaded.identities![0].voiceCandidates![1]],
-      }],
-    }
-    vi.mocked(wizardApi.deleteVoiceAudition).mockResolvedValue(afterDelete)
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Audition 1' }))
-    await waitFor(() => expect(wizardApi.deleteVoiceAudition).toHaveBeenCalledWith(
-      'book-1', 'auditions-upload-2', 'alice', 'av1',
-    ))
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Delete Audition/ })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Delete Audition/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select Audition 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Select Audition 2' })).toBeInTheDocument()
+    expect(wizardApi.deleteVoiceAudition).not.toHaveBeenCalled()
+
   })
 
   it('accepts a confirmed layered group route instead of a disposable group audition', async () => {

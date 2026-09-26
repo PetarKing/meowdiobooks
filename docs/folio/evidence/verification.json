@@ -2,16 +2,21 @@
   "date": "2026-09-26",
   "branch": "codex/studio-rebuild",
   "base": "688d07e (rejected Nocturne retained for history)",
-  "source": "Validated candidate committed on codex/studio-rebuild; no production adoption",
+  "source": "Reviewed Folio candidate with local repairs on codex/studio-rebuild; no production adoption",
   "unit": {
     "files": 24,
     "tests": 243,
     "passed": true
   },
   "storybook": {
-    "files": 4,
-    "stories": 55,
-    "passed": true
+    "files": 5,
+    "stories": 57,
+    "passed": true,
+    "finalRoutingRecheck": {
+      "stories": 2,
+      "passed": true,
+      "note": "After credential explanation and settled entrance visibility assertion"
+    }
   },
   "consumer": {
     "packedFiles": 76,
@@ -32,7 +37,10 @@
       "axe": 0,
       "horizontalOverflow": 0,
       "runtime": 0
-    }
+    },
+    "lightMatrix": 104,
+    "chineseWorkflowFrames": 80,
+    "currentAuditionInspectorFrames": 4
   },
   "manual": "Appearance switch and reload persistence observed; System restored. Independent review documented separately.",
   "limits": [
@@ -40,5 +48,35 @@
     "User aesthetic acceptance is pending.",
     "No merge, push, release or deployment."
   ],
-  "storybookTypes": "passed"
+  "storybookTypes": "passed",
+  "manualPreviewLocale": {
+    "persistedChineseStates": 40,
+    "reload": "passed",
+    "apiRequests": 0,
+    "runtimeErrors": 0
+  },
+  "independentCompactReview": {
+    "chineseFrames": 24,
+    "widths": [
+      320,
+      900,
+      720
+    ],
+    "actual200PercentTextZoom": "not exercised"
+  },
+  "routing": "Shared modal focus lifecycle; configured/unavailable isolated stories and independent light/dark phone/desktop rechecks",
+  "independentRoutingReview": {
+    "states": 8,
+    "widths": [
+      390,
+      1440
+    ],
+    "appearances": [
+      "light",
+      "dark"
+    ],
+    "axe": 0,
+    "horizontalOverflow": 0,
+    "keyboard": "focus containment, Escape and opener restoration observed; local and remote action focus colors rechecked"
+  }
 }

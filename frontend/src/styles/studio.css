@@ -122,3 +122,8 @@ html, body { background: var(--canvas, #f4f1eb); }
 
 .studio-heading-line { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 14px; }.folio-mobile-emblem { display: none; flex: 0 0 auto; }
 @media (max-width: 750px) { .folio-mobile-emblem { display: block; width: 80px; height: 60px; }.studio-hero h1 { margin-top: 6px; } }
+@media (max-width: 360px) {
+ .brand { font-size: 14px; gap: 6px; }
+ .cat-mark { width: 24px; height: 28px; flex-shrink: 0; }
+ .cat-mark img { width: 31px; height: 31px; }
+}

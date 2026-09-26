@@ -1,4 +1,5 @@
 import { expect, userEvent, waitFor, within } from "storybook/test";
+import i18n from "../src/i18n";
 import {
   fixtureVoiceSample,
   metadataFor,
@@ -12,33 +13,39 @@ export async function enterScenario(
   scenario: ScenarioId,
 ) {
   const metadata = metadataFor(scenario);
+  const t = (key: string | undefined, values?: Record<string, unknown>) => {
+    if (key === undefined) throw new Error(`Scenario ${scenario} has no expected heading`);
+    return i18n.t(key, values);
+  };
+  const escaped = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const prefix = (key: string, values?: Record<string, unknown>) => new RegExp(`^${escaped(t(key, values))}`);
   const canvas = within(canvasElement);
   const page = within(canvasElement.ownerDocument.body);
   const click = async (name: string | RegExp) => {
-    const control = await page.findByRole("button", { name });
+    const control = await page.findByRole("button", { name: typeof name === "string" ? t(name) : name });
     await waitFor(() => expect(control).toBeEnabled());
     await userEvent.click(control);
   };
 
   if (metadata.story.surface === "library") {
     if (metadata.gatewayVariant === "library-refresh-error")
-      await canvas.findByRole("button", { name: "Library, 2 audiobooks" });
-    await click(/^Library/);
+      await canvas.findByRole("button", { name: t("Library, {{count}} audiobooks", { count: 2 }) });
+    await click(prefix("Library"));
     if (metadata.gatewayVariant === "library-error")
       await expect(await canvas.findByRole("alert")).toHaveTextContent(
-        "Library could not be loaded",
+        t("Library could not be loaded"),
       );
     else if (metadata.gatewayVariant === "library-refresh-error")
       await expect(await canvas.findByRole("alert")).toHaveTextContent(
-        "Library could not be loaded. Try again.",
+        t("Library could not be loaded. Try again."),
       );
     else if (metadata.gatewayVariant === "library-loading")
       await expect(
-        await canvas.findByLabelText("Loading audiobooks"),
+        await canvas.findByLabelText(t("Loading audiobooks")),
       ).toHaveAttribute("aria-busy", "true");
     else
       await expect(
-        await canvas.findByRole("heading", { name: metadata.story.heading }),
+        await canvas.findByRole("heading", { name: t(metadata.story.heading) }),
       ).toBeVisible();
     if (metadata.gatewayVariant === "library-refresh-error")
       await expect(canvas.getAllByRole("article")).toHaveLength(2);
@@ -46,12 +53,12 @@ export async function enterScenario(
   }
 
   if (metadata.gatewayVariant === "empty-books") {
-    await expect(await canvas.findByText("Choose PDF")).toBeVisible();
+    await expect(await canvas.findByText(t("Choose PDF"))).toBeVisible();
     return;
   }
 
   const book = await canvas.findByRole("button", {
-    name: /Alice’s Adventures in Wonderland.*Continue/,
+    name: new RegExp(`Alice’s Adventures in Wonderland.*${escaped(t("Continue"))}`),
   });
 
   if (
@@ -80,10 +87,10 @@ export async function enterScenario(
   }
 
   await userEvent.click(book);
-  await canvas.findByRole("navigation", { name: "Wizard stages" });
+  await canvas.findByRole("navigation", { name: t("Wizard stages") });
 
   if (metadata.story.acceptedStageLabel) {
-    await click(new RegExp(`^${metadata.story.acceptedStageLabel} `));
+    await click(prefix(metadata.story.acceptedStageLabel));
     // Accepted-state stories are neutral visual references. Keep deliberate
     // keyboard focus demonstrations separate from resting page comparisons.
     (canvasElement.ownerDocument.activeElement as HTMLElement | null)?.blur();
@@ -94,70 +101,70 @@ export async function enterScenario(
   }
 
   await expect(
-    await canvas.findByRole("heading", { name: metadata.story.heading }),
+    await canvas.findByRole("heading", { name: t(metadata.story.heading) }),
   ).toBeVisible();
   await expect(
-    canvas.getByRole("navigation", { name: "Wizard stages" }),
+    canvas.getByRole("navigation", { name: t("Wizard stages") }),
   ).toBeVisible();
   if (metadata.snapshotVariant === "review-recovery") {
-    await expect(canvas.getByRole("button", { name: "Rebuild Dialogue →" })).toBeEnabled();
-    await expect(canvas.queryByRole("button", { name: /Accept preview and continue/ })).not.toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: prefix("Rebuild Dialogue") })).toBeEnabled();
+    await expect(canvas.queryByRole("button", { name: prefix("Accept preview and continue") })).not.toBeInTheDocument();
   }
 
   async function runStoryAction(action: WorkflowScenarioAction) {
     switch (action) {
       case "scan-review":
-        await click("Scan for issues →");
+        await click(prefix("Scan for issues"));
         return;
       case "open-final-review":
-        await click(/^Review complete transcript/);
-        await waitFor(() => expect(page.queryByText("Opening the transcript…")).toBeNull());
+        await click(prefix("Review complete transcript"));
+        await waitFor(() => expect(page.queryByText(t("Opening the transcript…"))).toBeNull());
         await expect(await page.findByText("Alice was beginning to get very tired of sitting by her sister on the bank.")).toBeVisible();
         return;
       case "design-voices":
-        await click(/^Design the voices/);
+        await click(prefix("Design the voices"));
         return;
       case "open-alice-voice":
-        await click(/^Open Alice voice/);
+        await click(prefix("Open {{name}} voice", { name: "Alice" }));
         await waitFor(() =>
           expect(
-            page.getByRole("dialog", { name: "Alice voice" }),
+            page.getByRole("dialog", { name: t("{{name}} voice", { name: "Alice" }) }),
           ).toBeVisible(),
         );
         return;
       case "open-identity-inspector":
-        await click("Inspect Alice & White Rabbit");
+        await click(t("Inspect {{name}}", { name: "Alice & White Rabbit" }));
         await waitFor(() =>
           expect(
-            page.getByRole("button", { name: "Confirm classification" }),
+            page.getByRole("button", { name: t("Confirm classification") }),
           ).toBeVisible(),
         );
         return;
       case "open-new-audition":
-        await click(/New audition/);
+        await click(prefix("New audition"));
         await waitFor(() =>
           expect(
-            page.getByRole("textbox", { name: "Performance notes" }),
+            page.getByRole("textbox", { name: t("Performance notes") }),
           ).toBeVisible(),
         );
         return;
       case "configure-sample":
         await userEvent.click(
-          await page.findByRole("radio", { name: /Clone from a sample/ }),
+          await page.findByRole("radio", { name: prefix("Clone from a sample") }),
         );
         await userEvent.upload(
-          await page.findByLabelText("Choose voice sample"),
+          await page.findByLabelText(t("Choose voice sample")),
           fixtureVoiceSample(),
         );
         await waitFor(() =>
           expect(
-            page.getByRole("textbox", { name: "Voice sample transcript" }),
+            page.getByRole("textbox", { name: t("Voice sample transcript") }),
           ).toHaveValue("Who in the world am I? Ah, that’s the great puzzle."),
         );
         return;
       case "create-sample":
         await click("Create sampled audition →");
-        await expect(await page.findByRole("button", { name: "Creating cloned audition…" })).toBeDisabled();
+        await expect(await page.findByRole("button", { name: t("Creating cloned audition…") })).toBeDisabled();
         return;
       case "open-existing-voice": {
         const summary = await waitFor(() => {
@@ -171,16 +178,16 @@ export async function enterScenario(
         return;
       }
       case "open-layered-voice":
-        await click(/^Open Alice & White Rabbit voice/);
+        await click(prefix("Open {{name}} voice", { name: "Alice & White Rabbit" }));
         await waitFor(() =>
           expect(
-            page.getByRole("dialog", { name: "Alice & White Rabbit voice" }),
+            page.getByRole("dialog", { name: t("{{name}} voice", { name: "Alice & White Rabbit" }) }),
           ).toBeVisible(),
         );
         if (metadata.castFixture === "layered")
           await waitFor(() =>
             expect(
-              page.getByRole("button", { name: "Confirm layered voices" }),
+              page.getByRole("button", { name: t("Confirm layered voices") }),
             ).toBeVisible(),
           );
         return;
@@ -189,24 +196,24 @@ export async function enterScenario(
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
       case "export":
-        await click(/^Export /);
+        await click(prefix("Export"));
         return;
       case "phase-help":
-        await click("About Extract");
+        await click(t("About {{phase}}", { phase: t("Extract") }));
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
       case "open-player":
-        await click("Listen to Down the Rabbit-Hole");
+        await click(t("Listen to {{title}}", { title: "Down the Rabbit-Hole" }));
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
       case "open-split":
-        await click("Split Down the Rabbit-Hole into shorter chapters");
+        await click(t("Split {{title}} into shorter chapters", { title: "Down the Rabbit-Hole" }));
         await expect(
-          await page.findByRole("button", { name: "Split into ≈ 5 chapters" }),
+          await page.findByRole("button", { name: t("Split into ≈ {{count}} chapters", { count: 5 }) }),
         ).toBeVisible();
         return;
       case "generate-selected":
-        await click(/Generate 3 selected/);
+        await click(prefix("Generate {{count}} selected", { count: 3 }));
         if (metadata.gatewayVariant === "generate-failed")
           await expect(await page.findByRole("alert")).toHaveTextContent(
             "Chapter generation stopped",
@@ -215,7 +222,7 @@ export async function enterScenario(
           await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
       case "build-dialogue":
-        await click(/Build transcript/);
+        await click(prefix("Build transcript"));
         if (metadata.snapshotVariant === "dialogue-routing-unconfigured")
           return;
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());

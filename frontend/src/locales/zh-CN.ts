@@ -718,6 +718,7 @@ const zhCN: Record<string, string> = {
   "Red cards marked Required must be confirmed before you can continue.": "标有“必需”的红色卡片必须确认后才能继续。",
   "Remote API": "远程 API",
   "Remote model": "远程模型",
+  "Remote model unavailable: API credentials are not configured.": "远程模型不可用：尚未配置 API 凭据。",
   "Restore AI choice": "恢复 AI 选择",
   "Runs at {{domain}}": "运行于 {{domain}}",
   "Search or type a character name": "搜索或输入角色名称",

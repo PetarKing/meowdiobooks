@@ -202,15 +202,20 @@ describe("CastVoiceReview", () => {
     play.mockRestore();
   });
 
-  it("deletes auditions only when another candidate remains", () => {
+  it("keeps auditions and lets their description select the exact candidate without deletion", () => {
     const onDelete = vi.fn();
-    render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} onDelete={onDelete} />);
+    const onApprove = vi.fn();
+    render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={onApprove} onRegenerate={() => undefined} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
-
-    expect(within(dialog).getAllByRole("button", { name: /Delete Audition/ })).toHaveLength(3);
-    fireEvent.click(within(dialog).getByRole("button", { name: "Delete Audition 2" }));
-    expect(onDelete).toHaveBeenCalledWith("many", "many-2");
+    expect(within(dialog).queryByRole("button", { name: /Delete Audition/ })).not.toBeInTheDocument();
+    const earlier = within(dialog).getByRole("button", { name: "Select Audition 1" });
+    fireEvent.click(within(earlier).getByText("Warm · Measured · neutral accent"));
+    expect(earlier).toHaveAttribute("aria-pressed", "true");
+    expect(onApprove).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve Audition 1" }));
+    expect(onApprove).toHaveBeenCalledWith("many", "many-1");
+    expect(onDelete).not.toHaveBeenCalled();
   });
 
   it("skips connector punctuation when building joint-speaker initials", () => {

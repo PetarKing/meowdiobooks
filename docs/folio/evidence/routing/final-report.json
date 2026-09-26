@@ -1,0 +1,338 @@
+[
+  {
+    "width": 390,
+    "appearance": "light",
+    "story": "configured",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 10,
+        "y": 10,
+        "width": 370,
+        "height": 824,
+        "top": 10,
+        "right": 380,
+        "bottom": 834,
+        "left": 10
+      },
+      "unavailable": null
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(37, 43, 44)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(156, 55, 37)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(185, 70, 48)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(185, 70, 48)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "appearance": "light",
+    "story": "credential-unavailable",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 10,
+        "y": 10,
+        "width": 370,
+        "height": 824,
+        "top": 10,
+        "right": 380,
+        "bottom": 834,
+        "left": 10
+      },
+      "unavailable": "Remote model unavailable: API credentials are not configured."
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(37, 43, 44)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(156, 55, 37)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "story": "configured",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 10,
+        "y": 10,
+        "width": 370,
+        "height": 824,
+        "top": 10,
+        "right": 380,
+        "bottom": 834,
+        "left": 10
+      },
+      "unavailable": null
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(241, 238, 229)",
+        "background": "rgb(17, 23, 24)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(255, 180, 153)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "hover",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(240, 160, 128)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(240, 160, 128)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "story": "credential-unavailable",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 10,
+        "y": 10,
+        "width": 370,
+        "height": 824,
+        "top": 10,
+        "right": 380,
+        "bottom": 834,
+        "left": 10
+      },
+      "unavailable": "Remote model unavailable: API credentials are not configured."
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(241, 238, 229)",
+        "background": "rgb(17, 23, 24)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(255, 180, 153)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "appearance": "light",
+    "story": "configured",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 310,
+        "y": 117.53125,
+        "width": 820,
+        "height": 664.921875,
+        "top": 117.53125,
+        "right": 1130,
+        "bottom": 782.453125,
+        "left": 310
+      },
+      "unavailable": null
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(37, 43, 44)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(156, 55, 37)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(185, 70, 48)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(185, 70, 48)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "appearance": "light",
+    "story": "credential-unavailable",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 310,
+        "y": 125.03125,
+        "width": 820,
+        "height": 649.921875,
+        "top": 125.03125,
+        "right": 1130,
+        "bottom": 774.953125,
+        "left": 310
+      },
+      "unavailable": "Remote model unavailable: API credentials are not configured."
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(37, 43, 44)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(255, 253, 248)",
+        "background": "rgb(156, 55, 37)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "story": "configured",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 310,
+        "y": 117.53125,
+        "width": 820,
+        "height": 664.921875,
+        "top": 117.53125,
+        "right": 1130,
+        "bottom": 782.453125,
+        "left": 310
+      },
+      "unavailable": null
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(241, 238, 229)",
+        "background": "rgb(17, 23, 24)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(255, 180, 153)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "hover",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(240, 160, 128)",
+        "violations": []
+      },
+      {
+        "route": "Luna",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(240, 160, 128)",
+        "violations": []
+      }
+    ]
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "story": "credential-unavailable",
+    "geom": {
+      "overflow": 0,
+      "dialog": {
+        "x": 310,
+        "y": 125.03125,
+        "width": 820,
+        "height": 649.921875,
+        "top": 125.03125,
+        "right": 1130,
+        "bottom": 774.953125,
+        "left": 310
+      },
+      "unavailable": "Remote model unavailable: API credentials are not configured."
+    },
+    "states": [
+      {
+        "route": "Qwen",
+        "state": "hover",
+        "color": "rgb(241, 238, 229)",
+        "background": "rgb(17, 23, 24)",
+        "violations": []
+      },
+      {
+        "route": "Qwen",
+        "state": "focus",
+        "color": "rgb(37, 43, 44)",
+        "background": "rgb(255, 180, 153)",
+        "violations": []
+      }
+    ]
+  }
+]

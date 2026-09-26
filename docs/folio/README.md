@@ -19,7 +19,7 @@ Edit production pages in `frontend/src/pages`, shared controls in `frontend/src/
 
 - Home integrates import with its introduction and exposes resume work in the first desktop viewport. A code-native animated book converts paper into audio waves; static and reduced-motion fallbacks remain available, with a small phone emblem.
 - Review places the decision queue, manuscript evidence and consequence choices together. Phone keeps a bounded queue and accessible resolutions.
-- Cast puts required voices first, offers a direct route to each blocker, and presents auditions before tuning. Search changes visibility without weakening acceptance requirements.
+- Cast puts required voices first, offers a direct route to each blocker, and presents auditions before tuning. Descriptions are part of the audition selection button; playback stays independent and approval still names the exact revision. Audition deletion controls are removed as originally requested; generated auditions remain available. Search changes visibility without weakening acceptance requirements.
 - Generate uses aligned chapter tracks with readiness, source range and listening/generation estimates. Failure feedback appears beside the action and preserves saved audio. A 120-chapter fixture exercises scale.
 - Export brings the manifest, metadata and live edition preview together. Library uses compact bibliographic rows with distinct edition scope.
 - Header navigation replaces the overlapping phone footer. Language and appearance remain available; inspectors preserve their focus and draft lifecycle.
@@ -28,14 +28,20 @@ Edit production pages in `frontend/src/pages`, shared controls in `frontend/src/
 
 [Independent critique](REVIEW.md) compares actual retained production and rejected screenshots, lists observed defects and rechecks their repairs. [Appearance](APPEARANCE.md) documents preference/host/portal behavior and contrast probes. [Workflow verification](WORKFLOWS.md) documents page-specific execution.
 
+[Candidate audit](CANDIDATE-AUDIT.md) maps the original requirements to the implementation and remaining boundaries. [Component review](COMPONENT-REVIEW.md) independently inspects the nine primitive and three composition stories plus Appearance, Phase Help, Dialogue results and configured/unavailable route choices. [Compact review](COMPACT-REVIEW.md) inspects Chinese layouts and keyboard traversal at 320px, tablet and width-equivalent reflow sizes; it distinguishes these from actual browser text zoom. Its 320px wordmark finding is repaired. Its Chinese preview stall led to locale-aware fixture entry; [all 40 manual preview states and reload](evidence/preview-locales.json) now pass with Chinese already persisted.
+
 Final unit/browser/consumer results are in [verification.json](evidence/verification.json). Final focused [light](evidence/final-light.json) and [dark](evidence/final-dark.json) captures have no reported runtime, accessibility or overflow failures. The full [dark matrix](evidence/dark-matrix.json) covers 52 product/component/composition stories at desktop and phone sizes. [Motion and preview safety](evidence/preview-motion.json) records offscreen pause/resume, GPU release, no-WebGL fallback, hidden phone allocation, pending-import races and navigation/reload without API calls.
+
+The complete [light matrix](evidence/light-matrix.json) now covers the same 52 stories at both widths; [Chinese rendered states](evidence/zh-rendered.json) cover all 40 workflow stories at desktop and phone. A visual defect in the isolated Dialog example passed those automated checks: it had used a full inspector with no content padding. The shared compact dialog surface replaced that misuse and was independently rechecked; [light](evidence/dialog-light-recheck.json) and [dark](evidence/dialog-dark-recheck.json) receipts preserve the focused rechecks. Automation supports accessibility/geometry claims, not aesthetic grades.
+
+Short recordings exercise the actual synthetic controls: [light/dark preference and animated book](clips/appearance-and-book.webm), [required voice review on phone](clips/required-voice-phone.webm), [generation failure in both appearances](clips/generation-failure-phone.webm), and [description selection with explicit audition approval](clips/audition-selection-phone.webm). [Recording assertions](evidence/recordings.json) verify preference persistence, blocked/enabled acceptance, visible saved-audio feedback and absence of production API calls. The clips contain synthetic silent audio and do not establish narration quality.
 
 | Surface | Light | Dark |
 | --- | --- | --- |
 | Home | [Desktop](screenshots/home-1440-light.png), [phone](screenshots/home-390-light.png), [animated render](screenshots/home-motion-light.png) | [Desktop](screenshots/home-1440-dark.png), [phone](screenshots/home-390-dark.png) |
 | Review | [Desktop](screenshots/review-1440-light.png), [phone](screenshots/review-390-light.png) | [Desktop](screenshots/review-1440-dark.png), [phone](screenshots/review-390-dark.png) |
 | Cast voices | [Desktop](screenshots/cast-voices-1440-light.png) | [Desktop](screenshots/cast-voices-1440-dark.png) |
-| Audition inspector | [Desktop](screenshots/cast-inspector-1440-light.png) | [Desktop](screenshots/cast-inspector-1440-dark.png) |
+| Audition inspector | [Desktop](screenshots/cast-inspector-1440-light.png), [phone](screenshots/cast-inspector-390-light.png) | [Desktop](screenshots/cast-inspector-1440-dark.png), [phone](screenshots/cast-inspector-390-dark.png) |
 | Export | [Desktop](screenshots/export-1440-light.png), [phone](screenshots/export-390-light.png) | Covered in full dark matrix |
 | Library | [Desktop](screenshots/library-1440-light.png), [phone](screenshots/library-390-light.png) | Covered in full dark matrix |
 | 120 chapter generation | [Desktop](screenshots/generate-long-book-1440-light.png), [phone](screenshots/generate-long-book-390-light.png) | Covered in full dark matrix |

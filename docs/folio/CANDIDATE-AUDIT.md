@@ -1,0 +1,20 @@
+# Folio candidate audit — 26 September 2026
+
+The rejected delivery confused implementation speed and automated checks with a convincing design improvement. It also missed concrete interaction requirements. This audit maps the repaired candidate to the user's requested outcome. It is a review receipt, not an aesthetic grade or authorization to adopt it.
+
+| Requested outcome | Current implementation and evidence | Remaining boundary |
+| --- | --- | --- |
+| Replace the incompatible Nocturne direction | Warm paper/graphite/vermilion light and charcoal/ivory/peach dark; rejected branch retained separately. [Appearance review](APPEARANCE.md), [independent critique](REVIEW.md). | The user must judge whether this direction fits the product. No acceptance inferred. |
+| Real light/dark mode | Light/Dark/System available in the app header; persisted preference and reload exercised in the [recording](clips/appearance-and-book.webm). Portals and sibling presentation roots reviewed. | Synthetic/local evidence; no production adoption. |
+| Reusable, editable system and Storybook | Production components, public scoped CSS, documented tokens/composition and live source-based previews. [Design system](../../frontend/DESIGN_SYSTEM.md). | Story coverage is a bounded inventory, not a claim that every prop combination is pristine. |
+| Each working screen earns its redesign | Import/resume, extraction, Dialogue, Review, Cast, Generate, Export and Library compositions inspected with failures, recovery and dense fixtures. [Workflow verification](WORKFLOWS.md), [critic findings](REVIEW.md). | Automated accessibility and geometry results do not establish aesthetic superiority. |
+| Whole targets respond naturally | Book resume targets, choice cards and audition descriptions are actionable. Audition playback remains independent; exact revision approval is explicit. [Audition recording](clips/audition-selection-phone.webm), [independent compact recheck](COMPACT-REVIEW.md). | Synthetic audio establishes interaction only. |
+| Remove audition management/deletion | Delete buttons and page deletion wiring removed; generation, comparison and explicit approval remain. App/CastVoiceReview regressions retain both auditions and assert no deletion call. | The gateway's existing public deletion API remains compatible; no stored artifact was deleted. |
+| Coherent Dialogue and uncluttered working flow | Shared appearance and header navigation; no overlapping wizard footer. Dialogue result actions now follow evidence rather than covering reader rows on phone. [Rendered repair](COMPONENT-REVIEW.md). | Phone acceptance can require scrolling past evidence, deliberately avoiding an obscuring persistent action. |
+| Animation and immersive detail | Code-native animated book/audio field with lazy Three.js, reduced-motion/static fallback, offscreen pause and GPU release. [Motion checks](evidence/preview-motion.json). | Shared bundle remains substantial. Motion does not compensate for usability defects. |
+| Quick images and manual testing | [Current screenshots and preview links](README.md), four actual synthetic interaction recordings, independent component and compact reviews. | Actual 200% text zoom, screen-reader listening and real provider narration were not exercised. |
+| Locale-compatible operation | Locale-aware scenario entry; all 40 manual preview states and reload run with Chinese already persisted. [Receipt](evidence/preview-locales.json). | This checks preview operation, not translation quality in every supported language. |
+
+The additional review found defects despite green checks: an unpadded isolated dialog, pale framing around dark Storybook examples, Dialogue actions covering phone evidence, a clipped 320px wordmark, an English-only preview entry path, and missed audition requirements. These were repaired and rechecked. Large-book route selection received separate focus-lifecycle and credential-unavailable review rather than being inferred from smaller Dialogue fixtures.
+
+The goal remains open for the user's design judgment. No push, merge, release or deployment has occurred.

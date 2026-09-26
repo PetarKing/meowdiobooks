@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { DialogueAttributionRoute, DialogueRoutingPreview } from "../api/contracts";
+import { DialogSurface } from "./DialogSurface";
 
 interface DialogueRoutingChoiceProps {
   routing: DialogueRoutingPreview;
@@ -26,21 +27,12 @@ function Tradeoff({ children }: { children: ReactNode }) {
 
 export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRoutingChoiceProps) {
   const { t } = useTranslation();
-  const dialogRef = useRef<HTMLElement>(null);
   const [selected, setSelected] = useState<DialogueAttributionRoute>();
   const remote = routing.remote;
   const money = (value: number) => value <= 0 ? t("$0 API cost") : t("≈ ${{cost}} API cost", { cost: value.toFixed(2) });
-  useEffect(() => {
-    dialogRef.current?.focus();
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", closeOnEscape);
-    return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
 
   return <div className="dialogue-routing-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <section ref={dialogRef} className="dialogue-routing-modal" role="dialog" aria-modal="true" aria-labelledby="dialogue-routing-title" tabIndex={-1}>
+    <DialogSurface className="dialogue-routing-modal" aria-labelledby="dialogue-routing-title" onDismiss={onClose}>
       <button className="dialogue-routing-close" type="button" aria-label={t("Close speaker-check choice")} onClick={onClose}>×</button>
       <header className="dialogue-routing-heading">
         <span className="eyebrow">{t("A lot to review")}</span>
@@ -87,6 +79,7 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
               <Tradeoff>{t("dialogue.remoteBillingTradeoff", { ns: "edition" })}</Tradeoff>
             </ul></span>
           </button>
+          {!remote?.credentialConfigured && <p className="dialogue-route-unavailable">{t("Remote model unavailable: API credentials are not configured.")}</p>}
           {selected === "remote" && remote?.credentialConfigured && <button type="button" className="dialogue-route-proceed remote" onClick={() => onChoose("remote")}>
             {t("Use {{model}}", { model: remote.displayName })} <i aria-hidden="true">→</i>
           </button>}
@@ -94,6 +87,6 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
       </div>
 
       <p className="dialogue-routing-privacy">{t("dialogue.routingPrivacyNote", { ns: "edition" })}</p>
-    </section>
+    </DialogSurface>
   </div>;
 }

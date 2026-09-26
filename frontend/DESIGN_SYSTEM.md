@@ -33,6 +33,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 ## Interaction and state
 
 - Every interactive element needs visible hover, keyboard focus, selected, and disabled treatment. Selection uses shape/border plus color.
+- Small confirmations can compose `DialogSurface` with `dialog-backdrop`, `dialog-card` and `dialog-actions` from the public primitive sheet. The card provides padding, bounded width/height and scrolling; full workbench inspectors keep their own geometry. `DialogSurface` itself owns the shared keyboard and scroll-lock lifecycle.
 - Loading preserves context: keep the initiating label, add progress when measurable, and prevent duplicate actions.
 - Empty states explain what unlocks the surface. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
 - Progress and completion use calm, brief motion. Ambient motion is allowed only in decorative home artwork: the lazy Three.js book sculpture caps rendering at 30fps, pauses while hidden or offscreen, and releases its GPU context on unmount. Task screens use purposeful hover, selection and transition feedback. Never animate an acceptance state into ambiguity.

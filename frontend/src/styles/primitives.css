@@ -5,6 +5,11 @@
   --motion-ease: cubic-bezier(.2, .7, .2, 1);
 }
 
+/* Small confirmations share a readable surface; full workbench inspectors own their geometry. */
+.dialog-backdrop { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 16px; background: var(--overlay); }
+.dialog-card { width: min(520px, 100%); max-height: calc(100dvh - 32px); overflow: auto; padding: 24px; border: 1px solid var(--line); border-radius: 16px; background: var(--paper); color: var(--ink); box-shadow: var(--shadow-lg); }
+.dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+
 .primary, .secondary, .ghost, .danger {
   display: inline-flex;
   align-items: center;

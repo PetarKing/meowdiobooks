@@ -75,6 +75,8 @@
 .voice-candidate-tile.applied.selected { box-shadow: none; }
 .voice-candidate-choice { padding: 15px; gap: 12px; }
 .voice-candidate-choice b { font: 600 14px var(--font-sans); }.voice-candidate-choice small { font-size: 11px; margin-top: 4px; }
+.voice-candidate-choice { align-items: flex-start; }
+.voice-candidate-summary { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; font-weight: 400; line-height: 1.5; }
 .candidate-selected-badge, .candidate-applied-badge { border-radius: 4px; font-size: 10px; font-weight: 600; text-transform: none; padding: 4px 7px; }
 .voice-candidate-tile > p { padding: 0 15px 12px; }.voice-candidate-tile audio { margin: 0 15px 15px; width: calc(100% - 30px); }
 .voice-setting-group { border: 0; padding: 0; background: none; border-radius: 0; }

@@ -27,10 +27,10 @@ import {
   message
 } from "../workflow/presentation";
 
-export type CastPageModel = Pick<WorkflowModel, "castingPreviewFingerprint" | "acceptCandidate" | "book" | "busy" | "castCandidate" | "castGenerationPaused" | "castingPreviewReady" | "castingSources" | "completed" | "confirmDefaultVoices" | "confirmedVoiceRoutes" | "deletingVoiceRevision" | "designingVoices" | "editingCast" | "gateway" | "identityDecisions" | "language" | "narrationLanguageConfirmed" | "narratorDirection" | "processCandidate" | "regeneratingCharacterId" | "resolvedLabels" | "revisingStages" | "setCastCandidate" | "setCastGenerationPaused" | "setCastingSources" | "setConfirmDefaultVoices" | "setConfirmedVoiceRoutes" | "setDeletingVoiceRevision" | "setDesigningVoices" | "setEditingCast" | "setError" | "setIdentityDecisions" | "setLanguage" | "setNarrationLanguageConfirmed" | "setNarratorDirection" | "setRegeneratingCharacterId" | "setResolvedLabels" | "setRevisingStages" | "setUploadingCharacterId" | "setVoiceModel" | "setVoiceRoutes" | "setVoiceSelections" | "snapshot" | "t" | "updateCastingPreview" | "uploadingCharacterId" | "voiceModel" | "voiceRoutes" | "voiceSelections">;
+export type CastPageModel = Pick<WorkflowModel, "castingPreviewFingerprint" | "acceptCandidate" | "book" | "busy" | "castCandidate" | "castGenerationPaused" | "castingPreviewReady" | "castingSources" | "completed" | "confirmDefaultVoices" | "confirmedVoiceRoutes" | "designingVoices" | "editingCast" | "gateway" | "identityDecisions" | "language" | "narrationLanguageConfirmed" | "narratorDirection" | "processCandidate" | "regeneratingCharacterId" | "resolvedLabels" | "revisingStages" | "setCastCandidate" | "setCastGenerationPaused" | "setCastingSources" | "setConfirmDefaultVoices" | "setConfirmedVoiceRoutes" | "setDesigningVoices" | "setEditingCast" | "setError" | "setIdentityDecisions" | "setLanguage" | "setNarrationLanguageConfirmed" | "setNarratorDirection" | "setRegeneratingCharacterId" | "setResolvedLabels" | "setRevisingStages" | "setUploadingCharacterId" | "setVoiceModel" | "setVoiceRoutes" | "setVoiceSelections" | "snapshot" | "t" | "updateCastingPreview" | "uploadingCharacterId" | "voiceModel" | "voiceRoutes" | "voiceSelections">;
 
 export function CastPage({ model }: { model: CastPageModel; }) {
-  const { castingPreviewFingerprint, acceptCandidate, book, busy, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, completed, confirmDefaultVoices, confirmedVoiceRoutes, deletingVoiceRevision, designingVoices, editingCast, gateway, identityDecisions, language, narrationLanguageConfirmed, narratorDirection, processCandidate, regeneratingCharacterId, resolvedLabels, revisingStages, setCastCandidate, setCastGenerationPaused, setCastingSources, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setDeletingVoiceRevision, setDesigningVoices, setEditingCast, setError, setIdentityDecisions, setLanguage, setNarrationLanguageConfirmed, setNarratorDirection, setRegeneratingCharacterId, setResolvedLabels, setRevisingStages, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, snapshot, t, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections } = model;
+  const { castingPreviewFingerprint, acceptCandidate, book, busy, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, completed, confirmDefaultVoices, confirmedVoiceRoutes, designingVoices, editingCast, gateway, identityDecisions, language, narrationLanguageConfirmed, narratorDirection, processCandidate, regeneratingCharacterId, resolvedLabels, revisingStages, setCastCandidate, setCastGenerationPaused, setCastingSources, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setDesigningVoices, setEditingCast, setError, setIdentityDecisions, setLanguage, setNarrationLanguageConfirmed, setNarratorDirection, setRegeneratingCharacterId, setResolvedLabels, setRevisingStages, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, snapshot, t, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections } = model;
   const revising = revisingStages.includes("cast");
   const current = castCandidate ?? (revising ? undefined : snapshot?.cast);
   const hasPreviousCast = Boolean(snapshot?.cast)
@@ -186,7 +186,6 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       onApprove={(characterId, revision) => setVoiceSelections((selected) => ({ ...selected, [characterId]: revision }))}
       regeneratingCharacterId={regeneratingCharacterId}
       uploadingCharacterId={uploadingCharacterId}
-      deletingVoiceRevision={deletingVoiceRevision}
       onTranscribe={(file) => {
         if (!book) return Promise.reject(new Error("Book not found"));
         return gateway.transcribeVoiceSample(book.id, file);
@@ -198,21 +197,6 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         void gateway.uploadVoiceSample(book.id, current.revision, characterId, file, referenceText).then((cast) => {
           setCastCandidate(cast);
         }).catch((reason) => setError(message(reason))).finally(() => setUploadingCharacterId(undefined));
-      }}
-      onDelete={(characterId, voiceRevision) => {
-        if (!book) return;
-        setDeletingVoiceRevision(voiceRevision);
-        setError(undefined);
-        void gateway.deleteVoiceAudition(book.id, current.revision, characterId, voiceRevision).then((cast) => {
-          const updatedVoice = [cast.narrator, ...(cast.identities ?? [])].find((row) => row?.characterId === characterId);
-          setCastCandidate(cast);
-          setVoiceSelections((selected) => {
-            if (updatedVoice && voiceHasRevision(updatedVoice, selected[characterId])) return selected;
-            const next = { ...selected };
-            delete next[characterId];
-            return next;
-          });
-        }).catch((reason) => setError(message(reason))).finally(() => setDeletingVoiceRevision(undefined));
       }}
       loadSourceVoices={snapshot?.castingPreviewAvailable && gateway.previewCasting && book ? () => gateway.previewCasting!(book.id, { proposalRevision: current.revision, identityDecisions: current.identityDecisions, voiceModel: current.voiceModel ?? voiceModel, language: current.language ?? language, sourceBookIds: [] }) : undefined}
       onReuseVoice={(characterId, sourceVoice) => {

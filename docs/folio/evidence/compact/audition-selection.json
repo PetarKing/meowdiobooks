@@ -1,0 +1,36 @@
+[
+  {
+    "theme": "light",
+    "descriptionRect": {
+      "x": 57.84375,
+      "y": 786.359375,
+      "width": 288.15625,
+      "height": 18
+    },
+    "selectedBefore": "true",
+    "appliedBefore": "Select Audition 2",
+    "deletes": 0,
+    "audioAfter": "true",
+    "audioApplied": "Select Audition 2",
+    "approved": "Select Audition 1",
+    "approveButtonsAfter": 0,
+    "documentWidth": 390
+  },
+  {
+    "theme": "dark",
+    "descriptionRect": {
+      "x": 57.84375,
+      "y": 786.359375,
+      "width": 288.15625,
+      "height": 18
+    },
+    "selectedBefore": "true",
+    "appliedBefore": "Select Audition 2",
+    "deletes": 0,
+    "audioAfter": "true",
+    "audioApplied": "Select Audition 2",
+    "approved": "Select Audition 1",
+    "approveButtonsAfter": 0,
+    "documentWidth": 390
+  }
+]

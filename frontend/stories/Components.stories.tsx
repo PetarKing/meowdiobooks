@@ -107,11 +107,11 @@ function DialogExample() {
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   return <PresentationRoot appearance={previewAppearance()}><Button ref={trigger} onClick={() => setOpen(true)}>Review audition</Button>
-    {open && <div className="cast-inspector-backdrop">
-      <DialogSurface className="cast-inspector" aria-label="Review audition" onDismiss={() => setOpen(false)} returnFocusRef={trigger}>
+    {open && <div className="dialog-backdrop">
+      <DialogSurface className="dialog-card" aria-label="Review audition" onDismiss={() => setOpen(false)} returnFocusRef={trigger}>
         <Panel title="Approve this voice?" variant="plain"><p>Listen to the audition before approving the exact sample.</p>
-          <Button variant="ghost" onClick={() => setOpen(false)}>Close review</Button>
-          <Button onClick={() => setOpen(false)}>Approve audition</Button>
+          <div className="dialog-actions"><Button variant="ghost" onClick={() => setOpen(false)}>Close review</Button>
+          <Button onClick={() => setOpen(false)}>Approve audition</Button></div>
         </Panel>
       </DialogSurface>
     </div>}

@@ -22,6 +22,7 @@ interface Props {
   onUpload?: (characterId: string, file: File, referenceText: string) => void;
   loadSourceVoices?: () => Promise<CastingPreview>;
   onReuseVoice?: (characterId: string, source: SourceVoice) => void;
+  /** Retained for host source compatibility; audition deletion has no UI control. */
   onDelete?: (characterId: string, revision: string) => void;
   regeneratingCharacterId?: string;
   uploadingCharacterId?: string;
@@ -194,7 +195,7 @@ function audioTime(seconds: number) {
 }
 
 export function CastVoiceReview({
-  bookId, layeredVoicePreviewUrl, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, onDelete, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId, deletingVoiceRevision,
+  bookId, layeredVoicePreviewUrl, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId,
 }: Props) {
   const { t } = useTranslation();
   const voices = useMemo(
@@ -533,12 +534,10 @@ export function CastVoiceReview({
                 <div className="voice-candidate-actions">
                   <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
                     <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
-                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small></span>
+                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
                     {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
                   </button>
-                  {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}
                 </div>
-                <p>{candidateSummary(candidate, t)}</p>
                 {candidate.previewUrl
                   ? <audio controls preload="metadata" src={candidate.previewUrl} />
                   : <small className="cast-muted">{t("No playable audio.")}</small>}
