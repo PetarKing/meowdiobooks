@@ -3,6 +3,7 @@ import type {
 } from "../api/contracts";
 import { sourcePageImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
+import { WorkflowEmpty } from "../components/WorkflowPage";
 import { PdfCoverPageInput, StepEyebrow } from "../pages/shared";
 import {
   chapterDuration
@@ -37,7 +38,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
       <div><StepEyebrow stage="export">{t("Step 6 · Export")}</StepEyebrow><h1>{t("Package your audiobook.")}</h1><p>{t("Choose finished chapters, check the book details, and pick a format.")}</p></div>
     </section>
 
-    {!playableChapters.length ? <section className="export-empty"><span aria-hidden="true">♪</span><h2>{t("Generate a chapter first.")}</h2><p>{t("Generate current chapter audio before exporting.")}</p><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></section> : <>
+    {!playableChapters.length ? <WorkflowEmpty className="export-empty" symbol="♪" title={t("Generate a chapter first.")} copy={t("Generate current chapter audio before exporting.")}><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></WorkflowEmpty> : <>
       <section className="export-layout">
         <div className="export-chapter-picker">
           <header><div><span className="eyebrow">{t("Choose audio")}</span><h2>{t("Chapters to include")}</h2></div><div className="chapter-bulk-actions"><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
@@ -48,9 +49,9 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
             const chapterNumber = String(index + 1).padStart(2, "0");
             const duration = chapterDuration(audio.audioSeconds, false);
             return <label key={row.id} className={selected ? "selected" : ""}>
-              <input aria-label={t("Chapter {{number}}, {{duration}}", { number: chapterNumber, duration })} type="checkbox" checked={selected} onChange={(event) => setExportChapterIds(event.target.checked ? [...new Set([...exportChapterIds, row.id])] : exportChapterIds.filter((id) => id !== row.id))} />
+              <input aria-describedby={`export-chapter-${row.id}-title`} aria-label={t("Chapter {{number}}, {{duration}}", { number: chapterNumber, duration })} type="checkbox" checked={selected} onChange={(event) => setExportChapterIds(event.target.checked ? [...new Set([...exportChapterIds, row.id])] : exportChapterIds.filter((id) => id !== row.id))} />
               <span className="export-chapter-book" aria-hidden="true"><small>{t("Chapter")}</small><b>{chapterNumber}</b></span>
-              <span className="export-chapter-duration">{duration}</span>
+              <span className="export-chapter-copy"><b id={`export-chapter-${row.id}-title`}>{row.title || t("Chapter {{number}}", { number: index + 1 })}</b><span className="export-chapter-duration">{duration}</span></span>
               <i aria-hidden="true">{selected ? "✓" : "+"}</i>
             </label>;
           })}</div>

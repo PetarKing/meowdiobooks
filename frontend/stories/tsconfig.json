@@ -12,6 +12,7 @@
     "./**/*.ts",
     "./**/*.tsx",
     "../.storybook/*.ts",
-    "../design-kit/fixtures.ts"
+    "../design-kit/fixtures.ts",
+    "../design-kit/studioPreview.tsx"
   ]
 }

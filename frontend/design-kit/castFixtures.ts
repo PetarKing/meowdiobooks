@@ -65,6 +65,14 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
       i,
     ),
   );
+  if (dense) {
+    identities[identities.length - 1] = {
+      ...voice("Alice & White Rabbit", 100), category: "group",
+      literalLabels: ["Alice & White Rabbit"], voiceAccepted: false,
+      acceptedVoiceRevision: undefined,
+    };
+    identities[0].literalLabels = ["Alice", "A. Liddell"];
+  }
   if (variant === "layered" || variant === "layered-confirmed")
     identities.push({
       ...voice("Alice & White Rabbit", 100),
@@ -126,7 +134,7 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
     proposals: identities.map((v, i) => ({
       label: v.name,
       category: v.category ?? "character",
-      canonicalName: v.name,
+      canonicalName: dense && i === 2 ? "The Queen" : v.name,
       aliases: [],
       reviewRequired:
         variant !== "voice-design" &&

@@ -6,5 +6,9 @@
 @import "../styles.css";
 @import "../media.css";
 @import "../components/dialog-surface.css";
+@import "./primitives.css";
+
+@import "./pages.css";
+@import "./studio.css";
 
 [data-presentation-root] { color: var(--color-ink, var(--ink)); }

@@ -1,3 +1,5 @@
+import { CollectionToolbar } from "./CollectionToolbar";
+import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog as InspectorShell } from "./Ui";
 import {
   useCallback,
@@ -229,6 +231,10 @@ export function CastIdentityReview({
   );
   const narratorAssignments = allGroups.find((group) => group.key === NARRATOR_KEY);
   const groups = allGroups.filter((group) => group.key !== NARRATOR_KEY);
+  const [collectionQuery, setCollectionQuery] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState("all");
+  const largeCollection = groups.length > 12;
+  const visibleGroups = largeCollection ? groups.filter((group) => collectionMatches(collectionQuery, [group.name, ...group.labels]) && (collectionFilter === "all" || (collectionFilter === "required" ? group.needsReview : !group.needsReview))) : groups;
   const [inspectedLabel, setInspectedLabel] = useState<string>();
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorClosing, setInspectorClosing] = useState(false);
@@ -246,6 +252,7 @@ export function CastIdentityReview({
   const mergeTimer = useRef<number | undefined>(undefined);
   const undoTimer = useRef<number | undefined>(undefined);
   const focusAfterClose = useRef<string | undefined>(undefined);
+  const workbenchRef = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const dragAutoScroll = useDragAutoScroll(Boolean(draggedGroupKey));
   const inspectingNarrator = inspectorOpen && inspectedLabel === NARRATOR_KEY;
@@ -268,7 +275,10 @@ export function CastIdentityReview({
     closeTimer.current = undefined;
     setInspectorOpen(false);
     setInspectorClosing(false);
-    if (focusAfterClose.current) tileRefs.current[focusAfterClose.current]?.focus();
+    if (focusAfterClose.current) {
+      const target = tileRefs.current[focusAfterClose.current] ?? workbenchRef.current?.querySelector<HTMLInputElement>(".collection-search input");
+      target?.focus();
+    }
     focusAfterClose.current = undefined;
   }
 
@@ -474,7 +484,7 @@ export function CastIdentityReview({
     return [...(proposal?.aliases ?? []), ...(proposal?.competingLabels ?? []), ...(dossier?.fuzzyCandidates ?? [])];
   }))].filter((label) => !active.labels.includes(label) && decisions[label]?.category !== NARRATOR_KEY) : [];
 
-  return <div className="cast-workbench">
+  return <div ref={workbenchRef} className="cast-workbench">
     <div className="cast-toolbar">
       <div><b>{remaining ? t("{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>{remaining > 0 && <small className="cast-required-help">{t("Red cards marked Required must be confirmed before you can continue.")}</small>}<small>{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
       <div className="cast-toolbar-actions">
@@ -489,6 +499,10 @@ export function CastIdentityReview({
       </div>
     </div>
 
+    {largeCollection && <CollectionToolbar query={collectionQuery} onQueryChange={setCollectionQuery} filter={collectionFilter} onFilterChange={setCollectionFilter} searchLabel={t("Search cast")} filterLabel={t("Show cast")} countLabel={t("{{shown}} of {{total}} cast members shown", { shown: visibleGroups.length, total: groups.length })} clearLabel={t("Clear")} filters={[
+      { value: "all", label: t("All") }, { value: "required", label: t("Required") }, { value: "ready", label: t("Ready") },
+    ]} />}
+    {largeCollection && !visibleGroups.length && <div className="collection-empty"><b>{t("No cast members match these filters.")}</b><span>{t("Clear the search and filter to see the whole cast.")}</span><button type="button" className="ghost" onClick={() => { setCollectionQuery(""); setCollectionFilter("all"); }}>{t("Clear")}</button></div>}
     <section className="cast-board" aria-label={t("Cast members")}>
       <button
         type="button"
@@ -503,7 +517,7 @@ export function CastIdentityReview({
         <span className="cast-atomic-number">N</span><strong>♬</strong><b>{t("Narrator")}</b>
         <small>{t("{{count}} reassigned labels · destination only", { count: narratorAssignments?.labels.length ?? 0 })}</small>
       </button>
-      {groups.map((group, index) => { const suspicious = group.needsReview && group.labels.length > 3; return <button
+      {visibleGroups.map((group) => { const index = groups.indexOf(group); const suspicious = group.needsReview && group.labels.length > 3; return <button
         type="button"
         draggable
         ref={(element) => { tileRefs.current[group.primaryLabel] = element; }}

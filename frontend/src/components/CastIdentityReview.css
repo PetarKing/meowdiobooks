@@ -29,7 +29,7 @@
   border-radius: 99px;
   background: rgba(51, 37, 59, .86);
   color: #fff;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 850;
   letter-spacing: .04em;
   text-transform: uppercase;
@@ -50,7 +50,7 @@
   border-radius: 13px;
   background: rgba(51, 37, 59, .96);
   color: #fff;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 700;
   box-shadow: 0 14px 38px rgba(36, 23, 43, .28);
 }
@@ -62,7 +62,7 @@
   border-radius: 8px;
   background: rgba(255, 255, 255, .12);
   color: #fff;
-  font-size: 9px;
+  font-size: 13px;
   font-weight: 850;
   cursor: pointer;
 }

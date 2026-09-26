@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { CastArtifact, VoiceRoute } from "../api/contracts";
+import i18n from "../i18n";
 import { CastVoiceReview } from "./CastVoiceReview";
 
 const cast: CastArtifact = {
@@ -58,6 +59,69 @@ const cast: CastArtifact = {
 };
 
 describe("CastVoiceReview", () => {
+  it("searches large ensembles by labels while keeping required review totals visible", () => {
+    const ensemble: CastArtifact = { ...cast, identities: [
+      ...Array.from({ length: 13 }, (_, index) => ({ ...cast.identities![0], characterId: `member-${index}`, name: index === 0 ? "Émilia" : `Member ${index}`, literalLabels: index === 0 ? ["Moonlight"] : [], voicePreviewRevision: `v-${index}` })),
+      { characterId: "duet", name: "Duet", category: "group", voiceRoute: { kind: "layered", characterIds: ["member-0", "member-1"] } },
+    ] };
+    const approve = vi.fn();
+    render(<CastVoiceReview bookId="book" cast={ensemble} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
+    const search = screen.getByRole("searchbox", { name: "Search cast" });
+    search.focus();
+    fireEvent.change(search, { target: { value: "moonLIGHT" } });
+    expect(screen.getByRole("button", { name: "Open Émilia voice" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Duet voice" })).not.toBeInTheDocument();
+    expect(screen.getByText("1 group voice requires review")).toBeInTheDocument();
+    expect(screen.getByText("1 of 15 cast members shown")).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: "emilia" } });
+    expect(screen.getByRole("button", { name: "Open Émilia voice" })).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "required" } });
+    expect(screen.getByText("No cast members match these filters.")).toBeInTheDocument();
+    fireEvent.keyDown(search, { key: "Escape" });
+    expect(search).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Open Duet voice" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open Émilia voice" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect(search).toHaveFocus();
+    expect(screen.getByText("15 of 15 cast members shown")).toBeInTheDocument();
+    expect(approve).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to collection search when approving removes the inspected filtered tile", () => {
+    const ensemble: CastArtifact = { ...cast, identities: Array.from({ length: 13 }, (_, index) => ({ ...cast.identities![0], characterId: `member-${index}`, name: `Member ${index}`, voicePreviewRevision: `v-${index}` })) };
+    const props = { bookId: "book", cast: ensemble, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} selections={{}} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "ready" } });
+    const trigger = screen.getByRole("button", { name: "Open Member 0 voice" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Member 0 voice" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Approve Audition 1" }));
+    view.rerender(<CastVoiceReview {...props} selections={{ "member-0": "v-0" }} />);
+    fireEvent.animationEnd(dialog);
+    expect(screen.queryByRole("button", { name: "Open Member 0 voice" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search cast" })).toHaveFocus();
+    expect(props.onApprove).toHaveBeenCalledWith("member-0", "v-0");
+  });
+
+  it("gives voice inspectors shared keyboard focus, Escape, and scroll locking", () => {
+    render(<CastVoiceReview bookId="book" cast={cast} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={vi.fn()} />);
+    const trigger = screen.getByRole("button", { name: "Open Many voice" });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "Many voice" });
+    expect(dialog).toHaveFocus();
+    expect(document.body.style.overflow).toBe("hidden");
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(within(dialog).getByRole("button", { name: /Approve Audition/ })).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Escape" });
+    expect(dialog).toHaveClass("closing");
+    fireEvent.animationEnd(dialog);
+    expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).not.toBe("hidden");
+  });
+
   it("offers an optional source voice picker only when opened", async () => {
     const load = vi.fn().mockResolvedValue({ sources: [{ bookId: "earlier", title: "Earlier book", voiceCount: 1, voices: [{ characterId: "different", name: "Different name", revision: "v1" }] }], exactMatchCount: 0, remainingVoiceCount: 3, totalVoiceCount: 3 });
     const reuse = vi.fn();
@@ -320,4 +384,22 @@ describe("CastVoiceReview", () => {
     expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
     expect(tile).toHaveFocus();
   });
+  it("localizes audition receipts and line counts while preserving a user-entered accent", async () => {
+    await i18n.changeLanguage("zh-CN");
+    const view = render(<CastVoiceReview bookId="book-1" cast={cast} selections={{ many: "many-3" }} routes={{}} onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={vi.fn()} />);
+    try {
+      fireEvent.click(screen.getByRole("button", { name: i18n.t("Open {{name}} voice", { name: "Many" }) }));
+      const dialog = screen.getByRole("dialog");
+      expect(dialog).toHaveTextContent("20 行");
+      expect(dialog).toHaveTextContent("声音已批准");
+      expect(dialog).toHaveTextContent("明亮 · 轻快 · 中性口音");
+      expect(dialog).toHaveTextContent("温柔 · 自然 · Japanese");
+      expect(dialog).toHaveTextContent("最新候选声音");
+      expect(dialog).toHaveTextContent("✓ 已应用");
+    } finally {
+      view.unmount();
+      await i18n.changeLanguage("en");
+    }
+  });
+
 });

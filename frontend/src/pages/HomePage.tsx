@@ -1,5 +1,5 @@
 import type { WorkflowModel } from "../app/useWorkflowModel";
-import heroArtwork from "../assets/brand/meowdiobooks-hero.png";
+import { StudioHero } from "../components/StudioHero";
 import { Panel } from "../components/Ui";
 import {
   formatFileSize,
@@ -13,7 +13,8 @@ export function HomePage({ model }: { model: HomePageModel; }) {
   const localBooks = books.filter((row) => row.source_name);
   const totalAssetBytes = localBooks.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
   return <>
-    <section className="welcome-hero"><img src={heroArtwork} alt={t("A cozy cat sound engineer narrating an enchanted open book")} /><div className="welcome-copy"><span className="eyebrow">{t("Your audiobook studio")}</span><h1>{t("Every book has")}<br />{t("a voice inside.")}</h1><p>{t("Turn a PDF into an audiobook, with control at every step.")}</p></div></section>
+    <StudioHero eyebrow={t("Your audiobook studio")} title={<>{t("Every book has")}<br /><em>{t("a voice inside.")}</em></>} description={t("Turn a PDF into an audiobook, with control at every step.")} />
+    <div className="studio-path" role="group" tabIndex={0} aria-label={t("Wizard stages")}>{["Extract", "Dialogue", "Review", "Cast & voices", "Generate", "Export"].map((label, index) => <span key={label}><b aria-hidden="true">0{index + 1}</b>{t(label)}{index < 5 && <i aria-hidden="true">↗</i>}</span>)}</div>
     <div className="home-flow">
       <section className={`quick-import ${file ? "has-file" : ""}`} aria-labelledby="quick-import-title">
         <div className="quick-import-copy"><span className="eyebrow">{t("New audiobook")}</span><h2 id="quick-import-title">{t(file ? "Ready to begin" : "Start another book")}</h2><p>{file ? t("books.importStorageNotice", { ns: "edition" }) : t("Add a PDF to start your audiobook.")}</p></div>

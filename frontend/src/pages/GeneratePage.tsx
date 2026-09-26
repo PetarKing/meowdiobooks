@@ -1,5 +1,8 @@
 import { sourcePageImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
+import { DialogSurface } from "../components/DialogSurface";
+import { TabList } from "../components/TabList";
+import { WorkflowEmpty } from "../components/WorkflowPage";
 import { ChapterAudioPlayer } from "../components/ChapterAudioPlayer";
 import { StepEyebrow } from "../pages/shared";
 import {
@@ -86,18 +89,18 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
 
     <section className="chapter-library" aria-label={t("Chapters")}>
       <div className="chapter-library-toolbar">
-        <div className="chapter-filter-tabs" role="tablist" aria-label={t("Filter chapters")}>
-          <button type="button" role="tab" aria-selected={chapterFilter === "all"} onClick={() => selectFilter("all")}>{t("All")} <small>{filterCounts.all}</small></button>
-          <button type="button" role="tab" aria-selected={chapterFilter === "pending"} onClick={() => selectFilter("pending")}>{t("To make")} <small>{filterCounts.pending}</small></button>
-          <button type="button" role="tab" aria-selected={chapterFilter === "generated"} onClick={() => selectFilter("generated")}>{t("Generated")} <small>{filterCounts.generated}</small></button>
-        </div>
+        <TabList label={t("Filter chapters")} className="chapter-filter-tabs" panelId="chapter-filter-panel" value={chapterFilter} onChange={selectFilter} items={[
+          { value: "all", label: <>{t("All")} <small>{filterCounts.all}</small></> },
+          { value: "pending", label: <>{t("To make")} <small>{filterCounts.pending}</small></> },
+          { value: "generated", label: <>{t("Generated")} <small>{filterCounts.generated}</small></> },
+        ]} />
         <div className="chapter-library-controls">
           <span>{t("{{count}} shown", { count: visibleChapters.length })}</span>
           <button type="button" onClick={() => setSelectedChapters(visibleAvailableChapterIds)}>{t("Select all shown")}</button>
           <button type="button" disabled={!selectedChapters.length} onClick={() => setSelectedChapters([])}>{t("Clear")}</button>
         </div>
       </div>
-      <div className={`chapter-card-grid ${selectedChapters.length ? "has-selection" : ""}`}>{visibleChapters.map((row) => {
+      <div id="chapter-filter-panel" role="tabpanel" aria-labelledby={`chapter-filter-panel-${chapterFilter}`} className={`chapter-card-grid ${selectedChapters.length ? "has-selection" : ""}`}>{visibleChapters.map((row) => {
         const playable = generatedByChapter.get(row.id);
         const unavailable = unavailableChapters.has(row.id);
         const selected = !unavailable && selectedChapters.includes(row.id);
@@ -122,12 +125,12 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
           <dl className="chapter-estimates"><div><dt>{t("Audio")}</dt><dd>{unavailable ? t("No audio") : chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div><div><dt>{t("Make")}</dt><dd>{unavailable ? t("Not needed") : generationDuration(estimatedSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>
         </article>;
       })}</div>
-      {!visibleChapters.length && <div className="chapter-filter-empty"><span aria-hidden="true">♪</span><b>{t("No chapters in this view.")}</b><small>{t("Choose another filter to see the rest of the book.")}</small></div>}
+      {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
       {(availableChapters.length > 0 || currentGenerated.length > 0) && <section className="generation-selection" aria-label={t("Generation action")}>
         <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
         {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
         <div className="generation-selection-actions">
-          {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">💣</span></button>}
+          {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">↯</span><span>{t("Split this into shorter chapters?")}</span></button>}
           {selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" onClick={() => setStage(stageIndex("export"))}>{t("Continue to Export")}</button>}
           <button className="primary" disabled={busy || (!selectedChapters.length && !currentGenerated.length)} onClick={() => selectedChapters.length ? void generateChapters(selectedChapters) : setStage(stageIndex("export"))}>{busy ? t("Generating…") : selectedChapters.length ? `${t("Generate {{count}} selected", { count: selectedChapters.length })} →` : currentGenerated.length ? `${t("Continue to Export")} →` : t("Select chapters above")}</button>
         </div>
@@ -135,23 +138,23 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
     </section>
 
     {splitChapter && <div className="chapter-player-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !busy) setSplitChapterId(undefined); }}>
-      <section className="chapter-split-modal" role="dialog" aria-modal="true" aria-labelledby="chapter-split-title">
+      <DialogSurface className="chapter-split-modal" aria-labelledby="chapter-split-title" onDismiss={busy ? undefined : () => setSplitChapterId(undefined)}>
         <button type="button" className="chapter-player-close" aria-label={t("Close chapter split")} disabled={busy} onClick={() => setSplitChapterId(undefined)}>×</button>
-        <div className="chapter-split-heading"><span aria-hidden="true">💣</span><div><span className="eyebrow">{t("Long chapter")}</span><h2 id="chapter-split-title">{t("Split this into shorter chapters?")}</h2></div></div>
+        <div className="chapter-split-heading"><span aria-hidden="true">↯</span><div><span className="eyebrow">{t("Long chapter")}</span><h2 id="chapter-split-title">{t("Split this into shorter chapters?")}</h2></div></div>
         <p>{t("{{title}} has {{duration}} of audio. It will become approximately {{count}} ordinary chapters around 30 minutes each.", { title: splitChapter.title, duration: chapterDuration(splitSeconds), count: proposedPartCount })}</p>
         <div className="chapter-split-facts"><span><b>{t("≈ {{count}} chapters", { count: proposedPartCount })}</b><small>{t("Usually 25–35 min each")}</small></span><span><b>{t("Safe text breaks")}</b><small>{t("Never inside a speech section")}</small></span></div>
         <p className="chapter-split-note">{t("The original item will be replaced. Review, cast and voices stay unchanged.")}</p>
         <div className="chapter-split-actions"><button className="ghost" type="button" disabled={busy} onClick={() => setSplitChapterId(undefined)}>{t("Cancel")}</button><button className="primary" type="button" disabled={busy} onClick={() => void splitLongChapter(splitChapter.id)}>{busy ? t("Splitting…") : t("Split into ≈ {{count}} chapters", { count: proposedPartCount })}</button></div>
-      </section>
+      </DialogSurface>
     </div>}
 
     {listeningChapter && listeningAudio && <div className="chapter-player-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setListeningChapterId(undefined); }}>
-      <section className="chapter-player-modal" role="dialog" aria-modal="true" aria-labelledby="chapter-player-title">
+      <DialogSurface className="chapter-player-modal" aria-labelledby="chapter-player-title" onDismiss={() => setListeningChapterId(undefined)}>
         <button type="button" className="chapter-player-close" aria-label={t("Close player")} onClick={() => setListeningChapterId(undefined)}>×</button>
         <div className="chapter-player-book" aria-hidden="true"><span>{t("Chapter")}</span><b>{String(chapters.findIndex((chapter) => chapter.id === listeningChapter.id) + 1).padStart(2, "0")}</b><i>♪</i></div>
         <div className="chapter-player-copy"><span className="eyebrow">{t(listeningAudio.current ? "Chapter audio" : "Older recording")}</span><h2 id="chapter-player-title">{listeningChapter.title || t("Untitled chapter")}</h2></div>
         <ChapterAudioPlayer src={listeningAudio.audioUrl} />
-      </section>
+      </DialogSurface>
     </div>}
   </>;
 

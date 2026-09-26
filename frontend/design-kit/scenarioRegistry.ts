@@ -119,7 +119,7 @@ const throughCast = [
  * The scenario ID, catalogue copy, data, gateway and entry behavior share one
  * exhaustive definition. ScenarioId and the public catalogue are derived below.
  */
-export const scenarioMetadata = {
+const baselineScenarioMetadata = {
   "cast-inspector": {
     label: "Cast · audition inspector",
     description: "Audition attempts, settings and generation controls.",
@@ -572,6 +572,18 @@ export const scenarioMetadata = {
       heading: "Package your audiobook.",
     },
   },
+} as const satisfies Record<string, ScenarioMetadata>;
+
+/** Failure and recovery variants use the same real pages and in-memory gateway. */
+export const scenarioMetadata = {
+  ...baselineScenarioMetadata,
+  "library-missing-cover": { ...baselineScenarioMetadata.library, label: "Library · missing cover", description: "A broken cover resolves to the readable production fallback.", gatewayVariant: "library-missing-cover" },
+  "library-refresh-error": { ...baselineScenarioMetadata.library, label: "Library · refresh failed", description: "Saved editions remain visible after a failed refresh.", gatewayVariant: "library-refresh-error" },
+  "dialogue-running": { ...baselineScenarioMetadata.dialogue, label: "Dialogue · running", description: "Cancelable progress while the transcript is being built.", gatewayVariant: "dialogue-running", story: { ...baselineScenarioMetadata.dialogue.story, actions: ["build-dialogue"] } },
+  "generate-running": { ...baselineScenarioMetadata.generate, label: "Generate · running", description: "Chapter progress with saved audio retained.", gatewayVariant: "generate-running", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
+  "generate-failed": { ...baselineScenarioMetadata.generate, label: "Generate · failed", description: "Generation failure preserves chapters and offers recovery.", gatewayVariant: "generate-failed", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
+  "cast-sample-pending": { ...baselineScenarioMetadata["cast-inspector"], label: "Cast · sample upload", description: "Sample upload stays pending; unavailable confirmation cannot proceed.", gatewayVariant: "sample-upload-pending", story: { ...baselineScenarioMetadata["cast-inspector"].story, actions: ["open-alice-voice", "configure-sample", "create-sample"] } },
+  "review-recovery": { ...baselineScenarioMetadata.review, label: "Review · recovery", description: "Unsafe source coverage requires rebuilding Dialogue before acceptance.", snapshotVariant: "review-recovery", story: { ...baselineScenarioMetadata.review.story, actions: [], heading: "Dialogue needs rebuilding" } },
 } as const satisfies Record<string, ScenarioMetadata>;
 
 export type ScenarioId = keyof typeof scenarioMetadata;

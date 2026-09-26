@@ -30,7 +30,7 @@ export async function enterScenario(
       );
     else if (metadata.gatewayVariant === "library-refresh-error")
       await expect(await canvas.findByRole("alert")).toHaveTextContent(
-        "Couldn’t refresh the Library.",
+        "Library could not be loaded. Try again.",
       );
     else if (metadata.gatewayVariant === "library-loading")
       await expect(
@@ -40,6 +40,8 @@ export async function enterScenario(
       await expect(
         await canvas.findByRole("heading", { name: metadata.story.heading }),
       ).toBeVisible();
+    if (metadata.gatewayVariant === "library-refresh-error")
+      await expect(canvas.getAllByRole("article")).toHaveLength(2);
     return;
   }
 
@@ -97,6 +99,10 @@ export async function enterScenario(
   await expect(
     canvas.getByRole("navigation", { name: "Wizard stages" }),
   ).toBeVisible();
+  if (metadata.snapshotVariant === "review-recovery") {
+    await expect(canvas.getByRole("button", { name: "Rebuild Dialogue →" })).toBeEnabled();
+    await expect(canvas.queryByRole("button", { name: /Accept preview and continue/ })).not.toBeInTheDocument();
+  }
 
   async function runStoryAction(action: WorkflowScenarioAction) {
     switch (action) {
@@ -151,11 +157,7 @@ export async function enterScenario(
         return;
       case "create-sample":
         await click("Create sampled audition →");
-        await expect(
-          await within(
-            page.getByRole("dialog", { name: "Alice voice" }),
-          ).findByRole("status"),
-        ).toBeVisible();
+        await expect(await page.findByRole("button", { name: "Creating cloned audition…" })).toBeDisabled();
         return;
       case "open-existing-voice": {
         const summary = await waitFor(() => {

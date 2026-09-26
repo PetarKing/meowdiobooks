@@ -88,7 +88,34 @@ function dragOverAt(target: Element, clientY: number, dataTransfer: ReturnType<t
   fireEvent(target, event);
 }
 
+function EnsembleHarness() {
+  const ensemble: CastArtifact = { revision: "ensemble", phase: "identity-review", dossiers: [], proposals: Array.from({ length: 14 }, (_, index) => ({ label: index === 0 ? "Moonlight" : `Label ${index}`, category: index === 0 ? "group" : "character", canonicalName: index === 0 ? "Émilia" : `Member ${index}`, reviewRequired: index === 0 })) };
+  const [decisions, setDecisions] = useState<Record<string, IdentityDecision>>(Object.fromEntries(ensemble.proposals.map((row) => [row.label, { label: row.label, category: row.category, canonicalName: row.canonicalName, aliases: [], primaryLabel: row.label }])));
+  const [resolved, setResolved] = useState<string[]>([]);
+  return <CastIdentityReview cast={ensemble} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={vi.fn()} onLanguageChange={vi.fn()} hideVoiceSettings />;
+}
+
 describe("CastIdentityReview", () => {
+  it("filters a large cast by source labels without concealing outstanding confirmations", () => {
+    render(<EnsembleHarness />);
+    const search = screen.getByRole("searchbox", { name: "Search cast" });
+    fireEvent.change(search, { target: { value: "moonLIGHT" } });
+    expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Inspect Narrator" })).toBeInTheDocument();
+    expect(screen.getByText("1 source labels need confirmation")).toBeInTheDocument();
+    expect(screen.getByText("1 of 14 cast members shown")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "ready" } });
+    expect(screen.getByText("No cast members match these filters.")).toBeInTheDocument();
+    expect(screen.getByText("1 source labels need confirmation")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("searchbox", { name: "Search cast" }).closest(".collection-toolbar")!).getByRole("button", { name: "Clear" }));
+    expect(search).toHaveFocus();
+    expect(screen.getByText("14 of 14 cast members shown")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "required" } });
+    expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
+  });
+
   afterEach(() => vi.restoreAllMocks());
 
   it("keeps reclassification hidden unless cast editing explicitly enables it", () => {

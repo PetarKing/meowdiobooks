@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { WorkflowGateway, CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
+import { CollectionToolbar } from "./CollectionToolbar";
+import { collectionMatches } from "./collectionSearch";
+import { InspectorDialog } from "./Ui";
 import { suggestedMemberIds } from "../voiceRoutes";
 
 interface Props {
@@ -111,16 +115,16 @@ function layeredPreviewUrl(
   return `/api/books/${encodeURIComponent(bookId)}/voices/layered/audio?${params.toString()}`;
 }
 
-function candidateSummary(candidate: VoiceCandidate) {
+function candidateSummary(candidate: VoiceCandidate, t: TFunction) {
   if (candidate.source === "upload") {
     return candidate.durationSeconds == null
-      ? "Cloned from an uploaded sample"
-      : `Cloned from a ${candidate.durationSeconds.toFixed(1)} sec sample`;
+      ? t("Cloned from an uploaded sample")
+      : t("Cloned from a {{seconds}} sec sample", { seconds: candidate.durationSeconds.toFixed(1) });
   }
   const settings = candidate.voiceSettings;
   if (!settings) return candidate.direction;
-  const accent = settings.accent && settings.accent !== "unspecified" ? settings.accent : "neutral accent";
-  return `${label(settings.tone)} · ${label(settings.pace)} · ${accent}`;
+  const accent = settings.accent && settings.accent !== "unspecified" ? settings.accent : t("neutral accent");
+  return `${t(label(settings.tone))} · ${t(label(settings.pace))} · ${accent}`;
 }
 
 function initials(name: string) {
@@ -161,9 +165,9 @@ function lineCountFor(voice: CastVoice, cast: CastArtifact) {
   );
 }
 
-function lineCountLabel(count: number | undefined) {
-  if (count == null) return "Line count pending";
-  return `${count} ${count === 1 ? "line" : "lines"}`;
+function lineCountLabel(count: number | undefined, t: TFunction) {
+  if (count == null) return t("Line count pending");
+  return t(count === 1 ? "{{count}} line" : "{{count}} lines", { count });
 }
 
 const options = {
@@ -229,6 +233,11 @@ export function CastVoiceReview({
       : Boolean(approvedRevisionFor(voice, selections));
   };
   const requiresReview = (voice: CastVoice) => routeFor(voice, routes).kind === "layered" && !routeReady(voice);
+  const [collectionQuery, setCollectionQuery] = useState("");
+  const [collectionFilter, setCollectionFilter] = useState("all");
+  const largeCollection = voices.length > 12;
+  const visibleVoices = largeCollection ? voices.filter((voice) => collectionMatches(collectionQuery, [voice.name, ...(voice.literalLabels ?? [])])
+    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))) : voices;
   const selectedCount = voices.filter(routeReady).length;
   const requiredCount = voices.filter(requiresReview).length;
   const defaultReadyCount = voices.length - selectedCount - requiredCount;
@@ -252,6 +261,7 @@ export function CastVoiceReview({
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptionRequest = useRef(0);
   const focusAfterClose = useRef<string | undefined>(undefined);
+  const workbenchRef = useRef<HTMLDivElement>(null);
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const previousInspectedId = useRef<string | undefined>(undefined);
   const previousPreviewRevision = useRef<string | undefined>(undefined);
@@ -377,12 +387,15 @@ export function CastVoiceReview({
     closeTimer.current = undefined;
     setInspectedId(undefined);
     setInspectorClosing(false);
-    if (focusAfterClose.current) tileRefs.current[focusAfterClose.current]?.focus();
+    if (focusAfterClose.current) {
+      const target = tileRefs.current[focusAfterClose.current] ?? workbenchRef.current?.querySelector<HTMLInputElement>(".collection-search input");
+      target?.focus();
+    }
     focusAfterClose.current = undefined;
   }
 
   function closeInspector() {
-    if (!inspected) return;
+    if (!inspected || inspectorClosing) return;
     focusAfterClose.current = inspected.characterId;
     setInspectorClosing(true);
     closeTimer.current = window.setTimeout(finishInspectorClose, 260);
@@ -408,7 +421,7 @@ export function CastVoiceReview({
   ) + 1;
   const performanceNotesTooLong = (settings?.description.length ?? 0) > performanceNotesLimit;
 
-  return <div className="cast-workbench voice-cast-workbench">
+  return <div ref={workbenchRef} className="cast-workbench voice-cast-workbench">
     <div className="cast-toolbar voice-cast-toolbar">
       <div>
         <b>{requiredCount > 0
@@ -428,8 +441,13 @@ export function CastVoiceReview({
       </div>
     </div>
 
+    {largeCollection && <CollectionToolbar query={collectionQuery} onQueryChange={setCollectionQuery} filter={collectionFilter} onFilterChange={setCollectionFilter} searchLabel={t("Search cast")} filterLabel={t("Show cast")} countLabel={t("{{shown}} of {{total}} cast members shown", { shown: visibleVoices.length, total: voices.length })} clearLabel={t("Clear")} filters={[
+      { value: "all", label: t("All") }, { value: "required", label: t("Required") }, { value: "approved", label: t("Voice approved") }, { value: "ready", label: t("Default audition ready") },
+    ]} />}
+    {largeCollection && !visibleVoices.length && <div className="collection-empty"><b>{t("No cast members match these filters.")}</b><span>{t("Clear the search and filter to see the whole cast.")}</span><button type="button" className="ghost" onClick={() => { setCollectionQuery(""); setCollectionFilter("all"); }}>{t("Clear")}</button></div>}
     <section className="cast-board voice-cast-board" aria-label={t("Cast voice auditions")}>
-      {voices.map((voice, index) => {
+      {visibleVoices.map((voice) => {
+        const index = voices.indexOf(voice);
         const selected = routeReady(voice);
         const required = requiresReview(voice);
         const isNarrator = voice.characterId === "narrator";
@@ -454,7 +472,7 @@ export function CastVoiceReview({
               : <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>}
             <strong>{isNarrator ? "♬" : initials(voice.name)}</strong>
             <b>{voice.name}</b>
-            <small>{t(lineCountLabel(lineCount))} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready")}</small>
+            <small>{lineCountLabel(lineCount, t)} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready")}</small>
           </button>
           <button
             type="button"
@@ -468,14 +486,13 @@ export function CastVoiceReview({
     </section>
     <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => setPlayingTileId(undefined)} onError={() => setPlayingTileId(undefined)} />
 
-    {inspected && <div className={`cast-inspector-backdrop ${inspectorClosing ? "closing" : ""}`} onClick={(event) => { if (event.target === event.currentTarget) closeInspector(); }}>
-      <section role="dialog" aria-modal="true" className={`cast-inspector voice-inspector ${inspectorClosing ? "closing" : ""}`} aria-label={t("{{name}} voice", { name: inspected.name })} onAnimationEnd={(event) => { if (event.target === event.currentTarget && inspectorClosing) finishInspectorClose(); }}>
+    {inspected && <InspectorDialog label={t("{{name}} voice", { name: inspected.name })} className="voice-inspector" closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
         <header className="cast-inspector-head">
           <div>
             <span className={`cast-status-dot ${inspectedReady ? "ready" : inspectedRequired ? "needs-review" : "default-ready"}`} />
             <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : inspectedSharedGroup ? "Shared voice selected" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : inspectedRequired ? "Audition required" : "Default audition ready")}</small>
             <h2>{inspected.name}</h2>
-            <p>{t(inspected.category ?? (inspected.characterId === "narrator" ? "Narrator" : "Character"))} · {t(lineCountLabel(lineCountFor(inspected, cast)))} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
+            <p>{t(label(inspected.category ?? (inspected.characterId === "narrator" ? "narrator" : "character")))} · {lineCountLabel(lineCountFor(inspected, cast), t)} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
           </div>
           <div className="cast-inspector-actions">
             {inspectedRoute.kind === "dedicated" && pendingRevision && pendingRevision !== approvedRevision && <button type="button" className="primary voice-header-approve" onClick={approvePendingVoice}>{pendingCandidateNumber ? t("Approve Audition {{number}}", { number: pendingCandidateNumber }) : t("Approve selected voice")}</button>}
@@ -603,7 +620,7 @@ export function CastVoiceReview({
                   </button>
                   {onDelete && inspectedCandidates.length > 1 && <button type="button" className="voice-candidate-delete" aria-label={t("Delete Audition {{number}}", { number })} disabled={deletingVoiceRevision === candidate.revision} onClick={() => onDelete(inspected.characterId, candidate.revision)}>{deletingVoiceRevision === candidate.revision ? "…" : "×"}</button>}
                 </div>
-                <p>{candidateSummary(candidate)}</p>
+                <p>{candidateSummary(candidate, t)}</p>
                 {candidate.previewUrl
                   ? <audio controls preload="metadata" src={candidate.previewUrl} />
                   : <small className="cast-muted">{t("No playable audio.")}</small>}
@@ -611,8 +628,7 @@ export function CastVoiceReview({
             })}</div>
           </section>}
         </div>
-      </section>
-    </div>}
+    </InspectorDialog>}
   </div>;
 }
 

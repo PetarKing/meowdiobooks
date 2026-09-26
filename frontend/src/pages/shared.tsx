@@ -12,6 +12,7 @@ import type {
 } from "../api/contracts";
 import { PhaseHelp } from "../components/PhaseHelp";
 import { Panel, Tag } from "../components/Ui";
+import { StepIntro, WorkflowLaunch } from "../components/WorkflowPage";
 import {
   type WizardStep
 } from "../workflow/navigation";
@@ -25,11 +26,11 @@ export function StepEyebrow({ stage, children }: { stage: WizardStep; children: 
 }
 
 export function PageTitle({ stage, step, title, copy }: { stage: WizardStep; step: string; title: string; copy?: string; }) {
-  return <div className="page-title"><StepEyebrow stage={stage}>{step}</StepEyebrow><h1>{title}</h1>{copy && <p>{copy}</p>}</div>;
+  return <StepIntro eyebrow={<StepEyebrow stage={stage}>{step}</StepEyebrow>} title={title} copy={copy} />;
 }
 
 export function StageLaunch({ children }: { children: ReactNode; }) {
-  return <div className="stage-launch">{children}</div>;
+  return <WorkflowLaunch>{children}</WorkflowLaunch>;
 }
 
 export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
@@ -45,13 +46,13 @@ export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, r
 }) {
   const { t } = useTranslation();
   return <div className={`compare extract-compare page-comparison ${className}`.trim()}>
-    <div className="paper">
+    <div className="paper" tabIndex={0} role="region" aria-label={t("ORIGINAL PAGE")}>
       {imageControls ? <div className="paper-heading"><span>{t("ORIGINAL PAGE")}</span>{imageControls}</div> : <span>{t("ORIGINAL PAGE")}</span>}
       {imageUrl && (imageZoom
         ? <div className="pdf-preview-frame"><img src={imageUrl} alt={imageAlt} style={{ width: `${imageZoom}%` }} /></div>
         : <img src={imageUrl} alt={imageAlt} />)}
     </div>
-    <div className={`extracted ${rightClassName}`.trim()}><div className="page-comparison-heading"><span>{rightLabel}</span>{rightMeta}</div>{children}</div>
+    <div className={`extracted ${rightClassName}`.trim()} tabIndex={0} role="region" aria-label={rightLabel}><div className="page-comparison-heading"><span>{rightLabel}</span>{rightMeta}</div>{children}</div>
   </div>;
 }
 

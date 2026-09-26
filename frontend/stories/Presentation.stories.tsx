@@ -11,10 +11,8 @@ export default meta
 type Story = StoryObj<typeof meta>
 
 export const IsolatedPalette: Story = {
-  // White on baseline coral is inherited accepted-main contrast debt (3.15:1).
-  parameters: { a11y: { config: { rules: [{ id: 'color-contrast', selector: '*:not([data-testid="baseline"] .primary)' }] } } },
   render: () => <div style={{ padding: 32, display: 'grid', gap: 24 }}>
-    <PresentationRoot data-testid="baseline"><Panel title="Accepted baseline"><Button onClick={action}>Baseline action</Button></Panel></PresentationRoot>
+    <PresentationRoot data-testid="baseline"><Panel title="Canonical studio"><Button onClick={action}>Baseline action</Button></Panel></PresentationRoot>
     <PresentationRoot data-testid="proposal" palette={{ action: '#235548', actionHover: '#183d33', paper: '#f0ecd8', border: '#817652' }}><Panel title="Independent palette"><Button onClick={action}>Proposal action</Button></Panel></PresentationRoot>
     <PresentationRoot data-testid="host" className="host-consumer"><Panel title="Host override"><Button onClick={action}>Host action</Button></Panel></PresentationRoot>
     <style>{'.host-consumer .primary { background: rgb(47, 64, 110); }'}</style>
@@ -25,7 +23,7 @@ export const IsolatedPalette: Story = {
     const baseline = canvas.getByRole('button', { name: 'Baseline action' })
     const proposal = canvas.getByRole('button', { name: 'Proposal action' })
     const host = canvas.getByRole('button', { name: 'Host action' })
-    await expect(getComputedStyle(baseline).backgroundColor).toBe('rgb(237, 102, 89)')
+    await expect(getComputedStyle(baseline).backgroundColor).toBe('rgb(105, 67, 185)')
     await expect(getComputedStyle(proposal).backgroundColor).toBe('rgb(35, 85, 72)')
     await expect(getComputedStyle(host).backgroundColor).toBe('rgb(47, 64, 110)')
     for (const key of ['fontFamily', 'borderRadius', 'padding', 'height'] as const) {

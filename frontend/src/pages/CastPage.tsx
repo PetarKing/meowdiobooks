@@ -1,3 +1,4 @@
+import { DialogSurface } from "../components/DialogSurface";
 import type {
   CastArtifact,
   CastVoice
@@ -250,8 +251,8 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         <button className="primary" disabled={busy || unavailableVoices.length > 0} onClick={requestCastAcceptance}>{t("Accept cast & voices")} →</button>
       </div>
     </div>
-    {confirmDefaultVoices && <div className="process-overlay" role="dialog" aria-modal="true" aria-labelledby="default-voices-title">
-      <div className="process-modal cast-default-modal">
+    {confirmDefaultVoices && <div className="process-overlay">
+      <DialogSurface as="div" className="process-modal cast-default-modal" aria-labelledby="default-voices-title" onDismiss={() => setConfirmDefaultVoices(false)}>
         <span className="eyebrow">{t("Approval confirmation")}</span>
         <h2 id="default-voices-title">{unapprovedVoices.length === 1 ? t("Approve 1 remaining voice?") : t("Approve {{count}} remaining voices?", { count: unapprovedVoices.length })}</h2>
         <p>{unapprovedVoices.length === 1
@@ -262,7 +263,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           <button className="ghost" autoFocus onClick={() => setConfirmDefaultVoices(false)}>{t("Keep reviewing")}</button>
           <button className="primary" onClick={submitCastVoices}>{t("Approve remaining & accept")} →</button>
         </div>
-      </div>
+      </DialogSurface>
     </div>}
   </>;
 

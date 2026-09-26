@@ -3,11 +3,12 @@ import { WorkflowScenario } from "./workflowScenario";
 import { enterScenario } from "./enterScenario";
 import { baselineContrastExceptions } from "./baselineContrastExceptions";
 import type { ScenarioId } from "../design-kit/fixtures";
-const meta = { title: "Product/Accepted baseline", component: WorkflowScenario } satisfies Meta<typeof WorkflowScenario>;
+const meta = { id: "product-accepted-baseline", title: "Product/Studio", component: WorkflowScenario } satisfies Meta<typeof WorkflowScenario>;
 export default meta;
 type Story = StoryObj<typeof meta>;
 function scenario(id: ScenarioId): Story {
-  const known = baselineContrastExceptions[id] ?? [];
+  // Historical exceptions are only for immutable extraction-parity comparisons.
+  const known = new URLSearchParams(window.location.search).has("legacyMedia") ? baselineContrastExceptions[id] ?? [] : [];
   return { parameters: { a11y: { config: { rules: [{ id: "color-contrast", selector: known.length ? `*:not(${known.join(",")})` : "*" }] } } }, args: { scenario: id }, play: async ({ canvasElement }) => { await enterScenario(canvasElement, id); canvasElement.dataset.scenarioReady = id; } };
 }
 export const Home: Story = scenario("home");
@@ -42,3 +43,11 @@ export const GeneratePlayer: Story = scenario("generate-player");
 export const Export: Story = scenario("export");
 export const ExportLongBook: Story = scenario("export-long-book");
 export const PhaseHelp: Story = scenario("phase-help");
+
+export const LibraryMissingCover: Story = scenario("library-missing-cover");
+export const LibraryRefreshError: Story = scenario("library-refresh-error");
+export const DialogueRunning: Story = scenario("dialogue-running");
+export const GenerateRunning: Story = scenario("generate-running");
+export const GenerateFailed: Story = scenario("generate-failed");
+export const CastSamplePending: Story = scenario("cast-sample-pending");
+export const ReviewRecovery: Story = scenario("review-recovery");

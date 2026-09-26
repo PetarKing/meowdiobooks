@@ -30,7 +30,8 @@
     "test-storybook": "vitest run --config vitest.storybook.config.ts",
     "storybook:check": "tsc -p stories/tsconfig.json",
     "visual:parity": "node scripts/visual-parity.mjs",
-    "test:consumer": "node scripts/verify-host-consumer.mjs"
+    "test:consumer": "node scripts/verify-host-consumer.mjs",
+    "studio": "vite --mode studio --host 127.0.0.1 --port 5179 --open /studio.html"
   },
   "dependencies": {
     "@vitejs/plugin-react": "4.4.1",
@@ -38,6 +39,7 @@
     "react": "19.1.4",
     "react-dom": "19.1.4",
     "react-i18next": "^17.0.9",
+    "three": "^0.186.1",
     "typescript": "5.8.3",
     "vite": "6.4.3"
   },
@@ -53,6 +55,7 @@
     "@types/node": "^22.20.4",
     "@types/react": "19.1.4",
     "@types/react-dom": "19.1.5",
+    "@types/three": "^0.186.0",
     "@vitest/browser": "4.1.11",
     "@vitest/browser-playwright": "4.1.11",
     "eslint": "9.27.0",
