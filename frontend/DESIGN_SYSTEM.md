@@ -1,17 +1,17 @@
-# Meowdiobooks design system — Folio
+# Meowdiobooks design system — Matcha & Cherry Sanctuary
 
-Folio is a warm literary/audio workshop. Paper, graphite, vermilion and teal give the light appearance a tactile identity; charcoal, ivory and peach carry that identity into dark mode. Working screens prioritize evidence and the next decision. The user rejected the preceding Nocturne direction; its artwork and reviews remain historical. This rebuild is a local review candidate, not aesthetic acceptance or production adoption.
+The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary and the existing reading cat imagined as a benevolent local kami. Folio and Nocturne are rejected art directions; their review records are historical. The sanctuary is the current local implementation candidate. Visual selection is not production adoption.
 
 ## Foundations
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Canvas | `#f4f1eb` | `#181e20` |
-| Paper | `#fffdf8` | `#222a2c` |
-| Copy | `#252b2c` | `#f1eee5` |
-| Muted copy | `#626967` | `#b3bdb8` |
-| Primary action | `#b94630` | `#f0a080` |
-| Success | `#286354` | `#86c7ad` |
+| Canvas | `#f1f2e8` | `#1d261b` |
+| Paper | `#fefff8` | `#293427` |
+| Copy | `#2d3825` | `#f0f4e6` |
+| Muted copy | `#5e684f` | `#bdc9ad` |
+| Primary action | `#a42f4d` | `#ee9cb4` |
+| Success | `#436627` | `#b4ce8f` |
 
 The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. Light/Dark/System is an accessible header select; System follows OS changes and user preferences persist locally. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
@@ -19,7 +19,9 @@ Working headings use the offline-safe humanist sans stack at approximately 32px.
 
 ## Brand artwork
 
-The existing `src/assets/brand/meowdiobooks-mark.png` remains the application mark. The home composition uses live HTML plus a code-native open book and audio waves. `StudioHero` provides static CSS paper leaves; `SoundField` progressively adds a lazy Three.js sculpture. Phone keeps a compact book/wave emblem instead of allocating the hidden desktop sculpture. The rejected Nocturne bitmap is no longer imported.
+The existing `src/assets/brand/meowdiobooks-mark.png` remains the application mark. `StudioHero` pairs live HTML copy and import controls with `matcha-kami-sanctuary.webp`: an original illustrated temple precinct, with the same glasses-wearing orange cat reading on its central dais. Sweeping rooflines, moss gardens, cherry lacquer, washi panels and layered architectural detail carry the maximalism. The same art remains visible on phone below the import action. It is decorative and hidden from assistive technology; no functional labels are baked into it.
+
+The artwork is generated with the built-in imagegen tool and encoded as a 539 KB WebP. [The exact prompt](../docs/matcha-sanctuary/ART-PROMPT.md) records provenance. The illustration depicts an imagined sanctuary, without claiming a real shrine or using decorative Japanese text. Brass screen framing, arched seals and fine paper texture continue through the shell; working screens use quieter double rules and botanical/status colors so evidence remains readable. The old Three.js sculpture is no longer allocated by the home view.
 
 Artwork never substitutes for names, acceptance state, source evidence or actual audio. Neutral primitives must not import direction artwork.
 
@@ -36,14 +38,14 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 - Small confirmations can compose `DialogSurface` with `dialog-backdrop`, `dialog-card` and `dialog-actions` from the public primitive sheet. The card provides padding, bounded width/height and scrolling; full workbench inspectors keep their own geometry. `DialogSurface` itself owns the shared keyboard and scroll-lock lifecycle.
 - Loading preserves context: keep the initiating label, add progress when measurable, and prevent duplicate actions.
 - Empty states explain what unlocks the surface. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
-- Progress and completion use calm, brief motion. Ambient motion is allowed only in decorative home artwork: the lazy Three.js book sculpture caps rendering at 30fps, pauses while hidden or offscreen, and releases its GPU context on unmount. Task screens use purposeful hover, selection and transition feedback. Never animate an acceptance state into ambiguity.
+- Progress and completion use calm, brief motion. The sanctuary illustration is static and allocates no animation loop or WebGL context. Task screens use purposeful hover, selection and transition feedback. Never animate an acceptance state into ambiguity.
 - `prefers-reduced-motion` disables transforms, looping animation, and nonessential transitions. State changes must remain legible without motion.
 
 ## Responsive behavior
 
 - Wide layouts favor comparison and review density. Tablet retains the stage rail; phone uses one scrollable named stage rail in the header.
 - On mobile, primary actions remain reachable without covering the final content. Horizontal choice rails must show more than one card edge so overflow is discoverable.
-- Desktop entrance artwork enhances the compact import composition; phone retains a small book/wave emblem. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
+- Desktop entrance artwork shares the screen with the import composition; phone stacks the illustration below the import action. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
 
 ## Product boundaries
 
@@ -107,4 +109,4 @@ frontend dependencies and Playwright Chromium; it removes its temporary project 
 - `styles/studio.css` owns the shell and entrance art. Keep this direction out of shared primitive source.
 - Update the owning canonical sheet; do not append ad hoc overrides to `product.css`. Some baseline declarations remain for legacy import compatibility; this is an explicit transition boundary, not a claim that all old CSS has been eliminated.
 - `studio.html` is a separate synthetic review entry. `npm run studio` starts it without an API proxy; its navigation stays on the fixture entry after refresh. Production `index.html` and its real gateway remain unchanged.
-- [Folio review](../docs/folio/REVIEW.md) records the current independent rendered critique; [workflow evidence](../docs/folio/WORKFLOWS.md) records screen-specific execution. Earlier `design-review.md` and `design-review-pages.md` describe the rejected Nocturne candidate. A new component needs a useful isolated story; a new product state needs a realistic gateway-backed story.
+- [Sanctuary review](../docs/matcha-sanctuary/REVIEW.md) records the current rendered critique. [Folio review](../docs/folio/REVIEW.md) and [workflow evidence](../docs/folio/WORKFLOWS.md) are historical records of the preceding candidate. Earlier `design-review.md` and `design-review-pages.md` describe the rejected Nocturne candidate. A new component needs a useful isolated story; a new product state needs a realistic gateway-backed story.

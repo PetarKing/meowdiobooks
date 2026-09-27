@@ -12,7 +12,7 @@ host selectors with equal specificity continue to win.
 | `primitives.css` | Shared Button, Panel, Choice, Tag, SourceExcerpt and language-control presentation |
 | `pages.css` | Workflow compositions and domain page presentation |
 | `cast-workbench.css` | Cast collection and audition inspector geometry |
-| `studio.css` | Application shell, Home, hero art and decorative motion |
+| `studio.css` | Application shell, Home sanctuary art and finite decorative transitions |
 | `../components/*.css` | Existing specialized component styles and dialog focus surface |
 
 Change the owning sheet first. Add component states to `Components.stories.tsx`,

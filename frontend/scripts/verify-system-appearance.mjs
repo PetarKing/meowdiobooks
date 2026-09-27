@@ -22,7 +22,7 @@ try {
   await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
   const preference = page.getByRole('combobox', { name: 'Appearance', exact: true });
   async function observe(name, expected, screenshot = false) {
-    const colors = expected === 'dark' ? { background: 'rgb(24, 30, 32)', text: 'rgb(241, 238, 229)' } : { background: 'rgb(244, 241, 235)', text: 'rgb(37, 43, 44)' };
+    const colors = expected === 'dark' ? { background: 'rgb(29, 38, 27)', text: 'rgb(240, 244, 230)' } : { background: 'rgb(241, 242, 232)', text: 'rgb(45, 56, 37)' };
     // Attribute updates precede the finite color transition. Assert the settled
     // surface too, rather than recording an intermediate frame as final evidence.
     await page.waitForFunction(({ mode, background, text }) => {

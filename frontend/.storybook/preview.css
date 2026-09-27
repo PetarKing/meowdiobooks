@@ -1,6 +1,6 @@
 /* Frame-only canvas: product appearance stays scoped to its PresentationRoot. */
 :is(html, body):has(#storybook-root [data-presentation-root][data-appearance="dark"]):not(:has(#storybook-root [data-presentation-root][data-appearance="light"])) {
-  background: #181e20;
-  color: #f1eee5;
+  background: #1d261b;
+  color: #f0f4e6;
   color-scheme: dark;
 }

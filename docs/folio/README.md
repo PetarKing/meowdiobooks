@@ -1,4 +1,6 @@
-# Folio — current design review candidate
+# Folio — historical rejected design candidate
+
+Folio was also rejected. The current selected direction is [Matcha & Cherry Sanctuary](../matcha-sanctuary/README.md). Links and evidence below describe the earlier candidate and must not be read as current visual acceptance.
 
 The user rejected Nocturne's color scheme, oversized entrance and insufficient improvement over production. Folio replaces that direction with warm paper/graphite/vermilion and a complete charcoal/ivory/peach counterpart. It changes working compositions as well as appearance. This candidate lives on `codex/studio-rebuild`; rejected commit `688d07e` remains preserved on `codex/nocturne-studio`.
 

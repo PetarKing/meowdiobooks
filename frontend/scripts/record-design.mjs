@@ -4,14 +4,14 @@ import { mkdir, writeFile, rename } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:5179/studio.html';
-const out = process.argv[3] ?? '/tmp/folio-recordings';
+const out = process.argv[3] ?? '/tmp/sanctuary-recordings';
 const filter = new RegExp(process.argv[4] ?? '.*');
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const results = [];
 try {
   for (const [name, viewport] of [
-    ['appearance-and-book', { width: 1440, height: 900 }],
+    ['appearance-and-sanctuary', { width: 1440, height: 900 }],
     ['required-voice-phone', { width: 390, height: 844 }],
     ['generation-failure-phone', { width: 390, height: 844 }],
     ['audition-selection-phone', { width: 390, height: 844 }],
@@ -30,9 +30,11 @@ try {
     await ready.waitFor();
     const appearance = page.getByRole('combobox', { name: 'Appearance', exact: true });
     const preview = page.getByRole('combobox', { name: 'Preview', exact: true });
-    if (name === 'appearance-and-book') {
+    if (name === 'appearance-and-sanctuary') {
       await appearance.selectOption('light');
-      await page.locator('.sound-field[data-render-state="active"] canvas').waitFor();
+      await page.locator('.sanctuary-art img').waitFor();
+      await page.locator('.sanctuary-art img').evaluate(image => image.decode());
+      await page.locator('.sanctuary-art').hover();
       await page.waitForTimeout(2200);
       await appearance.selectOption('dark');
       assert.equal(await page.locator('[data-presentation-root]').getAttribute('data-appearance'), 'dark');

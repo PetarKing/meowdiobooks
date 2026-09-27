@@ -24,6 +24,7 @@ change; proposed plans are clearly marked as unimplemented.
 - [Audiobook export contract](M4B_EXPORT.md)
 - [Frontend development reference](../frontend/README.md)
 - [Design system](../frontend/DESIGN_SYSTEM.md)
+- [Current local design candidate: Matcha & Cherry Sanctuary](matcha-sanctuary/README.md)
 
 ## Contributing
 

@@ -1,0 +1,209 @@
+{
+  "url": "http://127.0.0.1:5179/studio.html",
+  "generatedAt": "2026-09-27T19:56:55.927Z",
+  "reload": "passed",
+  "results": [
+    {
+      "scenario": "cast-inspector",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-missing",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-accepted",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "extract-accepted",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "dialogue-accepted",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "review-accepted",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-stale",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-player",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-split",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "phase-help",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-voices",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "home",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "import",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "home-error",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "delete-dialog",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library-empty",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library-loading",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library-error",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "extract",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "dialogue",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "dialogue-conflicts",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "dialogue-results",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "review",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "review-boundaries",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "review-final",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-identities",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-dense",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-voices-dense",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "export",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "export-long-book",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-long-book",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library-missing-cover",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "library-refresh-error",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "dialogue-running",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-running",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "generate-failed",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "cast-sample-pending",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    },
+    {
+      "scenario": "review-recovery",
+      "persistedLocale": "zh-CN",
+      "passed": true
+    }
+  ],
+  "errors": [],
+  "apiRequests": []
+}
