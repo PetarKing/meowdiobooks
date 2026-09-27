@@ -104,7 +104,8 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
         const estimatedSeconds = scriptChapters.get(row.id)?.estimatedSeconds ?? (row.estimatedCharacters ?? 0) / 15;
         const audioSeconds = playable?.audioSeconds ?? estimatedSeconds;
         return <article key={row.id} className={`chapter-card ${selected ? "selected" : ""} ${playable?.current ? "generated" : ""} ${playable ? "has-audio" : ""} ${playable && !playable.current ? "stale" : ""} ${unavailable ? "unavailable" : ""}`}>
-          <label className="chapter-select">
+          {/* The native label is the whole track target. Listen stays its own sibling action. */}
+          <label className="chapter-select chapter-row-target">
             <input aria-label={t("Select {{title}}", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} type="checkbox" disabled={unavailable} checked={selected} onChange={(event) => setSelectedChapters(event.target.checked ? [...new Set([...selectedChapters, row.id])] : selectedChapters.filter((id) => id !== row.id))} />
           </label>
           <div className="chapter-track-number">

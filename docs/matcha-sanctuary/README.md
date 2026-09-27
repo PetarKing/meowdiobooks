@@ -1,5 +1,7 @@
 # Matcha & Cherry Sanctuary
 
+Historical candidate: the [butterfly iteration](../matcha-butterfly/README.md) supersedes the framing, appearance control and Generate/Export layouts described here.
+
 Current local design candidate on `codex/studio-rebuild`, following the user's selection of Matcha & Cherry with Japanese-inspired maximalism and the reading cat as a local kami. The original cat remains recognizable; the home sanctuary is imagined and richly illustrated. Light/Dark/System stays functional throughout. This direction supersedes rejected Folio and Nocturne visuals; it preserves the improved workflow compositions and public host contracts.
 
 ## Open and edit

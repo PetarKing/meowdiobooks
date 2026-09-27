@@ -101,11 +101,10 @@
   --shadow-sm: 0 4px 14px rgb(var(--shadow-color) / .07);
   --shadow: 0 16px 44px rgb(var(--shadow-color) / .1);
   --shadow-lg: 0 28px 80px rgb(var(--shadow-color) / .24);
-  --focus: 0 0 0 3px var(--paper), 0 0 0 6px var(--poppy);
+  --focus: 0 0 0 2px var(--poppy);
 }
 [data-presentation-root] { background: var(--canvas); color: var(--ink); }
-.theme-toggle { display:flex; align-items:center; gap:7px; min-height:38px; color:var(--muted); }
-.theme-toggle svg { width:17px; height:17px; stroke:currentColor; stroke-width:1.5; flex:none; }
-.theme-label { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
-.theme-toggle select { min-height:38px; max-width:100px; padding:5px 7px; border:1px solid var(--line); border-radius:7px; background:var(--paper); color:var(--ink); font-size:12px; cursor:pointer; }
-@media (max-width:600px) { .theme-toggle { gap:3px; } .theme-toggle svg { display:none; } .theme-toggle select { max-width:78px; font-size:11px; padding:5px 3px; } }
+.theme-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; color: var(--ink); background: transparent; border: 0; border-radius: 50%; cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+.theme-toggle:hover { background: var(--surface-soft); color: var(--poppy); }
+.theme-toggle svg { display: block; width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) { .theme-toggle { transition: none; } }

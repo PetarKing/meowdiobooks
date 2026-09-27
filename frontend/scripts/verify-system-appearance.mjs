@@ -1,3 +1,4 @@
+import { chooseAppearance, readAppearance } from './appearance-controls.mjs';
 /** Exercise live OS-preference changes in an isolated synthetic preview context. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -20,7 +21,6 @@ await page.route('**/api/**', route => {
 try {
   await page.goto(base);
   await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
-  const preference = page.getByRole('combobox', { name: 'Appearance', exact: true });
   async function observe(name, expected, screenshot = false) {
     const colors = expected === 'dark' ? { background: 'rgb(29, 38, 27)', text: 'rgb(240, 244, 230)' } : { background: 'rgb(241, 242, 232)', text: 'rgb(45, 56, 37)' };
     // Attribute updates precede the finite color transition. Assert the settled
@@ -37,23 +37,23 @@ try {
     }));
     assert.equal(result.colorScheme, expected);
     assert.equal(result.background, colors.background); assert.equal(result.text, colors.text);
-    observations.push({ name, preference: await preference.inputValue(), ...result });
+    observations.push({ name, preference: await readAppearance(page), ...result });
     if (screenshot) await page.screenshot({ path: `${out}/${name}.png` });
   }
-  await preference.selectOption('system');
+  await chooseAppearance(page, 'system');
   await observe('system-light', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
   await observe('system-dark', 'dark', true);
-  await preference.selectOption('light');
+  await chooseAppearance(page, 'light');
   await observe('explicit-light-on-dark-os', 'light', true);
   await page.emulateMedia({ colorScheme: 'light' });
   await observe('explicit-light-on-light-os', 'light');
-  await preference.selectOption('dark');
+  await chooseAppearance(page, 'dark');
   await observe('explicit-dark-on-light-os', 'dark');
   await page.reload();
   await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
   await observe('explicit-dark-after-reload', 'dark');
-  await preference.selectOption('system');
+  await chooseAppearance(page, 'system');
   await observe('system-resumed-light', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
   await observe('system-resumed-dark', 'dark');

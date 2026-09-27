@@ -1,0 +1,73 @@
+{
+  "url": "http://127.0.0.1:5179/studio.html",
+  "executedAt": "2026-09-27T21:31:31.941Z",
+  "scope": "Synthetic preview presentation and control wiring; no real backend PDF parsing or audio generation.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 320,
+      "appearance": "light",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 320,
+      "appearance": "dark",
+      "overflow": 0,
+      "artwork": "visible and decoded",
+      "importFileReceipt": "passed",
+      "changeFile": "passed",
+      "persistedAppearance": "passed",
+      "errors": [],
+      "apiRequests": []
+    }
+  ]
+}

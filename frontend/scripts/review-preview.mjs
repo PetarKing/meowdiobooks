@@ -1,3 +1,4 @@
+import { chooseAppearance, readAppearance } from './appearance-controls.mjs';
 /** Render the safe sanctuary preview and verify its real import controls. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -15,7 +16,7 @@ try {
     await page.route('**/api/**', route => { if (!new URL(route.request().url()).pathname.startsWith('/api/')) return route.continue(); apiRequests.push(route.request().url()); return route.abort(); });
     await page.goto(url);
     await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
-    await page.locator('.theme-toggle select').selectOption(appearance);
+    await chooseAppearance(page, appearance);
     await page.waitForFunction(a => document.querySelector('.app-shell')?.dataset.appearance === a, appearance);
     await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode())); });
     assert(await page.locator('.sanctuary-art img').isVisible(), 'Cat sanctuary remains visible on phone');
@@ -31,7 +32,7 @@ try {
     assert(await page.locator('.quick-upload').isVisible());
     await page.reload();
     await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
-    assert.equal(await page.locator('.theme-toggle select').inputValue(), appearance, 'Appearance persists after reload');
+    assert.equal(await readAppearance(page), appearance, 'Appearance persists after reload');
     assert.deepEqual(errors, []); assert.deepEqual(apiRequests, []);
     results.push({ width, appearance, overflow, artwork: 'visible and decoded', importFileReceipt: 'passed', changeFile: 'passed', persistedAppearance: 'passed', errors, apiRequests });
     await page.close();

@@ -1,0 +1,137 @@
+{
+  "generatedAt": "2026-09-27T21:28:00.300Z",
+  "syntheticTextEnlargement": true,
+  "nativeZoom": false,
+  "screenshots": 8,
+  "errors": [],
+  "apiRequests": [],
+  "scope": "Compact receipt. Complete measurement report and screenshots are preserved in the workspace and can be regenerated.",
+  "results": [
+    {
+      "theme": "light",
+      "scenario": "home",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "visually-hidden",
+          "text": "Start another book"
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "scenario": "review",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "",
+          "text": "Alice\u2019s Adventures in Wonderland"
+        }
+      ]
+    },
+    {
+      "theme": "light",
+      "scenario": "cast-inspector",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": []
+    },
+    {
+      "theme": "light",
+      "scenario": "generate-long-book",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "",
+          "text": "Alice\u2019s Adventures in Wonderland"
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "scenario": "home",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "visually-hidden",
+          "text": "Start another book"
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "scenario": "review",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "",
+          "text": "Alice\u2019s Adventures in Wonderland"
+        }
+      ]
+    },
+    {
+      "theme": "dark",
+      "scenario": "cast-inspector",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": []
+    },
+    {
+      "theme": "dark",
+      "scenario": "generate-long-book",
+      "factor": 2,
+      "documentWidth": 1440,
+      "viewportWidth": 1440,
+      "fontIntegrityFailures": 0,
+      "clippingCandidates": [
+        {
+          "class": "cat-mark",
+          "text": ""
+        },
+        {
+          "class": "",
+          "text": "Alice\u2019s Adventures in Wonderland"
+        }
+      ]
+    }
+  ]
+}

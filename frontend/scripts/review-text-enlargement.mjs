@@ -1,3 +1,4 @@
+import { chooseAppearance, readAppearance } from './appearance-controls.mjs';
 /** Synthetic 200% text enlargement. Not browser zoom or a WCAG conformance test. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -19,7 +20,7 @@ try {
     });
     await page.goto(url);
     await page.locator('.preview-controls select:not([disabled])').waitFor();
-    await page.locator('.theme-toggle select').selectOption(theme);
+    await chooseAppearance(page, theme);
     await page.locator('.preview-controls select').selectOption(scenario);
     await page.waitForTimeout(100);
     await page.waitForFunction(() => document.querySelector('.preview-controls [role="status"]')?.textContent === 'Synthetic data · safe to explore');

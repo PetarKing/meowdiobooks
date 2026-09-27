@@ -12,5 +12,7 @@
 @import "./pages.css";
 @import "./cast-workbench.css";
 @import "./studio.css";
+@import "./generate-stage.css";
+@import "./export-stage.css";
 
 [data-presentation-root] { color: var(--color-ink, var(--ink)); }

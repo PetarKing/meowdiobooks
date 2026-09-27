@@ -23,7 +23,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
     <div className="home-flow">
       {localBooks.length > 0 && <section className="wip-shelf"><Panel eyebrow={t("Work in progress")} title={t("books.workingTitle", { ns: "edition" })} actions={<div className="local-assets-summary"><b>{localBooks.length === 1 ? t("1 book") : t("{{count}} books", { count: localBooks.length })}</b><span>{t("{{size}} used", { size: formatFileSize(totalAssetBytes) })}</span></div>}><div className="recent-books">{localBooks.map((row) => { const opening = openingBookId === row.id; return <article key={row.id}><button className="recent-book-open" disabled={Boolean(openingBookId) || Boolean(deletingBookId)} aria-busy={opening} onClick={() => void openBook(row)}><span className="recent-cover">{monogram(row.title)}</span><span><strong>{row.title}</strong><small>{t("{{count}} pages · {{size}}", { count: row.page_count ?? "?", size: formatFileSize(row.asset_size_bytes ?? 0) })}</small></span><b className={opening ? "book-loading" : undefined}>{opening && <i aria-hidden="true" />} {t(opening ? "Opening…" : "Continue")} {!opening && "→"}</b></button><button className="recent-book-delete" aria-label={t("Delete {{title}}", { title: row.title })} disabled={Boolean(openingBookId) || Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(row)}>{t("Delete")}</button></article>; })}</div></Panel></section>}
     </div>
-    <div className="studio-path" role="group" tabIndex={0} aria-label={t("Wizard stages")}>{["Extract", "Dialogue", "Review", "Cast & voices", "Generate", "Export"].map((stage, index) => <span key={stage}><b aria-hidden="true">0{index + 1}</b>{t(stage)}{index < 5 && <i aria-hidden="true">→</i>}</span>)}</div>
+
   </>;
 
 }

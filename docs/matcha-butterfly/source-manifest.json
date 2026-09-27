@@ -1,0 +1,124 @@
+{
+  "generatedAt": "2026-09-27T21:33:38.659928+00:00",
+  "baseCheckpoint": "f29f5dd2f5e16dcf8430be8cdd94425f70b37b33",
+  "branch": "codex/studio-rebuild",
+  "scope": "Changed frontend source/scripts and the retained sanctuary artwork. These hashes identify the reviewed candidate independently of the prior HEAD.",
+  "files": [
+    {
+      "path": "frontend/DESIGN_SYSTEM.md",
+      "sha256": "e86fbc0e2f7fc109f66c3d2903d563d88824aa54d97c4de52fdaa4b84ed2a0e5"
+    },
+    {
+      "path": "frontend/scripts/appearance-controls.mjs",
+      "sha256": "8b0776a7f7effb6a35ffc8924d47dff9fc6c6081c62fcacbb479936d029f71cd"
+    },
+    {
+      "path": "frontend/scripts/record-design.mjs",
+      "sha256": "08448e2a516ac10454ce00380508a58c120b63ae1543ab8fddd09636a4031bc4"
+    },
+    {
+      "path": "frontend/scripts/review-preview.mjs",
+      "sha256": "8789d6d117940c493c3f36a0cfe14873086b60a6a5d08e76647042714ba85efc"
+    },
+    {
+      "path": "frontend/scripts/review-text-enlargement.mjs",
+      "sha256": "cb4fe452f671a76967bfd5725e4a3864b42e827a2a85525644bbfb0f6e17516a"
+    },
+    {
+      "path": "frontend/scripts/verify-appearance.mjs",
+      "sha256": "fc2795856f3785890cf21b22dd0417cf28d0bb71ed7aabce91509c3171bd1967"
+    },
+    {
+      "path": "frontend/scripts/verify-system-appearance.mjs",
+      "sha256": "4ccb83fef379145e907ba9061f0c7ea35df5df31cdfe3f6fd3a7a8307496d43b"
+    },
+    {
+      "path": "frontend/src/assets/brand/matcha-kami-sanctuary.webp",
+      "sha256": "d76cf0ec437836e35256b6350b50ce504fe424fe9d83d216da31b433614521c0"
+    },
+    {
+      "path": "frontend/src/components/StudioHero.tsx",
+      "sha256": "ae14be23d65e31057a576ed21c5b9357e45b1e046d6e9bf85c9d0ce8d1dd2dce"
+    },
+    {
+      "path": "frontend/src/components/ThemeToggle.test.tsx",
+      "sha256": "c54035c19c7b44896a5e9cdea693265d0b1252a0cb6a8e530ca04eceb61f0446"
+    },
+    {
+      "path": "frontend/src/components/ThemeToggle.tsx",
+      "sha256": "902dbb2291fb8230365749371080cf6411b1933116ffe0e970d8159c9b19fbaf"
+    },
+    {
+      "path": "frontend/src/locales/zh-CN.ts",
+      "sha256": "86e5053154ae265c66b1bffc349a8ae5dc4763a4ad330280a1ea1607c5fbd864"
+    },
+    {
+      "path": "frontend/src/pages/DialoguePage.tsx",
+      "sha256": "d5fc09efa89134ff147690483f418225839a1bc945a2f558b80cced54c9acaaa"
+    },
+    {
+      "path": "frontend/src/pages/ExportPage.tsx",
+      "sha256": "a99206e60a3f6df21c3d68fdc78a62a7df4fe613974a2694d478a8555f8807da"
+    },
+    {
+      "path": "frontend/src/pages/ExtractPage.tsx",
+      "sha256": "269fb6c0ec4d5c0444fc57012fd9b055c036d38b91706607b53deb5dc865d6de"
+    },
+    {
+      "path": "frontend/src/pages/GeneratePage.test.tsx",
+      "sha256": "dad857c7b228d538349e78b9d3e36695ca97e1267807e9876fc92556f9541152"
+    },
+    {
+      "path": "frontend/src/pages/GeneratePage.tsx",
+      "sha256": "5e859e75041d07d63101775756d120d5ddb4add3c4c4693afe3e28e8eb780baf"
+    },
+    {
+      "path": "frontend/src/pages/HomePage.tsx",
+      "sha256": "232cabcae2dd67c08b20746d820f1101135a0f64e2b81c3c09016d32607f99a3"
+    },
+    {
+      "path": "frontend/src/pages/LibraryPage.tsx",
+      "sha256": "85fa1cd96838a4c9a32d5cb5b6401af5983ce5ca53a1381cd3c80a7c57d5ccba"
+    },
+    {
+      "path": "frontend/src/pages/shared.tsx",
+      "sha256": "5370606932e51c2d3170039cb70e75e84c40d079b4ac2bbe6dda677b7deaccde"
+    },
+    {
+      "path": "frontend/src/styles.css",
+      "sha256": "a669d0d06cba219ea70f835170470e13caebf5b37d7556bdadb92571a499324d"
+    },
+    {
+      "path": "frontend/src/styles/README.md",
+      "sha256": "213cbdccf1993024342bba6654bbd7aa1a2fc6bd1c736f6996ad90baf797cabb"
+    },
+    {
+      "path": "frontend/src/styles/appearance.css",
+      "sha256": "c552d871a6fe2a471043283b3b39bca75eafa6fe0484eb132a62ff1e08acbd59"
+    },
+    {
+      "path": "frontend/src/styles/export-stage.css",
+      "sha256": "6c4165df081912250eb7366c8dd8a90f7d653b862ad882424609e1b4927b2eae"
+    },
+    {
+      "path": "frontend/src/styles/generate-stage.css",
+      "sha256": "db5192873ba9539cb3d3d31add080ed2a6f9e65be6469299cf8b948e3aadca4c"
+    },
+    {
+      "path": "frontend/src/styles/pages.css",
+      "sha256": "6776e18a62eb6ce5b3f7048d00078107dd3f46420d7ec230aebd9c0c4c61927b"
+    },
+    {
+      "path": "frontend/src/styles/primitives.css",
+      "sha256": "c0e80caf58993e53476ef26d8ee393c8fbe66340a981804f594a3679ff280565"
+    },
+    {
+      "path": "frontend/src/styles/product.css",
+      "sha256": "addeeb6e7c1a475bc4dc0d4541ff5442f550591b123cfcca2b2d7f2b09fc9b3b"
+    },
+    {
+      "path": "frontend/src/styles/studio.css",
+      "sha256": "a36c10a9938f0ca927283a72c865c1ec38f7e98e9069aa5a80a1d3e24b81c6e8"
+    }
+  ]
+}

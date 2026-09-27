@@ -1,6 +1,6 @@
-# Meowdiobooks design system — Matcha & Cherry Sanctuary
+# Meowdiobooks design system — Matcha & Cherry
 
-The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary and the existing reading cat imagined as a benevolent local kami. Folio and Nocturne are rejected art directions; their review records are historical. The sanctuary is the current local implementation candidate. Visual selection is not production adoption.
+The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary and the existing reading cat imagined as a benevolent local kami. Folio and Nocturne are rejected art directions; their review records are historical. The butterfly iteration is the current local implementation candidate, opening the shell and rebuilding Generate and Export after the sanctuary review. Visual selection is not production adoption.
 
 ## Foundations
 
@@ -13,15 +13,15 @@ The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary
 | Primary action | `#a42f4d` | `#ee9cb4` |
 | Success | `#436627` | `#b4ce8f` |
 
-The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. Light/Dark/System is an accessible header select; System follows OS changes and user preferences persist locally. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
+The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance and persists locally. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
-Working headings use the offline-safe humanist sans stack at approximately 32px. Home and bibliographic titles use the editorial serif stack. Source excerpts preserve readable manuscript typography. A 4px spacing rhythm, restrained borders and modest corner radii support the content. Do not enlarge headings or decorative surfaces at the expense of the first decision.
+Working headings, home titles and bibliographic titles use the offline-safe editorial serif stack; supporting copy and controls use the humanist sans stack. Source excerpts preserve readable manuscript typography. A 4px spacing rhythm, restrained borders and modest corner radii support the content. Do not enlarge headings or decorative surfaces at the expense of the first decision.
 
 ## Brand artwork
 
 The existing `src/assets/brand/meowdiobooks-mark.png` remains the application mark. `StudioHero` pairs live HTML copy and import controls with `matcha-kami-sanctuary.webp`: an original illustrated temple precinct, with the same glasses-wearing orange cat reading on its central dais. Sweeping rooflines, moss gardens, cherry lacquer, washi panels and layered architectural detail carry the maximalism. The same art remains visible on phone below the import action. It is decorative and hidden from assistive technology; no functional labels are baked into it.
 
-The artwork is generated with the built-in imagegen tool and encoded as a 539 KB WebP. [The exact prompt](../docs/matcha-sanctuary/ART-PROMPT.md) records provenance. The illustration depicts an imagined sanctuary, without claiming a real shrine or using decorative Japanese text. Brass screen framing, arched seals and fine paper texture continue through the shell; working screens use quieter double rules and botanical/status colors so evidence remains readable. The old Three.js sculpture is no longer allocated by the home view.
+The artwork is generated with the built-in imagegen tool and encoded as a 539 KB WebP. [The exact prompt](../docs/matcha-sanctuary/ART-PROMPT.md) records provenance. The illustration depicts an imagined sanctuary, without claiming a real shrine or using decorative Japanese text. The illustration carries the architectural richness. The shell uses open space, botanical/status colors and simple separators. Avoid adding decorative frames around groups that already have their own controls. The old Three.js sculpture is no longer allocated by the home view.
 
 Artwork never substitutes for names, acceptance state, source evidence or actual audio. Neutral primitives must not import direction artwork.
 
@@ -34,7 +34,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 
 ## Interaction and state
 
-- Every interactive element needs visible hover, keyboard focus, selected, and disabled treatment. Selection uses shape/border plus color.
+- Every interactive element needs visible hover, keyboard focus, selected, and disabled treatment. Use one focus indicator per target. Whole-row Generate and Export selections own their indicator; their inner checkbox does not add another ring. Selection retains native checkmarks/radios alongside color.
 - Small confirmations can compose `DialogSurface` with `dialog-backdrop`, `dialog-card` and `dialog-actions` from the public primitive sheet. The card provides padding, bounded width/height and scrolling; full workbench inspectors keep their own geometry. `DialogSurface` itself owns the shared keyboard and scroll-lock lifecycle.
 - Loading preserves context: keep the initiating label, add progress when measurable, and prevent duplicate actions.
 - Empty states explain what unlocks the surface. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
@@ -43,7 +43,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 
 ## Responsive behavior
 
-- Wide layouts favor comparison and review density. Tablet retains the stage rail; phone uses one scrollable named stage rail in the header.
+- Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone uses one scrollable named stage rail in the header.
 - On mobile, primary actions remain reachable without covering the final content. Horizontal choice rails must show more than one card edge so overflow is discoverable.
 - Desktop entrance artwork shares the screen with the import composition; phone stacks the illustration below the import action. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
 
@@ -106,7 +106,8 @@ frontend dependencies and Playwright Chromium; it removes its temporary project 
 - `styles/primitives.css` owns canonical shared controls. Use `Button`, `Panel`, `Choice`, `Tag`, `TabList`, `DialogSurface` and `SourceExcerpt` instead of inventing parallel variants.
 - `styles/pages.css` owns workflow geometry and compositions. `StepIntro`, `WorkflowLaunch` and `WorkflowEmpty` are production components with their own stories. Large cast collections share `CollectionToolbar`.
 - `styles/cast-workbench.css` owns cast collection rows and audition-first inspector geometry.
+- `styles/generate-stage.css` owns the selectable chapter score and generation footer. `styles/export-stage.css` owns the cover proof, book details, contents, format choices and creation receipt.
 - `styles/studio.css` owns the shell and entrance art. Keep this direction out of shared primitive source.
 - Update the owning canonical sheet; do not append ad hoc overrides to `product.css`. Some baseline declarations remain for legacy import compatibility; this is an explicit transition boundary, not a claim that all old CSS has been eliminated.
 - `studio.html` is a separate synthetic review entry. `npm run studio` starts it without an API proxy; its navigation stays on the fixture entry after refresh. Production `index.html` and its real gateway remain unchanged.
-- [Sanctuary review](../docs/matcha-sanctuary/REVIEW.md) records the current rendered critique. [Folio review](../docs/folio/REVIEW.md) and [workflow evidence](../docs/folio/WORKFLOWS.md) are historical records of the preceding candidate. Earlier `design-review.md` and `design-review-pages.md` describe the rejected Nocturne candidate. A new component needs a useful isolated story; a new product state needs a realistic gateway-backed story.
+- [Butterfly review](../docs/matcha-butterfly/REVIEW.md) records the current rendered evidence. [Sanctuary review](../docs/matcha-sanctuary/REVIEW.md) records the preceding candidate. [Folio review](../docs/folio/REVIEW.md) and [workflow evidence](../docs/folio/WORKFLOWS.md) are historical records of the preceding candidate. Earlier `design-review.md` and `design-review-pages.md` describe the rejected Nocturne candidate. A new component needs a useful isolated story; a new product state needs a realistic gateway-backed story.

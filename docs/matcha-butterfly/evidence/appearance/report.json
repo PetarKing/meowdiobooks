@@ -1,0 +1,78 @@
+{
+  "base": "http://127.0.0.1:5179/studio.html",
+  "source": {
+    "head": "f29f5dd2f5e16dcf8430be8cdd94425f70b37b33",
+    "trackedChanges": "M frontend/src/components/StudioHero.tsx\n M frontend/src/components/ThemeToggle.test.tsx\n M frontend/src/components/ThemeToggle.tsx\n M frontend/src/locales/zh-CN.ts\n M frontend/src/pages/DialoguePage.tsx\n M frontend/src/pages/ExportPage.tsx\n M frontend/src/pages/ExtractPage.tsx\n M frontend/src/pages/GeneratePage.tsx\n M frontend/src/pages/HomePage.tsx\n M frontend/src/pages/LibraryPage.tsx\n M frontend/src/pages/shared.tsx\n M frontend/src/styles.css\n M frontend/src/styles/appearance.css\n M frontend/src/styles/pages.css\n M frontend/src/styles/primitives.css\n M frontend/src/styles/product.css\n M frontend/src/styles/studio.css\n?? frontend/src/pages/GeneratePage.test.tsx\n?? frontend/src/styles/export-stage.css\n?? frontend/src/styles/generate-stage.css"
+  },
+  "generatedAt": "2026-09-27T21:23:16.965Z",
+  "method": "Chromium emulated prefers-color-scheme changes; no host OS settings changed",
+  "observations": [
+    {
+      "name": "system-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "system-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "explicit-light-on-dark-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "explicit-light-on-light-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "explicit-dark-on-light-os",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "explicit-dark-after-reload",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "system-resumed-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "system-resumed-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    }
+  ],
+  "errors": [],
+  "apiRequests": [],
+  "passed": true
+}

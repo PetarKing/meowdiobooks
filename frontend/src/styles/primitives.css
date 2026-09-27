@@ -18,7 +18,7 @@
   min-height: 44px;
   padding: 12px 20px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: 6px;
   font-family: var(--font-sans);
   font-size: 13px;
   font-weight: 650;
@@ -48,7 +48,7 @@
 .ghost {
   color: var(--color-ink, var(--ink));
   background: transparent;
-  border-color: var(--color-border, var(--line));
+  border-color: transparent;
   box-shadow: none;
 }
 .ghost:hover:not(:disabled) { background: var(--surface-soft); border-color: var(--color-action, var(--poppy)); box-shadow: none; }
@@ -61,7 +61,7 @@
 .action-spinner { flex: 0 0 auto; width: 14px; height: 14px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: action-spin 800ms linear infinite; }
 @keyframes action-spin { to { transform: rotate(360deg); } }
 
-.panel { background: var(--color-paper, var(--surface-raised)); border-color: var(--color-border, var(--line)); border-radius: 18px; padding: 26px; box-shadow: none; }
+.panel { background: var(--color-paper, var(--surface-raised)); border: 0; border-radius: 4px; padding: 32px; box-shadow: none; }
 .panel-head { align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
 .panel-head h2 { font-weight: 500; font-size: 26px; line-height: 1.15; letter-spacing: -.035em; }
 .panel-plain { padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -98,10 +98,10 @@
 .narration-language-menu .language-flags button.selected { border-color: var(--color-action, var(--poppy)); background: var(--surface-soft); }
 .narration-language-menu .language-flags button:hover, .narration-language-menu .language-flags button:focus-visible { background: var(--surface-soft); }
 :where(audio) { width: 100%; min-width: 0; border-radius: 10px; }
-:where(input, select, textarea):focus-visible { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 3px; box-shadow: none; }
 
 @media (max-width: 600px) {
-  .panel { padding: 20px; border-radius: 14px; }
+  .panel { padding: 24px 20px; border-radius: 4px; }
   .panel-plain { padding: 0; }
   .panel-head { margin-bottom: 20px; }
   .panel-head h2 { font-size: 23px; }
@@ -113,3 +113,7 @@
   .primary, .secondary, .ghost, .danger, .choice, .choice-tooltip { transition: none; }
   .action-spinner { animation: none; }
 }
+
+/* Hidden file input uses its visible target; checkboxes keep their own single ring. */
+label:has(input:focus-visible) { box-shadow: none; }
+.quick-upload:has(input:focus-visible) { outline: 2px solid var(--poppy); outline-offset: 3px; }

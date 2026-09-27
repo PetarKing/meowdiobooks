@@ -1,3 +1,4 @@
+import { chooseAppearance, readAppearance } from './appearance-controls.mjs';
 /** Record actual synthetic interactions; no mocked screenshots or production API access. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile, rename } from 'node:fs/promises';
@@ -28,24 +29,23 @@ try {
     await page.goto(base);
     const ready = page.getByText('Synthetic data · safe to explore', { exact: true });
     await ready.waitFor();
-    const appearance = page.getByRole('combobox', { name: 'Appearance', exact: true });
     const preview = page.getByRole('combobox', { name: 'Preview', exact: true });
     if (name === 'appearance-and-sanctuary') {
-      await appearance.selectOption('light');
+      await chooseAppearance(page, 'light');
       await page.locator('.sanctuary-art img').waitFor();
       await page.locator('.sanctuary-art img').evaluate(image => image.decode());
       await page.locator('.sanctuary-art').hover();
       await page.waitForTimeout(2200);
-      await appearance.selectOption('dark');
+      await chooseAppearance(page, 'dark');
       assert.equal(await page.locator('[data-presentation-root]').getAttribute('data-appearance'), 'dark');
       await page.waitForTimeout(2200);
       await page.reload(); await ready.waitFor();
-      assert.equal(await appearance.inputValue(), 'dark', 'Preference survives reload');
+      assert.equal(await readAppearance(page), 'dark', 'Preference survives reload');
       await page.waitForTimeout(1400);
-      await appearance.selectOption('system');
+      await chooseAppearance(page, 'system');
       await page.waitForTimeout(1600);
     } else if (name === 'required-voice-phone') {
-      await appearance.selectOption('dark');
+      await chooseAppearance(page, 'dark');
       await preview.selectOption('cast-voices-dense');
       const review = page.getByRole('button', { name: 'Review required voices →' });
       await review.waitFor(); await page.waitForTimeout(1300);
@@ -62,7 +62,7 @@ try {
       assert(await gate.isEnabled(), 'Reviewed route enables continuation');
       await page.waitForTimeout(1700);
     } else if (name === 'audition-selection-phone') {
-      await appearance.selectOption('dark');
+      await chooseAppearance(page, 'dark');
       await preview.selectOption('cast-inspector');
       const dialog = page.getByRole('dialog', { name: 'Alice voice' });
       await dialog.waitFor();
@@ -81,7 +81,7 @@ try {
       assert.match(await dialog.getByRole('button', { name: 'Select Audition 1' }).innerText(), /Applied/);
       await page.waitForTimeout(1700);
     } else {
-      await appearance.selectOption('light');
+      await chooseAppearance(page, 'light');
       await preview.selectOption('generate-failed');
       const receipt = page.locator('.generation-error');
       await receipt.waitFor();
@@ -89,7 +89,7 @@ try {
       assert.match(await receipt.innerText(), /first three chapters are still saved/);
       assert(await page.getByRole('button', { name: /Generate .*selected/ }).isEnabled(), 'Retry stays available');
       await page.waitForTimeout(3300);
-      await appearance.selectOption('dark');
+      await chooseAppearance(page, 'dark');
       await receipt.scrollIntoViewIfNeeded();
       await page.waitForTimeout(2200);
     }

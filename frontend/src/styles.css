@@ -19,7 +19,7 @@ body { margin: 0; min-width: 320px; background: var(--paper); }
 button, input, select, textarea { font: inherit; }
 button { color: inherit; }
 button, label, input, select, textarea, audio { accent-color: var(--color-action, var(--poppy)); }
-button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible, label:has(input:focus-visible) { outline: none; box-shadow: var(--focus); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: none; box-shadow: var(--focus); }
 button:disabled { cursor: not-allowed; }
 .app-shell { min-height: 100vh; }
 

@@ -34,7 +34,7 @@ page selectors into another direction sheet would increase that debt.
 Validate shared styling changes with focused component stories, representative
 1440px and 390px product renders, and `npm run test:consumer`. A structural cleanup
 that should not alter presentation also needs before/after pixel comparison.
-Browser appearance uses the optional controlled App preference or a local Light/Dark/System choice.
+Browser appearance uses the optional controlled App preference or a local preference, initially System. The one-icon header control toggles explicit light/dark.
 `PresentationRoot` takes an explicit light/dark appearance for isolated previews.
 Palette customization continues through `PresentationRoot` semantic colors; do
 not increase selector specificity to force an art direction over a host palette.
