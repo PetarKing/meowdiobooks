@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CastArtifact } from "../api/contracts";
 import type { IdentityDecision } from "../castIdentity";
+import { castFor } from "../../design-kit/castFixtures";
 import { CastIdentityReview } from "./CastIdentityReview";
 
 const cast: CastArtifact = {
@@ -29,6 +30,15 @@ function Harness({ onReclassify }: { onReclassify?: () => void } = {}) {
     <CastIdentityReview cast={cast} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[{ id: "qwen", label: "Qwen", supportedLanguages: ["english"] }]} voiceModel="qwen" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} onReclassify={onReclassify} />
     <output data-testid="decisions">{JSON.stringify(decisions)}</output>
   </>;
+}
+
+function FixtureHarness() {
+  const fixture = castFor("identity-review");
+  const [decisions, setDecisions] = useState<Record<string, IdentityDecision>>(Object.fromEntries(
+    fixture.proposals.map((row) => [row.label, { label: row.label, category: row.category, canonicalName: row.canonicalName, aliases: [], primaryLabel: row.label }]),
+  ));
+  const [resolved, setResolved] = useState<string[]>([]);
+  return <CastIdentityReview cast={fixture} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} hideVoiceSettings />;
 }
 
 function OverloadedHarness() {
@@ -176,7 +186,7 @@ describe("CastIdentityReview", () => {
 
     fireEvent.click(possibleMatch);
     const possibleMatchDialog = screen.getByRole("dialog", { name: "Inspect fake Cecilus" });
-    expect(possibleMatchDialog).toHaveTextContent("Ready");
+    expect(possibleMatchDialog).toHaveTextContent("Suggested matches");
     expect(within(possibleMatchDialog).queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
   });
 
@@ -199,17 +209,32 @@ describe("CastIdentityReview", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
     expect(screen.getByRole("dialog", { name: "Inspect Cecilus" })).toHaveTextContent("Cecilus: Run!");
-    const suggestions = screen.getByText("Suggested matches").closest("details")!;
-    expect(suggestions).not.toHaveAttribute("open");
-    fireEvent.click(within(suggestions).getByText("Suggested matches"));
+    const suggestions = screen.getByRole("dialog", { name: "Inspect Cecilus" }).querySelector<HTMLDetailsElement>(".cast-match-panel")!;
+    expect(suggestions).toHaveAttribute("open");
     expect(within(suggestions).getByRole("button", { name: "Attach" })).toBeInTheDocument();
+  });
+
+  it("shows actionable Queen suggestions in the grid and attaches a real source label", () => {
+    render(<FixtureHarness />);
+    const queen = screen.getByRole("button", { name: "Inspect Queen of Hearts" });
+    expect(queen).toHaveClass("has-suggestions");
+    expect(queen).not.toHaveClass("needs-review");
+    fireEvent.click(queen);
+    const inspector = screen.getByRole("dialog", { name: "Inspect Queen of Hearts" });
+    expect(inspector).toHaveTextContent("Suggested matches");
+    const suggestions = inspector.querySelector<HTMLDetailsElement>(".cast-match-panel")!;
+    expect(suggestions).toHaveAttribute("open");
+    expect(within(suggestions).getByText("Queen")).toBeInTheDocument();
+    fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
+    expect(within(inspector).getByText("Queen", { selector: ".cast-alias-card b" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Queen" })).not.toBeInTheDocument();
+    expect(queen).not.toHaveClass("has-suggestions");
   });
 
   it("keeps the current cast member open when a secondary label is detached", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
-    const suggestions = screen.getByText("Suggested matches").closest("details")!;
-    fireEvent.click(within(suggestions).getByText("Suggested matches"));
+    const suggestions = screen.getByRole("dialog", { name: "Inspect Cecilus" }).querySelector<HTMLDetailsElement>(".cast-match-panel")!;
     fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
 
     const dialog = screen.getByRole("dialog", { name: "Inspect Cecilus" });

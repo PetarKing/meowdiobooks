@@ -118,7 +118,7 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
     detectedLanguage: "english",
     narrator: voice("Narrator", -1),
     identities,
-    dossiers: identities.map((v, i) => ({
+    dossiers: [...identities.map((v, i) => ({
       label: v.name,
       occurrenceCount: v.lineCount,
       firstAppearance: i + 2,
@@ -129,9 +129,15 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
           contextBefore: "The garden grew quiet.",
         },
       ],
-      fuzzyCandidates: i === 2 ? ["Queen", "Queen of Hearts"] : [],
-    })),
-    proposals: identities.map((v, i) => ({
+      fuzzyCandidates: i === 2 && variant === "identity-review" ? ["Queen"] : [],
+    })), ...(variant === "identity-review" ? [{
+      label: "Queen",
+      occurrenceCount: 4,
+      firstAppearance: 11,
+      examples: [{ source: "Queen: ‘Sentence first—verdict afterwards.’", page: 11, contextBefore: "The court fell silent." }],
+      fuzzyCandidates: ["Queen of Hearts"],
+    }] : [])],
+    proposals: [...identities.map((v, i) => ({
       label: v.name,
       category: v.category ?? "character",
       canonicalName: dense && i === 2 ? "The Queen" : v.name,
@@ -141,10 +147,18 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
         (v.category === "group" || i === 2 || (dense && i % 11 === 0)),
       reason:
         i === 2
-          ? "The literal label could refer to two different characters. Confirm the identity using the source evidence."
+          ? variant === "identity-review"
+            ? "The shorter Queen label may refer to this character. Compare the lines before attaching it."
+            : "The literal label could refer to two different characters. Confirm the identity using the source evidence."
           : undefined,
       competingCandidates:
         i === 2 ? ["Queen of Hearts", "Queen of Diamonds"] : [],
-    })),
+    })), ...(variant === "identity-review" ? [{
+      label: "Queen",
+      category: "character",
+      canonicalName: "Queen",
+      aliases: [],
+      reviewRequired: false,
+    }] : [])],
   };
 }

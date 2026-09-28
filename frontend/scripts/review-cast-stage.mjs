@@ -37,7 +37,7 @@ try {for(const width of [1440,390]) for(const appearance of ['light','dark']) {
  assert(await dialog.getByRole('group',{name:'Voice traits'}).isVisible());
  assert.equal(await dialog.evaluate(e=>e.scrollTop),0,'Switching to Ghost resets inspector scroll');
  assert.equal(await dialog.getByRole('button',{name:'Apply Audition 1'}).count(),0);
- assert.deepEqual(await axe('.voice-inspector'),[],'Ghost mode accessibility');
+ assert.deepEqual(await axe('.voice-inspector'),[],'New voice mode accessibility');
  await page.screenshot({path:`${out}/ghost-${width}-${appearance}.png`});
  await dialog.getByRole('button',{name:'Back to auditions'}).click();
  assert(await dialog.getByRole('button',{name:'Apply Audition 1'}).isVisible());
@@ -52,13 +52,15 @@ try {for(const width of [1440,390]) for(const appearance of ['light','dark']) {
  await confirmation.getByRole('button',{name:'Keep current cast'}).click();assert(await change.isVisible());
  assert(await change.evaluate(e=>e===document.activeElement),'Cancel returns focus to Change settings');
  await change.click();await page.getByRole('button',{name:'Change cast →'}).click();
+ await page.getByRole('region',{name:'Cast voice auditions'}).waitFor();
+ await page.getByRole('button',{name:/Edit cast/}).click();
  await page.getByRole('region',{name:'Cast members'}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Review cast & voices →'}).count(),0);
  await page.getByRole('button',{name:'Cancel cast edits'}).click();
- await page.getByRole('heading',{name:'Cast and voices ready'}).waitFor();
+ await page.getByRole('region',{name:'Cast voice auditions'}).waitFor();
  const overflow=await page.evaluate(()=>document.documentElement.scrollWidth-innerWidth);assert(overflow<=1);
  assert.deepEqual(errors,[]);assert.deepEqual(apiRequests,[]);assert.deepEqual(nativeDialogs,[]);
- results.push({width,appearance,rosterColumns:columns,oneClickApply:true,ghostMode:true,designedConfirmation:true,confirmationFocusRestored:true,directCastEditor:true,cancelReturnsAcceptedSummary:true,axe:'0 scoped violations across roster, inspector, Ghost and confirmation',overflow,errors,apiRequests,nativeDialogs});
+ results.push({width,appearance,rosterColumns:columns,oneClickApply:true,voiceCreationMode:true,designedConfirmation:true,confirmationFocusRestored:true,directVoicesReturn:true,editCastAvailable:true,axe:'0 scoped violations across roster, inspector, voice creation and confirmation',overflow,errors,apiRequests,nativeDialogs});
  await page.close();
 }}finally{await browser.close()}
 await writeFile(`${out}/report.json`,JSON.stringify({base,executedAt:new Date().toISOString(),scope:'Synthetic fixture; no backend voice generation, persisted revision, or real audio audition.',results},null,2));

@@ -2318,7 +2318,11 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument())
   })
 
-  it('opens accepted cast settings directly, with a designed confirmation and no rescanning', async () => {
+  it('prepares an editable accepted cast and opens voices after confirmation', async () => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'succeeded', result: { revision: 'cast-replacement' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({
+      ...base.cast!, revision: 'cast-replacement', phase: 'audition-review',
+    })
     await open()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.getByText(/only the replacement can generate new audio/)).toBeInTheDocument()
@@ -2336,12 +2340,25 @@ describe('v2 wizard', () => {
     expect(trigger).toHaveFocus()
     fireEvent.click(trigger)
     fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
-    expect(await screen.findByRole('region', { name: 'Cast members' })).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review cast & voices →' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
-    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', {})
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-replacement')
+    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
+    expect(screen.getByRole('region', { name: 'Cast members' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cancel cast edits' }))
+    expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
+  })
+
+  it('keeps the accepted cast available when preparing its replacement fails', async () => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'failed', error: 'Could not prepare cast' })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not prepare cast')
     expect(screen.getByRole('heading', { name: 'Cast and voices ready' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change settings →' })).toBeEnabled()
     expect(screen.queryByRole('region', { name: 'Cast voice auditions' })).not.toBeInTheDocument()
   })
 
@@ -2948,7 +2965,7 @@ describe('v2 wizard', () => {
     expect(applyEdits).toBeEnabled()
   })
 
-  it('confirms a Ghost audition in the designed dialog before starting generation', async () => {
+  it('confirms a new audition in the designed dialog before starting generation', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },

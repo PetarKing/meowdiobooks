@@ -29,6 +29,7 @@ interface CastGroup {
   needsReview: boolean;
   autoGrouped: boolean;
   qwenReview: boolean;
+  hasSuggestions: boolean;
 }
 
 interface Props {
@@ -78,7 +79,8 @@ function makeGroups(
 ): CastGroup[] {
   const confirmationLabels = new Set(strongConfirmationLabelsForCast(cast, decisions));
   const dossierByLabel = new Map(cast.dossiers.map((row) => [row.label, row]));
-  const groups = new Map<string, Omit<CastGroup, "primaryLabel" | "autoGrouped" | "qwenReview">>();
+  const availableLabels = new Set(cast.proposals.map((proposal) => proposal.label));
+  const groups = new Map<string, Omit<CastGroup, "primaryLabel" | "autoGrouped" | "qwenReview" | "hasSuggestions">>();
   for (const proposal of cast.proposals) {
     const decision = decisions[proposal.label] ?? fallbackDecision(proposal);
     const narrator = decision.category === NARRATOR_KEY;
@@ -119,12 +121,19 @@ function makeGroups(
     const qwenReview = unresolved.some((proposal) =>
       Boolean(proposal.competingLabels?.length) || proposal.category !== "character",
     ) || (group.needsReview && !autoGrouped);
+    const hasSuggestions = group.labels.some((label) => {
+      const proposal = group.proposals.find((row) => row.label === label);
+      const dossier = dossierByLabel.get(label);
+      return [...(proposal?.aliases ?? []), ...(proposal?.competingLabels ?? []), ...(dossier?.fuzzyCandidates ?? [])]
+        .some((candidate) => availableLabels.has(candidate) && !group.labels.includes(candidate));
+    });
     return {
       ...group,
       primaryLabel,
       labels,
       autoGrouped,
       qwenReview,
+      hasSuggestions,
     };
   }).sort((left, right) =>
     right.occurrenceCount - left.occurrenceCount || left.name.localeCompare(right.name),
@@ -482,7 +491,8 @@ export function CastIdentityReview({
     const proposal = cast.proposals.find((row) => row.label === label);
     const dossier = dossierByLabel.get(label);
     return [...(proposal?.aliases ?? []), ...(proposal?.competingLabels ?? []), ...(dossier?.fuzzyCandidates ?? [])];
-  }))].filter((label) => !active.labels.includes(label) && decisions[label]?.category !== NARRATOR_KEY) : [];
+  }))].filter((label) => cast.proposals.some((proposal) => proposal.label === label)
+    && !active.labels.includes(label) && decisions[label]?.category !== NARRATOR_KEY) : [];
 
   return <div ref={workbenchRef} className="cast-workbench">
     <div className="cast-toolbar">
@@ -524,7 +534,7 @@ export function CastIdentityReview({
         ref={(element) => { tileRefs.current[group.primaryLabel] = element; }}
         aria-label={t("Inspect {{name}}", { name: group.name })}
         key={group.key}
-        className={`cast-tile ${group.needsReview ? "needs-review" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
+        className={`cast-tile ${group.needsReview ? "needs-review" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${group.hasSuggestions && !group.needsReview ? "has-suggestions" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
         onClick={() => openInspector(group.primaryLabel)}
         onDragStart={(event) => startDrag(event, group)}
         onDragEnd={() => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }}
@@ -535,14 +545,14 @@ export function CastIdentityReview({
         <span className="cast-atomic-number">{String(index + 1).padStart(2, "0")}</span>
         {group.needsReview && <span className="cast-tile-required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required")}</span>}
         <strong>{suspicious ? "!" : tileSymbol(group)}</strong><b>{group.name}</b>
-        <small>{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</small>
+        <small>{group.hasSuggestions && !group.needsReview ? `${t("Suggested matches")} · ` : ""}{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</small>
       </button>; })}
     </section>
 
     {dragAutoScroll.direction && <div className={`cast-drag-scroll-cue ${dragAutoScroll.direction}`} aria-hidden="true"><span>{dragAutoScroll.direction === "up" ? `↑ ${t("Scroll up")}` : `↓ ${t("Scroll down")}`}</span></div>}
     {mergeUndo && <div className="cast-merge-undo" role="status"><span>{mergeUndo.message}</span><button type="button" onClick={undoLastMerge}>{t("Undo")}</button></div>}
 
-    {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
+    {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
         <div><span className="cast-status-dot ready" /> <small>{t("Always available")}</small><h2>{t("Narrator")}</h2><p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p></div>
         <button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button>
@@ -560,9 +570,9 @@ export function CastIdentityReview({
       </div>
     </InspectorShell>}
 
-    {active && <InspectorShell label={t("Inspect {{name}}", { name: active.name })} closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
+    {active && <InspectorShell label={t("Inspect {{name}}", { name: active.name })} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
-        <div><span className={`cast-status-dot ${active.autoGrouped ? "auto-grouped" : active.qwenReview ? "qwen-review" : active.needsReview ? "needs-review" : "ready"}`} /> <small>{t(active.needsReview ? "Confirmation required" : "Ready")}</small><h2>{active.name}</h2><p>{t("{{lines}} spoken lines across {{labels}} source labels.", { lines: active.occurrenceCount, labels: active.labels.length })}</p></div>
+        <div><span className={`cast-status-dot ${active.autoGrouped ? "auto-grouped" : active.qwenReview ? "qwen-review" : active.needsReview ? "needs-review" : active.hasSuggestions ? "has-suggestions" : "ready"}`} /> <small>{t(active.needsReview ? "Confirmation required" : active.hasSuggestions ? "Suggested matches" : "Ready")}</small><h2>{active.name}</h2><p>{t("{{lines}} spoken lines across {{labels}} source labels.", { lines: active.occurrenceCount, labels: active.labels.length })}</p></div>
         <div className="cast-inspector-actions">{active.needsReview && <button type="button" className="primary" onClick={confirmMaterialDecision}>{t(active.labels.length > 1 ? "Confirm grouping" : "Confirm classification")}</button>}<button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button></div>
       </header>
       <div className="cast-inspector-grid">
@@ -573,7 +583,7 @@ export function CastIdentityReview({
         <div className="cast-aliases-and-lines">
           <div className="cast-section-heading"><div><small>{t("Source evidence")}</small><h3>{t("Source labels")}</h3></div><span>{t("{{count}} attached", { count: active.labels.length })}</span></div>
           {active.labels.map((label) => <EvidenceCard key={label} label={label} dossier={dossierByLabel.get(label)} proposal={cast.proposals.find((row) => row.label === label)} primary={label === active.primaryLabel} action={label !== active.primaryLabel ? <button type="button" className="ghost compact" onClick={() => detachLabel(label)}>{t("Detach")}</button> : undefined} />)}
-          {suggestedLabels.length > 0 && <details className="cast-match-panel"><summary><span><small>{t("Across this cast member")}</small><b>{t("Suggested matches")}</b></span><strong>{suggestedLabels.length}</strong></summary><p>{t("Model and spelling hints only. Open when you want to compare another label.")}</p><div className="cast-label-results">{suggestedLabels.map((label) => { const owner = groups.find((group) => group.labels.includes(label)); return <article key={label}><div><b>{label}</b><small>{t("Currently {{owner}}", { owner: owner?.name ?? t("unassigned") })}</small><q>{exampleLine(dossierByLabel.get(label))}</q></div><button type="button" onClick={() => attachLabel(label)}>{owner?.primaryLabel === label && owner.labels.length > 1 ? t("Merge {{name}}", { name: owner.name }) : t("Attach")}</button></article>; })}</div></details>}
+          {suggestedLabels.length > 0 && <details key={active.key} className="cast-match-panel" open><summary><span><small>{t("Across this cast member")}</small><b>{t("Suggested matches")}</b></span><strong>{suggestedLabels.length}</strong></summary><div className="cast-label-results">{suggestedLabels.map((label) => { const owner = groups.find((group) => group.labels.includes(label)); return <article key={label}><div><b>{label}</b><small>{t("Currently {{owner}}", { owner: owner?.name ?? t("unassigned") })}</small><q>{exampleLine(dossierByLabel.get(label))}</q></div><button type="button" onClick={() => attachLabel(label)}>{owner?.primaryLabel === label && owner.labels.length > 1 ? t("Merge {{name}}", { name: owner.name }) : t("Attach")}</button></article>; })}</div></details>}
         </div>
       </div>
     </InspectorShell>}

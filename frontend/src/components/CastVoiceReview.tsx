@@ -257,9 +257,12 @@ export function CastVoiceReview({
   const [auditionMode, setAuditionMode] = useState<"auditions" | "create">("auditions");
   const [playingTileId, setPlayingTileId] = useState<string>();
   const tilePlaybackRequest = useRef(0);
+  const [playingCandidateRevision, setPlayingCandidateRevision] = useState<string>();
+  const candidatePlaybackRequest = useRef(0);
   const [inspectorClosing, setInspectorClosing] = useState(false);
   const closeTimer = useRef<number | undefined>(undefined);
   const tileAudioRef = useRef<HTMLAudioElement | null>(null);
+  const candidateAudioRef = useRef<HTMLAudioElement | null>(null);
   const sampleAudioRef = useRef<HTMLAudioElement | null>(null);
   const transcriptionRequest = useRef(0);
   const focusAfterClose = useRef<string | undefined>(undefined);
@@ -272,6 +275,12 @@ export function CastVoiceReview({
     const inspector = workbenchRef.current?.querySelector<HTMLElement>(".voice-inspector");
     if (inspector) inspector.scrollTop = 0;
   }, [auditionMode]);
+
+  useEffect(() => {
+    candidatePlaybackRequest.current += 1;
+    pauseCandidatePlayback();
+    setPlayingCandidateRevision(undefined);
+  }, [auditionMode, inspectedId]);
 
   useEffect(() => {
     if (!inspected) {
@@ -310,6 +319,7 @@ export function CastVoiceReview({
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
     const audio = tileAudioRef.current;
     if (audio?.getAttribute("src")) audio.pause();
+    pauseCandidatePlayback();
     sampleAudioRef.current?.pause();
   }, []);
 
@@ -379,6 +389,33 @@ export function CastVoiceReview({
     }
   }
 
+  function toggleCandidatePreview(candidate: VoiceCandidate) {
+    const audio = candidateAudioRef.current;
+    if (!audio || !candidate.previewUrl) return;
+    const request = ++candidatePlaybackRequest.current;
+    if (playingCandidateRevision === candidate.revision) {
+      pauseCandidatePlayback();
+      audio.currentTime = 0;
+      setPlayingCandidateRevision(undefined);
+      return;
+    }
+    pauseCandidatePlayback();
+    audio.src = candidate.previewUrl;
+    audio.currentTime = 0;
+    setPlayingCandidateRevision(candidate.revision);
+    try {
+      const playback = audio.play();
+      if (playback) void playback.catch(() => { if (candidatePlaybackRequest.current === request) setPlayingCandidateRevision(undefined); });
+    } catch {
+      setPlayingCandidateRevision(undefined);
+    }
+  }
+
+  function pauseCandidatePlayback() {
+    const audio = candidateAudioRef.current;
+    if (audio && !audio.paused) audio.pause();
+  }
+
   function openInspector(characterId: string) {
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
     tilePlaybackRequest.current += 1;
@@ -402,6 +439,9 @@ export function CastVoiceReview({
 
   function closeInspector() {
     if (!inspected || inspectorClosing) return;
+    candidatePlaybackRequest.current += 1;
+    pauseCandidatePlayback();
+    setPlayingCandidateRevision(undefined);
     focusAfterClose.current = inspected.characterId;
     setInspectorClosing(true);
     closeTimer.current = window.setTimeout(finishInspectorClose, 260);
@@ -468,6 +508,7 @@ export function CastVoiceReview({
             onClick={() => openInspector(voice.characterId)}
           >
             <b>{voice.name}</b>
+            {required && <span className="voice-tile-alert">{t(routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required")}</span>}
             {voice.category === "group" && <small>{t(label(voice.category))}</small>}
           </button>
         </div>;
@@ -521,37 +562,42 @@ export function CastVoiceReview({
 
           {inspectedRoute.kind === "dedicated" && auditionMode === "auditions" && <section className="voice-candidates-section">
             <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
-            <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>
-            <p className="voice-candidates-help">{t("Listen, then choose a voice. Your choice applies immediately and can be changed.")}</p>
+            {inspectedCandidates.length > 0 && <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>}
+            <p className="voice-candidates-help">{t(inspectedCandidates.length > 0 ? "Listen, then choose a voice. Your choice applies immediately and can be changed." : "No auditions yet. Create one to hear this cast member.")}</p>
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
               const applied = candidate.revision === approvedRevision;
+              const playingCandidate = playingCandidateRevision === candidate.revision;
               return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied selected" : ""}`}>
                 <div className="voice-candidate-actions">
                   <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={applied} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
-                    <span className="voice-candidate-radio" aria-hidden="true">{applied ? "●" : "○"}</span>
                     <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
                     {applied && <strong className="candidate-applied-badge">{t("✓ Applied")}</strong>}
                   </button>
                 </div>
                 {candidate.previewUrl
-                  ? <audio controls preload="metadata" src={candidate.previewUrl} />
+                  ? <button type="button" className={`voice-candidate-play ${playingCandidate ? "playing" : ""}`} aria-label={t("{{action}} Audition {{number}}", { action: t(playingCandidate ? "Stop" : "Play"), number })} aria-pressed={playingCandidate} onClick={() => toggleCandidatePreview(candidate)}>
+                    <span className="voice-candidate-play-icon" aria-hidden="true">{playingCandidate ? "■" : "▶"}</span>
+                    <span>{t(playingCandidate ? "Stop audition" : "Play audition")}</span>
+                    <span className="voice-candidate-play-wave" aria-hidden="true"><i /><i /><i /><i /></span>
+                  </button>
                   : <small className="cast-muted">{t("No playable audio.")}</small>}
               </article>;
             })}
-              <button type="button" className="voice-ghost-audition" onClick={() => setAuditionMode("create")} aria-label={t("Create a new audition")}>
-                <span className="voice-ghost-sigil" aria-hidden="true">✦</span>
-                <span><b>{t("The Ghost")}</b><small>{t("Imagine a new voice")}</small></span>
-                <span className="voice-ghost-arrow" aria-hidden="true">↗</span>
+              <button type="button" className="voice-new-audition" onClick={() => { candidatePlaybackRequest.current += 1; pauseCandidatePlayback(); setPlayingCandidateRevision(undefined); setAuditionMode("create"); }} aria-label={t("Create a new audition")}>
+                <span className="voice-new-audition-icon" aria-hidden="true">＋</span>
+                <span><b>{t("New voice")}</b><small>{t("Create a new audition")}</small></span>
               </button>
             </div>
+            <audio ref={candidateAudioRef} className="voice-candidate-audio" preload="metadata" onEnded={() => { candidatePlaybackRequest.current += 1; setPlayingCandidateRevision(undefined); }} onError={() => { candidatePlaybackRequest.current += 1; setPlayingCandidateRevision(undefined); }} />
           </section>}
 
           {inspectedRoute.kind === "dedicated" && settings && auditionMode === "create" && <section className="voice-settings-section voice-audition-settings">
             <button type="button" className="voice-create-back" onClick={() => setAuditionMode("auditions")}>← {t("Back to auditions")}</button>
-            <div className="cast-section-heading"><div><small>{t("The Ghost")}</small><h3>{t("Imagine a new voice")}</h3></div></div>
+            <div className="cast-section-heading"><div><small>{t("New voice")}</small><h3>{t("Create a new audition")}</h3></div></div>
+            <p className="voice-create-intro">{t("Shape a performance for {{name}}. Your existing auditions stay available.", { name: inspected.name })}</p>
             {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
-              <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><b>{t("Design a voice")}</b><small>{t("Use voice traits and direction.")}</small></button>
-              <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the voice reference.")}</small></button>
+              <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><span aria-hidden="true">✦</span><b>{t("Design a voice")}</b><small>{t("Shape its character and delivery.")}</small></button>
+              <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><span aria-hidden="true">♫</span><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the reference.")}</small></button>
             </div>}
             {auditionSource === "designed" && <><div className="voice-settings-groups">
               <fieldset className="voice-setting-group voice-traits-group"><legend>{t("Voice traits")}</legend><div className="voice-trait-columns">
@@ -577,7 +623,7 @@ export function CastVoiceReview({
               <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings apply to the next audition. Earlier auditions remain available.")}</small>
               <button
                 type="button"
-                className="ghost regenerate-voice-action"
+                className="primary regenerate-voice-action"
                 disabled={performanceNotesTooLong || regeneratingCharacterId === inspected.characterId}
                 onClick={() => onRegenerate(inspected.characterId, { ...settings, accent: settings.accent.trim() || "unspecified", description: settings.description.trim() })}
               >

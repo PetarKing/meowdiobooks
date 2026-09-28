@@ -67,7 +67,7 @@ try {
     assert(await regenerateConfirmation.isVisible());
     await page.keyboard.press('Escape');
     await regenerateConfirmation.waitFor({ state: 'hidden' });
-    assert(await generateAudition.evaluate(el => el === document.activeElement), 'Canceling audition regeneration restores Ghost action focus');
+    assert(await generateAudition.evaluate(el => el === document.activeElement), 'Canceling audition regeneration restores New voice action focus');
     await dialog.getByRole('button', { name: 'Back to auditions' }).click();
     assert.equal(await first.getAttribute('aria-pressed'), 'true', 'Back keeps the applied candidate');
     assert.equal(await dialog.locator('.voice-candidate-tile').count(), 3, 'Canceled regeneration keeps the audition set');
@@ -91,6 +91,9 @@ try {
     assert(replacementFocusRestored, 'Escape returns focus to Change settings');
     await change.click();
     await confirmation.getByRole('button', { name: /Change cast/ }).click();
+    await page.getByRole('heading', { name: 'Choose the cast voices.' }).waitFor();
+    assert(await page.getByRole('region', { name: 'Cast voice auditions' }).isVisible(), 'Change settings returns to voices');
+    await page.getByRole('button', { name: /Edit cast/ }).click();
     await page.getByRole('heading', { name: 'Review the cast.' }).waitFor();
     assert.equal(await page.getByRole('button', { name: /Review cast & voices/ }).count(), 0, 'Change settings opens populated editor without another scan');
     assert(await page.locator('.cast-tile').count() > 0, 'Existing cast members remain populated');
@@ -107,7 +110,7 @@ try {
     assert.deepEqual(nativeDialogs, []);
     assert.deepEqual(errors, []);
     assert.deepEqual(apiRequests, []);
-    results.push({ width, appearance, roster: rosterCount, boardStyle, longNameBounds, oneClickApply: true, ghostBack: true, populatedSettings: true, dialogs: { custom: true, replacementFocusRestored, reclassifyFocusRestored, regenerationFocusRestored: true }, nativeDialogs, errors, apiRequests });
+    results.push({ width, appearance, roster: rosterCount, boardStyle, longNameBounds, oneClickApply: true, newVoiceBack: true, populatedSettings: true, dialogs: { custom: true, replacementFocusRestored, reclassifyFocusRestored, regenerationFocusRestored: true }, nativeDialogs, errors, apiRequests });
     await page.close();
   }
 } finally { await browser.close(); }

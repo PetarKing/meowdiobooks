@@ -66,9 +66,12 @@ describe("CastVoiceReview", () => {
     render(<CastVoiceReview bookId="book" cast={missing} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={regenerate} />);
     const board = screen.getByRole("region", { name: "Cast voice auditions" });
     expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Missing voice");
+    expect(within(board).getByRole("button", { name: "Open Missing voice" })).toHaveTextContent("Audition required");
     expect(screen.getByRole("button", { name: "Play Missing preview" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
     const dialog = screen.getByRole("dialog", { name: "Missing voice" });
+    expect(dialog).toHaveTextContent("No auditions yet. Create one to hear this cast member.");
+    expect(dialog).not.toHaveTextContent("Listen, then choose a voice.");
     expect(within(dialog).queryByRole("button", { name: /Approve Audition/ })).not.toBeInTheDocument();
     expect(within(dialog).queryByRole("group", { name: "Voice traits" })).not.toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
@@ -79,6 +82,34 @@ describe("CastVoiceReview", () => {
     fireEvent.click(generate);
     expect(regenerate).toHaveBeenCalledWith("missing", expect.objectContaining({ description: "" }));
     expect(approve).not.toHaveBeenCalled();
+  });
+
+  it("plays an audition with one toggle without applying it", () => {
+    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
+    const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    const approve = vi.fn();
+    try {
+      render(<CastVoiceReview bookId="book" cast={cast} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
+      fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+      const dialog = screen.getByRole("dialog", { name: "Many voice" });
+      const playNewest = within(dialog).getByRole("button", { name: "Play Audition 3" });
+      fireEvent.click(playNewest);
+      expect(play).toHaveBeenCalledTimes(1);
+      const stopNewest = within(dialog).getByRole("button", { name: "Stop Audition 3" });
+      expect(stopNewest).toHaveAttribute("aria-pressed", "true");
+      expect(approve).not.toHaveBeenCalled();
+      fireEvent.click(stopNewest);
+      expect(within(dialog).getByRole("button", { name: "Play Audition 3" })).toHaveAttribute("aria-pressed", "false");
+      fireEvent.click(within(dialog).getByRole("button", { name: "Play Audition 2" }));
+      const audio = dialog.querySelector<HTMLAudioElement>(".voice-candidate-audio");
+      expect(audio?.getAttribute("src")).toBe("/many-2.wav");
+      if (audio) fireEvent.ended(audio);
+      expect(within(dialog).getByRole("button", { name: "Play Audition 2" })).toHaveAttribute("aria-pressed", "false");
+      expect(approve).not.toHaveBeenCalled();
+    } finally {
+      play.mockRestore();
+      pause.mockRestore();
+    }
   });
 
   it("searches large ensembles by labels while keeping required review totals visible", () => {

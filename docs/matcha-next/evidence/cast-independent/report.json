@@ -1,6 +1,6 @@
 {
-  "url": "http://127.0.0.1:5179/studio.html",
-  "executedAt": "2026-09-28T06:55:00.108Z",
+  "url": "http://127.0.0.1:5180/studio.html",
+  "executedAt": "2026-09-28T09:01:47.838Z",
   "scope": "Independent local synthetic Cast UI audit; no provider operations or real book mutations.",
   "results": [
     {
@@ -12,13 +12,13 @@
         "columns": "203.188px 203.203px 203.203px 203.203px 203.188px"
       },
       "longNameBounds": {
-        "width": 171,
-        "scrollWidth": 171,
-        "height": 111,
-        "scrollHeight": 111
+        "width": 169,
+        "scrollWidth": 169,
+        "height": 93,
+        "scrollHeight": 93
       },
       "oneClickApply": true,
-      "ghostBack": true,
+      "newVoiceBack": true,
       "populatedSettings": true,
       "dialogs": {
         "custom": true,
@@ -39,13 +39,13 @@
         "columns": "203.188px 203.203px 203.203px 203.203px 203.188px"
       },
       "longNameBounds": {
-        "width": 171,
-        "scrollWidth": 171,
-        "height": 111,
-        "scrollHeight": 111
+        "width": 169,
+        "scrollWidth": 169,
+        "height": 93,
+        "scrollHeight": 93
       },
       "oneClickApply": true,
-      "ghostBack": true,
+      "newVoiceBack": true,
       "populatedSettings": true,
       "dialogs": {
         "custom": true,
@@ -66,13 +66,13 @@
         "columns": "173px 173px"
       },
       "longNameBounds": {
-        "width": 151,
-        "scrollWidth": 151,
-        "height": 57,
-        "scrollHeight": 58
+        "width": 147,
+        "scrollWidth": 147,
+        "height": 79,
+        "scrollHeight": 79
       },
       "oneClickApply": true,
-      "ghostBack": true,
+      "newVoiceBack": true,
       "populatedSettings": true,
       "dialogs": {
         "custom": true,
@@ -93,13 +93,13 @@
         "columns": "173px 173px"
       },
       "longNameBounds": {
-        "width": 151,
-        "scrollWidth": 151,
-        "height": 57,
-        "scrollHeight": 58
+        "width": 147,
+        "scrollWidth": 147,
+        "height": 79,
+        "scrollHeight": 79
       },
       "oneClickApply": true,
-      "ghostBack": true,
+      "newVoiceBack": true,
       "populatedSettings": true,
       "dialogs": {
         "custom": true,
