@@ -1,4 +1,6 @@
-# Cast redesign — rendered evidence
+# Cast redesign — first roster pass
+
+The arched roster images here document the earlier iteration. The [square-panel correction](../cast-flat/README.md) is the current visual candidate following user review; audition and dialog behavior remains as documented below.
 
 The voice roster is now a selectable portrait grid (five columns at 1440 px; two at 390 px). The compact audition inspector shows preserved candidate revisions and a Ghost card. Clicking a candidate selects its exact revision immediately; Ghost swaps to design, sample clone, and reuse controls, with a return link. Existing audio controls remain independent of selection. Accepted Cast “Change settings” opens the populated editor after a designed confirmation, and a saved draft reopens directly. The three former native Cast confirmations use the shared accessible dialog surface.
 

@@ -432,7 +432,6 @@ export function CastVoiceReview({
     {largeCollection && !visibleVoices.length && <div className="collection-empty"><b>{t("No cast members match these filters.")}</b><span>{t("Clear the search and filter to see the whole cast.")}</span><button type="button" className="ghost" onClick={() => { setCollectionQuery(""); setCollectionFilter("all"); }}>{t("Clear")}</button></div>}
     <section className="cast-board voice-cast-board" aria-label={t("Cast voice auditions")}>
       {visibleVoices.map((voice) => {
-        const index = voices.indexOf(voice);
         const selected = routeReady(voice);
         const required = requiresReview(voice);
         const isNarrator = voice.characterId === "narrator";
@@ -441,23 +440,25 @@ export function CastVoiceReview({
         const playing = playingTileId === voice.characterId;
         const sharedGroupId = sharedGroupFor(voice, selections);
         const sharedColor = sharedGroupId == null ? undefined : sharedGroupColors.get(sharedGroupId);
+        const statusLabel = t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready");
         return <div className="cast-tile-shell" key={voice.characterId}>
           <button
             type="button"
             ref={(element) => { tileRefs.current[voice.characterId] = element; }}
             aria-label={t("Open {{name}} voice", { name: voice.name })}
+            aria-description={required ? `${t("Required")}: ${statusLabel}` : statusLabel}
             data-shared-voice-group={sharedGroupId}
             style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
-            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
+            className={`cast-tile voice-cast-tile portrait-tone-${Math.floor(stableHue(voice.characterId) / 90)} ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
             onClick={() => openInspector(voice.characterId)}
           >
-            <span className="cast-atomic-number">{isNarrator ? "N" : String(index).padStart(2, "0")}</span>
-            {required
-              ? <span className="cast-tile-required">{t("Required")}</span>
-              : <span className={`voice-tile-status ${selected ? "selected" : ""}`}>{selected ? "✓" : "○"}</span>}
-            <strong aria-hidden="true">{isNarrator ? "N" : initials(voice.name)}</strong>
-            <b>{voice.name}<em>{t(isNarrator ? "Narrator" : label(voice.category ?? "character"))}</em></b>
-            <small>{lineCountLabel(lineCount, t)} · {t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : sharedGroupId ? "shared voice" : selected ? "voice selected" : required ? "audition required" : "default ready")}</small>
+            <span className="voice-tile-portrait" aria-hidden="true"><strong>{isNarrator ? "N" : initials(voice.name)}</strong></span>
+            <span className="voice-tile-copy">
+              <b>{voice.name}</b>
+              {voice.category === "group" && <span className="voice-tile-role">{t(label(voice.category))}</span>}
+              <small>{lineCountLabel(lineCount, t)}</small>
+              <span className="voice-tile-state">{required && <>{t("Required")} · </>}{statusLabel}</span>
+            </span>
           </button>
           <button
             type="button"

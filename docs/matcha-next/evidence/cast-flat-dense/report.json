@@ -1,0 +1,115 @@
+{
+  "url": "http://127.0.0.1:5179/studio.html",
+  "executedAt": "2026-09-28T07:14:10.076Z",
+  "scope": "Independent local synthetic Cast UI audit; no provider operations or real book mutations.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "203.188px 203.203px 203.203px 203.203px 203.188px"
+      },
+      "longNameBounds": {
+        "width": 171,
+        "scrollWidth": 171,
+        "height": 68,
+        "scrollHeight": 68
+      },
+      "oneClickApply": true,
+      "ghostBack": true,
+      "populatedSettings": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "203.188px 203.203px 203.203px 203.203px 203.188px"
+      },
+      "longNameBounds": {
+        "width": 171,
+        "scrollWidth": 171,
+        "height": 68,
+        "scrollHeight": 68
+      },
+      "oneClickApply": true,
+      "ghostBack": true,
+      "populatedSettings": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "173px 173px"
+      },
+      "longNameBounds": {
+        "width": 147,
+        "scrollWidth": 147,
+        "height": 58,
+        "scrollHeight": 58
+      },
+      "oneClickApply": true,
+      "ghostBack": true,
+      "populatedSettings": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "173px 173px"
+      },
+      "longNameBounds": {
+        "width": 147,
+        "scrollWidth": 147,
+        "height": 58,
+        "scrollHeight": 58
+      },
+      "oneClickApply": true,
+      "ghostBack": true,
+      "populatedSettings": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    }
+  ]
+}
