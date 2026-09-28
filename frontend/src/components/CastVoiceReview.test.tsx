@@ -126,7 +126,7 @@ describe("CastVoiceReview", () => {
     fireEvent.change(search, { target: { value: "moonLIGHT" } });
     expect(screen.getByRole("button", { name: "Open Émilia voice" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open Duet voice" })).not.toBeInTheDocument();
-    expect(screen.getByText("1 required voice")).toBeInTheDocument();
+    expect(screen.getByText("1 required")).toBeInTheDocument();
     expect(screen.getByText("1 of 15 cast members shown")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
     const requiredDialog = screen.getByRole("dialog", { name: "Duet voice" });
@@ -205,7 +205,8 @@ describe("CastVoiceReview", () => {
     const onUpload = vi.fn();
     const onTranscribe = vi.fn().mockResolvedValue({ text: "An imperfect automatic draft.", language: "English" });
     const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue(undefined);
-    render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} onTranscribe={onTranscribe} onUpload={onUpload} />);
+    const props = { bookId: "book-1", selections: {}, routes: {}, onRouteChange: () => undefined, onApprove: () => undefined, onRegenerate: () => undefined, onTranscribe, onUpload };
+    const view = render(<CastVoiceReview {...props} cast={cast} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
     fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
@@ -235,6 +236,9 @@ describe("CastVoiceReview", () => {
     expect(onUpload).toHaveBeenCalledWith(
       "many", sample, "These are the exact words in my sample.",
     );
+    const many = cast.identities![1];
+    view.rerender(<CastVoiceReview {...props} cast={{ ...cast, identities: [cast.identities![0], { ...many, voicePreviewRevision: "many-sample", voiceCandidates: [...many.voiceCandidates!, { revision: "many-sample", previewUrl: "/many-sample.wav", referenceText: "A sampled line.", direction: "Sampled.", source: "upload" }] }] }} />);
+    expect(await within(dialog).findByRole("button", { name: "Play Audition 4" })).toHaveFocus();
     play.mockRestore();
   });
 
@@ -293,8 +297,8 @@ describe("CastVoiceReview", () => {
     const groupTile = screen.getByRole("button", { name: "Open Subaru & Cecilus voice" });
     expect(groupTile).toHaveClass("voice-required", "needs-review");
     expect(groupTile).toHaveAttribute("aria-description", "Required: confirm suggested voices");
-    expect(screen.getByText("1 required voice")).toBeInTheDocument();
-    expect(screen.getByText("Review required voices before accepting the cast.")).toBeInTheDocument();
+    expect(screen.getByText("1 required")).toBeInTheDocument();
+    expect(screen.getByText("1 not yet approved")).toBeInTheDocument();
     fireEvent.click(groupTile);
 
     expect(screen.getByText("Subaru + Cecilus")).toBeInTheDocument();
@@ -321,17 +325,18 @@ describe("CastVoiceReview", () => {
     expect(resolvePreview).not.toHaveBeenCalled();
   });
 
-  it("pins Narrator, orders the cast by line count, and keeps tile metadata quiet", () => {
+  it("pins Narrator, orders the cast by line count, and marks unapproved voices", () => {
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
     const tiles = within(screen.getByRole("region", { name: "Cast voice auditions" })).getAllByRole("button", { name: /^Open / });
     expect(tiles.map((tile) => tile.getAttribute("aria-label"))).toEqual([
       "Open Narrator voice", "Open Many voice", "Open Few voice",
     ]);
     expect(tiles[1]).toHaveClass("voice-default-ready");
-    expect(tiles[1]).toHaveAttribute("aria-description", "default ready");
-    expect(tiles[1]).not.toHaveTextContent("default ready");
+    expect(tiles[1]).toHaveAttribute("aria-description", "not yet approved");
+    expect(tiles[1]).toHaveTextContent("Not yet approved");
     expect(tiles[1]).not.toHaveTextContent("20 lines");
-    expect(screen.getByText("3 voices can be approved when you continue")).toBeInTheDocument();
+    expect(screen.getByText("3 not yet approved")).toBeInTheDocument();
+    expect(screen.queryByText(/Listen first|voices can be approved when you continue/)).not.toBeInTheDocument();
   });
 
   it("marks reused auditions as informative shared voices with matching initials colors", () => {
@@ -375,7 +380,7 @@ describe("CastVoiceReview", () => {
       merchant.style.getPropertyValue("--shared-voice-accent"),
     );
     expect(guard).toHaveAttribute("aria-description", "shared voice");
-    expect(screen.getByText(/Brief roles may share a voice to save time and cost/)).toBeInTheDocument();
+    expect(screen.queryByText(/Brief roles may share a voice to save time and cost/)).not.toBeInTheDocument();
 
     fireEvent.click(guard);
     expect(within(screen.getByRole("dialog", { name: "Guard voice" })).getByText("Shared voice")).toBeInTheDocument();
@@ -426,6 +431,38 @@ describe("CastVoiceReview", () => {
     expect(dialog).toHaveTextContent("Settings apply to the next audition");
     fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
     expect(onRegenerate).toHaveBeenCalledWith("many", expect.objectContaining({ pace: "measured" }));
+  });
+
+  it("returns to auditions and focuses playback when the first generated voice arrives", async () => {
+    const missingVoice = { characterId: "missing", name: "Missing", category: "character" as const, referenceText: "A first line." };
+    const firstCast: CastArtifact = { ...cast, identities: [missingVoice] };
+    const props = { bookId: "book-1", selections: {}, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} cast={firstCast} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Missing voice" }));
+    const dialog = screen.getByRole("dialog", { name: "Missing voice" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
+    expect(props.onRegenerate).toHaveBeenCalledOnce();
+
+    view.rerender(<CastVoiceReview {...props} cast={{ ...firstCast, identities: [{ ...missingVoice, voicePreviewRevision: "missing-1", previewUrl: "/missing-1.wav" }] }} />);
+    const play = await within(dialog).findByRole("button", { name: "Play Audition 1" });
+    expect(play).toHaveFocus();
+    expect(dialog).not.toHaveTextContent("Create a new audition →");
+  });
+
+  it("returns to the newest playable audition after generating a replacement", async () => {
+    const props = { bookId: "book-1", selections: {}, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} cast={cast} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+    const dialog = screen.getByRole("dialog", { name: "Many voice" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
+    const many = cast.identities![1];
+    const nextCast: CastArtifact = { ...cast, identities: [cast.identities![0], { ...many, voicePreviewRevision: "many-4", previewUrl: "/many-4.wav", voiceCandidates: [...many.voiceCandidates!, { revision: "many-4", previewUrl: "/many-4.wav", referenceText: "New audition.", direction: "New sound." }] }] };
+    view.rerender(<CastVoiceReview {...props} cast={nextCast} />);
+    const play = await within(dialog).findByRole("button", { name: "Play Audition 4" });
+    expect(play).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Apply Audition 4" })).toBeInTheDocument();
   });
 
   it("applies any preserved candidate on click and keeps the inspector open for comparison", () => {

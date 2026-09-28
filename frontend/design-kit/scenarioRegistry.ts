@@ -134,7 +134,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-alice-voice"],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   "cast-missing": {
@@ -149,7 +149,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-alice-voice"],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   "cast-accepted": {
@@ -289,7 +289,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   home: {
@@ -539,7 +539,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   generate: {

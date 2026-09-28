@@ -1,4 +1,5 @@
 import { CollectionToolbar } from "./CollectionToolbar";
+import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog as InspectorShell } from "./Ui";
 import {
@@ -515,38 +516,24 @@ export function CastIdentityReview({
     ]} />}
     {largeCollection && !visibleGroups.length && <div className="collection-empty"><b>{t("No cast members match these filters.")}</b><span>{t("Clear the search and filter to see the whole cast.")}</span><button type="button" className="ghost" onClick={() => { setCollectionQuery(""); setCollectionFilter("all"); }}>{t("Clear")}</button></div>}
     <section className="cast-board" aria-label={t("Cast members")}>
-      <button
-        type="button"
-        ref={(element) => { tileRefs.current[NARRATOR_KEY] = element; }}
-        aria-label={t("Inspect Narrator")}
-        className={`cast-tile cast-narrator-tile ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
-        onClick={() => openInspector(NARRATOR_KEY)}
-        onDragOver={(event) => dragOver(event, NARRATOR_KEY)}
-        onDragLeave={() => setDropTargetKey(undefined)}
-        onDrop={(event) => dropOn(event)}
-      >
-        <span className="cast-atomic-number">N</span><strong>♬</strong><b>{t("Narrator")}</b>
-        <small>{t("{{count}} reassigned labels · destination only", { count: narratorAssignments?.labels.length ?? 0 })}</small>
-      </button>
-      {visibleGroups.slice().sort((left, right) => Number(right.needsReview) - Number(left.needsReview)).map((group) => { const index = groups.indexOf(group); const suspicious = group.needsReview && group.labels.length > 3; return <button
-        type="button"
-        draggable
-        ref={(element) => { tileRefs.current[group.primaryLabel] = element; }}
-        aria-label={t("Inspect {{name}}", { name: group.name })}
+      <CastRosterCard
+        name={t("Narrator")} symbol="♬"
+        detail={t("{{count}} reassigned labels · destination only", { count: narratorAssignments?.labels.length ?? 0 })}
+        portraitClassName="cast-narrator-tile"
+        cardClassName={`cast-narrator-tile ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
+        inspectRef={(element) => { tileRefs.current[NARRATOR_KEY] = element; }}
+        inspectProps={{ "aria-label": t("Inspect Narrator"), onClick: () => openInspector(NARRATOR_KEY), onDragOver: (event) => dragOver(event, NARRATOR_KEY), onDragLeave: () => setDropTargetKey(undefined), onDrop: (event) => dropOn(event) }}
+      />
+      {visibleGroups.slice().sort((left, right) => Number(right.needsReview) - Number(left.needsReview)).map((group) => { const suspicious = group.needsReview && group.labels.length > 3; return <CastRosterCard
         key={group.key}
-        className={`cast-tile ${group.needsReview ? "needs-review" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${group.hasSuggestions && !group.needsReview ? "has-suggestions" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
-        onClick={() => openInspector(group.primaryLabel)}
-        onDragStart={(event) => startDrag(event, group)}
-        onDragEnd={() => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }}
-        onDragOver={(event) => dragOver(event, group.key)}
-        onDragLeave={() => setDropTargetKey(undefined)}
-        onDrop={(event) => dropOn(event, group)}
-      >
-        <span className="cast-atomic-number">{String(index + 1).padStart(2, "0")}</span>
-        {group.needsReview && <span className="cast-tile-required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required")}</span>}
-        <strong>{suspicious ? "!" : tileSymbol(group)}</strong><b>{group.name}</b>
-        <small>{group.hasSuggestions && !group.needsReview ? `${t("Suggested matches")} · ` : ""}{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</small>
-      </button>; })}
+        name={group.name} symbol={suspicious ? "!" : tileSymbol(group)}
+        portraitClassName={`portrait-tone-${groups.indexOf(group) % 4}`}
+        detail={<>{group.hasSuggestions && !group.needsReview ? `${t("Suggested matches")} · ` : ""}{t("{{labels}} labels · {{lines}} lines", { labels: group.labels.length, lines: group.occurrenceCount })}</>}
+        badge={group.needsReview ? <span className="cast-tile-required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required")}</span> : undefined}
+        cardClassName={`${group.needsReview ? "needs-review" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${group.hasSuggestions && !group.needsReview ? "has-suggestions" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
+        inspectRef={(element) => { tileRefs.current[group.primaryLabel] = element; }}
+        inspectProps={{ draggable: true, "aria-label": t("Inspect {{name}}", { name: group.name }), onClick: () => openInspector(group.primaryLabel), onDragStart: (event) => startDrag(event, group), onDragEnd: () => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }, onDragOver: (event) => dragOver(event, group.key), onDragLeave: () => setDropTargetKey(undefined), onDrop: (event) => dropOn(event, group) }}
+      />; })}
     </section>
 
     {dragAutoScroll.direction && <div className={`cast-drag-scroll-cue ${dragAutoScroll.direction}`} aria-hidden="true"><span>{dragAutoScroll.direction === "up" ? `↑ ${t("Scroll up")}` : `↓ ${t("Scroll down")}`}</span></div>}

@@ -1,23 +1,28 @@
 /* Character-select portraits stay compact and let names, not ornaments, lead. */
 .voice-cast-workbench { gap: 24px; }
-.voice-cast-toolbar { align-items: end; padding: 8px 0 24px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
-.voice-cast-toolbar .voice-cast-summary-copy > b { font: 500 clamp(24px, 2.3vw, 32px)/1.2 var(--font-display); }
-.voice-cast-toolbar .voice-cast-summary-copy > small { font-size: 13px; }
-.voice-cast-toolbar .cast-receipt { gap: clamp(18px, 3vw, 40px); }
-.voice-cast-toolbar .cast-receipt dd { font: 500 24px/1 var(--font-display); }
+.voice-stage-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.voice-stage-heading h1 { margin: 0; font: 500 clamp(30px, 3vw, 42px)/1.1 var(--font-display); }
+.voice-cast-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.voice-cast-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0; color: var(--muted); font: 650 12px/1.4 var(--font-sans); }
+.voice-cast-progress span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.voice-cast-progress span::before { content: ""; width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--green); }
+.voice-cast-progress .pending { color: var(--gilt-ink); }
+.voice-cast-progress .pending::before { background: var(--gilt-ink); }
+.voice-cast-progress .required { color: var(--danger-ink); }
+.voice-cast-progress .required::before { background: var(--danger-ink); }
 .voice-cast-board { grid-template-columns: repeat(auto-fill, minmax(min(100%, 194px), 1fr)); gap: clamp(12px, 1.7vw, 24px); overflow: visible; border: 0; border-radius: 0; background: transparent; }
-.voice-cast-board .cast-tile-shell, .voice-cast-board .cast-tile-shell:first-child { display: flex; min-width: 0; flex-direction: column; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--paper); box-shadow: 0 8px 20px rgb(var(--shadow-color) / .05); transition: transform 180ms ease, box-shadow 180ms ease; }
-.voice-cast-board .cast-tile-shell:hover { transform: translateY(-2px); box-shadow: 0 14px 28px rgb(var(--shadow-color) / .1); }
-.voice-cast-board .cast-tile-shell:has(.voice-selected) { border-color: var(--success-border); }
-.voice-cast-board .cast-tile-shell:has(.voice-required) { border-color: var(--danger-border); }
+.voice-cast-board .cast-tile-shell, .voice-cast-board .cast-tile-shell:first-child { display: flex; min-width: 0; flex-direction: column; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--paper); box-shadow: none; transition: border-color 180ms ease, transform 180ms ease; }
+.voice-cast-board .cast-tile-shell:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: none; }
+.voice-cast-board .cast-tile-shell.is-approved { border-color: var(--success-border); }
+.voice-cast-board .cast-tile-shell.is-pending { border: 2px solid var(--gilt-ink); }
+.voice-cast-board .cast-tile-shell.is-required { border: 2px solid var(--danger-ink); }
 .voice-cast-board .voice-cast-tile,
 .voice-cast-board .voice-cast-tile.voice-selected,
 .voice-cast-board .voice-cast-tile.voice-required,
 .voice-cast-board .voice-cast-tile.cast-narrator-tile { display: flex; min-height: 76px; height: auto; flex: 1 1 auto; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; padding: 14px 16px; border: 0; border-radius: 0; background: var(--paper); text-align: left; box-shadow: none; }
 .voice-cast-board .voice-cast-tile:hover { background: var(--paper); box-shadow: none; transform: none; }
 .voice-cast-board .voice-cast-tile:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
-.voice-cast-board .voice-tile-portrait { --portrait-start: var(--matcha-soft); --portrait-end: var(--matcha); position: relative; display: grid; width: 100%; min-height: 122px; flex: 0 0 auto; place-items: center; overflow: hidden; padding: 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: linear-gradient(145deg, color-mix(in srgb, var(--portrait-start) 34%, var(--paper)), color-mix(in srgb, var(--portrait-end) 23%, var(--paper))); color: var(--ink); cursor: pointer; }
-.voice-cast-board .voice-tile-portrait::before { content: ""; position: absolute; inset: 11px; border: 1px solid color-mix(in srgb, var(--ink) 12%, transparent); border-radius: 2px; pointer-events: none; }
+.voice-cast-board .voice-tile-portrait { --portrait-start: var(--matcha-soft); --portrait-end: var(--matcha); position: relative; display: grid; width: 100%; min-height: 122px; flex: 0 0 auto; place-items: center; overflow: hidden; padding: 0; border: 0; border-radius: 0; background: linear-gradient(145deg, color-mix(in srgb, var(--portrait-start) 34%, var(--paper)), color-mix(in srgb, var(--portrait-end) 23%, var(--paper))); color: var(--ink); cursor: pointer; }
 .voice-cast-board .voice-tile-portrait:hover:not(:disabled) { background: linear-gradient(145deg, color-mix(in srgb, var(--portrait-start) 42%, var(--paper)), color-mix(in srgb, var(--portrait-end) 28%, var(--paper))); }
 .voice-cast-board .voice-tile-portrait:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
 .voice-cast-board .voice-tile-portrait:disabled { cursor: not-allowed; }
@@ -26,9 +31,9 @@
 .voice-cast-board .voice-tile-portrait.portrait-tone-2 { --portrait-start: var(--blush); --portrait-end: var(--sakura); }
 .voice-cast-board .voice-tile-portrait.portrait-tone-3 { --portrait-start: var(--matcha-soft); --portrait-end: var(--matcha); }
 .voice-cast-board .voice-tile-portrait.cast-narrator-tile { --portrait-start: var(--sakura); --portrait-end: var(--blush); }
+.voice-cast-board .voice-tile-portrait.voice-pending { --portrait-start: var(--gilt); --portrait-end: var(--paper); }
 .voice-cast-board .voice-tile-portrait.voice-required { --portrait-start: var(--danger-soft); --portrait-end: var(--sakura); }
-.voice-cast-board .voice-tile-portrait.voice-selected { box-shadow: inset 0 -3px var(--green); }
-.voice-cast-board .voice-tile-portrait.voice-required { box-shadow: inset 0 -3px var(--danger-ink); }
+.voice-cast-board .voice-tile-portrait.voice-selected, .voice-cast-board .voice-tile-portrait.voice-required { box-shadow: none; }
 .voice-cast-board .voice-tile-play-cue { position: absolute; right: 15px; bottom: 13px; color: var(--ink); font: 600 12px/1 var(--font-sans); opacity: .65; }
 .voice-cast-board .voice-tile-portrait:hover .voice-tile-play-cue, .voice-cast-board .voice-tile-portrait:focus-visible .voice-tile-play-cue { opacity: 1; }
 .voice-cast-board .voice-tile-wave { display: flex; height: 40px; align-items: center; gap: 5px; }
@@ -39,12 +44,14 @@
 .voice-cast-board .voice-cast-tile > b { display: block; width: 100%; padding: 0 20px 2px 0; color: var(--ink); font: 500 clamp(16px, 1.4vw, 19px)/1.2 var(--font-display); overflow: visible; white-space: normal; overflow-wrap: anywhere; }
 .voice-cast-board .voice-cast-tile > small { width: 100%; color: var(--muted); font: 650 10px/1.3 var(--font-sans); letter-spacing: .06em; text-transform: uppercase; overflow: visible; white-space: normal; }
 .voice-cast-board .voice-tile-alert { display: inline-flex; align-self: flex-start; margin-top: 4px; padding: 3px 7px; border-radius: 3px; background: var(--danger-soft); color: var(--danger-ink); font: 700 10px/1.2 var(--font-sans); letter-spacing: .025em; }
+.voice-cast-board .voice-tile-alert.pending { background: color-mix(in srgb, var(--gilt) 24%, var(--paper)); color: var(--gilt-ink); }
 .voice-cast-board .voice-cast-tile.voice-required { background: color-mix(in srgb, var(--danger-soft) 38%, var(--paper)); }
+.voice-cast-board .voice-cast-tile.voice-pending { background: color-mix(in srgb, var(--gilt) 9%, var(--paper)); }
 .voice-cast-board .voice-cast-tile.voice-required > small { padding: 0; color: var(--muted); }
 .voice-cast-board .voice-cast-tile.voice-selected::after, .voice-cast-board .voice-cast-tile.voice-required::after { position: absolute; top: 16px; right: 14px; font: 700 14px/1 var(--font-sans); }
 .voice-cast-board .voice-cast-tile.voice-selected::after { content: "✓"; color: var(--green); }
 .voice-cast-board .voice-cast-tile.voice-required::after { content: "!"; color: var(--danger-ink); }
-.voice-cast-board .voice-cast-tile.shared-voice { box-shadow: inset 0 -3px var(--shared-voice-accent); }
+.voice-cast-board .voice-cast-tile.shared-voice { box-shadow: none; }
 .voice-inspector-body { display: block; background: var(--paper); }
 .cast-inspector-backdrop:has(> .voice-inspector) { justify-content: center; align-items: center; padding: 24px; }
 .voice-inspector.cast-inspector { width: min(1000px, calc(100vw - 48px)); height: auto; max-height: calc(100dvh - 48px); margin: 0; overflow: auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 32px 100px rgb(var(--shadow-color) / .24); animation: voice-dialog-in 220ms cubic-bezier(.2,.8,.2,1) both; }
@@ -69,16 +76,18 @@
 .voice-candidate-tile.sample-derived.applied { border-color: var(--success-border); background: var(--green-soft); }
 .voice-candidate-tile.selected,
 .voice-candidate-tile.applied.selected { border-width: 1px; box-shadow: none; }
-.voice-candidate-choice { display: flex; min-height: 122px; align-items: start; justify-content: space-between; gap: 8px; padding: 17px; }
+.voice-candidate-choice { display: flex; min-height: 122px; align-items: start; justify-content: space-between; gap: 8px; padding: 17px; border: 0; box-shadow: none; }
+.voice-candidate-choice:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
 .voice-candidate-choice:hover { background: color-mix(in srgb, var(--matcha) 9%, transparent); }
 .voice-candidate-choice b { font: 500 20px/1.15 var(--font-display); white-space: nowrap; }
 .voice-candidate-choice > span:first-child { display: grid; min-width: 0; gap: 4px; }
 .voice-candidate-choice small { display: block; margin: 0; line-height: 1.3; }
 .voice-candidate-choice .voice-candidate-summary { overflow-wrap: anywhere; }
 .voice-candidate-choice .candidate-applied-badge { flex: 0 0 auto; padding: 4px 0; background: transparent; white-space: nowrap; font-size: 9px; }
-.voice-candidate-play { display: flex; width: calc(100% - 28px); min-height: 48px; align-items: center; gap: 9px; margin: 0 14px 14px; padding: 8px 13px; border: 1px solid var(--line-strong); border-radius: 7px; background: var(--surface-soft); color: var(--ink); font: 650 12px/1 var(--font-sans); text-align: left; cursor: pointer; }
-.voice-candidate-play:hover, .voice-candidate-play:focus-visible { border-color: var(--poppy); color: var(--poppy); }
-.voice-candidate-play.playing { border-color: var(--poppy); background: color-mix(in srgb, var(--sakura) 32%, var(--paper)); color: var(--poppy); }
+.voice-candidate-play { display: flex; width: 100%; min-height: 62px; align-items: center; gap: 11px; margin: 0; padding: 9px 17px 12px; border: 0; border-radius: 0; background: color-mix(in srgb, var(--surface-soft) 55%, var(--paper)); color: var(--ink); box-shadow: none; font: 650 12px/1 var(--font-sans); text-align: left; cursor: pointer; }
+.voice-candidate-play:hover { background: color-mix(in srgb, var(--sakura) 23%, var(--paper)); color: var(--poppy); }
+.voice-candidate-play:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
+.voice-candidate-play.playing { background: color-mix(in srgb, var(--sakura) 32%, var(--paper)); color: var(--poppy); }
 .voice-candidate-play-icon { display: grid; width: 31px; height: 31px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--poppy); color: var(--action-ink); font-size: 12px; }
 .voice-candidate-play.playing .voice-candidate-play-icon { font-size: 10px; }
 .voice-candidate-play-wave { display: flex; height: 22px; align-items: center; gap: 3px; margin-left: auto; opacity: .42; }
@@ -120,8 +129,9 @@
 @media (max-width: 600px) {
   .cast-inspector-backdrop:has(> .voice-inspector) { padding: 0; }
   .voice-inspector.cast-inspector { width: 100vw; height: 100dvh; max-height: none; align-self: stretch; margin: 0; border: 0; border-radius: 0; }
-  .voice-cast-toolbar { padding: 0 0 18px; }
-  .voice-cast-toolbar .cast-receipt { gap: 14px; flex-wrap: wrap; }
+  .voice-stage-heading { margin-bottom: 12px; }
+  .voice-cast-toolbar { flex-wrap: wrap; padding: 0 0 16px; }
+  .voice-cast-progress { gap: 6px 12px; font-size: 11px; }
   .voice-cast-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .voice-cast-board .voice-cast-tile,
   .voice-cast-board .voice-cast-tile.voice-selected,

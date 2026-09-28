@@ -72,6 +72,14 @@ try {
     assert.equal(await first.getAttribute('aria-pressed'), 'true', 'Back keeps the applied candidate');
     assert.equal(await dialog.locator('.voice-candidate-tile').count(), 3, 'Canceled regeneration keeps the audition set');
     assert.equal(await dialog.getByRole('group', { name: 'Voice traits' }).count(), 0);
+    await dialog.getByRole('button', { name: 'Create a new audition' }).click();
+    await dialog.getByRole('button', { name: 'Generate new audition →' }).click();
+    await regenerateConfirmation.getByRole('button', { name: 'Create audition →' }).click();
+    const newestPlay = dialog.getByRole('button', { name: 'Play Audition 4' });
+    await newestPlay.waitFor();
+    assert(await newestPlay.evaluate(el => el === document.activeElement), 'Generated audition returns to the list with Play focused');
+    assert.equal(await dialog.locator('.voice-candidate-tile').count(), 4);
+    await dialog.screenshot({ path: `${out}/audition-generated-${width}-${appearance}.png` });
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'hidden' });
     assert(await page.getByRole('button', { name: 'Open Alice voice' }).evaluate(el => el === document.activeElement), 'Inspector Escape restores tile focus');
@@ -91,7 +99,7 @@ try {
     assert(replacementFocusRestored, 'Escape returns focus to Change settings');
     await change.click();
     await confirmation.getByRole('button', { name: /Change cast/ }).click();
-    await page.getByRole('heading', { name: 'Choose the cast voices.' }).waitFor();
+    await page.getByRole('heading', { name: 'Voices' }).waitFor();
     assert(await page.getByRole('region', { name: 'Cast voice auditions' }).isVisible(), 'Change settings returns to voices');
     await page.getByRole('button', { name: /Edit cast/ }).click();
     await page.getByRole('heading', { name: 'Review the cast.' }).waitFor();
@@ -106,11 +114,17 @@ try {
     const reclassifyFocusRestored = await reclassify.evaluate(el => el === document.activeElement);
     assert(reclassifyFocusRestored, 'Cancel returns focus to Reclassify from Dialogue');
     await page.screenshot({ path: `${out}/accepted-settings-${width}-${appearance}.png` });
+    await reclassify.click();
+    await secondConfirmation.getByRole('button', { name: 'Reclassify labels →' }).click();
+    await page.getByRole('heading', { name: 'Build the cast.' }).waitFor();
+    assert(await page.getByRole('region', { name: 'Cast members' }).isVisible(), 'Reclassification returns to Cast identity review');
+    assert.equal(await page.getByRole('region', { name: 'Cast voice auditions' }).count(), 0);
+    await page.screenshot({ path: `${out}/reclassified-${width}-${appearance}.png` });
     assert(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
     assert.deepEqual(nativeDialogs, []);
     assert.deepEqual(errors, []);
     assert.deepEqual(apiRequests, []);
-    results.push({ width, appearance, roster: rosterCount, boardStyle, longNameBounds, oneClickApply: true, newVoiceBack: true, populatedSettings: true, dialogs: { custom: true, replacementFocusRestored, reclassifyFocusRestored, regenerationFocusRestored: true }, nativeDialogs, errors, apiRequests });
+    results.push({ width, appearance, roster: rosterCount, boardStyle, longNameBounds, oneClickApply: true, generatedAuditionReturnsToList: true, populatedSettings: true, reclassifyReturnsToCast: true, dialogs: { custom: true, replacementFocusRestored, reclassifyFocusRestored, regenerationFocusRestored: true }, nativeDialogs, errors, apiRequests });
     await page.close();
   }
 } finally { await browser.close(); }

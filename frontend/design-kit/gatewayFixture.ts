@@ -45,6 +45,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
     { ...fixtureBook, id: "kit-book-6", title: "The Secret Garden", source_name: "secret-garden.pdf", page_count: 256, asset_size_bytes: 8_400_000 },
   ] : [fixtureBook];
   const canceledJobs = new Set<string>();
+  let castCandidate: CastArtifact | undefined;
   const exports = [
     "library-populated",
     "library-missing-cover",
@@ -85,28 +86,45 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
     processStage: async (_book, stage, settings) => {
       if (stage === "cast") {
         const voiceSettings = settings as CastProcessSettings;
-        const voice = [
-          snapshot.cast?.narrator,
-          ...(snapshot.cast?.identities ?? []),
-        ].find((row) => row?.characterId === voiceSettings.characterId);
-        if (voice) {
-          const revision = `${voice.characterId}-preview-${(voice.voiceCandidates?.length ?? 0) + 1}`;
-          voice.voiceCandidates = [
-            ...(voice.voiceCandidates ?? []),
-            {
-              revision,
-              previewUrl: silentWav,
-              referenceText: voice.referenceText ?? "Synthetic audition line.",
-              direction: voiceSettings.sourceVoice
-                ? "Synthetic reused voice"
-                : (voiceSettings.voiceSettings?.description ??
-                  "Synthetic new audition"),
-              voiceSettings: voiceSettings.voiceSettings ?? voice.voiceSettings,
-            },
-          ];
-          voice.voicePreviewRevision = revision;
-          voice.voiceSettings =
-            voiceSettings.voiceSettings ?? voice.voiceSettings;
+        if (voiceSettings.forceReclassify) {
+          castCandidate = {
+            ...structuredClone(snapshot.cast!),
+            revision: "cast-fixture-draft",
+            phase: "identity-review",
+            identityDecisions: undefined,
+            narrator: undefined,
+            identities: undefined,
+            reusedFromRevision: undefined,
+          };
+        } else {
+          const voice = [
+            snapshot.cast?.narrator,
+            ...(snapshot.cast?.identities ?? []),
+          ].find((row) => row?.characterId === voiceSettings.characterId);
+          if (voice) {
+            const revision = `${voice.characterId}-preview-${(voice.voiceCandidates?.length ?? 0) + 1}`;
+            voice.voiceCandidates = [
+              ...(voice.voiceCandidates ?? []),
+              {
+                revision,
+                previewUrl: silentWav,
+                referenceText: voice.referenceText ?? "Synthetic audition line.",
+                direction: voiceSettings.sourceVoice
+                  ? "Synthetic reused voice"
+                  : (voiceSettings.voiceSettings?.description ??
+                    "Synthetic new audition"),
+                voiceSettings: voiceSettings.voiceSettings ?? voice.voiceSettings,
+              },
+            ];
+            voice.voicePreviewRevision = revision;
+            voice.voiceSettings =
+              voiceSettings.voiceSettings ?? voice.voiceSettings;
+          }
+          castCandidate = {
+            ...structuredClone(snapshot.cast!),
+            revision: "cast-fixture-draft",
+            phase: "audition-review",
+          };
         }
       }
       if (
@@ -192,7 +210,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
           : stage === "dialogue"
             ? dialogueCandidate()
             : stage === "cast"
-              ? { ...snapshot.cast!, phase: "audition-review" as const }
+              ? castCandidate ?? { ...snapshot.cast!, revision, phase: "audition-review" as const }
               : { revision };
       return candidate as StageCandidate[typeof stage];
     },

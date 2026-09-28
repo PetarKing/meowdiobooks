@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { DialogSurface } from "../components/DialogSurface";
+import { PhaseHelp } from "../components/PhaseHelp";
 import type {
   CastArtifact,
   CastVoice,
@@ -238,7 +239,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   }
 
   return <>
-    <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Choose the cast voices.")} copy={t(current.reusedFromRevision ? "Your dialogue is unchanged. Previous cast and audition choices are kept." : "Initials play a voice. Names open auditions; choosing one applies it immediately.")} />
+    <header className="voice-stage-heading"><h1>{t("Voices")}</h1><PhaseHelp stage="cast" /></header>
     <CastVoiceReview
       layeredVoicePreviewUrl={gateway.layeredVoicePreviewUrl?.bind(gateway)}
       bookId={book?.id ?? ""}

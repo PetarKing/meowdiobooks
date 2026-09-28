@@ -1,4 +1,11 @@
 const zhCN: Record<string, string> = {
+  "Voices": "声音",
+  "Voice review progress": "声音审核进度",
+  "{{count}} approved": "已批准 {{count}} 个",
+  "{{count}} not yet approved": "尚未批准 {{count}} 个",
+  "{{count}} required": "必审 {{count}} 个",
+  "Not yet approved": "尚未批准",
+  "not yet approved": "尚未批准",
   "voice selected": "声音已选定",
   "Voice approved": "声音已批准",
   "Apply Audition {{number}}": "应用试听 {{number}}",

@@ -21,4 +21,15 @@ describe('synthetic review gateway', () => {
       if (!snapshot.book.completedStages.includes('cast')) expect(snapshot.generatedChapters).toHaveLength(0);
     }
   });
+  it('returns to identity review when the preview reclassifies source labels', async () => {
+    const gateway = createFixtureGateway('cast-accepted');
+    const accepted = await gateway.getBookSnapshot('kit-book');
+    const job = await gateway.processStage('kit-book', 'cast', { forceReclassify: true });
+    const revision = job.result?.revision;
+    expect(revision).toBe('cast-fixture-draft');
+    const candidate = await gateway.getStageCandidate('kit-book', 'cast', revision!);
+    expect(candidate.phase).toBe('identity-review');
+    expect(candidate.identityDecisions).toBeUndefined();
+    expect((await gateway.getBookSnapshot('kit-book')).cast).toEqual(accepted.cast);
+  });
 });

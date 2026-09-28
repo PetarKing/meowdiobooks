@@ -2456,7 +2456,7 @@ describe('v2 wizard', () => {
       .mockResolvedValueOnce(freshCast)
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
-    expect(await screen.findByText('Your dialogue is unchanged. Previous cast and audition choices are kept.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Voices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reclassify from Dialogue' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '← Review cast' }))
