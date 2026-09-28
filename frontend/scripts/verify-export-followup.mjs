@@ -1,0 +1,91 @@
+import assert from 'node:assert/strict';
+import { mkdir, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { chromium } from 'playwright';
+
+const base = process.argv[2] ?? 'http://127.0.0.1:5182/studio.html';
+const output = path.resolve(process.argv[3] ?? '/private/tmp/export-followup');
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch();
+const results = [];
+
+try {
+  for (const scenario of ['export', 'export-long-book']) {
+    for (const appearance of ['light', 'dark']) for (const width of [1440, 390, 320]) {
+      const page = await browser.newPage({ viewport: { width, height: 900 }, colorScheme: appearance, reducedMotion: 'reduce' });
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(base);
+      await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
+      await page.getByRole('combobox', { name: 'Preview', exact: true }).selectOption(scenario);
+      await page.getByRole('heading', { name: 'Prepare your audiobook' }).waitFor();
+      const theme = page.getByRole('button', { name: 'Toggle dark mode', exact: true });
+      if ((await theme.getAttribute('aria-pressed') === 'true') !== (appearance === 'dark')) await theme.click();
+      await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(img => img.decode().catch(() => {}))); });
+
+      const identity = page.locator('.edition-identity');
+      const release = page.locator('.edition-release');
+      const cover = page.locator('.edition-cover');
+      const title = page.getByLabel('Title', { exact: true });
+      const originalTitle = await title.inputValue();
+      const originalCover = await page.getByAltText('Current audiobook cover').getAttribute('src');
+      const top = await page.evaluate(() => {
+        const a = document.querySelector('.edition-identity').getBoundingClientRect();
+        const b = document.querySelector('.edition-release').getBoundingClientRect();
+        return { identityBottom: a.bottom, releaseTop: b.top, releaseBottom: b.bottom, viewportHeight: innerHeight };
+      });
+      assert.ok(top.releaseTop >= top.identityBottom - 1, `CTA overlaps cover/details at top: ${JSON.stringify(top)}`);
+      const coverWidth = await cover.evaluate(el => el.getBoundingClientRect().width);
+      assert.ok(coverWidth >= (width === 1440 ? 300 : width === 390 ? 260 : 240), `cover too small: ${coverWidth}`);
+      await page.screenshot({ path: path.join(output, `${scenario}-${width}-${appearance}-top.png`), fullPage: false });
+
+      // The sole CTA should follow the selection area without obscuring the front page.
+      await page.locator('.edition-selections').scrollIntoViewIfNeeded();
+      const middle = await release.evaluate(el => { const r = el.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, viewport: innerHeight }; });
+      assert.ok(middle.bottom <= middle.viewport + 1, `CTA not in viewport over selections: ${JSON.stringify(middle)}`);
+      if (width <= 390) {
+        await release.evaluate(el => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+        assert.equal(await release.evaluate(el => el.classList.contains('is-floating')), true, 'phone CTA should compact while following selections');
+      }
+      await page.screenshot({ path: path.join(output, `${scenario}-${width}-${appearance}-middle.png`), fullPage: false });
+      await page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' }));
+      await page.waitForTimeout(50);
+      assert.equal(await release.evaluate(el => el.classList.contains('is-floating')), false, 'CTA should show full summary at the end');
+      const bottom = await page.evaluate(() => ({ lastFormatBottom: document.querySelector('.edition-format-options label:last-child').getBoundingClientRect().bottom, releaseTop: document.querySelector('.edition-release').getBoundingClientRect().top }));
+      assert.ok(bottom.lastFormatBottom <= bottom.releaseTop - 8, `final format option obscured at bottom: ${JSON.stringify(bottom)}`);
+      await page.screenshot({ path: path.join(output, `${scenario}-${width}-${appearance}-bottom.png`), fullPage: false });
+
+      const next = page.getByRole('button', { name: 'Next cover page' });
+      await next.click();
+      await page.waitForFunction(() => document.querySelector('[aria-label="PDF cover page"]')?.value === '2');
+      await page.getByRole('button', { name: 'Previous cover page' }).click();
+      await page.waitForFunction(() => document.querySelector('[aria-label="PDF cover page"]')?.value === '1');
+      await page.getByLabel('PDF cover page').fill('7');
+      await page.waitForFunction(() => document.querySelector('.edition-cover-source')?.textContent?.includes('PDF page 7 of'));
+      await page.locator('.edition-upload input').setInputFiles({ name: 'synthetic-cover.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64') });
+      await page.waitForFunction(() => document.querySelector('.edition-cover img')?.getAttribute('src')?.startsWith('blob:'));
+      assert.equal(await page.getByRole('button', { name: 'Next cover page' }).count(), 0);
+      await title.fill('');
+      assert.equal(await release.getByRole('button', { name: 'Create high-quality M4B →' }).isDisabled(), true);
+      await title.fill('A revised audiobook title');
+      await page.getByLabel('Author', { exact: true }).fill('A revised author');
+      await page.getByRole('button', { name: 'Reset book details' }).click();
+      assert.equal(await title.inputValue(), originalTitle);
+      assert.equal(await page.getByAltText('Current audiobook cover').getAttribute('src'), originalCover);
+      assert.equal(await page.getByLabel('PDF cover page').inputValue(), '1');
+      if (scenario === 'export-long-book') assert.equal(await page.locator('.edition-chapters label').count(), 20);
+      const overflow = await page.evaluate(() => Math.max(document.documentElement.scrollWidth, document.body.scrollWidth) - innerWidth);
+      assert.ok(overflow <= 1, `horizontal overflow ${overflow}`);
+      await page.addScriptTag({ path: path.resolve('node_modules/axe-core/axe.min.js') });
+      const violations = await page.evaluate(async () => (await window.axe.run(document.querySelector('.edition-workbench'))).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
+      assert.deepEqual(violations, []);
+      assert.deepEqual(errors, []);
+      results.push({ scenario, appearance, width, top, middle, coverWidth, overflow, violations, errors });
+      console.log(`PASS ${scenario} ${width} ${appearance}: cover ${Math.round(coverWidth)}px, overflow ${overflow}, axe ${violations.length}`);
+      await page.close();
+    }
+  }
+} finally {
+  await browser.close();
+  await writeFile(path.join(output, 'report.json'), JSON.stringify(results, null, 2));
+}

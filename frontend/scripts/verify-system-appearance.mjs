@@ -22,13 +22,21 @@ try {
   await page.goto(base);
   await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
   async function observe(name, expected, screenshot = false) {
-    const colors = expected === 'dark' ? { background: 'rgb(29, 38, 27)', text: 'rgb(240, 244, 230)' } : { background: 'rgb(241, 242, 232)', text: 'rgb(45, 56, 37)' };
-    // Attribute updates precede the finite color transition. Assert the settled
-    // surface too, rather than recording an intermediate frame as final evidence.
-    await page.waitForFunction(({ mode, background, text }) => {
+    // Resolve the semantic palette in the browser so a deliberate color change
+    // does not make this appearance-transition check stale.
+    await page.waitForFunction((mode) => {
       const root = document.querySelector('[data-presentation-root]');
-      return root?.dataset.appearance === mode && getComputedStyle(root).backgroundColor === background && getComputedStyle(root).color === text;
-    }, { mode: expected, ...colors });
+      if (!root || root.dataset.appearance !== mode) return false;
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--folio-canvas)';
+      probe.style.color = 'var(--folio-ink)';
+      root.append(probe);
+      const expectedBackground = getComputedStyle(probe).backgroundColor;
+      const expectedText = getComputedStyle(probe).color;
+      probe.remove();
+      const current = getComputedStyle(root);
+      return current.backgroundColor === expectedBackground && current.color === expectedText;
+    }, expected);
     const result = await page.locator('[data-presentation-root]').evaluate(root => ({
       appearance: root.dataset.appearance,
       colorScheme: getComputedStyle(root).colorScheme,
@@ -36,7 +44,6 @@ try {
       text: getComputedStyle(root).color,
     }));
     assert.equal(result.colorScheme, expected);
-    assert.equal(result.background, colors.background); assert.equal(result.text, colors.text);
     observations.push({ name, preference: await readAppearance(page), ...result });
     if (screenshot) await page.screenshot({ path: `${out}/${name}.png` });
   }
@@ -44,6 +51,8 @@ try {
   await observe('system-light', 'light');
   await page.emulateMedia({ colorScheme: 'dark' });
   await observe('system-dark', 'dark', true);
+  assert.notEqual(observations[0].background, observations[1].background);
+  assert.notEqual(observations[0].text, observations[1].text);
   await chooseAppearance(page, 'light');
   await observe('explicit-light-on-dark-os', 'light', true);
   await page.emulateMedia({ colorScheme: 'light' });

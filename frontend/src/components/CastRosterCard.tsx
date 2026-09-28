@@ -23,18 +23,18 @@ export function CastRosterCard({
   portraitClassName = "", detailClassName = "", dataSharedVoiceGroup, style, inspectRef, inspectProps, previewProps,
 }: CastRosterCardProps) {
   const portrait = portraitContent ?? <strong aria-hidden="true">{symbol}</strong>;
-  const contents = <><b>{name}</b>{badge}{detail && <small>{detail}</small>}</>;
+  const contents = <><b>{name}</b>{previewProps && badge}{detail && <small>{detail}</small>}</>;
 
   if (!previewProps) {
     return <button {...inspectProps} ref={inspectRef} type="button" style={style}
       className={`cast-tile cast-roster-card cast-roster-identity ${cardClassName} ${inspectProps.className ?? ""}`}>
-      <span className={`cast-roster-portrait ${portraitClassName}`}>{portrait}</span>
+      <span className={`cast-roster-portrait ${portraitClassName}`}>{portrait}{badge}</span>
       <span className="cast-roster-details">{contents}</span>
     </button>;
   }
 
   return <div className={`cast-tile-shell cast-roster-card ${cardClassName}`}>
-    <button {...previewProps} type="button" className={`voice-tile-portrait cast-roster-portrait ${portraitClassName} ${previewProps.className ?? ""}`}>
+    <button {...previewProps} type="button" data-symbol-length={symbol.length} className={`voice-tile-portrait cast-roster-portrait ${portraitClassName} ${previewProps.className ?? ""}`}>
       {portrait}{portraitCue}
     </button>
     <button {...inspectProps} ref={inspectRef} type="button" style={style} data-shared-voice-group={dataSharedVoiceGroup}

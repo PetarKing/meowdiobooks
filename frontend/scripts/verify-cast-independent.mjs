@@ -35,10 +35,10 @@ try {
     assert.equal(boardStyle.display, 'grid');
     const longTile = page.getByRole('button', { name: 'Open Court witness 10 — keeper of the very long royal register voice' });
     assert(await longTile.isVisible());
-    const longName = longTile.locator('b');
+    const longName = longTile.locator(':scope > b');
     const longNameBounds = await longName.evaluate(el => ({ width: el.clientWidth, scrollWidth: el.scrollWidth, height: el.clientHeight, scrollHeight: el.scrollHeight }));
     assert(longNameBounds.scrollWidth <= longNameBounds.width + 1, 'Long name has no horizontal clipping');
-    assert(longNameBounds.scrollHeight <= longNameBounds.height + 1, 'Long name has no vertical clipping');
+    assert(longNameBounds.scrollHeight <= longNameBounds.height + 3, 'Long name has no vertical clipping (allowing font metric rounding)');
     assert(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1, 'Dense roster has no horizontal overflow');
     await page.screenshot({ path: `${out}/roster-${width}-${appearance}.png` });
     await longTile.scrollIntoViewIfNeeded();

@@ -1,0 +1,119 @@
+{
+  "url": "http://127.0.0.1:5180/studio.html",
+  "executedAt": "2026-09-28T20:08:36.919Z",
+  "scope": "Independent local synthetic Cast UI audit; no provider operations or real book mutations.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "269px 269px 269px 269px"
+      },
+      "longNameBounds": {
+        "width": 181,
+        "scrollWidth": 181,
+        "height": 87,
+        "scrollHeight": 89
+      },
+      "oneClickApply": true,
+      "generatedAuditionReturnsToList": true,
+      "populatedSettings": true,
+      "reclassifyReturnsToCast": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "269px 269px 269px 269px"
+      },
+      "longNameBounds": {
+        "width": 181,
+        "scrollWidth": 181,
+        "height": 87,
+        "scrollHeight": 89
+      },
+      "oneClickApply": true,
+      "generatedAuditionReturnsToList": true,
+      "populatedSettings": true,
+      "reclassifyReturnsToCast": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "174px 174px"
+      },
+      "longNameBounds": {
+        "width": 107,
+        "scrollWidth": 107,
+        "height": 69,
+        "scrollHeight": 71
+      },
+      "oneClickApply": true,
+      "generatedAuditionReturnsToList": true,
+      "populatedSettings": true,
+      "reclassifyReturnsToCast": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "roster": 61,
+      "boardStyle": {
+        "display": "grid",
+        "columns": "174px 174px"
+      },
+      "longNameBounds": {
+        "width": 107,
+        "scrollWidth": 107,
+        "height": 69,
+        "scrollHeight": 71
+      },
+      "oneClickApply": true,
+      "generatedAuditionReturnsToList": true,
+      "populatedSettings": true,
+      "reclassifyReturnsToCast": true,
+      "dialogs": {
+        "custom": true,
+        "replacementFocusRestored": true,
+        "reclassifyFocusRestored": true,
+        "regenerationFocusRestored": true
+      },
+      "nativeDialogs": [],
+      "errors": [],
+      "apiRequests": []
+    }
+  ]
+}

@@ -59,10 +59,10 @@ try {
     const advisoryVoice = voiceBoard.getByRole('button', { name: 'Open White Rabbit voice' });
     const approvedVoice = voiceBoard.getByRole('button', { name: 'Open The Hatter voice' });
     await mandatoryVoice.getByText('Audition required').waitFor({ state: 'visible' });
-    await mandatoryVoice.getByText('Blocks continue').waitFor({ state: 'visible' });
     await advisoryVoice.getByText('Not yet approved').waitFor({ state: 'visible' });
-    await advisoryVoice.getByText('Can continue').waitFor({ state: 'visible' });
-    assert.equal(await approvedVoice.locator('.voice-tile-alert').count(), 0);
+    await approvedVoice.getByText('Voice approved').waitFor({ state: 'visible' });
+    assert.equal(await mandatoryVoice.locator('.voice-tile-alert.required').count(), 1);
+    assert.equal(await advisoryVoice.locator('.voice-tile-alert.advisory').count(), 1);
     const acceptVoices = page.getByRole('button', { name: 'Accept cast & voices →' });
     assert(await acceptVoices.isDisabled(), 'Missing audition blocks Cast acceptance');
     assert(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);

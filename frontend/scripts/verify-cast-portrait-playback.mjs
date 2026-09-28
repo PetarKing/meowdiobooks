@@ -30,7 +30,7 @@ try {
     assert.equal(await alice.getAttribute('aria-pressed'), 'false');
     assert(await alice.locator('strong').isVisible(), 'Portrait begins with initials');
     assert.equal(await openAlice.getAttribute('aria-description'), 'voice selected');
-    assert.equal(await openAlice.innerText(), 'Alice', 'Card body has only the character name');
+    assert.equal(await openAlice.locator(':scope > b').innerText(), 'Alice', 'Card body leads with the character name');
 
     await alice.click();
     const pauseAlice = board.getByRole('button', { name: 'Pause Alice preview' });

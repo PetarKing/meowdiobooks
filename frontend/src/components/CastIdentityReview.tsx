@@ -526,7 +526,7 @@ export function CastIdentityReview({
     <section className="cast-board" aria-label={t("Cast members")}>
       <CastRosterCard
         name={t("Narrator")} symbol="♬"
-        detail={t("{{count}} reassigned labels · destination only", { count: narratorAssignments?.labels.length ?? 0 })}
+        detail={t("Normal book prose")}
         portraitClassName="cast-narrator-tile"
         cardClassName={`cast-narrator-tile ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[NARRATOR_KEY] = element; }}
@@ -549,7 +549,7 @@ export function CastIdentityReview({
 
     {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
-        <div><span className="cast-status-dot ready" /> <small>{t("Always available")}</small><h2>{t("Narrator")}</h2><p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p></div>
+        <div><span className="cast-status-dot ready" /> <small>{t("Always available")}</small><h2>{t("Narrator")}</h2>{(narratorAssignments?.occurrenceCount ?? 0) > 0 && <p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p>}</div>
         <button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button>
       </header>
       <div className="cast-inspector-grid narrator-inspector-grid">
@@ -557,9 +557,8 @@ export function CastIdentityReview({
           <section className="narrator-rule"><b>{t("Narrator routing")}</b><small>{t("Drag a cast member onto Narrator to use the narrator voice. Narrator cannot be merged into another character. Choose the narrator voice in the next step.")}</small></section>
         </aside>
         <div className="cast-aliases-and-lines">
-          <div className="cast-section-heading"><div><small>{t("Dialogue fallback")}</small><h3>{t("Labels assigned to Narrator")}</h3></div><span>{t("{{count}} assigned", { count: narratorAssignments?.labels.length ?? 0 })}</span></div>
+          <div className="cast-section-heading"><div><small>{t("Dialogue fallback")}</small><h3>{t("Labels assigned to Narrator")}</h3></div>{(narratorAssignments?.labels.length ?? 0) > 0 && <span>{t("{{count}} assigned", { count: narratorAssignments?.labels.length ?? 0 })}</span>}</div>
           <article className="cast-alias-card narrator-primary-label"><header><div><b>{t("Narrator")}</b><small>{t("Normal book prose")}</small></div><span className="primary-label-badge">{t("Permanent primary")}</span></header><p className="cast-reason">{t("This identity always remains the Narrator and cannot be dragged or replaced.")}</p></article>
-          {!narratorAssignments?.labels.length && <div className="cast-empty-state"><b>{t("No speaker labels reassigned.")}</b><span>{t("Narrator still reads the book’s normal prose.")}</span></div>}
           {narratorAssignments?.labels.map((label) => <EvidenceCard key={label} label={label} dossier={dossierByLabel.get(label)} proposal={cast.proposals.find((row) => row.label === label)} action={<button type="button" className="ghost compact" onClick={() => restoreNarratorLabel(label)}>{t("Pop out to cast")}</button>} />)}
         </div>
       </div>

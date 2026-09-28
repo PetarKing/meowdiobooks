@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import type {
   AudioExportPreset
 } from "../api/contracts";
@@ -27,6 +28,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
     { preset: "mp3-chapters", title: t("MP3 chapters"), technical: t("96 kbps MP3 · ZIP download"), description: t("One widely compatible MP3 per chapter.") },
   ];
   const exportAction = exportPreset === "m4b-high" ? t("Create high-quality M4B") : exportPreset === "m4b-compact" ? t("Create smaller M4B") : t("Create MP3 ZIP");
+  const compactExportAction = exportPreset === "mp3-chapters" ? t("Create ZIP") : t("Create M4B");
   const exportProgress = exportPreset === "mp3-chapters" ? t("Saving MP3 ZIP…") : t("Saving M4B…");
   const exportSummary = exportPreset === "m4b-high" ? t("A chaptered, high-quality M4B with the details shown above.") : exportPreset === "m4b-compact" ? t("A chaptered M4B at half the usual size, with the details shown above.") : t("A ZIP with one ordered, tagged MP3 file per selected chapter.");
   const pdfCoverUrl = book ? sourcePageImageUrl(gateway, book.id, exportCoverPage) : undefined;
@@ -42,30 +44,35 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
     {!playableChapters.length ? <WorkflowEmpty className="export-empty" symbol="♪" title={t("Generate a chapter first.")} copy={t("Generate current chapter audio before exporting.")}><button className="primary" onClick={() => setStage(stageIndex("generate"))}>← {t("Back to Generate")}</button></WorkflowEmpty> : <>
       <div className="edition-identity">
         <section className="edition-proof" aria-label={t("Audiobook preview")}>
-          <div className="edition-cover-stage"><div className="edition-cover">{coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}</div></div>
-          <div className={(exportTitle || book?.title || "").length > 100 ? "edition-proof-caption long-title" : "edition-proof-caption"}>
-            <span className="eyebrow">{t("Audiobook preview")}</span>
-            <h2>{exportTitle || book?.title}</h2>
-            <p>{exportAuthor || book?.author}</p>
-            <div className="edition-proof-facts"><span>{t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) })}</span><span>{exportChoices.find((choice) => choice.preset === exportPreset)?.title}</span></div>
+          <div className="edition-cover-stage">
+            <div className="edition-cover-frame">
+              <div className="edition-cover">{coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}</div>
+              {!exportCover && pageCount > 1 && <div className="edition-cover-arrows">
+                <button type="button" aria-label={t("Previous cover page")} disabled={exportCoverPage <= 1} onClick={() => setExportCoverPage(exportCoverPage - 1)}>‹</button>
+                <button type="button" aria-label={t("Next cover page")} disabled={exportCoverPage >= pageCount} onClick={() => setExportCoverPage(exportCoverPage + 1)}>›</button>
+              </div>}
+            </div>
+          </div>
+          <div className="edition-cover-tools">
+            <div className="edition-cover-source"><span className="eyebrow">{t("Front page")}</span><span>{exportCover?.name ?? t("PDF page {{page}} of {{count}}", { page: exportCoverPage, count: pageCount })}</span></div>
+            <div className="edition-cover-actions">
+              {!exportCover && <label className="edition-page-picker">{t("Page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /><span aria-hidden="true">/ {pageCount}</span></label>}
+              <label className="edition-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setExportCover(event.target.files?.[0])} /><span>{t(exportCover ? "Change image" : "Choose image")}</span></label>
+              {exportCover && <button type="button" className="edition-use-pdf" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
+            </div>
           </div>
         </section>
         <section className="edition-details" aria-labelledby="edition-details-title">
-          <header><span className="eyebrow">{t("Book details")}</span><h2 id="edition-details-title">{t("How it appears in your library")}</h2></header>
-          <label className="edition-field">{t("Title")}<input value={exportTitle} maxLength={500} onChange={(event) => setExportTitle(event.target.value)} /></label>
-          <label className="edition-field">{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
-          <div className="edition-cover-tools">
-            <div className="edition-cover-source"><b>{t("Cover")}</b><small>{exportCover?.name ?? t("Page {{page}}", { page: exportCoverPage })}</small></div>
-            <div className="edition-cover-actions">
-              {!exportCover && <label className="edition-page-picker">{t("PDF page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /></label>}
-              <label className="edition-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setExportCover(event.target.files?.[0])} /><span>{t(exportCover ? "Change image" : "Choose image")}</span></label>
-              {exportCover && <button type="button" className="text-button" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
-            </div>
+          <header><div><span className="eyebrow">{t("Book details")}</span><h2 id="edition-details-title" className="visually-hidden">{t("Book details")}</h2></div><button type="button" className="edition-reset" aria-label={t("Reset book details")} title={t("Reset book details")} onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportCover(undefined); setExportCoverPage(1); }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" /></svg></button></header>
+          <div className="edition-editable-identity">
+            <label className="edition-field edition-title-field"><span>{t("Title")}</span><textarea aria-label={t("Title")} value={exportTitle} rows={2} maxLength={500} onChange={(event) => setExportTitle(event.target.value)} /></label>
+            <label className="edition-field edition-author-field">{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
           </div>
-          <button type="button" className="text-button edition-reset" onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportCover(undefined); setExportCoverPage(1); }}>{t("Reset book details")}</button>
+          <div className="edition-proof-facts"><span>{t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) })}</span><span>{exportChoices.find((choice) => choice.preset === exportPreset)?.title}</span></div>
         </section>
       </div>
 
+      <div className="edition-output">
       <div className="edition-selections">
       <section className="edition-contents" aria-labelledby="edition-contents-title">
         <header><div><span className="eyebrow">{t("Choose audio")}</span><h2 id="edition-contents-title">{t("Chapters to include")}</h2></div><div className="edition-bulk"><span className="edition-selected-count" aria-live="polite">{t("{{count}} chapters selected", { count: selectedPlayable.length })}</span><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
@@ -101,10 +108,63 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
       </section>
       </div>
 
-      <section className="edition-release" aria-label={t("Export summary")}>
-        <div><span className="eyebrow">{t("Ready to create")}</span><h2>{selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}</h2><p>{exportSummary}</p></div>
-        <button className="primary" disabled={exporting || !selectedPlayable.length || !exportTitle.trim()} onClick={() => void exportCurrent()}>{exporting ? exportProgress : `${exportAction} →`}</button>
-      </section>
+      <ExportRelease
+        ariaLabel={t("Export summary")}
+        eyebrow={t("Ready to create")}
+        title={selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}
+        summary={exportSummary}
+        action={exportAction}
+        compactAction={compactExportAction}
+        progress={exportProgress}
+        exporting={exporting}
+        disabled={exporting || !selectedPlayable.length || !exportTitle.trim()}
+        onCreate={() => void exportCurrent()}
+      />
+      </div>
     </>}
   </div>;
+}
+
+function ExportRelease({ ariaLabel, eyebrow, title, summary, action, compactAction, progress, exporting, disabled, onCreate }: {
+  ariaLabel: string; eyebrow: string; title: string; summary: string; action: string; compactAction: string; progress: string;
+  exporting: boolean; disabled: boolean; onCreate: () => void;
+}) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const [floating, setFloating] = useState(false);
+
+  useEffect(() => {
+    const anchor = anchorRef.current;
+    const output = anchor?.parentElement;
+    if (!anchor || !output) return;
+    let frame = 0;
+    const update = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        const viewportBottom = window.innerHeight - 12;
+        const outputTop = output.getBoundingClientRect().top;
+        const naturalTop = anchor.getBoundingClientRect().top;
+        setFloating(outputTop < viewportBottom - 64 && naturalTop > viewportBottom - 100);
+      });
+    };
+    update();
+    window.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return <>
+    <span ref={anchorRef} className="edition-release-anchor" aria-hidden="true" />
+    <section className={`edition-release${floating ? " is-floating" : ""}`} aria-label={ariaLabel}>
+      <div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2><p>{summary}</p></div>
+      <button className="primary" aria-label={exporting ? progress : `${action} →`} disabled={disabled} onClick={onCreate}>
+        <span className="edition-action-full">{exporting ? progress : `${action} →`}</span>
+        <span className="edition-action-compact" aria-hidden="true">{exporting ? progress : `${compactAction} →`}</span>
+      </button>
+    </section>
+  </>;
 }

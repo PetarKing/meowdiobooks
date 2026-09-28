@@ -62,7 +62,7 @@ export const AppearanceSiblings: Story = {
     await expect(getComputedStyle(light).colorScheme).toBe('light')
     await expect(getComputedStyle(dark).colorScheme).toBe('dark')
     await expect(getComputedStyle(within(light).getByRole('button')).backgroundColor).toBe('rgb(164, 47, 77)')
-    await expect(getComputedStyle(within(dark).getByRole('button')).backgroundColor).toBe('rgb(238, 156, 180)')
-    await expect(getComputedStyle(within(dark).getByRole('button')).color).toBe('rgb(29, 38, 27)')
+    await expect(getComputedStyle(within(dark).getByRole('button')).backgroundColor).toBe('rgb(243, 142, 173)')
+    await expect(getComputedStyle(within(dark).getByRole('button')).color).toBe('rgb(20, 35, 31)')
   },
 }

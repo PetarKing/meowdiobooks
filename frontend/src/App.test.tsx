@@ -107,8 +107,9 @@ describe('v2 wizard', () => {
 
   it('shows only released product navigation', async () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
+    const productNavigation = within(screen.getByRole('navigation', { name: 'Product areas' }))
+    expect(productNavigation.getByRole('button', { name: 'Create' })).toBeInTheDocument()
+    expect(productNavigation.getByRole('button', { name: 'Library' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Player/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/Coming soon/)).not.toBeInTheDocument()
   })
@@ -122,7 +123,7 @@ describe('v2 wizard', () => {
     }])
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
     expect(screen.getByText('12 chapters')).toBeInTheDocument()
@@ -144,7 +145,7 @@ describe('v2 wizard', () => {
     }])
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
 
     expect(await screen.findByText('Chapters 1–3 & 7')).toBeInTheDocument()
     expect(screen.queryByText('Down the Rabbit-Hole · The Pool of Tears + 2 more')).not.toBeInTheDocument()
@@ -159,7 +160,7 @@ describe('v2 wizard', () => {
     const renderLibraryActions = vi.fn(() => <button>Download M4B</button>)
     render(<App renderLibraryActions={renderLibraryActions} />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
 
     expect(await screen.findByRole('button', { name: 'Download M4B' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open audiobook' })).not.toBeInTheDocument()
@@ -796,9 +797,14 @@ describe('v2 wizard', () => {
     fireEvent.change(title, { target: { value: 'Alice — Audiobook' } })
     expect(title).toHaveFocus()
     const preview = screen.getByRole('region', { name: 'Audiobook preview' })
-    expect(within(preview).getByRole('heading', { name: 'Alice — Audiobook' })).toBeInTheDocument()
-    expect(within(preview).getByText('Lewis Carroll')).toBeInTheDocument()
+    expect(screen.getByLabelText('Title')).toHaveValue('Alice — Audiobook')
+    expect(screen.getByLabelText('Author')).toHaveValue('Lewis Carroll')
+    expect(within(preview).getByText('Front page')).toBeInTheDocument()
     const coverPage = screen.getByLabelText('PDF cover page')
+    fireEvent.click(screen.getByRole('button', { name: 'Next cover page' }))
+    expect(coverPage).toHaveValue(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous cover page' }))
+    expect(coverPage).toHaveValue(1)
     fireEvent.change(coverPage, { target: { value: '' } })
     expect(coverPage).toHaveValue(null)
     expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')

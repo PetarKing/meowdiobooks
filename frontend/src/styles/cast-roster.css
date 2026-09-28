@@ -34,9 +34,10 @@
 }
 .cast-board .cast-roster-identity:hover { transform: translateY(-2px); border-color: var(--line-strong); box-shadow: none; }
 .cast-board .cast-roster-identity .cast-roster-portrait {
+  position: relative;
   display: grid;
   width: 100%;
-  min-height: 122px;
+  min-height: 116px;
   place-items: center;
 }
 .cast-board .cast-roster-identity .cast-roster-portrait strong {
@@ -49,24 +50,26 @@
 }
 .cast-board .cast-roster-identity .cast-roster-details {
   display: flex;
-  min-height: 76px;
+  min-height: 70px;
+  flex: 1 1 auto;
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: 3px;
+  padding: 12px 15px;
   background: var(--paper);
 }
 .cast-board .cast-roster-identity .cast-roster-details b { color: var(--ink); font: 500 clamp(16px, 1.4vw, 19px)/1.2 var(--font-display); white-space: normal; }
 .cast-board .cast-roster-identity .cast-roster-details small { width: 100%; color: var(--muted); font: 650 10px/1.3 var(--font-sans); letter-spacing: .02em; white-space: normal; }
-.cast-board .cast-roster-identity.has-suggestions { border: 2px solid var(--gilt-ink); }
+.cast-board .cast-roster-identity.has-suggestions { padding: 0; border: 2px solid var(--gilt-ink); }
 .cast-board .cast-roster-identity.has-suggestions .cast-roster-portrait { --portrait-start: var(--gilt); --portrait-end: var(--paper); }
 .cast-board .cast-roster-identity.has-suggestions .cast-roster-details { background: color-mix(in srgb, var(--gilt) 9%, var(--paper)); }
-.cast-board .cast-roster-identity.needs-review { border: 2px solid var(--danger-ink); }
+.cast-board .cast-roster-identity.needs-review { padding: 0; border: 2px solid var(--danger-ink); }
 .cast-board .cast-roster-identity.needs-review .cast-roster-portrait { --portrait-start: var(--danger-soft); --portrait-end: var(--sakura); }
 .cast-board .cast-roster-identity.needs-review .cast-roster-details { background: color-mix(in srgb, var(--danger-soft) 38%, var(--paper)); }
 .cast-board .cast-roster-identity .cast-tile-required { position: static; max-width: 100%; margin-top: 2px; padding: 3px 7px; border-radius: 3px; background: var(--danger-soft); color: var(--danger-ink); font: 700 10px/1.2 var(--font-sans); }
 .cast-board .cast-review-badge { display: inline-flex; max-width: 100%; align-self: flex-start; flex-wrap: wrap; gap: 3px 7px; margin-top: 6px; padding: 4px 8px; border-radius: 4px; font: 700 10px/1.25 var(--font-sans); letter-spacing: 0; text-transform: none; }
+.cast-board .cast-roster-identity .cast-review-badge { position: absolute; right: 10px; bottom: 9px; max-width: calc(100% - 20px); margin-top: 0; }
 .cast-board .cast-review-badge.required { background: var(--danger-soft); color: var(--danger-ink); }
 .cast-board .cast-review-badge.advisory { background: color-mix(in srgb, var(--gilt) 22%, var(--paper)); color: var(--gilt-ink); }
 .cast-board .cast-review-badge b { font: inherit; }
@@ -91,7 +94,7 @@
   .cast-board:not(.voice-cast-board) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
   .cast-board .cast-roster-identity .cast-roster-portrait { min-height: 108px; }
   .cast-board .cast-roster-identity .cast-roster-portrait strong { font-size: 37px; }
-  .cast-board .cast-roster-identity .cast-roster-details { min-height: 70px; padding: 11px 12px; }
+  .cast-board .cast-roster-identity .cast-roster-details { min-height: 66px; padding: 10px 12px; }
   .cast-board .cast-roster-identity .cast-roster-details b { font-size: 16px; }
   .cast-review-explanation { padding: 12px 16px; }
 }

@@ -524,7 +524,7 @@ export function CastVoiceReview({
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span> : undefined}
           portraitCue={previewUrl ? <span className="voice-tile-play-cue" aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span> : undefined}
-          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b><small>{t(required ? "Blocks continue" : "Can continue")}</small></span>}
+          badge={<span className={`cast-review-badge voice-tile-alert ${selected ? "approved" : required ? "required" : "advisory pending"}`}><b>{t(selected ? "Voice approved" : required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
           inspectRef={(element) => { tileRefs.current[voice.characterId] = element; }}

@@ -1,0 +1,30 @@
+[
+  {
+    "width": 1440,
+    "appearance": "light",
+    "cast": "required/advisory/ready",
+    "voices": "required/advisory/approved",
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "cast": "required/advisory/ready",
+    "voices": "required/advisory/approved",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "appearance": "light",
+    "cast": "required/advisory/ready",
+    "voices": "required/advisory/approved",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "cast": "required/advisory/ready",
+    "voices": "required/advisory/approved",
+    "errors": []
+  }
+]

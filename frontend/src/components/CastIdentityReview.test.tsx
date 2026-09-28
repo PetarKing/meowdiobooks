@@ -208,8 +208,19 @@ describe("CastIdentityReview", () => {
     render(<Harness />);
     const board = screen.getByRole("region", { name: "Cast members" });
     expect(within(board).getAllByRole("button")).toHaveLength(4);
-    expect(screen.getByRole("button", { name: "Inspect Narrator" })).not.toHaveAttribute("draggable", "true");
+    const narrator = screen.getByRole("button", { name: "Inspect Narrator" });
+    expect(narrator).not.toHaveAttribute("draggable", "true");
+    expect(narrator).toHaveTextContent("Normal book prose");
+    expect(narrator).not.toHaveTextContent("reassigned labels");
     expect(screen.getByText("3 source labels are currently grouped into 3 cast members. Narrator is separate.")).toBeInTheDocument();
+
+    fireEvent.click(narrator);
+    const narratorDialog = screen.getByRole("dialog", { name: "Inspect Narrator" });
+    expect(narratorDialog).toHaveTextContent("Permanent primary");
+    expect(narratorDialog).not.toHaveTextContent("No speaker labels reassigned");
+    expect(narratorDialog).not.toHaveTextContent("0 assigned");
+    expect(narratorDialog).not.toHaveTextContent("0 dialogue lines");
+    fireEvent.click(within(narratorDialog).getByRole("button", { name: "Close cast member" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
     expect(screen.getByRole("dialog", { name: "Inspect Cecilus" })).toHaveTextContent("Cecilus: Run!");
