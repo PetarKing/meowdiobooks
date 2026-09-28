@@ -233,7 +233,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   }
 
   return <>
-    <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Choose the cast voices.")} copy={t(current.reusedFromRevision ? "Your dialogue is unchanged. Previous cast and audition choices are kept." : "Open a character to compare auditions. Choosing one applies it immediately.")} />
+    <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Choose the cast voices.")} copy={t(current.reusedFromRevision ? "Your dialogue is unchanged. Previous cast and audition choices are kept." : "Initials play a voice. Names open auditions; choosing one applies it immediately.")} />
     <CastVoiceReview
       layeredVoicePreviewUrl={gateway.layeredVoicePreviewUrl?.bind(gateway)}
       bookId={book?.id ?? ""}

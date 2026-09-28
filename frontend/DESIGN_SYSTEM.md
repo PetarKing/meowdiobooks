@@ -30,6 +30,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 - Avatars represent cast identity; they do not replace names, roles, or acceptance state.
 - Color and shape must be deterministic from a stable character identifier, never list position. Initials remain the accessible fallback until durable portrait assets exist.
 - Emotional avatar states may decorate future playback, but must not alter Character or Review decisions.
+- In the current Cast roster, the initials are the preview play/pause button; a small sound motif replaces them only during playback. The separate name button opens the inspector. Selected and required marks remain visible without repeating status or line-count text on every card, and both controls retain accessible names and states.
 - Do not use generated portraits that imply unsupported age, gender, ethnicity, or story facts.
 
 ## Interaction and state

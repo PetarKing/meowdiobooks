@@ -256,6 +256,7 @@ export function CastVoiceReview({
   const [sampleDuration, setSampleDuration] = useState(0);
   const [auditionMode, setAuditionMode] = useState<"auditions" | "create">("auditions");
   const [playingTileId, setPlayingTileId] = useState<string>();
+  const tilePlaybackRequest = useRef(0);
   const [inspectorClosing, setInspectorClosing] = useState(false);
   const closeTimer = useRef<number | undefined>(undefined);
   const tileAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -361,6 +362,7 @@ export function CastVoiceReview({
     const audio = tileAudioRef.current;
     const previewUrl = previewUrlFor(voice);
     if (!audio || !previewUrl) return;
+    const request = ++tilePlaybackRequest.current;
     if (playingTileId === voice.characterId) {
       audio.pause();
       setPlayingTileId(undefined);
@@ -371,7 +373,7 @@ export function CastVoiceReview({
     setPlayingTileId(voice.characterId);
     try {
       const playback = audio.play();
-      if (playback) void playback.catch(() => setPlayingTileId(undefined));
+      if (playback) void playback.catch(() => { if (tilePlaybackRequest.current === request) setPlayingTileId(undefined); });
     } catch {
       setPlayingTileId(undefined);
     }
@@ -379,6 +381,7 @@ export function CastVoiceReview({
 
   function openInspector(characterId: string) {
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
+    tilePlaybackRequest.current += 1;
     if (playingTileId) tileAudioRef.current?.pause();
     setPlayingTileId(undefined);
     setInspectorClosing(false);
@@ -435,7 +438,6 @@ export function CastVoiceReview({
         const selected = routeReady(voice);
         const required = requiresReview(voice);
         const isNarrator = voice.characterId === "narrator";
-        const lineCount = lineCountFor(voice, cast);
         const previewUrl = previewUrlFor(voice);
         const playing = playingTileId === voice.characterId;
         const sharedGroupId = sharedGroupFor(voice, selections);
@@ -444,33 +446,34 @@ export function CastVoiceReview({
         return <div className="cast-tile-shell" key={voice.characterId}>
           <button
             type="button"
+            className={`voice-tile-portrait portrait-tone-${Math.floor(stableHue(voice.characterId) / 90)} ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required" : ""}`}
+            aria-label={t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name })}
+            aria-pressed={playing}
+            disabled={!previewUrl}
+            onClick={() => toggleTilePreview(voice)}
+          >
+            {playing
+              ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span>
+              : <strong aria-hidden="true">{isNarrator ? "N" : initials(voice.name)}</strong>}
+            {previewUrl && <span className="voice-tile-play-cue" aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span>}
+          </button>
+          <button
+            type="button"
             ref={(element) => { tileRefs.current[voice.characterId] = element; }}
             aria-label={t("Open {{name}} voice", { name: voice.name })}
             aria-description={required ? `${t("Required")}: ${statusLabel}` : statusLabel}
             data-shared-voice-group={sharedGroupId}
             style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
-            className={`cast-tile voice-cast-tile portrait-tone-${Math.floor(stableHue(voice.characterId) / 90)} ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
+            className={`cast-tile voice-cast-tile ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
             onClick={() => openInspector(voice.characterId)}
           >
-            <span className="voice-tile-portrait" aria-hidden="true"><strong>{isNarrator ? "N" : initials(voice.name)}</strong></span>
-            <span className="voice-tile-copy">
-              <b>{voice.name}</b>
-              {voice.category === "group" && <span className="voice-tile-role">{t(label(voice.category))}</span>}
-              <small>{lineCountLabel(lineCount, t)}</small>
-              <span className="voice-tile-state">{required && <>{t("Required")} · </>}{statusLabel}</span>
-            </span>
+            <b>{voice.name}</b>
+            {voice.category === "group" && <small>{t(label(voice.category))}</small>}
           </button>
-          <button
-            type="button"
-            className={`voice-tile-listen ${playing ? "playing" : ""}`}
-            aria-label={t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name })}
-            disabled={!previewUrl}
-            onClick={() => toggleTilePreview(voice)}
-          ><span aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span><span>{t(playing ? "Pause" : "Listen")}</span></button>
         </div>;
       })}
     </section>
-    <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => setPlayingTileId(undefined)} onError={() => setPlayingTileId(undefined)} />
+    <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} onError={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} />
 
     {inspected && <InspectorDialog label={t("{{name}} voice", { name: inspected.name })} className="voice-inspector" closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
         <header className="cast-inspector-head">

@@ -3136,7 +3136,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Accept cast & voices →' })).toBeDisabled()
     const groupVoice = screen.getByRole('button', { name: 'Open Subaru & Cecilus voice' })
     expect(groupVoice).toHaveClass('voice-required', 'needs-review')
-    expect(groupVoice).toHaveTextContent('Required')
+    expect(groupVoice).toHaveAttribute('aria-description', 'Required: confirm suggested voices')
     expect(screen.getByText('1 voice still requires review')).toBeInTheDocument()
     fireEvent.click(groupVoice)
     expect(screen.getByRole('radio', { name: /Layer existing cast voices/ })).toHaveAttribute('aria-checked', 'true')

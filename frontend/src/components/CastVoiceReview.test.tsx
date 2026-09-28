@@ -241,7 +241,7 @@ describe("CastVoiceReview", () => {
 
     render(<CastVoiceReview bookId="book-1" cast={jointCast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
 
-    expect(within(screen.getByRole("button", { name: "Open Subaru & Cecilus voice" })).getByText("S&C")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "Play Subaru & Cecilus preview" })).getByText("S&C")).toBeInTheDocument();
   });
 
   it("shows exact group members for confirmation and refreshes the combined preview when an applied audition changes", () => {
@@ -261,7 +261,7 @@ describe("CastVoiceReview", () => {
     const view = render(<CastVoiceReview bookId="book-1" cast={groupCast} selections={{ subaru: "subaru-1", cecilus: "cecilus-1" }} routes={route} confirmedRoutes={{ "subaru-cecilus": false }} onRouteChange={() => undefined} onConfirmRoute={onConfirmRoute} onApprove={() => undefined} onRegenerate={() => undefined} />);
     const groupTile = screen.getByRole("button", { name: "Open Subaru & Cecilus voice" });
     expect(groupTile).toHaveClass("voice-required", "needs-review");
-    expect(groupTile).toHaveTextContent("Required");
+    expect(groupTile).toHaveAttribute("aria-description", "Required: confirm suggested voices");
     expect(screen.getByText("1 required voice")).toBeInTheDocument();
     expect(screen.getByText("Review required voices before accepting the cast.")).toBeInTheDocument();
     fireEvent.click(groupTile);
@@ -290,15 +290,16 @@ describe("CastVoiceReview", () => {
     expect(resolvePreview).not.toHaveBeenCalled();
   });
 
-  it("pins Narrator, orders the cast by line count, and shows counts on tiles", () => {
+  it("pins Narrator, orders the cast by line count, and keeps tile metadata quiet", () => {
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
     const tiles = within(screen.getByRole("region", { name: "Cast voice auditions" })).getAllByRole("button", { name: /^Open / });
     expect(tiles.map((tile) => tile.getAttribute("aria-label"))).toEqual([
       "Open Narrator voice", "Open Many voice", "Open Few voice",
     ]);
-    expect(tiles[1]).toHaveTextContent("20 lines");
     expect(tiles[1]).toHaveClass("voice-default-ready");
-    expect(tiles[1]).toHaveTextContent("default ready");
+    expect(tiles[1]).toHaveAttribute("aria-description", "default ready");
+    expect(tiles[1]).not.toHaveTextContent("default ready");
+    expect(tiles[1]).not.toHaveTextContent("20 lines");
     expect(screen.getByText("3 voices can be approved when you continue")).toBeInTheDocument();
   });
 
@@ -342,7 +343,7 @@ describe("CastVoiceReview", () => {
     expect(guard.style.getPropertyValue("--shared-voice-accent")).not.toBe(
       merchant.style.getPropertyValue("--shared-voice-accent"),
     );
-    expect(guard).toHaveTextContent("shared voice");
+    expect(guard).toHaveAttribute("aria-description", "shared voice");
     expect(screen.getByText(/Brief roles may share a voice to save time and cost/)).toBeInTheDocument();
 
     fireEvent.click(guard);
@@ -354,15 +355,20 @@ describe("CastVoiceReview", () => {
     const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} />);
 
-    fireEvent.click(screen.getByRole("button", { name: "Play Many preview" }));
+    const preview = screen.getByRole("button", { name: "Play Many preview" });
+    expect(within(preview).getByText("M")).toBeInTheDocument();
+    fireEvent.click(preview);
 
     expect(play).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Pause Many preview" })).toBeInTheDocument();
+    const pausePreview = screen.getByRole("button", { name: "Pause Many preview" });
+    expect(pausePreview).toHaveAttribute("aria-pressed", "true");
+    expect(within(pausePreview).queryByText("M")).not.toBeInTheDocument();
+    expect(pausePreview.querySelectorAll(".voice-tile-wave i")).toHaveLength(5);
     expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Pause Many preview" }));
+    fireEvent.click(pausePreview);
     expect(pause).toHaveBeenCalled();
     expect(play).toHaveBeenCalledOnce();
-    expect(screen.getByRole("button", { name: "Play Many preview" })).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: "Play Many preview" })).getByText("M")).toBeInTheDocument();
     play.mockRestore();
     pause.mockRestore();
   });

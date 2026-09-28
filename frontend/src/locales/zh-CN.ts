@@ -8,6 +8,7 @@ const zhCN: Record<string, string> = {
   "Back to auditions": "返回试听",
   "Listen, then choose a voice. Your choice applies immediately and can be changed.": "先试听，再选择声音。选择会立即应用，也可以随时更换。",
   "Open a character to compare auditions. Choosing one applies it immediately.": "打开角色比较试听；选择后会立即应用。",
+  "Initials play a voice. Names open auditions; choosing one applies it immediately.": "点击名字首字母播放声音；点击角色名打开试听，选择后会立即应用。",
   "Cast decision": "角色阵容确认",
   "Change the cast?": "更改角色阵容？",
   "Reclassify source labels?": "重新分类来源标签？",
