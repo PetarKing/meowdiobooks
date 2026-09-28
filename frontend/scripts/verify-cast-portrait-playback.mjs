@@ -30,13 +30,14 @@ try {
     assert.equal(await alice.getAttribute('aria-pressed'), 'false');
     assert(await alice.locator('strong').isVisible(), 'Portrait begins with initials');
     assert.equal(await openAlice.getAttribute('aria-description'), 'voice selected');
-    assert.equal(await openAlice.locator(':scope > b').innerText(), 'Alice', 'Card body leads with the character name');
+    assert.equal(await openAlice.innerText(), 'Alice', 'Card body has only the character name');
 
     await alice.click();
-    const pauseAlice = board.getByRole('button', { name: 'Pause Alice preview' });
+    const pauseAlice = board.getByRole('button', { name: 'Stop Alice preview' });
     assert.equal(await pauseAlice.getAttribute('aria-pressed'), 'true');
     assert.equal(await pauseAlice.locator('strong').count(), 0, 'Initials swap away while playing');
     assert.equal(await pauseAlice.locator('.voice-tile-wave i').count(), 5);
+    assert.equal(await pauseAlice.locator('.voice-tile-play-cue').count(), 0, 'Active playback has no separate pause cue');
     const animation = await pauseAlice.locator('.voice-tile-wave i').first().evaluate(el => getComputedStyle(el).animationName);
     assert.equal(animation, reducedMotion ? 'none' : 'voice-tile-wave');
     assert.equal(await page.getByRole('dialog', { name: 'Alice voice' }).count(), 0, 'Portrait playback does not open the inspector');
@@ -44,15 +45,17 @@ try {
 
     await pauseAlice.click();
     assert.equal(await alice.getAttribute('aria-pressed'), 'false');
-    assert(await alice.locator('strong').isVisible(), 'Pause restores initials');
+    assert(await alice.locator('strong').isVisible(), 'Stop restores initials');
+    assert.equal(await alice.locator('.voice-tile-play-cue').count(), 1, 'Stopping restores the small play cue');
     await alice.click();
     await page.locator('audio.voice-tile-audio').dispatchEvent('ended');
     await alice.locator('strong').waitFor({ state: 'visible' });
+    assert.equal(await alice.locator('.voice-tile-play-cue').count(), 1, 'Natural audio end restores the play cue');
 
     await alice.click();
     await board.getByRole('button', { name: 'Play White Rabbit preview' }).click();
     assert(await alice.locator('strong').isVisible(), 'Playing a different voice restores the previous portrait');
-    assert.equal(await board.getByRole('button', { name: 'Pause White Rabbit preview' }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await board.getByRole('button', { name: 'Stop White Rabbit preview' }).getAttribute('aria-pressed'), 'true');
     await openAlice.click();
     assert(await page.getByRole('dialog', { name: 'Alice voice' }).isVisible());
     assert(await board.getByRole('button', { name: 'Play White Rabbit preview' }).locator('strong').isVisible(), 'Opening an inspector stops tile playback');
@@ -66,7 +69,7 @@ try {
   await actualPage.goto(base);
   await actualPage.getByRole('combobox', { name: 'Preview' }).selectOption('cast-voices');
   await actualPage.getByRole('button', { name: 'Play Alice preview' }).click();
-  const actualPause = actualPage.getByRole('button', { name: 'Pause Alice preview' });
+  const actualPause = actualPage.getByRole('button', { name: 'Stop Alice preview' });
   await actualPause.waitFor();
   const duration = await actualPage.locator('audio.voice-tile-audio').evaluate(async audio => {
     if (Number.isFinite(audio.duration)) return audio.duration;

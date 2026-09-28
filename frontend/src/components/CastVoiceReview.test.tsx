@@ -396,15 +396,20 @@ describe("CastVoiceReview", () => {
     fireEvent.click(preview);
 
     expect(play).toHaveBeenCalledOnce();
-    const pausePreview = screen.getByRole("button", { name: "Pause Many preview" });
-    expect(pausePreview).toHaveAttribute("aria-pressed", "true");
-    expect(within(pausePreview).queryByText("M")).not.toBeInTheDocument();
-    expect(pausePreview.querySelectorAll(".voice-tile-wave i")).toHaveLength(5);
+    const stopPreview = screen.getByRole("button", { name: "Stop Many preview" });
+    expect(stopPreview).toHaveAttribute("aria-pressed", "true");
+    expect(within(stopPreview).queryByText("M")).not.toBeInTheDocument();
+    expect(stopPreview.querySelectorAll(".voice-tile-wave i")).toHaveLength(5);
+    expect(stopPreview.querySelector(".voice-tile-play-cue")).toBeNull();
     expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
-    fireEvent.click(pausePreview);
+    const audio = document.querySelector("audio.voice-tile-audio") as HTMLAudioElement;
+    audio.currentTime = 1.5;
+    fireEvent.click(stopPreview);
     expect(pause).toHaveBeenCalled();
+    expect(audio.currentTime).toBe(0);
     expect(play).toHaveBeenCalledOnce();
     expect(within(screen.getByRole("button", { name: "Play Many preview" })).getByText("M")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Play Many preview" }).querySelector(".voice-tile-play-cue")).toBeInTheDocument();
     play.mockRestore();
     pause.mockRestore();
   });

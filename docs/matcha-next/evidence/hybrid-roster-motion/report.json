@@ -1,0 +1,73 @@
+{
+  "url": "http://127.0.0.1:5180/studio.html",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "castBefore": 0,
+      "castAfter": 1,
+      "voiceBefore": 0,
+      "voiceAfter": 1,
+      "playbackAnimation": "roster-curve-audio",
+      "bloomAnimation": "voice-ink-bloom",
+      "fieldAnimation": "roster-field-tide",
+      "noLayoutShift": true,
+      "noOverflow": true,
+      "axeViolations": [],
+      "errors": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "castBefore": 0,
+      "castAfter": 1,
+      "voiceBefore": 0,
+      "voiceAfter": 1,
+      "playbackAnimation": "roster-curve-audio",
+      "bloomAnimation": "voice-ink-bloom",
+      "fieldAnimation": "roster-field-tide",
+      "noLayoutShift": true,
+      "noOverflow": true,
+      "axeViolations": [],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "castBefore": 0,
+      "castAfter": 1,
+      "voiceBefore": 0,
+      "voiceAfter": 1,
+      "playbackAnimation": "roster-curve-audio",
+      "bloomAnimation": "voice-ink-bloom",
+      "fieldAnimation": "roster-field-tide",
+      "noLayoutShift": true,
+      "noOverflow": true,
+      "axeViolations": [],
+      "errors": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "castBefore": 0,
+      "castAfter": 1,
+      "voiceBefore": 0,
+      "voiceAfter": 1,
+      "playbackAnimation": "roster-curve-audio",
+      "bloomAnimation": "voice-ink-bloom",
+      "fieldAnimation": "roster-field-tide",
+      "noLayoutShift": true,
+      "noOverflow": true,
+      "axeViolations": [],
+      "errors": []
+    }
+  ],
+  "reducedMotion": {
+    "transition": "0s",
+    "transform": "none",
+    "curve": "none",
+    "playback": "none",
+    "field": "none",
+    "bloom": "none"
+  }
+}

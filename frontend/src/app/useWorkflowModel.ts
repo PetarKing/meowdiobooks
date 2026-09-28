@@ -70,6 +70,7 @@ import {
   type WizardStep
 } from "../workflow/navigation";
 import {
+  DEFAULT_EXPORT_DESCRIPTION,
   decodeImage,
   message
 } from "../workflow/presentation";
@@ -284,6 +285,10 @@ export function useWorkflowModel({
   const [exportTitle, setExportTitle] = useState("");
 
   const [exportAuthor, setExportAuthor] = useState("");
+
+  const [exportDescription, setExportDescription] = useState(() => t(DEFAULT_EXPORT_DESCRIPTION));
+
+  const exportBookId = useRef<string | undefined>(undefined);
 
   const [exportCover, setExportCover] = useState<File>();
 
@@ -515,12 +520,19 @@ export function useWorkflowModel({
       const pending = available.filter((id) => !generated.has(id));
       return current.length ? current.filter((id) => pending.includes(id)) : pending;
     });
+    const newExportBook = exportBookId.current !== next.book.id;
+    exportBookId.current = next.book.id;
     setExportChapterIds((current) => {
       const playable = next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId);
-      return current.length ? current.filter((id) => playable.includes(id)) : playable;
+      return newExportBook || !current.length ? playable : current.filter((id) => playable.includes(id));
     });
-    setExportTitle((current) => current || next.book.title || "");
-    setExportAuthor((current) => current || next.book.author || "");
+    setExportTitle((current) => newExportBook ? next.book.title || "" : current || next.book.title || "");
+    setExportAuthor((current) => newExportBook ? next.book.author || "" : current || next.book.author || "");
+    if (newExportBook) {
+      setExportDescription(t(DEFAULT_EXPORT_DESCRIPTION));
+      setExportCover(undefined);
+      setExportCoverPage(1);
+    }
     return next;
   }
 
@@ -960,7 +972,7 @@ export function useWorkflowModel({
     if (!chapters.length) return;
     setExporting(true);
     try {
-      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage, preset: exportPreset };
+      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), description: exportDescription.trim(), cover: exportCover, coverPage: exportCoverPage, preset: exportPreset };
       if (gateway.createAudioExport) await gateway.createAudioExport(book.id, chapters, options);
       else if (exportPreset === "m4b-high" && gateway.createM4bExport) await gateway.createM4bExport(book.id, chapters, options);
       else if (exportPreset === "m4b-high") await gateway.exportM4b(book.id, chapters, options);
@@ -993,7 +1005,7 @@ export function useWorkflowModel({
       setError(message(reason));
     }
   }
-  return { castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryExports, libraryReady, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
+  return { castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryExports, libraryReady, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
 }
 
 export type WorkflowModel = ReturnType<typeof useWorkflowModel>;

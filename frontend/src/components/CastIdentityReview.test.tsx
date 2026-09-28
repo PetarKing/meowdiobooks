@@ -302,7 +302,7 @@ describe("CastIdentityReview", () => {
     fireEvent.drop(target, { dataTransfer });
 
     expect(screen.queryByRole("button", { name: "Inspect Cecilus" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Inspect Emilia" })).toHaveTextContent("2 labels");
+    expect(screen.getByRole("button", { name: "Inspect Emilia" })).toHaveTextContent("14 lines");
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Emilia");
 
     expect(screen.getByText("Merged Cecilus into Emilia.")).toBeInTheDocument();

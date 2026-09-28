@@ -278,7 +278,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       }}
       onRegenerate={(characterId, voiceSettings) => setConfirmation({ kind: "regenerate", characterId, voiceSettings })}
     />
-    <div className="phase-action">
+    <div className="phase-action cast-voice-final-action">
       <span>{unavailableVoices.length > 0
         ? unavailableVoices.length === 1 ? t("1 voice still requires review") : t("{{count}} voices still require review", { count: unavailableVoices.length })
         : unapprovedVoices.length > 0

@@ -1594,6 +1594,7 @@ def create_app_v2(
                         "chapters": json.loads(raw_chapters),
                         "title": form.get("title"),
                         "author": form.get("author"),
+                        "description": form.get("description"),
                         "coverPage": form.get("coverPage") or 1,
                         "preset": form.get("preset") or AudioExportPreset.M4B_HIGH,
                     }
@@ -1696,6 +1697,7 @@ def create_app_v2(
         author = (
             (body.author or "").strip() or metadata.get("author") or book.author or "Meowdiobooks"
         )
+        description = body.description.strip() if body.description is not None else None
         temp_root = root / "tmp"
         temp_root.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix=f"m4b-{book.id}-", dir=temp_root))
@@ -1739,6 +1741,7 @@ def create_app_v2(
                     output,
                     title=title,
                     author=author,
+                    description=description,
                     cover=cover,
                     preset=body.preset,
                 )
@@ -1763,6 +1766,7 @@ def create_app_v2(
             book_id=book.id,
             title=title,
             author=author,
+            description=description,
             filename=destination.name,
             file_path=str(destination),
             chapter_count=len(export_chapters),
@@ -2571,6 +2575,7 @@ def _library_export_payload(item: LibraryExport, *, package: Path | None = None)
         "bookId": item.book_id,
         "title": item.title,
         "author": item.author,
+        "description": item.description,
         "filename": item.filename,
         "location": item.file_path,
         "chapterCount": item.chapter_count,

@@ -1,0 +1,7 @@
+# Shared Cast and Voices motion review
+
+The [short interaction recording](cast-voice-home-motion.mp4) captures the local synthetic Studio fixture. Desktop cards use a status spine and curved divider; phone cards use the same divider as a bowl and move the status accent to the bottom. Hover and keyboard focus draw the curve and send a restrained highlight along the accent. The card itself stays fixed. During voice playback, the play cue disappears and the monogram field breathes with the waveform, ink bloom, and curved divider. Clicking the same target stops playback and restores the initials. Home's Continue arrow moves independently of the book entry.
+
+Selected stills: [desktop Cast, dark](cast-hover-1440-dark.png), [phone Cast, light](cast-hover-390-light.png), [desktop Voices, dark](voice-hover-1440-dark.png), [desktop audition playing, dark](voice-playing-1440-dark.png), [phone audition playing, light](voice-playing-390-light.png), [phone Home, dark](home-hover-390-dark.png).
+
+`node frontend/scripts/verify-roster-motion.mjs http://127.0.0.1:5180/studio.html /private/tmp/roster-motion-active` passed at 1440 and 390 pixels in light and dark appearance. It checked hover and keyboard focus, voice play/stop, zero card layout shift, horizontal overflow, scoped axe violations, page errors, and reduced motion. The separate portrait playback check also verified switching voices and natural audio end reset. The exact results are in [report.json](report.json). This is fixture evidence, not a production workflow or audio quality check.

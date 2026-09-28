@@ -1,4 +1,4 @@
-/* Voices keep the character-select grid, with the audition as a compact play target. */
+/* Character-select portraits stay compact and let names, not ornaments, lead. */
 .voice-cast-workbench { gap: 24px; }
 .voice-stage-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .voice-stage-heading h1 { margin: 0; font: 500 clamp(30px, 3vw, 42px)/1.1 var(--font-display); }
@@ -13,50 +13,6 @@
 .voice-cast-progress .pending::before { background: var(--gilt-ink); }
 .voice-cast-progress .required { color: var(--danger-ink); }
 .voice-cast-progress .required::before { background: var(--danger-ink); }
-.voice-cast-board { grid-template-columns: repeat(auto-fill, minmax(min(100%, 245px), 1fr)); gap: 12px; overflow: visible; border: 0; border-radius: 0; background: transparent; }
-.voice-cast-board .cast-tile-shell, .voice-cast-board .cast-tile-shell:first-child { display: grid; grid-template-columns: 70px minmax(0, 1fr); min-width: 0; min-height: 94px; border: 1px solid var(--line); border-left: 4px solid var(--line-strong); border-radius: 10px; overflow: hidden; background: var(--paper); box-shadow: none; transition: border-color 180ms ease, background 180ms ease; }
-.voice-cast-board .cast-tile-shell:hover { border-color: var(--line-strong); box-shadow: none; }
-.voice-cast-board .cast-tile-shell.is-approved { border-left-color: var(--green); }
-.voice-cast-board .cast-tile-shell.is-pending { border-left-color: var(--gilt-ink); background: color-mix(in srgb, var(--gilt) 6%, var(--paper)); }
-.voice-cast-board .cast-tile-shell.is-required { border-left-color: var(--danger-ink); background: color-mix(in srgb, var(--danger-soft) 31%, var(--paper)); }
-.voice-cast-board .voice-cast-tile,
-.voice-cast-board .voice-cast-tile.voice-selected,
-.voice-cast-board .voice-cast-tile.voice-required,
-.voice-cast-board .voice-cast-tile.cast-narrator-tile { display: flex; min-width: 0; min-height: 94px; height: auto; flex-direction: column; align-items: flex-start; justify-content: center; gap: 5px; padding: 11px 11px 11px 2px; border: 0; border-radius: 0; background: transparent; text-align: left; box-shadow: none; }
-.voice-cast-board .voice-cast-tile:hover { background: transparent; box-shadow: none; transform: none; }
-.voice-cast-board .voice-cast-tile:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
-.voice-cast-board .voice-tile-portrait,
-.voice-cast-board .cast-roster-portrait.voice-tile-portrait { position: relative; display: grid; width: 70px; min-width: 0; min-height: 94px; align-self: stretch; place-items: center; padding: 0 2px 11px; border: 0; border-right: 1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius: 0; background: transparent; color: var(--ink); cursor: pointer; }
-.voice-cast-board .voice-tile-portrait:hover:not(:disabled) { color: var(--poppy); background: color-mix(in srgb, var(--sakura) 13%, transparent); }
-.voice-cast-board .voice-tile-portrait:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
-.voice-cast-board .voice-tile-portrait:disabled { cursor: not-allowed; }
-.voice-cast-board .voice-tile-portrait strong { position: relative; color: inherit; font: 500 clamp(26px, 2.6vw, 34px)/1 var(--font-display); letter-spacing: -.07em; }
-.voice-cast-board .voice-tile-portrait[data-symbol-length="2"] strong { font-size: clamp(25px, 2.3vw, 30px); }
-.voice-cast-board .voice-tile-portrait[data-symbol-length="3"] strong { font-size: 22px; }
-.voice-cast-board .voice-tile-portrait[data-symbol-length="4"] strong { font-size: 18px; }
-.voice-cast-board .cast-tile-shell.is-required .voice-tile-portrait { color: var(--danger-ink); }
-.voice-cast-board .cast-tile-shell.is-pending .voice-tile-portrait { color: var(--gilt-ink); }
-.voice-cast-board .cast-tile-shell.is-approved .voice-tile-portrait { color: var(--green); }
-.voice-cast-board .voice-tile-portrait:disabled strong { opacity: .55; }
-.voice-cast-board .voice-tile-play-cue { position: absolute; right: 3px; bottom: 19px; display: grid; width: 19px; height: 19px; place-items: center; border: 1px solid currentColor; border-radius: 50%; background: var(--paper); color: inherit; font: 600 8px/1 var(--font-sans); opacity: .9; }
-.voice-cast-board .voice-tile-portrait:hover .voice-tile-play-cue, .voice-cast-board .voice-tile-portrait:focus-visible .voice-tile-play-cue { background: var(--poppy); color: var(--action-ink); opacity: 1; }
-.voice-cast-board .voice-tile-wave { display: flex; height: 31px; align-items: center; gap: 3px; }
-.voice-cast-board .voice-tile-wave i { display: block; width: 2px; height: 22px; border-radius: 2px; background: currentColor; transform-origin: center; animation: voice-tile-wave 1050ms ease-in-out infinite; }
-.voice-cast-board .voice-tile-wave i:nth-child(2), .voice-cast-board .voice-tile-wave i:nth-child(4) { animation-delay: -420ms; }
-.voice-cast-board .voice-tile-wave i:nth-child(3) { animation-delay: -710ms; }
-@keyframes voice-tile-wave { 0%, 100% { transform: scaleY(.38); } 50% { transform: scaleY(1); } }
-.voice-cast-board .voice-cast-tile > b { display: block; width: 100%; padding: 0 18px 0 0; color: var(--ink); font: 500 clamp(16px, 1.35vw, 19px)/1.15 var(--font-display); overflow: visible; white-space: normal; overflow-wrap: anywhere; }
-.voice-cast-board .voice-cast-tile > small { width: 100%; color: var(--muted); font: 650 10px/1.3 var(--font-sans); letter-spacing: .02em; text-transform: none; overflow: visible; white-space: normal; }
-.voice-cast-board .voice-cast-tile .cast-review-badge.voice-tile-alert { display: inline-flex; align-self: flex-start; flex-wrap: wrap; gap: 1px 5px; margin-top: 0; padding: 0; border-radius: 0; background: transparent; color: var(--danger-ink); font: 700 11px/1.2 var(--font-sans); letter-spacing: .005em; }
-.voice-cast-board .voice-cast-tile .voice-tile-alert::before { content: ""; width: 6px; height: 6px; align-self: center; border-radius: 50%; background: currentColor; }
-.voice-cast-board .voice-cast-tile .cast-review-badge.voice-tile-alert.pending { background: transparent; color: var(--gilt-ink); }
-.voice-cast-board .voice-cast-tile .cast-review-badge.voice-tile-alert.approved { color: var(--green); }
-.voice-cast-board .voice-tile-alert small { font-size: 9px; }
-.voice-cast-board .voice-cast-tile.voice-required { background: transparent; }
-.voice-cast-board .voice-cast-tile.voice-pending { background: transparent; }
-.voice-cast-board .voice-cast-tile.voice-required > small { padding: 0; color: var(--muted); }
-.voice-cast-board .voice-cast-tile.voice-selected::after, .voice-cast-board .voice-cast-tile.voice-required::after { content: none; }
-.voice-cast-board .voice-cast-tile.shared-voice { box-shadow: none; }
 .voice-inspector-body { display: block; background: var(--paper); }
 .cast-inspector-backdrop:has(> .voice-inspector) { justify-content: center; align-items: center; padding: 24px; }
 .voice-inspector.cast-inspector { width: min(1000px, calc(100vw - 48px)); height: auto; max-height: calc(100dvh - 48px); margin: 0; overflow: auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 32px 100px rgb(var(--shadow-color) / .24); animation: voice-dialog-in 220ms cubic-bezier(.2,.8,.2,1) both; }
@@ -125,9 +81,16 @@
 .voice-audition-settings .voice-regenerate-footer { flex-direction: row; align-items: center; justify-content: space-between; gap: 24px; margin-top: 25px; padding-top: 21px; border-top: 1px solid var(--line); }
 .voice-audition-settings .regenerate-voice-action { flex: 0 0 auto; min-height: 48px; padding: 12px 19px; }
 .cast-confirmation-modal { max-width: 560px; }
+.cast-final-action, .cast-voice-final-action { margin: 22px 0 0; padding: 18px 20px; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+@media (max-width: 600px) {
+  .cast-final-action, .cast-voice-final-action { gap: 14px; padding: 17px 16px 8px; }
+  .cast-final-action .phase-action-buttons > .ghost,
+  .cast-voice-final-action .phase-action-buttons > .ghost { min-height: 44px; border: 0; background: transparent; box-shadow: none; text-align: center; }
+  .cast-final-action .phase-action-buttons > .ghost:hover:not(:disabled),
+  .cast-voice-final-action .phase-action-buttons > .ghost:hover:not(:disabled) { border: 0; background: transparent; }
+}
 @media (max-width: 850px) {
   .voice-inspector.cast-inspector { width: min(760px, calc(100vw - 48px)); }
-  .voice-cast-board { grid-template-columns: repeat(auto-fill, minmax(min(100%, 225px), 1fr)); }
   .voice-audition-settings .voice-settings-groups { grid-template-columns: 1fr; }
   .voice-audition-settings .voice-regenerate-footer { align-items: stretch; flex-direction: column; }
 }
@@ -137,21 +100,6 @@
   .voice-stage-heading { margin-bottom: 12px; }
   .voice-cast-toolbar { flex-wrap: wrap; padding: 0 0 16px; }
   .voice-cast-progress { gap: 6px 12px; font-size: 11px; }
-  .voice-cast-board { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .voice-cast-board .cast-tile-shell, .voice-cast-board .cast-tile-shell:first-child { grid-template-columns: 54px minmax(0, 1fr); min-height: 104px; }
-  .voice-cast-board .voice-cast-tile,
-  .voice-cast-board .voice-cast-tile.voice-selected,
-  .voice-cast-board .voice-cast-tile.voice-required,
-  .voice-cast-board .voice-cast-tile.cast-narrator-tile { min-height: 104px; padding: 9px 8px 9px 0; }
-  .voice-cast-board .voice-tile-portrait,
-  .voice-cast-board .cast-roster-portrait.voice-tile-portrait { width: 54px; min-height: 104px; }
-  .voice-cast-board .voice-tile-portrait strong { font-size: 28px; }
-  .voice-cast-board .voice-tile-portrait[data-symbol-length="2"] strong { font-size: 24px; }
-  .voice-cast-board .voice-tile-portrait[data-symbol-length="3"] strong { font-size: 17px; }
-  .voice-cast-board .voice-tile-portrait[data-symbol-length="4"] strong { font-size: 14px; }
-  .voice-cast-board .voice-tile-play-cue { right: 0; bottom: 20px; width: 17px; height: 17px; }
-  .voice-cast-board .voice-cast-tile > b { font-size: 15px; padding-right: 0; }
-  .voice-cast-board .voice-cast-tile .cast-review-badge.voice-tile-alert { font-size: 10px; }
   .voice-inspector-body > section { padding: 24px 18px; }
   .voice-inspector .cast-inspector-head { padding: 18px; }
   .voice-candidate-grid { grid-template-columns: 1fr; }

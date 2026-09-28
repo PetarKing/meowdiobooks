@@ -366,7 +366,7 @@ describe('HttpWizardApi', () => {
     const cover = new File(['cover'], 'cover.png', { type: 'image/png' })
     const download = await new HttpWizardApi('/api').exportM4b('book-1', [
       { chapterId: 'chapter-1', revision: 'render-1' },
-    ], { title: 'A Cat', author: 'Maou', cover, coverPage: 7 })
+    ], { title: 'A Cat', author: 'Maou', description: 'A bedtime edition.', cover, coverPage: 7 })
 
     expect(download.filename).toBe('A Cat.m4b')
     expect(await download.blob.text()).toBe('m4b')
@@ -376,6 +376,7 @@ describe('HttpWizardApi', () => {
     expect(JSON.parse(String(body.get('chapters')))).toEqual([{ chapterId: 'chapter-1', revision: 'render-1' }])
     expect(body.get('title')).toBe('A Cat')
     expect(body.get('author')).toBe('Maou')
+    expect(body.get('description')).toBe('A bedtime edition.')
     expect(body.get('cover')).toBe(cover)
     expect(body.get('coverPage')).toBe('7')
   })
@@ -401,6 +402,8 @@ describe('HttpWizardApi', () => {
       method: 'POST',
       headers: { Accept: 'application/json' },
     }))
+    const request = fetchMock.mock.calls[0][1] as RequestInit
+    expect((request.body as FormData).has('description')).toBe(false)
   })
 
   it('creates the selected audio export without downloading its body', async () => {
@@ -418,7 +421,7 @@ describe('HttpWizardApi', () => {
 
     const result = await new HttpWizardApi('/api').createAudioExport('book-1', [
       { chapterId: 'chapter-1', revision: 'render-1' },
-    ], { preset: 'mp3-chapters', title: 'A Cat' })
+    ], { preset: 'mp3-chapters', title: 'A Cat', description: '' })
 
     expect(result).toEqual(exported)
     expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/exports/audio', expect.objectContaining({
@@ -428,6 +431,8 @@ describe('HttpWizardApi', () => {
     const request = fetchMock.mock.calls[0][1] as RequestInit
     const body = request.body as FormData
     expect(body.get('preset')).toBe('mp3-chapters')
+    expect(body.has('description')).toBe(true)
+    expect(body.get('description')).toBe('')
   })
 
   it('turns structured export failures into a useful message', async () => {

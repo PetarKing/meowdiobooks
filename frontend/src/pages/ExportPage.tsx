@@ -10,14 +10,15 @@ import {
   chapterDuration
 } from "../workflow/generation";
 import {
+  DEFAULT_EXPORT_DESCRIPTION,
   estimatedAudioExportBytes,
   formatFileSize
 } from "../workflow/presentation";
 
-export type ExportPageModel = Pick<WorkflowModel, "gateway" | "book" | "exportAuthor" | "exportChapterIds" | "exportCover" | "exportCoverPage" | "exportCoverPreviewUrl" | "exportCurrent" | "exportPreset" | "exportTitle" | "exporting" | "setExportAuthor" | "setExportChapterIds" | "setExportCover" | "setExportCoverPage" | "setExportPreset" | "setExportTitle" | "setStage" | "snapshot" | "stageIndex" | "t">;
+export type ExportPageModel = Pick<WorkflowModel, "gateway" | "book" | "exportAuthor" | "exportChapterIds" | "exportCover" | "exportCoverPage" | "exportCoverPreviewUrl" | "exportDescription" | "exportCurrent" | "exportPreset" | "exportTitle" | "exporting" | "setExportAuthor" | "setExportChapterIds" | "setExportCover" | "setExportCoverPage" | "setExportDescription" | "setExportPreset" | "setExportTitle" | "setStage" | "snapshot" | "stageIndex" | "t">;
 
 export function ExportPage({ model }: { model: ExportPageModel; }) {
-  const { gateway, book, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportCurrent, exportPreset, exportTitle, exporting, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportPreset, setExportTitle, setStage, snapshot, stageIndex, t } = model;
+  const { gateway, book, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setStage, snapshot, stageIndex, t } = model;
   const generatedByChapter = new Map((snapshot?.generatedChapters ?? []).filter((row) => row.current).map((row) => [row.chapterId, row]));
   const playableChapters = (snapshot?.chapters ?? []).filter((row) => generatedByChapter.has(row.id));
   const selectedPlayable = playableChapters.filter((row) => exportChapterIds.includes(row.id));
@@ -47,26 +48,29 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
           <div className="edition-cover-stage">
             <div className="edition-cover-frame">
               <div className="edition-cover">{coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}</div>
-              {!exportCover && pageCount > 1 && <div className="edition-cover-arrows">
-                <button type="button" aria-label={t("Previous cover page")} disabled={exportCoverPage <= 1} onClick={() => setExportCoverPage(exportCoverPage - 1)}>‹</button>
-                <button type="button" aria-label={t("Next cover page")} disabled={exportCoverPage >= pageCount} onClick={() => setExportCoverPage(exportCoverPage + 1)}>›</button>
-              </div>}
-            </div>
-          </div>
-          <div className="edition-cover-tools">
-            <div className="edition-cover-source"><span className="eyebrow">{t("Front page")}</span><span>{exportCover?.name ?? t("PDF page {{page}} of {{count}}", { page: exportCoverPage, count: pageCount })}</span></div>
-            <div className="edition-cover-actions">
-              {!exportCover && <label className="edition-page-picker">{t("Page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /><span aria-hidden="true">/ {pageCount}</span></label>}
-              <label className="edition-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setExportCover(event.target.files?.[0])} /><span>{t(exportCover ? "Change image" : "Choose image")}</span></label>
-              {exportCover && <button type="button" className="edition-use-pdf" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
+              <div className="edition-cover-tools">
+                <div className="edition-cover-top">
+                  <div className="edition-cover-source"><span className="eyebrow">{t("Front page")}</span><span>{exportCover?.name ?? t("PDF page {{page}} of {{count}}", { page: exportCoverPage, count: pageCount })}</span></div>
+                  <div className="edition-cover-image-actions">
+                    <label className="edition-upload"><input type="file" accept="image/png,image/jpeg,image/webp" onChange={(event) => setExportCover(event.target.files?.[0])} /><span>{t(exportCover ? "Change image" : "Choose image")}</span></label>
+                    {exportCover && <button type="button" className="edition-use-pdf" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
+                  </div>
+                </div>
+                {!exportCover && <div className="edition-cover-navigation">
+                  {pageCount > 1 && <button type="button" className="edition-cover-step" aria-label={t("Previous cover page")} disabled={exportCoverPage <= 1} onClick={() => setExportCoverPage(exportCoverPage - 1)}>‹</button>}
+                  <label className="edition-page-picker">{t("Page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /><span aria-hidden="true">/ {pageCount}</span></label>
+                  {pageCount > 1 && <button type="button" className="edition-cover-step" aria-label={t("Next cover page")} disabled={exportCoverPage >= pageCount} onClick={() => setExportCoverPage(exportCoverPage + 1)}>›</button>}
+                </div>}
+              </div>
             </div>
           </div>
         </section>
         <section className="edition-details" aria-labelledby="edition-details-title">
-          <header><div><span className="eyebrow">{t("Book details")}</span><h2 id="edition-details-title" className="visually-hidden">{t("Book details")}</h2></div><button type="button" className="edition-reset" aria-label={t("Reset book details")} title={t("Reset book details")} onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportCover(undefined); setExportCoverPage(1); }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" /></svg></button></header>
+          <header><div><span className="eyebrow">{t("Book details")}</span><h2 id="edition-details-title" className="visually-hidden">{t("Book details")}</h2></div><button type="button" className="edition-reset" aria-label={t("Reset book details")} title={t("Reset book details")} onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportDescription(t(DEFAULT_EXPORT_DESCRIPTION)); setExportCover(undefined); setExportCoverPage(1); }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" /></svg></button></header>
           <div className="edition-editable-identity">
             <label className="edition-field edition-title-field"><span>{t("Title")}</span><textarea aria-label={t("Title")} value={exportTitle} rows={2} maxLength={500} onChange={(event) => setExportTitle(event.target.value)} /></label>
             <label className="edition-field edition-author-field">{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
+            <label className="edition-field edition-description-field">{t("Description")}<textarea aria-label={t("Description")} value={exportDescription} maxLength={2000} rows={2} onChange={(event) => setExportDescription(event.target.value)} /></label>
           </div>
           <div className="edition-proof-facts"><span>{t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) })}</span><span>{exportChoices.find((choice) => choice.preset === exportPreset)?.title}</span></div>
         </section>

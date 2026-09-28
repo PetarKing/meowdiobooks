@@ -396,6 +396,7 @@ export function CastVoiceReview({
     const request = ++tilePlaybackRequest.current;
     if (playingTileId === voice.characterId) {
       audio.pause();
+      audio.currentTime = 0;
       setPlayingTileId(undefined);
       return;
     }
@@ -523,10 +524,10 @@ export function CastVoiceReview({
           dataSharedVoiceGroup={sharedGroupId}
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span> : undefined}
-          portraitCue={previewUrl ? <span className="voice-tile-play-cue" aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span> : undefined}
-          badge={<span className={`cast-review-badge voice-tile-alert ${selected ? "approved" : required ? "required" : "advisory pending"}`}><b>{t(selected ? "Voice approved" : required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
+          portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true">▶</span> : undefined}
+          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b><small>{t(required ? "Blocks continue" : "Can continue")}</small></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
-          previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
+          previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Stop" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
           inspectRef={(element) => { tileRefs.current[voice.characterId] = element; }}
           inspectProps={{ "aria-label": t("Open {{name}} voice", { name: voice.name }), "aria-description": required ? `${t("Required")}: ${statusLabel}` : !selected && sharedGroupId ? `${statusLabel} · ${t("shared voice")}` : statusLabel, onClick: () => openInspector(voice.characterId) }}
         />;

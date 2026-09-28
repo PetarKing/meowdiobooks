@@ -57,6 +57,7 @@ class LibraryExport(BaseModel):
     book_id: str
     title: str = Field(min_length=1, max_length=500)
     author: str = Field(max_length=500)
+    description: str | None = Field(default=None, max_length=2000)
     filename: str
     file_path: str
     chapter_count: int = Field(ge=1)

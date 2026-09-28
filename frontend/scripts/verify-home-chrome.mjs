@@ -33,7 +33,8 @@ try {
     assert(bookCard && bookCard.width >= 270 && bookCard.width <= 460, `Book shelf card width ${bookCard?.width}`);
     assert(await card.getByRole('button', { name: /Continue/ }).isVisible());
     assert(await card.getByRole('button', { name: /Delete/ }).isVisible());
-    assert((await card.getByRole('button', { name: /Continue/ }).boundingBox()).height >= 300);
+    const bookCardHeight = (await card.getByRole('button', { name: /Continue/ }).boundingBox()).height;
+    assert(bookCardHeight >= 100 && bookCardHeight <= 170, `Compact book card height ${bookCardHeight}`);
     let overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert(overflow <= 1, `Home overflow: ${overflow}`);
     await page.screenshot({ path: `${out}/home-one-${width}-${appearance}.png`, fullPage: true });

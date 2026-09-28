@@ -37,6 +37,7 @@ class AudioExportRequest(ApiRequest):
     chapters: list[M4BChapterRequest] = Field(min_length=1)
     title: str | None = Field(default=None, max_length=500)
     author: str | None = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, max_length=2000)
     coverPage: int = Field(default=1, ge=1)
     preset: AudioExportPreset = AudioExportPreset.M4B_HIGH
 
