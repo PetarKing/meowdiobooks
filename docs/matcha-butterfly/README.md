@@ -1,5 +1,7 @@
 # Matcha & Cherry — butterfly iteration
 
+Historical candidate: the [stagecraft iteration](../matcha-next/README.md) supersedes its Cast auditions, Review return, Extract preview and local-books shelf.
+
 The current local candidate retains the Japanese-inspired sanctuary and recognizable reading cat as a benevolent local kami. This iteration responds to the six concrete criticisms of the sanctuary candidate: open composition, repaired visual defects, one-icon appearance, usable chapter rows, a rebuilt Export workspace and removal of the home step strip.
 
 Open the [safe studio](http://127.0.0.1:5179/studio.html) or the [component workshop](http://127.0.0.1:6006/). Both use live source components and editable synthetic states. Select Generate, Export or Library in the studio's Preview menu; use the header icon for light/dark.

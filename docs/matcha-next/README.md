@@ -1,0 +1,7 @@
+# Matcha & Cherry — stagecraft iteration
+
+This is the current local design candidate. It builds on the [butterfly pass](../matcha-butterfly/README.md) and addresses the next review: a game-like Cast roster, one-click voice audition choices with Ghost as the new-voice doorway, full-height PDF pages, softer Generate tabs, a stronger local-book shelf, designed confirmation dialogs and an automatic return to Review settings. The sanctuary's reading cat remains the visual anchor; a quieter [decorative canopy](ASSET-PROVENANCE.md) adds atmosphere to working screens.
+
+Open the [safe studio](http://127.0.0.1:5179/studio.html) and select **Cast · audition review**, **Review · scan invitation**, **Extract · preview**, **Create · six local books** or **Generate** from Preview. The [Storybook workshop](http://127.0.0.1:6006/) uses the same source components with editable controls. These fixtures carry synthetic workflow data and silent audio; they do not publish artifacts or run real generation.
+
+The [review record](REVIEW.md) links the rendered evidence and checks. [Decisions](DECISIONS.md) distinguish immediate draft choices from accepted workflow revisions. No push, merge, release or deployment has occurred. Aesthetic acceptance remains the user's decision.

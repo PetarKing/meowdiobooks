@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { DialogSurface } from "../components/DialogSurface";
 import type {
   CastArtifact,
-  CastVoice
+  CastVoice,
+  VoiceSettings,
 } from "../api/contracts";
 import type { WorkflowModel } from "../app/useWorkflowModel";
 import { strongConfirmationLabelsForCast } from "../castIdentity";
@@ -35,17 +37,41 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   const current = castCandidate ?? (revising ? undefined : snapshot?.cast);
   const hasPreviousCast = Boolean(snapshot?.cast)
     || (snapshot?.history.cast?.some((row) => row.status === "superseded") ?? false);
+  const [confirmation, setConfirmation] = useState<
+    | { kind: "replacement" }
+    | { kind: "reclassify" }
+    | { kind: "regenerate"; characterId: string; voiceSettings: VoiceSettings }
+  >();
+  const [editingAcceptedCast, setEditingAcceptedCast] = useState(false);
 
   function beginCastReplacement() {
-    if (!window.confirm(t(
-      "Changing the cast or voices creates a replacement. After you accept it, the previous voices can no longer generate new audio. Existing generated audio and Library exports stay available. Continue?",
-    ))) return;
-    if (current?.revision === snapshot?.cast?.revision) setCastCandidate(undefined);
+    setConfirmation({ kind: "replacement" });
+  }
+
+  function confirmCastReplacement() {
+    const hasRestoredDraft = Boolean(current && current.revision !== snapshot?.cast?.revision);
+    if (current && !hasRestoredDraft) {
+      setCastCandidate(current);
+      setIdentityDecisions(decisionsForCast(current));
+      setResolvedLabels(resolvedLabelsForCast(current));
+      setVoiceSelections({ ...automaticSharedVoiceSelections(current), ...acceptedVoiceSelections(current) });
+      setVoiceRoutes(voiceRoutesForCast(current));
+      setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(current));
+      setVoiceModel(current.voiceModel ?? voiceModel);
+      setLanguage(current.language ?? language);
+      setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection);
+      setEditingCast(true);
+      setDesigningVoices(false);
+      setEditingAcceptedCast(true);
+    }
     setRevisingStages([...new Set([...revisingStages, "cast"])]);
   }
 
   function reclassifyCast() {
-    if (!window.confirm(t("Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Once you accept the replacement, only its voices can generate new audio."))) return;
+    setConfirmation({ kind: "reclassify" });
+  }
+
+  function confirmReclassifyCast() {
     void processCandidate("cast", { forceReclassify: true }).then((candidate) => {
       const cast = candidate as unknown as CastArtifact;
       setCastCandidate(cast);
@@ -59,6 +85,42 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       setDesigningVoices(false);
     }).catch((reason) => setError(message(reason)));
   }
+
+  function confirmRegenerate(characterId: string, voiceSettings: VoiceSettings) {
+    if (!current) return;
+    setRegeneratingCharacterId(characterId);
+    void processCandidate("cast", { proposalRevision: current.revision, characterId, voiceSettings }).then((candidate) => {
+      const cast = candidate as unknown as CastArtifact;
+      const regenerated = [cast.narrator, ...(cast.identities ?? [])].find((row) => row?.characterId === characterId);
+      setCastCandidate(cast);
+      setVoiceSelections((selected) => {
+        const next = { ...selected };
+        if (regenerated && !voiceHasRevision(regenerated, selected[characterId])) delete next[characterId];
+        return next;
+      });
+    }).catch((reason) => setError(message(reason))).finally(() => setRegeneratingCharacterId(undefined));
+  }
+
+  const confirmationDialog = confirmation && <div className="process-overlay">
+    <DialogSurface as="div" className="process-modal cast-confirmation-modal" aria-labelledby="cast-confirmation-title" onDismiss={() => setConfirmation(undefined)}>
+      <span className="eyebrow">{t("Cast decision")}</span>
+      <h2 id="cast-confirmation-title">{t(confirmation.kind === "replacement" ? "Change the cast?" : confirmation.kind === "reclassify" ? "Reclassify source labels?" : "Create a replacement audition?")}</h2>
+      <p>{t(confirmation.kind === "replacement"
+        ? "Changing the cast or voices creates a replacement. After you accept it, the previous voices can no longer generate new audio. Existing generated audio and Library exports stay available. Continue?"
+        : confirmation.kind === "reclassify"
+          ? "Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Once you accept the replacement, only its voices can generate new audio."
+          : "Regenerating replaces this cast member’s current audition set. Existing generated audio and Library exports stay available. Continue?")}</p>
+      <div className="cast-default-actions">
+        <button type="button" className="ghost" onClick={() => setConfirmation(undefined)}>{t("Keep current cast")}</button>
+        <button type="button" className="primary" onClick={() => {
+          setConfirmation(undefined);
+          if (confirmation.kind === "replacement") confirmCastReplacement();
+          else if (confirmation.kind === "reclassify") confirmReclassifyCast();
+          else confirmRegenerate(confirmation.characterId, confirmation.voiceSettings);
+        }}>{t(confirmation.kind === "replacement" ? "Change cast" : confirmation.kind === "reclassify" ? "Reclassify labels" : "Create audition")} →</button>
+      </div>
+    </DialogSurface>
+  </div>;
 
   if (!current) return <><PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t(hasPreviousCast ? "Review your cast." : "Build your cast.")} copy={t(hasPreviousCast ? "Confirm your existing cast against the updated review." : "Confirm which names belong to each character, then choose their voices.")} /><StageLaunch><button className="primary" onClick={() => void processCandidate("cast", {}, !hasPreviousCast).then((candidate) => {
     const cast = candidate as unknown as CastArtifact;
@@ -77,8 +139,8 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     const supported = snapshot?.voiceModels.find((row) => row.id === modelId)?.supportedLanguages ?? [];
     if (cast.language && supported.includes(cast.language)) setLanguage(cast.language);
     else if (cast.detectedLanguage && supported.includes(cast.detectedLanguage)) setLanguage(cast.detectedLanguage);
-  }).catch((reason) => setError(message(reason)))}>{t(hasPreviousCast ? "Review cast & voices" : "Find characters")} →</button></StageLaunch></>;
-  if (completed.includes("cast") && !revising) { const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean); return <AcceptedSummary stage="cast" step={t("Step 4")} title={t("Cast and voices ready")} revision={snapshot?.activeArtifacts.cast} onRevise={beginCastReplacement} note={t("Changing the cast or voices creates a replacement. Once accepted, only the replacement can generate new audio. Existing generated audio and Library exports stay available.")}><span><b>{voices.length}</b><small>{t("Assigned voices")}</small></span><span><b>{t(snapshot?.voiceSelection.language ?? "—")}</b><small>{t("Audition language")}</small></span><span><b>{snapshot?.voiceModels.find((row) => row.id === snapshot.voiceSelection.modelId)?.label ?? snapshot?.voiceSelection.modelId ?? "—"}</b><small>{t("Voice model")}</small></span></AcceptedSummary>; }
+  }).catch((reason) => setError(message(reason)))}>{t(hasPreviousCast ? "Review cast & voices" : "Find characters")} →</button></StageLaunch>{confirmationDialog}</>;
+  if (completed.includes("cast") && !revising) { const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean); return <><AcceptedSummary stage="cast" step={t("Step 4")} title={t("Cast and voices ready")} revision={snapshot?.activeArtifacts.cast} onRevise={beginCastReplacement} note={t("Changing the cast or voices creates a replacement. Once accepted, only the replacement can generate new audio. Existing generated audio and Library exports stay available.")}><span><b>{voices.length}</b><small>{t("Assigned voices")}</small></span><span><b>{t(snapshot?.voiceSelection.language ?? "—")}</b><small>{t("Audition language")}</small></span><span><b>{snapshot?.voiceModels.find((row) => row.id === snapshot.voiceSelection.modelId)?.label ?? snapshot?.voiceSelection.modelId ?? "—"}</b><small>{t("Voice model")}</small></span></AcceptedSummary>{confirmationDialog}</>; }
   if (current.phase === "identity-review" || editingCast || current.auditionPackRefreshRequired) {
     const confirmationLabels = strongConfirmationLabelsForCast(current, identityDecisions);
     const pendingConfirmations = confirmationLabels.filter((label) => !resolvedLabels.includes(label));
@@ -88,7 +150,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       || voiceModel !== (current.voiceModel ?? voiceModel)
       || language !== (current.language ?? language)
       || current.auditionPackRefreshRequired === true;
-    const generateVoices = () => void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, ...(enhancedCasting ? { sourceBookIds, castingPreviewFingerprint } : {}) }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastingSources({ bookId: book?.id ?? "", ids: [] }); setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); setDesigningVoices(false); }).catch((reason) => setError(message(reason)));
+    const generateVoices = () => void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, ...(enhancedCasting ? { sourceBookIds, castingPreviewFingerprint } : {}) }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastingSources({ bookId: book?.id ?? "", ids: [] }); setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); setDesigningVoices(false); setEditingAcceptedCast(false); }).catch((reason) => setError(message(reason)));
     const changeCastingModel = (id: string) => {
       setCastGenerationPaused(false);
       setVoiceModel(id);
@@ -108,11 +170,12 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
         </div>
         <CastingChoice gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onSourcesChange={(ids) => { setCastGenerationPaused(false); setCastingSources({ bookId: book.id, ids }); }} onModelChange={changeCastingModel} action={<button className="primary" disabled={!castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
+        {confirmationDialog}
       </section>;
     }
     return <><PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t(editingCast ? "Review the cast." : "Build the cast.")} copy={t("Open a cast member to check its names and source labels.")} />
       <CastIdentityReview hideVoiceSettings={enhancedCasting} hideVoiceModel={enhancedCasting} cast={current} decisions={identityDecisions} setDecisions={setIdentityDecisions} resolvedLabels={resolvedLabels} setResolvedLabels={setResolvedLabels} voiceModels={snapshot?.voiceModels ?? []} voiceModel={voiceModel} language={language} onVoiceModelChange={(id) => { setCastGenerationPaused(false); setVoiceModel(id); const supported = snapshot?.voiceModels.find((row) => row.id === id)?.supportedLanguages ?? []; if (!supported.includes(language)) setLanguage(supported.includes("english") ? "english" : supported[0] ?? ""); }} onLanguageChange={(id) => { setCastGenerationPaused(false); setLanguage(id); }} onReclassify={editingCast ? reclassifyCast : undefined} />
-      <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t("{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(castGenerationPaused ? "Completed voices are saved; continue from the interrupted voice" : current.auditionPackRefreshRequired ? "The voice recipe changed; regenerate the complete audition pack" : editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "Cast structure is ready for auditions")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); setCastingSources({ bookId: book?.id ?? "", ids: [] }); updateCastingPreview(false); setDesigningVoices(false); setEditingCast(false); }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={pendingConfirmations.length > 0 || (!enhancedCasting && (!voiceModel || !language || (editingCast && !castEditsDirty)))} onClick={enhancedCasting ? () => { updateCastingPreview(false); setDesigningVoices(true); } : generateVoices}>{t(enhancedCasting ? "Design the voices" : castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : enhancedCasting ? "Continue" : "Generate required auditions")} →</button></div></div></>;
+      <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t("{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(castGenerationPaused ? "Completed voices are saved; continue from the interrupted voice" : current.auditionPackRefreshRequired ? "The voice recipe changed; regenerate the complete audition pack" : editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "Cast structure is ready for auditions")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); setCastingSources({ bookId: book?.id ?? "", ids: [] }); updateCastingPreview(false); setDesigningVoices(false); setEditingCast(false); if (editingAcceptedCast) { setCastCandidate(undefined); setRevisingStages(revisingStages.filter((stage) => stage !== "cast")); setEditingAcceptedCast(false); } }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={pendingConfirmations.length > 0 || (!enhancedCasting && (!voiceModel || !language || (editingCast && !castEditsDirty)))} onClick={enhancedCasting ? () => { updateCastingPreview(false); setDesigningVoices(true); } : generateVoices}>{t(enhancedCasting ? "Design the voices" : castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : enhancedCasting ? "Continue" : "Generate required auditions")} →</button></div></div>{confirmationDialog}</>;
   }
   const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean) as CastVoice[];
   const voiceById = Object.fromEntries(voices.map((voice) => [voice.characterId, voice]));
@@ -170,7 +233,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   }
 
   return <>
-    <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Choose the cast voices.")} copy={t(current.reusedFromRevision ? "Your dialogue is unchanged. Previous cast and audition choices are kept." : "Open a character to compare auditions and approve a voice.")} />
+    <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Choose the cast voices.")} copy={t(current.reusedFromRevision ? "Your dialogue is unchanged. Previous cast and audition choices are kept." : "Open a character to compare auditions. Choosing one applies it immediately.")} />
     <CastVoiceReview
       layeredVoicePreviewUrl={gateway.layeredVoicePreviewUrl?.bind(gateway)}
       bookId={book?.id ?? ""}
@@ -207,22 +270,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           setVoiceSelections((selected) => { const next = { ...selected }; delete next[characterId]; return next; });
         }).catch((reason) => setError(message(reason))).finally(() => setRegeneratingCharacterId(undefined));
       }}
-      onRegenerate={(characterId, voiceSettings) => {
-        if (!window.confirm(t(
-          "Regenerating replaces this cast member’s current audition set. Existing generated audio and Library exports stay available. Continue?",
-        ))) return;
-        setRegeneratingCharacterId(characterId);
-        void processCandidate("cast", { proposalRevision: current.revision, characterId, voiceSettings }).then((candidate) => {
-          const cast = candidate as unknown as CastArtifact;
-          const regenerated = [cast.narrator, ...(cast.identities ?? [])].find((row) => row?.characterId === characterId);
-          setCastCandidate(cast);
-          setVoiceSelections((selected) => {
-            const next = { ...selected };
-            if (regenerated && !voiceHasRevision(regenerated, selected[characterId])) delete next[characterId];
-            return next;
-          });
-        }).catch((reason) => setError(message(reason))).finally(() => setRegeneratingCharacterId(undefined));
-      }}
+      onRegenerate={(characterId, voiceSettings) => setConfirmation({ kind: "regenerate", characterId, voiceSettings })}
     />
     <div className="phase-action">
       <span>{unavailableVoices.length > 0
@@ -244,11 +292,12 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           : t("Continuing approves the latest audition for each of these voices and accepts the full cast: {{names}}.", { names: summarizedVoiceNames(unapprovedVoices) })}</p>
         {approvedCount > 0 && <p>{approvedCount === 1 ? t("Your 1 approved choice stays exactly as selected.") : t("Your {{count}} approved choices stay exactly as selected.", { count: approvedCount })}</p>}
         <div className="cast-default-actions">
-          <button className="ghost" autoFocus onClick={() => setConfirmDefaultVoices(false)}>{t("Keep reviewing")}</button>
+          <button className="ghost" onClick={() => setConfirmDefaultVoices(false)}>{t("Keep reviewing")}</button>
           <button className="primary" onClick={submitCastVoices}>{t("Approve remaining & accept")} →</button>
         </div>
       </DialogSurface>
     </div>}
+    {confirmationDialog}
   </>;
 
 }

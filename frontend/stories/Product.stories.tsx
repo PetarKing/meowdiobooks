@@ -26,6 +26,7 @@ export const DialogueConflicts: Story = scenario("dialogue-conflicts");
 export const DialogueResults: Story = scenario("dialogue-results");
 export const DialogueAccepted: Story = scenario("dialogue-accepted");
 export const Review: Story = scenario("review");
+export const ReviewIntro: Story = scenario("review-intro");
 export const ReviewBoundaries: Story = scenario("review-boundaries");
 export const ReviewFinal: Story = scenario("review-final");
 export const ReviewAccepted: Story = scenario("review-accepted");

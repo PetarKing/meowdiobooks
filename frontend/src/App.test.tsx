@@ -2318,26 +2318,31 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument())
   })
 
-  it('reopens an accepted cast as recovery work without flashing the processing overlay', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const editable = {
-      ...base.cast!, revision: 'cast-editable', phase: 'audition-review' as const,
-    }
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'succeeded', result: { revision: 'cast-editable' } })
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue(editable)
-
+  it('opens accepted cast settings directly, with a designed confirmation and no rescanning', async () => {
     await open()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.getByText(/only the replacement can generate new audio/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
-
-    expect(await screen.findByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
+    const trigger = screen.getByRole('button', { name: 'Change settings →' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    const confirmation = screen.getByRole('dialog', { name: 'Change the cast?' })
+    expect(confirmation).toHaveTextContent('previous voices can no longer generate new audio')
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.keyDown(confirmation, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Change settings →' })).toBeInTheDocument()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep current cast' }))
+    expect(trigger).toHaveFocus()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
+    expect(await screen.findByRole('region', { name: 'Cast members' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review cast & voices →' })).not.toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
-    expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', {})
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(
-      'previous voices can no longer generate new audio',
-    ))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel cast edits' }))
+    expect(screen.getByRole('heading', { name: 'Cast and voices ready' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Cast voice auditions' })).not.toBeInTheDocument()
   })
 
   it('reuses previously accepted auditions after a Review-only change', async () => {
@@ -2397,6 +2402,7 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: /Cast & voices Draft ready/ })).toBeInTheDocument()
     fireEvent.click(within(nav).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
 
     expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-draft')
@@ -2431,8 +2437,6 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getStageCandidate)
       .mockResolvedValueOnce(reusedCast)
       .mockResolvedValueOnce(freshCast)
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
     expect(await screen.findByText('Your dialogue is unchanged. Previous cast and audition choices are kept.')).toBeInTheDocument()
@@ -2440,12 +2444,14 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '← Review cast' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reclassify from Dialogue' }))
+    const confirmation = screen.getByRole('dialog', { name: 'Reclassify source labels?' })
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Reclassify labels →' }))
 
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenLastCalledWith('book-1', 'cast', { forceReclassify: true }))
     expect(await screen.findByRole('region', { name: 'Cast members' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reclassify from Dialogue' })).not.toBeInTheDocument()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
-    confirm.mockRestore()
   })
 
   it('lets the user approve detected chapter starts in one clear action', async () => {
@@ -2644,10 +2650,47 @@ describe('v2 wizard', () => {
     const scanButton = screen.getByRole('button', { name: 'Scan for issues →' })
     fireEvent.click(scanButton)
 
-    expect(scanButton).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Scan for issues →' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Scanning for issues…' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
     finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
     expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+  })
+
+  it('starts a fresh Review candidate from Change settings and keeps the accepted review until approval', async () => {
+    let finishScan!: (job: { id: string; status: 'succeeded'; result: { revision: string } }) => void
+    vi.mocked(wizardApi.processStage).mockReturnValue(new Promise((resolve) => { finishScan = resolve }))
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-replacement', warnings: [], boundaryCandidates: [] })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+
+    expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'review', {})
+    expect(screen.getByRole('status', { name: 'Scanning for issues…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan for issues →' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+
+    finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-replacement' } })
+    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'review', 'review-replacement')
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+  })
+
+  it('lets a failed automatic Review scan retry in place', async () => {
+    vi.mocked(wizardApi.processStage)
+      .mockRejectedValueOnce(new Error('Review scan unavailable'))
+      .mockResolvedValueOnce({ id: 'review-job', status: 'succeeded', result: { revision: 'review-retry' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-retry', warnings: [], boundaryCandidates: [] })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Review scan unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(2)
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
 
   it('shows one bounded context excerpt and explains retention separately from narrator assignment', async () => {
@@ -2871,13 +2914,14 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Open Narrator voice' })).not.toHaveAttribute('draggable')
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    expect(narratorDialog).toHaveTextContent('Tune and generate')
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    expect(within(narratorDialog).getByRole('button', { name: 'Create a new audition' })).toBeInTheDocument()
+    expect(narratorDialog).not.toHaveTextContent('Tune and generate')
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
     fireEvent.click(screen.getByRole('button', { name: 'Open Alice voice' }))
     const aliceDialog = screen.getByRole('dialog', { name: 'Alice voice' })
-    fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(aliceDialog)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Accept cast & voices →' })).toBeEnabled())
@@ -2902,6 +2946,34 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: 'Accept suggestion' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
     expect(applyEdits).toBeEnabled()
+  })
+
+  it('confirms a Ghost audition in the designed dialog before starting generation', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      cast: {
+        revision: 'auditions-ghost', phase: 'audition-review', dossiers: [], proposals: [],
+        narrator: { characterId: 'narrator', name: 'Narrator', voicePreviewRevision: 'nv1', previewUrl: '/n.wav' },
+        identities: [],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
+    const confirmation = screen.getByRole('dialog', { name: 'Create a replacement audition?' })
+    expect(confirmation).toHaveTextContent('replaces this cast member’s current audition set')
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Keep current cast' }))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create audition →' }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
+      proposalRevision: 'auditions-ghost', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
+    })))
   })
 
   it('offers one complete pack refresh when the registered voice recipe changed', async () => {
@@ -2958,8 +3030,7 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Select Audition 1' }))
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
@@ -3008,6 +3079,7 @@ describe('v2 wizard', () => {
     })
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Open Alice voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
     fireEvent.click(screen.getByRole('radio', { name: /Clone from a sample/ }))
     const sample = new File(['voice'], 'alice.wav', { type: 'audio/wav' })
     fireEvent.change(screen.getByLabelText('Choose voice sample'), { target: { files: [sample] } })
@@ -3027,13 +3099,14 @@ describe('v2 wizard', () => {
     expect(await screen.findByText('Audition 2')).toBeInTheDocument()
     expect(screen.getByText('Cloned from a 4.0 sec sample')).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Approve Audition 2' })).toBeInTheDocument()
-      expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived', 'selected')
+      expect(screen.getByRole('button', { name: 'Apply Audition 2' })).toBeInTheDocument()
+      expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived')
     })
 
     expect(screen.queryByRole('button', { name: /Delete Audition/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Select Audition 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Select Audition 2' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply Audition 1' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Audition 2' }))
+    expect(screen.getByRole('button', { name: 'Apply Audition 2' })).toHaveAttribute('aria-pressed', 'true')
     expect(wizardApi.deleteVoiceAudition).not.toHaveBeenCalled()
 
   })
@@ -3095,7 +3168,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 

@@ -67,18 +67,21 @@ try {
       const dialog = page.getByRole('dialog', { name: 'Alice voice' });
       await dialog.waitFor();
       assert.equal(await dialog.getByRole('button', { name: /Delete Audition/ }).count(), 0);
-      const candidate = dialog.getByRole('button', { name: 'Select Audition 1' });
+      const candidate = dialog.getByRole('button', { name: 'Apply Audition 1' });
       await candidate.locator('.voice-candidate-summary').click();
       assert.equal(await candidate.getAttribute('aria-pressed'), 'true');
       await page.waitForTimeout(1500);
       await candidate.locator('..').locator('..').locator('audio').click();
-      assert.equal(await candidate.getAttribute('aria-pressed'), 'true', 'Listening does not change the pending selection');
+      assert.equal(await candidate.getAttribute('aria-pressed'), 'true', 'Listening does not change the applied audition');
       await page.waitForTimeout(1300);
-      await dialog.getByRole('button', { name: 'Approve Audition 1' }).click();
+      await dialog.getByRole('button', { name: 'Create a new audition' }).click();
+      await dialog.getByRole('button', { name: 'Generate new audition →' }).waitFor();
+      await dialog.getByRole('button', { name: 'Back to auditions' }).click();
+      await dialog.getByRole('button', { name: 'Close voice' }).click();
       await dialog.waitFor({ state: 'hidden' });
       await page.getByRole('button', { name: 'Open Alice voice' }).click();
       await dialog.waitFor();
-      assert.match(await dialog.getByRole('button', { name: 'Select Audition 1' }).innerText(), /Applied/);
+      assert.match(await dialog.getByRole('button', { name: 'Apply Audition 1' }).innerText(), /Applied/);
       await page.waitForTimeout(1700);
     } else {
       await chooseAppearance(page, 'light');

@@ -28,6 +28,6 @@ export function PresentationRoot({ palette, appearance = 'light', style, childre
   ])) as CSSProperties
   const visualTokens = Object.fromEntries(Object.entries(style ?? {}).filter(([key]) => key.startsWith('--'))) as CSSProperties
   return <PresentationBoundary.Provider value={{ appearance, tokens: { ...tokens, ...visualTokens } }}>
-    <div {...props} data-presentation-root="" data-appearance={appearance} style={{ ...tokens, ...style }}>{children}</div>
+    <div {...props} data-presentation-root="" data-appearance={appearance} data-presentation-palette={palette ? 'custom' : undefined} style={{ ...tokens, ...style }}>{children}</div>
   </PresentationBoundary.Provider>
 }

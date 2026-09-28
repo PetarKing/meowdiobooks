@@ -58,6 +58,7 @@ export type GatewayVariant =
   | "generate-failed"
   | "generate-running"
   | "home-error"
+  | "home-shelf"
   | "library-error"
   | "library-loading"
   | "library-missing-cover"
@@ -458,6 +459,21 @@ const baselineScenarioMetadata = {
       heading: "Review your manuscript",
     },
   },
+  "review-intro": {
+    label: "Review · scan invitation",
+    description: "Unscanned manuscript and source-check invitation.",
+    completedStages: throughDialogue,
+    snapshotVariant: "review-warnings",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Check for issues",
+    },
+  },
   "review-boundaries": {
     label: "Review · chapters",
     description: "Chapter heading decision and anchored examples.",
@@ -578,6 +594,7 @@ const baselineScenarioMetadata = {
 /** Failure and recovery variants use the same real pages and in-memory gateway. */
 export const scenarioMetadata = {
   ...baselineScenarioMetadata,
+  "home-shelf": { ...baselineScenarioMetadata.home, label: "Create · six local books", description: "Responsive shelf of six synthetic local drafts.", gatewayVariant: "home-shelf" },
   "generate-long-book": { ...baselineScenarioMetadata.generate, label: "Generate · 120 chapters", description: "A long synthetic book for tracklist selection, estimates and listening.", snapshotVariant: "generate-long-book" },
   "library-missing-cover": { ...baselineScenarioMetadata.library, label: "Library · missing cover", description: "A broken cover resolves to the readable production fallback.", gatewayVariant: "library-missing-cover" },
   "library-refresh-error": { ...baselineScenarioMetadata.library, label: "Library · refresh failed", description: "Saved editions remain visible after a failed refresh.", gatewayVariant: "library-refresh-error" },

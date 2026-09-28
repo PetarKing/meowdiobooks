@@ -109,8 +109,38 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       setReviewTransition(false);
     }
   }
-  if (!reviewCandidate && completed.includes("review") && !revisingStages.includes("review")) return <AcceptedSummary stage="review" step={t("Step 3")} title={t("Review complete")} revision={snapshot?.activeArtifacts.review} onRevise={() => setRevisingStages([...new Set([...revisingStages, "review"])])}><span><b>{snapshot?.reviewInspection.decisions.length ?? 0}</b><small>{t("Issues resolved")}</small></span><span><b>{snapshot?.chapters.length ?? 0}</b><small>{t("Chapters confirmed")}</small></span><span><b>{t("Ready")}</b><small>{t("For cast & voices")}</small></span></AcceptedSummary>;
-  if (!reviewCandidate) return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("Check for issues")} copy={t("Scan extraction, layout, chapter boundaries and delivery before choosing what happens.")} /><StageLaunch><button className="primary" disabled={busy} onClick={() => void processCandidate("review", {}, false).then((candidate) => { setReviewCandidate(candidate); setReviewDecisions({}); setBoundaryDecisions({}); setActiveBoundary(0); setActiveWarning(0); setActiveOccurrence(0); setActiveReviewGroup(Array.isArray(candidate.boundaryCandidates) && candidate.boundaryCandidates.length ? "chapters" : "warnings"); }).catch((reason) => setError(message(reason)))}>{t("Scan for issues")} →</button></StageLaunch></>;
+  async function scanForIssues() {
+    try {
+      const candidate = await processCandidate("review", {}, false);
+      setReviewCandidate(candidate);
+      setReviewDecisions({});
+      setBoundaryDecisions({});
+      setActiveBoundary(0);
+      setActiveWarning(0);
+      setActiveOccurrence(0);
+      setActiveReviewGroup(Array.isArray(candidate.boundaryCandidates) && candidate.boundaryCandidates.length ? "chapters" : "warnings");
+    } catch (reason) {
+      setError(message(reason));
+    }
+  }
+
+  if (!reviewCandidate && completed.includes("review") && !revisingStages.includes("review")) return <AcceptedSummary stage="review" step={t("Step 3")} title={t("Review complete")} revision={snapshot?.activeArtifacts.review} onRevise={() => {
+    setRevisingStages([...new Set([...revisingStages, "review"])]);
+    void scanForIssues();
+  }}><span><b>{snapshot?.reviewInspection.decisions.length ?? 0}</b><small>{t("Issues resolved")}</small></span><span><b>{snapshot?.chapters.length ?? 0}</b><small>{t("Chapters confirmed")}</small></span><span><b>{t("Ready")}</b><small>{t("For cast & voices")}</small></span></AcceptedSummary>;
+  if (!reviewCandidate) return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("Check for issues")} copy={t("Scan extraction, layout, chapter boundaries and delivery before choosing what happens.")} />
+    <section className="review-scan-scene" aria-label={t("Manuscript review")}>
+      <div className="review-scan-copy">
+        <span className="eyebrow">{t("Manuscript review")}</span>
+        <h2>{busy ? t("Reading through your manuscript…") : t("A closer look at the story")}</h2>
+        <p>{busy ? t("Checking source words, chapter openings and reading order. Your accepted version remains available while we prepare a new review.") : t("We will bring the chapter openings and any source issues together for your decisions.")}</p>
+        {busy ? <div className="review-scan-progress" role="status" aria-label={t("Scanning for issues…")}><span className="review-scan-progress-track" aria-hidden="true"><i /></span>{t("Scanning for issues…")}</div>
+          : <StageLaunch><button className="primary" onClick={() => void scanForIssues()}>{t("Scan for issues")} →</button></StageLaunch>}
+      </div>
+      <div className="review-scan-art" aria-hidden="true"><div className="review-scan-page"><i /><i /><i /><i /><i /><i /></div><div className="review-scan-stamp">✦</div></div>
+      <div className="review-scan-themes" aria-hidden="true"><span>{t("Source words")}</span><span>{t("Chapter openings")}</span><span>{t("Reading order")}</span></div>
+    </section>
+  </>;
   const recovery = reviewCandidate?.recovery;
   if (recovery) { const recoveryMessage = String(recovery.message ?? "Rebuild Dialogue before continuing."); return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("The transcript needs rebuilding before review.")} copy={t("Extraction completed successfully, but the transcript no longer maps back to every extracted character exactly.")} /><Panel eyebrow={t("Source safety check")} title={t("Nothing was lost or accepted incorrectly")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}><p className="panel-copy">{t(recoveryMessage, { defaultValue: recoveryMessage })}</p><div className="strategy-list two"><button className="strategy-card" onClick={() => { setRevisingStages([...new Set([...revisingStages, "dialogue"])]); setStage(stageIndex("dialogue")); }}><strong>{t("Rebuild Dialogue")}</strong><small>{t("Recommended. Keep the accepted extraction and create a fresh source-exact transcript.")}</small></button><button className="strategy-card" onClick={() => { setRevisingStages([...new Set([...revisingStages, "extract"])]); setStage(stageIndex("extract")); }}><strong>{t("Try another extraction")}</strong><small>{t("Use this only when the extracted words or reading order are themselves wrong.")}</small></button></div></Panel></>; }
   if (reviewFinalCheck) return <ReviewTranscriptFinalCheck

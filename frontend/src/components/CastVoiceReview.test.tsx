@@ -70,6 +70,8 @@ describe("CastVoiceReview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
     const dialog = screen.getByRole("dialog", { name: "Missing voice" });
     expect(within(dialog).queryByRole("button", { name: /Approve Audition/ })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("group", { name: "Voice traits" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
     const generate = within(dialog).getByRole("button", { name: "Generate new audition →" });
     expect(generate).toBeEnabled();
     expect(approve).not.toHaveBeenCalled();
@@ -125,8 +127,9 @@ describe("CastVoiceReview", () => {
     trigger.focus();
     fireEvent.click(trigger);
     const dialog = screen.getByRole("dialog", { name: "Member 0 voice" });
-    fireEvent.click(within(dialog).getByRole("button", { name: "Approve Audition 1" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply Audition 1" }));
     view.rerender(<CastVoiceReview {...props} selections={{ "member-0": "v-0" }} />);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close voice" }));
     fireEvent.animationEnd(dialog);
     expect(screen.queryByRole("button", { name: "Open Member 0 voice" })).not.toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search cast" })).toHaveFocus();
@@ -142,7 +145,7 @@ describe("CastVoiceReview", () => {
     expect(dialog).toHaveFocus();
     expect(document.body.style.overflow).toBe("hidden");
     fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(within(dialog).getByRole("button", { name: /Approve Audition/ })).toHaveFocus();
+    expect(within(dialog).getByRole("button", { name: "Close voice" })).toHaveFocus();
     fireEvent.keyDown(dialog, { key: "Escape" });
     expect(dialog).toHaveClass("closing");
     fireEvent.animationEnd(dialog);
@@ -157,6 +160,7 @@ describe("CastVoiceReview", () => {
     render(<CastVoiceReview bookId="book" cast={cast} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={vi.fn()} loadSourceVoices={load} onReuseVoice={reuse} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     expect(load).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Create a new audition" }));
     const details = screen.getByText("Use a voice from another book").closest("details")!;
     details.open = true;
     fireEvent(details, new Event("toggle"));
@@ -173,6 +177,7 @@ describe("CastVoiceReview", () => {
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} onTranscribe={onTranscribe} onUpload={onUpload} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
     const sample = new File(["voice"], "many.flac", { type: "audio/flac" });
 
     expect(within(dialog).getByRole("radiogroup", { name: "Audition source" })).toBeInTheDocument();
@@ -202,19 +207,18 @@ describe("CastVoiceReview", () => {
     play.mockRestore();
   });
 
-  it("keeps auditions and lets their description select the exact candidate without deletion", () => {
+  it("keeps auditions and applies the exact candidate with one click without deletion", () => {
     const onDelete = vi.fn();
     const onApprove = vi.fn();
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={onApprove} onRegenerate={() => undefined} onDelete={onDelete} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
     expect(within(dialog).queryByRole("button", { name: /Delete Audition/ })).not.toBeInTheDocument();
-    const earlier = within(dialog).getByRole("button", { name: "Select Audition 1" });
+    const earlier = within(dialog).getByRole("button", { name: "Apply Audition 1" });
     fireEvent.click(within(earlier).getByText("Warm · Measured · neutral accent"));
-    expect(earlier).toHaveAttribute("aria-pressed", "true");
-    expect(onApprove).not.toHaveBeenCalled();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Approve Audition 1" }));
     expect(onApprove).toHaveBeenCalledWith("many", "many-1");
+    expect(dialog).not.toHaveClass("closing");
+    expect(within(dialog).queryByRole("button", { name: /Approve Audition/ })).not.toBeInTheDocument();
     expect(onDelete).not.toHaveBeenCalled();
   });
 
@@ -369,6 +373,8 @@ describe("CastVoiceReview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
     expect(dialog).toHaveTextContent("20 lines");
+    expect(within(dialog).queryByRole("group", { name: "Voice traits" })).not.toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
     expect(within(dialog).getByLabelText("Gender")).toHaveValue("androgynous");
     fireEvent.change(within(dialog).getByLabelText("Pace"), { target: { value: "measured" } });
     expect(within(dialog).getByLabelText("Accent")).toHaveAttribute(
@@ -385,24 +391,19 @@ describe("CastVoiceReview", () => {
     expect(onRegenerate).toHaveBeenCalledWith("many", expect.objectContaining({ pace: "measured" }));
   });
 
-  it("selects and explicitly approves any preserved candidate", () => {
+  it("applies any preserved candidate on click and keeps the inspector open for comparison", () => {
     const onApprove = vi.fn();
     render(<CastVoiceReview bookId="book-1" cast={cast} selections={{ many: "many-1" }} routes={{}} onRouteChange={() => undefined} onApprove={onApprove} onRegenerate={() => undefined} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     const dialog = screen.getByRole("dialog", { name: "Many voice" });
 
-    expect(within(dialog).getByRole("button", { name: "Select Audition 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(dialog).getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "true");
     expect(within(dialog).queryByRole("button", { name: "Approve Audition 1" })).not.toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Select Audition 2" }));
-    expect(onApprove).not.toHaveBeenCalled();
-    const approve = within(dialog).getByRole("button", { name: "Approve Audition 2" });
-    expect(approve.closest("header")).toBeInTheDocument();
-    fireEvent.click(approve);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply Audition 2" }));
 
     expect(onApprove).toHaveBeenCalledWith("many", "many-2");
-    expect(dialog).toHaveClass("closing");
-    fireEvent.animationEnd(dialog);
-    expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
+    expect(dialog).not.toHaveClass("closing");
+    expect(within(dialog).getByRole("button", { name: "Create a new audition" })).toBeInTheDocument();
   });
 
   it("animates the panel closed and restores tile focus", () => {

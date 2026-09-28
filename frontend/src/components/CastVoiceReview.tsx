@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import type { WorkflowGateway, CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
@@ -254,7 +254,7 @@ export function CastVoiceReview({
   const [samplePlaying, setSamplePlaying] = useState(false);
   const [sampleElapsed, setSampleElapsed] = useState(0);
   const [sampleDuration, setSampleDuration] = useState(0);
-  const [pendingRevision, setPendingRevision] = useState<string>();
+  const [auditionMode, setAuditionMode] = useState<"auditions" | "create">("auditions");
   const [playingTileId, setPlayingTileId] = useState<string>();
   const [inspectorClosing, setInspectorClosing] = useState(false);
   const closeTimer = useRef<number | undefined>(undefined);
@@ -266,6 +266,11 @@ export function CastVoiceReview({
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const previousInspectedId = useRef<string | undefined>(undefined);
   const previousPreviewRevision = useRef<string | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const inspector = workbenchRef.current?.querySelector<HTMLElement>(".voice-inspector");
+    if (inspector) inspector.scrollTop = 0;
+  }, [auditionMode]);
 
   useEffect(() => {
     if (!inspected) {
@@ -279,6 +284,7 @@ export function CastVoiceReview({
       && previousPreviewRevision.current !== inspected.voicePreviewRevision;
     setSettings(settingsFor(inspected));
     if (!sameCharacter) {
+      setAuditionMode("auditions");
       setAuditionSource("designed");
       setSampleTranscript("");
       setSampleFile(undefined);
@@ -290,14 +296,10 @@ export function CastVoiceReview({
       setSampleDuration(0);
       transcriptionRequest.current += 1;
     }
-    setPendingRevision(
-      regenerated
-        ? inspected.voicePreviewRevision
-        : approvedRevisionFor(inspected, selections) ?? inspected.voicePreviewRevision,
-    );
+    if (regenerated) setAuditionMode("auditions");
     previousInspectedId.current = inspected.characterId;
     previousPreviewRevision.current = inspected.voicePreviewRevision;
-  }, [inspected, selections]);
+  }, [inspected]);
 
   useEffect(() => () => {
     if (samplePreviewUrl) URL.revokeObjectURL(samplePreviewUrl);
@@ -402,12 +404,6 @@ export function CastVoiceReview({
     closeTimer.current = window.setTimeout(finishInspectorClose, 260);
   }
 
-  function approvePendingVoice() {
-    if (!inspected || !pendingRevision || !candidateForRevision(inspected, pendingRevision)) return;
-    onApprove(inspected.characterId, pendingRevision);
-    closeInspector();
-  }
-
   const inspectedCandidates = inspected ? candidatesFor(inspected) : [];
   const approvedRevision = inspected ? approvedRevisionFor(inspected, selections) : undefined;
   const inspectedSharedGroup = inspected ? sharedGroupFor(inspected, selections) : undefined;
@@ -417,9 +413,6 @@ export function CastVoiceReview({
   const inspectedPreviewUrl = inspected ? previewUrlFor(inspected) : undefined;
   const memberVoices = (cast.identities ?? []).filter((voice) => voice.category === "character");
   const suggestedIds = inspected?.category === "group" ? suggestedMemberIds(inspected, memberVoices) : [];
-  const pendingCandidateNumber = inspectedCandidates.findIndex(
-    (candidate) => candidate.revision === pendingRevision,
-  ) + 1;
   const performanceNotesTooLong = (settings?.description.length ?? 0) > performanceNotesLimit;
 
   return <div ref={workbenchRef} className="cast-workbench voice-cast-workbench">
@@ -487,7 +480,6 @@ export function CastVoiceReview({
             <p>{t(label(inspected.category ?? (inspected.characterId === "narrator" ? "narrator" : "character")))} · {lineCountLabel(lineCountFor(inspected, cast), t)} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
           </div>
           <div className="cast-inspector-actions">
-            {inspectedRoute.kind === "dedicated" && pendingRevision && pendingRevision !== approvedRevision && <button type="button" className="primary voice-header-approve" onClick={approvePendingVoice}>{pendingCandidateNumber ? t("Approve Audition {{number}}", { number: pendingCandidateNumber }) : t("Approve selected voice")}</button>}
             <button type="button" className="cast-inspector-close" aria-label={t("Close voice")} onClick={closeInspector}>×</button>
           </div>
         </header>
@@ -523,30 +515,36 @@ export function CastVoiceReview({
             </div>}
           </section>}
 
-          {inspectedRoute.kind === "dedicated" && <section className="voice-candidates-section">
+          {inspectedRoute.kind === "dedicated" && auditionMode === "auditions" && <section className="voice-candidates-section">
             <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
             <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>
-            <p className="voice-candidates-help">{t("Listen, compare, then approve the audition you want to use.")}</p>
+            <p className="voice-candidates-help">{t("Listen, then choose a voice. Your choice applies immediately and can be changed.")}</p>
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
               const applied = candidate.revision === approvedRevision;
-              const selected = candidate.revision === pendingRevision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied" : ""} ${selected ? "selected" : ""}`}>
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied selected" : ""}`}>
                 <div className="voice-candidate-actions">
-                  <button type="button" className="voice-candidate-choice" aria-label={t("Select Audition {{number}}", { number })} aria-pressed={selected} onClick={() => setPendingRevision(candidate.revision)}>
-                    <span className="voice-candidate-radio" aria-hidden="true">{selected ? "●" : "○"}</span>
+                  <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={applied} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
+                    <span className="voice-candidate-radio" aria-hidden="true">{applied ? "●" : "○"}</span>
                     <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
-                    {(applied || selected) && <strong className={applied ? "candidate-applied-badge" : "candidate-selected-badge"}>{t(applied ? "✓ Applied" : "Selected")}</strong>}
+                    {applied && <strong className="candidate-applied-badge">{t("✓ Applied")}</strong>}
                   </button>
                 </div>
                 {candidate.previewUrl
                   ? <audio controls preload="metadata" src={candidate.previewUrl} />
                   : <small className="cast-muted">{t("No playable audio.")}</small>}
               </article>;
-            })}</div>
+            })}
+              <button type="button" className="voice-ghost-audition" onClick={() => setAuditionMode("create")} aria-label={t("Create a new audition")}>
+                <span className="voice-ghost-sigil" aria-hidden="true">✦</span>
+                <span><b>{t("The Ghost")}</b><small>{t("Imagine a new voice")}</small></span>
+                <span className="voice-ghost-arrow" aria-hidden="true">↗</span>
+              </button>
+            </div>
           </section>}
 
-          {inspectedRoute.kind === "dedicated" && settings && <section className="voice-settings-section voice-audition-settings">
-            <div className="cast-section-heading"><div><small>{t("Audition setup")}</small><h3>{t("Tune and generate")}</h3></div></div>
+          {inspectedRoute.kind === "dedicated" && settings && auditionMode === "create" && <section className="voice-settings-section voice-audition-settings">
+            <button type="button" className="voice-create-back" onClick={() => setAuditionMode("auditions")}>← {t("Back to auditions")}</button>
+            <div className="cast-section-heading"><div><small>{t("The Ghost")}</small><h3>{t("Imagine a new voice")}</h3></div></div>
             {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
               <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><b>{t("Design a voice")}</b><small>{t("Use voice traits and direction.")}</small></button>
               <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the voice reference.")}</small></button>

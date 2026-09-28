@@ -9,8 +9,10 @@
 .generate-hero-stats dd small { font: 500 11px var(--font-sans); }
 .chapter-library-toolbar { gap: 24px; margin-bottom: 24px; }
 .chapter-filter-tabs { gap: 24px; border: 0; }
-.chapter-filter-tabs button { min-height: 46px; padding: 10px 0; font-size: 14px; }
+.chapter-filter-tabs button { min-height: 46px; padding: 10px 2px; font-size: 14px; border-radius: 7px 7px 0 0; }
 .chapter-filter-tabs button small { background: transparent; font-size: 11px; }
+.chapter-filter-tabs button[aria-selected="true"] { border: 0; border-bottom: 2px solid var(--poppy); background: transparent; color: var(--poppy); box-shadow: none; }
+.chapter-filter-tabs button:focus-visible, .chapter-filter-tabs button[aria-selected="true"]:focus-visible { outline: 0; border-radius: 7px 7px 0 0; background: var(--matcha-soft); box-shadow: inset 0 -4px var(--poppy); }
 .chapter-library-controls { gap: 16px; }
 .chapter-library-controls, .chapter-library-controls button { font-size: 12px; }
 .chapter-library-controls button { min-height: 40px; border: 0; background: transparent; }

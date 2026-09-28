@@ -1,0 +1,18 @@
+# Review record — Matcha & Cherry stagecraft
+
+This local candidate addresses the September 28 UI review. It has not been merged or deployed; aesthetic acceptance is still open. The safe [studio](http://127.0.0.1:5179/studio.html) and [Storybook](http://127.0.0.1:6006/) expose editable, source-backed preview states.
+
+| Request | Result and direct evidence |
+| --- | --- |
+| Auditions without a second approval; voice creation behind Ghost | Choosing an audition immediately updates the exact working revision. The Ghost card opens the existing creation controls and Back preserves the choices. [Cast evidence](evidence/cast/README.md), [independent Cast audit](evidence/cast-independent/README.md). The final Cast acceptance remains a separate workflow action. |
+| Character-select grid | Five portrait cards across on desktop and two on phone, including a 61-voice and long-name check. [Desktop](evidence/cast/roster-1440-light.png), [phone](evidence/cast/roster-390-dark.png). |
+| Complete PDF page | The source page uses its natural aspect ratio; transcript scrolls separately. [Public-domain Alice page on phone](evidence/review-extract/alice-page-extract-390-light.png), [Extract check](evidence/review-extract/README.md). |
+| Softer hard edges | Generate filters lose their square side borders, while keyboard focus keeps a soft surface and underline. [Generate and Home check](evidence/chrome/README.md). |
+| Local books shelf | Responsive cover cards with distinct Continue/Delete actions replace the long-row list. [Six books on desktop](evidence/chrome/home-six-1440-light.png), [phone](evidence/chrome/home-six-390-dark.png). |
+| Designed pop-ups | Three native Cast confirmations are now `DialogSurface` dialogs. Escape and Cancel restore focus; destructive/replacement work still requires confirmation. [Independent keyboard audit](evidence/cast-independent/README.md). |
+| Premium atmosphere | A transparent pine/cherry/lantern canopy sits behind working stages, with a small optional sway and a reduced-motion stop. It is excluded from custom host palettes. [Asset provenance](ASSET-PROVENANCE.md), [light desktop](evidence/atmosphere/review-intro-1440-light.png), [dark phone](evidence/atmosphere/review-intro-390-dark.png). |
+| Return to settings without a dead scan screen | Accepted Review starts its unpublished candidate scan on Change settings and shows an in-page progress/failure state. Accepted Cast opens its populated editor, and Cancel returns to its accepted summary. Initial Review now has a composed invitation. [Review evidence](evidence/review-extract/README.md), [Cast evidence](evidence/cast-independent/README.md). |
+
+The final source ran `npm test` (25 files, 250 tests), `npm run lint` (zero errors; one existing Fast Refresh warning), `npm run build`, `npm run storybook:check`, `npm run test-storybook` (5 files, 58 checks), and `npm run test:consumer` (83 packed files; types and host CSS override passed). `git diff --check` passed. The build still reports a >500 KB chunk warning. Browser scripts and reports are linked above; the independent Cast matrix covered 1440/390 px in light/dark with no native dialogs, horizontal overflow, runtime/API errors or scoped accessibility violations. An early independent Escape-focus failure was fixed and all four states reran successfully.
+
+The Alice PDF check rasterized a real public-domain page into the browser layout. It did not run backend extraction. Cast and Review behavior were checked with synthetic gateway data; no provider audition, new voice synthesis, production book mutation, merge, release or deployment was performed. The user can review the visual direction and request refinements before adoption.

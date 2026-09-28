@@ -1,0 +1,107 @@
+/* The source page keeps its natural aspect ratio; only the extracted text scrolls. */
+.extract-page-comparison { align-items: start; }
+.page-comparison.extract-page-comparison .paper,
+.page-comparison.extract-page-comparison .extracted {
+  height: auto;
+  min-height: 0;
+}
+.extract-page-comparison .paper {
+  overflow: visible;
+}
+.extract-page-comparison .paper img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  object-fit: contain;
+}
+.extract-page-comparison .extracted {
+  max-height: min(84vh, 900px);
+  overflow: auto;
+}
+.extract-page-comparison .extracted pre {
+  flex: none;
+  height: auto;
+  margin-bottom: 0;
+  overflow: visible;
+}
+
+.review-scan-scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, .7fr);
+  column-gap: clamp(32px, 6vw, 100px);
+  align-items: center;
+  min-height: 390px;
+  padding: 20px 0 18px;
+  overflow: hidden;
+}
+.review-scan-copy { position: relative; z-index: 1; max-width: 610px; }
+.review-scan-copy h2 {
+  max-width: 590px;
+  margin: 13px 0 16px;
+  color: var(--ink);
+  font: 500 clamp(34px, 4vw, 58px)/1.04 var(--font-display);
+  letter-spacing: -.035em;
+}
+.review-scan-copy p { max-width: 520px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+.review-scan-copy .stage-launch { margin-top: 34px; padding: 0; }
+.review-scan-copy .stage-launch .primary { min-width: 280px; }
+.review-scan-art { position: relative; width: min(100%, 360px); aspect-ratio: 1; justify-self: center; }
+.review-scan-art::before {
+  content: "";
+  position: absolute;
+  inset: 5% 2% 10%;
+  border: 1px solid color-mix(in srgb, var(--line) 48%, transparent);
+  border-radius: 48% 48% 5% 5%;
+  background: radial-gradient(circle at 55% 34%, color-mix(in srgb, var(--honey) 36%, transparent), transparent 55%);
+}
+.review-scan-page {
+  position: absolute;
+  inset: 16% 18% 12%;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  padding: 19% 12% 0;
+  background: var(--paper);
+  border-radius: 48% 48% 3% 3%;
+  box-shadow: 0 15px 40px rgb(var(--shadow-color) / .1);
+  transform: rotate(-5deg);
+}
+.review-scan-page::before { content: "✦"; position: absolute; top: 11%; left: 0; width: 100%; color: var(--poppy); text-align: center; font-size: 22px; }
+.review-scan-page i { height: 2px; border-radius: 3px; background: color-mix(in srgb, var(--ink) 28%, transparent); }
+.review-scan-page i:nth-child(2), .review-scan-page i:nth-child(5) { width: 82%; }
+.review-scan-page i:nth-child(4), .review-scan-page i:nth-child(6) { width: 62%; }
+.review-scan-stamp {
+  position: absolute;
+  right: 7%;
+  bottom: 11%;
+  display: grid;
+  width: 86px;
+  aspect-ratio: 1;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--poppy) 50%, transparent);
+  border-radius: 50%;
+  background: var(--paper);
+  color: var(--poppy);
+  font-size: 32px;
+  box-shadow: 0 9px 18px rgb(var(--shadow-color) / .1);
+  transform: rotate(10deg);
+}
+.review-scan-themes { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 12px 28px; margin-top: 20px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; letter-spacing: .025em; }
+.review-scan-themes span + span::before { content: "✦"; margin-right: 28px; color: var(--poppy); font-size: 9px; }
+.review-scan-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin-top: 32px; color: var(--ink); font-size: 13px; }
+.review-scan-progress-track { display: block; width: 90px; height: 3px; overflow: hidden; border-radius: 2px; background: var(--line); }
+.review-scan-progress-track i { display: block; width: 48%; height: 100%; border-radius: inherit; background: var(--poppy); animation: review-scan-drift 1.6s ease-in-out infinite alternate; }
+@keyframes review-scan-drift { from { transform: translateX(-10%); } to { transform: translateX(130%); } }
+@media (max-width: 700px) {
+  .review-scan-scene { grid-template-columns: minmax(0, 1fr); gap: 12px; padding-top: 14px; }
+  .review-scan-art { width: min(76%, 280px); grid-row: 2; }
+  .review-scan-themes { gap: 8px 16px; margin-top: 0; }
+  .review-scan-themes span + span::before { margin-right: 16px; }
+  .review-scan-copy .stage-launch .primary { min-width: 0; width: 100%; }
+  .extract-page-comparison .extracted { max-height: 460px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .review-scan-progress-track i { animation: none; width: 100%; }
+}

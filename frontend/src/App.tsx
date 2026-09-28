@@ -47,7 +47,7 @@ export default function App(props: AppProps) {
     extract: ExtractPage({ model }),
     dialogue: DialoguePage({ model }),
     review: ReviewPage({ model }),
-    cast: CastPage({ model }),
+    cast: <CastPage key="cast" model={model} />,
     generate: <GeneratePage key="generate" model={model} />,
     export: ExportPage({ model }),
   };

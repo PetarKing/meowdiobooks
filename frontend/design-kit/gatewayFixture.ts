@@ -36,7 +36,14 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const { gatewayVariant } = metadata;
   const snapshot = snapshotFor(id);
   let libraryRequests = 0;
-  const books = gatewayVariant === "empty-books" ? [] : [fixtureBook];
+  const books = gatewayVariant === "empty-books" ? [] : gatewayVariant === "home-shelf" ? [
+    fixtureBook,
+    { ...fixtureBook, id: "kit-book-2", title: "The Moonlit Temple", source_name: "moonlit-temple.pdf", page_count: 296, asset_size_bytes: 11_800_000 },
+    { ...fixtureBook, id: "kit-book-3", title: "The Little Prince", source_name: "little-prince.pdf", page_count: 96, asset_size_bytes: 3_800_000 },
+    { ...fixtureBook, id: "kit-book-4", title: "A Very Long Book Title That Takes More Than One Line", source_name: "long-title.pdf", page_count: 433, asset_size_bytes: 18_400_000 },
+    { ...fixtureBook, id: "kit-book-5", title: "夜の猫", source_name: "night-cat.pdf", page_count: 184, asset_size_bytes: 6_100_000 },
+    { ...fixtureBook, id: "kit-book-6", title: "The Secret Garden", source_name: "secret-garden.pdf", page_count: 256, asset_size_bytes: 8_400_000 },
+  ] : [fixtureBook];
   const canceledJobs = new Set<string>();
   const exports = [
     "library-populated",
@@ -189,10 +196,12 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
               : { revision };
       return candidate as StageCandidate[typeof stage];
     },
-    getBookSnapshot: async () => {
+    getBookSnapshot: async (bookId) => {
       if (gatewayVariant === "home-error")
         throw new Error("This book could not be opened. Try again.");
-      return structuredClone(snapshot);
+      const selectedBook = books.find((book) => book.id === bookId);
+      if (!selectedBook || gatewayVariant !== "home-shelf") return structuredClone(snapshot);
+      return { ...structuredClone(snapshot), book: { ...snapshot.book, id: selectedBook.id, title: selectedBook.title, filename: selectedBook.source_name ?? snapshot.book.filename } };
     },
     getRepresentativePages: async () => [
       { page: 1, reason: "Opening page", },

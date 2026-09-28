@@ -1,0 +1,126 @@
+{
+  "generatedAt": "2026-09-28T06:46:26.871Z",
+  "base": "http://127.0.0.1:5179/studio.html",
+  "results": [
+    {
+      "width": 1440,
+      "theme": "light",
+      "reducedMotion": "reduce",
+      "backgroundImage": "linear-gradient(color(srgb 0.945098 0.94902 0.909804 / 0.58), color(srgb 0.945098 0.94902 0.909804 / 0.75) 190px, rgb(241, 242, 232) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "none",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "reducedMotion": "no-preference",
+      "backgroundImage": "linear-gradient(color(srgb 0.945098 0.94902 0.909804 / 0.58), color(srgb 0.945098 0.94902 0.909804 / 0.75) 190px, rgb(241, 242, 232) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "sanctuary-canopy-sway",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "reducedMotion": "reduce",
+      "backgroundImage": "linear-gradient(color(srgb 0.113725 0.14902 0.105882 / 0.58), color(srgb 0.113725 0.14902 0.105882 / 0.75) 190px, rgb(29, 38, 27) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "none",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "reducedMotion": "no-preference",
+      "backgroundImage": "linear-gradient(color(srgb 0.113725 0.14902 0.105882 / 0.58), color(srgb 0.113725 0.14902 0.105882 / 0.75) 190px, rgb(29, 38, 27) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "sanctuary-canopy-sway",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "reducedMotion": "reduce",
+      "backgroundImage": "linear-gradient(color(srgb 0.945098 0.94902 0.909804 / 0.58), color(srgb 0.945098 0.94902 0.909804 / 0.75) 190px, rgb(241, 242, 232) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "none",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "reducedMotion": "no-preference",
+      "backgroundImage": "linear-gradient(color(srgb 0.945098 0.94902 0.909804 / 0.58), color(srgb 0.945098 0.94902 0.909804 / 0.75) 190px, rgb(241, 242, 232) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "sanctuary-canopy-sway",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "reducedMotion": "reduce",
+      "backgroundImage": "linear-gradient(color(srgb 0.113725 0.14902 0.105882 / 0.58), color(srgb 0.113725 0.14902 0.105882 / 0.75) 190px, rgb(29, 38, 27) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "none",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "reducedMotion": "no-preference",
+      "backgroundImage": "linear-gradient(color(srgb 0.113725 0.14902 0.105882 / 0.58), color(srgb 0.113725 0.14902 0.105882 / 0.75) 190px, rgb(29, 38, 27) 440px), url(\"http://127.0.0.1:5179/src/assets/brand/sanctuary-canopy.webp\")",
+      "animationName": "sanctuary-canopy-sway",
+      "assetSize": [
+        1536,
+        1024
+      ],
+      "documentOverflow": 0,
+      "customPaletteBackground": "none",
+      "errors": [],
+      "apiRequests": []
+    }
+  ]
+}

@@ -141,7 +141,7 @@ export async function enterScenario(
         );
         return;
       case "open-new-audition":
-        await click(prefix("New audition"));
+        await click("Create a new audition");
         await waitFor(() =>
           expect(
             page.getByRole("textbox", { name: t("Performance notes") }),
@@ -149,6 +149,8 @@ export async function enterScenario(
         );
         return;
       case "configure-sample":
+        if (page.queryByRole("button", { name: t("Create a new audition") }))
+          await click("Create a new audition");
         await userEvent.click(
           await page.findByRole("radio", { name: prefix("Clone from a sample") }),
         );
