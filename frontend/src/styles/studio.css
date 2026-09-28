@@ -1,6 +1,6 @@
 /* Matcha & Cherry sanctuary: ornamental shell, clear working surfaces. */
 html, body { background: var(--canvas, #f4f1eb); }
-.app-shell { color: var(--ink); background: var(--canvas); background-image: radial-gradient(ellipse at 12% 0%, color-mix(in srgb, var(--matcha) 18%, transparent), transparent 55%); }
+.app-shell { color: var(--ink); background: var(--canvas); }
 .topbar { height: 76px; background: var(--canvas); border: 0; box-shadow: none; backdrop-filter: none; }
 .topbar-inner { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(0,1fr); gap: 24px; padding: 0 32px; }
 .brand { font: 600 23px/1 var(--font-display); letter-spacing: -.045em; gap: 11px; }
@@ -38,11 +38,6 @@ html, body { background: var(--canvas, #f4f1eb); }
 .rail nav button.done b { border-color: transparent; background: var(--green-soft); color: var(--green); }
 .rail nav button.revising b { background: var(--warning-soft); color: var(--warning-ink); border-color: transparent; }
 .rail nav button:disabled { opacity: .72; }
-.rail-signature { padding: 20px 10px 0; margin-top: auto; color: var(--muted); }
-.rail-signature .rail-kami { display: grid; width: 54px; height: 58px; place-items: center; margin: 0 0 12px; border: 0; border-radius: 0; background: transparent; box-shadow: none; }.rail-kami img { width: 46px; height: 46px; object-fit: contain; }
-.rail-signature svg { display: block; width: 84px; height: 34px; color: var(--poppy); opacity: .7; }
-.rail-signature span { font: italic 14px/1.5 var(--font-display); }
-.rail-collapsed .rail-signature { display: none; }
 .workspace main { width: 100%; max-width: 1440px; margin: 0 auto; padding: 40px 56px 72px; }
 .workspace .home-main { max-width: 1480px; padding: 44px 56px 72px; }
 .mobile-progress { display: none; }
@@ -108,7 +103,7 @@ html, body { background: var(--canvas, #f4f1eb); }
  .rail nav { display: flex; flex-direction: row; gap: 5px; padding: 0; overflow-x: auto; scrollbar-width: thin; }
  .rail nav button, .rail-collapsed .rail nav button { display: flex; justify-content: flex-start; gap: 7px; flex: 0 0 auto; padding: 8px; min-height: 40px; border-radius: 5px; }
  .rail nav b { display: grid; width: 20px; height: 20px; }.rail nav button > span, .rail-collapsed .rail nav button > span { display: block; }.rail nav button strong { font-size: 10px; }.rail nav button small { display: none; }
- .book-mini, .rail-toggle, .rail-signature { display: none; }.mobile-progress { display: none; }
+ .book-mini, .rail-toggle { display: none; }.mobile-progress { display: none; }
  .workspace main, .workspace .home-main { padding: 22px 16px 32px; }
  .studio-hero { display: flex; flex-direction: column; align-items: stretch; gap: 28px; min-height: 0; margin-bottom: 48px; padding: 0; }
  .studio-hero-copy { padding: 8px 0; }.studio-hero h1 { font-size: 49px; margin: 14px 0; }.studio-hero-copy > p { font-size: 13px; margin-bottom: 20px; }.quick-upload { min-height: 70px; }

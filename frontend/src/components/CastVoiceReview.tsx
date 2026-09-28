@@ -238,8 +238,11 @@ export function CastVoiceReview({
   const [collectionQuery, setCollectionQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const largeCollection = voices.length > 12;
+  const byReviewPriority = (left: CastVoice, right: CastVoice) =>
+    Number(requiresReview(right)) - Number(requiresReview(left))
+      || Number(!routeReady(right)) - Number(!routeReady(left));
   const visibleVoices = largeCollection ? voices.filter((voice) => collectionMatches(collectionQuery, [voice.name, ...(voice.literalLabels ?? [])])
-    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))).slice().sort((left, right) => Number(requiresReview(right)) - Number(requiresReview(left))) : voices.slice().sort((left, right) => Number(requiresReview(right)) - Number(requiresReview(left)));
+    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))).slice().sort(byReviewPriority) : voices.slice().sort(byReviewPriority);
   const selectedCount = voices.filter(routeReady).length;
   const requiredCount = voices.filter(requiresReview).length;
   const defaultReadyCount = voices.length - selectedCount - requiredCount;
@@ -491,8 +494,8 @@ export function CastVoiceReview({
     <div className="cast-toolbar voice-cast-toolbar">
       <p className="voice-cast-progress" aria-label={t("Voice review progress")}>
         <span className="approved">{t("{{count}} approved", { count: selectedCount })}</span>
-        <span className={defaultReadyCount ? "pending" : ""}>{t("{{count}} not yet approved", { count: defaultReadyCount })}</span>
-        {requiredCount > 0 && <span className="required">{t("{{count}} required", { count: requiredCount })}</span>}
+        <span className={defaultReadyCount ? "pending" : ""}><b>{t("{{count}} not yet approved", { count: defaultReadyCount })}</b><small>{t("Can continue")}</small></span>
+        {requiredCount > 0 && <span className="required"><b>{t("{{count}} required", { count: requiredCount })}</b><small>{t("Blocks continue")}</small></span>}
       </p>
       {requiredCount > 0 && <button type="button" className="primary compact" onClick={() => { const next = voices.find(requiresReview); if(next) openInspector(next.characterId); }}>{t("Review required voices")} →</button>}
     </div>
@@ -521,7 +524,7 @@ export function CastVoiceReview({
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span> : undefined}
           portraitCue={previewUrl ? <span className="voice-tile-play-cue" aria-hidden="true">{playing ? "Ⅱ" : "▶"}</span> : undefined}
-          badge={!selected && <span className={`voice-tile-alert ${required ? "required" : "pending"}`}>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</span>}
+          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b><small>{t(required ? "Blocks continue" : "Can continue")}</small></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Pause" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
           inspectRef={(element) => { tileRefs.current[voice.characterId] = element; }}
@@ -531,18 +534,25 @@ export function CastVoiceReview({
     </section>
     <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} onError={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} />
 
-    {inspected && <InspectorDialog label={t("{{name}} voice", { name: inspected.name })} className="voice-inspector" closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
+    {inspected && <InspectorDialog label={t("{{name}} voice", { name: inspected.name })} className={`voice-inspector ${auditionMode === "create" ? "voice-inspector-creating" : ""}`} closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
         <header className="cast-inspector-head">
-          <div>
+          {auditionMode === "create" ? <div className="voice-create-header-copy">
+            <small>{t("New voice")}</small>
+            <h2>{t("Create a new audition")}</h2>
+            <p>{inspected.name}</p>
+          </div> : <div>
             <span className={`cast-status-dot ${inspectedReady ? "ready" : inspectedRequired ? "needs-review" : "default-ready"}`} />
             <small>{t(inspectedReady ? inspectedRoute.kind === "layered" ? "Layered voices ready" : inspectedSharedGroup ? "Shared voice selected" : "Voice approved" : inspectedRoute.kind === "layered" ? "Confirm suggested voices" : inspectedRequired ? "Audition required" : "Default audition ready")}</small>
             <h2>{inspected.name}</h2>
             <p>{t(label(inspected.category ?? (inspected.characterId === "narrator" ? "narrator" : "character")))} · {lineCountLabel(lineCountFor(inspected, cast), t)} · {cast.language ? t(cast.language) : t("Unknown language")}</p>
-          </div>
+          </div>}
           <div className="cast-inspector-actions">
+            {auditionMode === "create" && <button type="button" className="voice-create-back" onClick={() => setAuditionMode("auditions")}>← {t("Back to auditions")}</button>}
             <button type="button" className="cast-inspector-close" aria-label={t("Close voice")} onClick={closeInspector}>×</button>
           </div>
         </header>
+
+        {auditionMode === "auditions" && !inspectedReady && <p className={`cast-review-explanation ${inspectedRequired ? "required" : "advisory"}`}><strong>{t(inspectedRequired ? "Required before continuing" : "Optional check")}</strong><span>{t(inspectedRequired ? inspectedRoute.kind === "layered" ? "Complete and confirm this group’s layered voice route before continuing." : "Create an audition for this voice before continuing." : "Listen and choose if you like. You can approve the available audition when continuing.")}</span></p>}
 
         <div className="voice-inspector-body">
           {inspected.category === "group" && <section className="voice-route-section">
@@ -607,8 +617,6 @@ export function CastVoiceReview({
           </section>}
 
           {inspectedRoute.kind === "dedicated" && settings && auditionMode === "create" && <section className="voice-settings-section voice-audition-settings">
-            <button type="button" className="voice-create-back" onClick={() => setAuditionMode("auditions")}>← {t("Back to auditions")}</button>
-            <div className="cast-section-heading"><div><small>{t("New voice")}</small><h3>{t("Create a new audition")}</h3></div></div>
             <p className="voice-create-intro">{t("Shape a performance for {{name}}. Your existing auditions stay available.", { name: inspected.name })}</p>
             {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
               <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><span aria-hidden="true">✦</span><b>{t("Design a voice")}</b><small>{t("Shape its character and delivery.")}</small></button>
@@ -635,7 +643,6 @@ export function CastVoiceReview({
               </div></fieldset>
             </div>
             <div className="voice-regenerate-footer">
-              <small>{t(inspected.voiceSettings ? "Starting points prepared from the character evidence." : "This older audition has been placed into the editable controls.")} {t("Settings apply to the next audition. Earlier auditions remain available.")}</small>
               <button
                 type="button"
                 className="primary regenerate-voice-action"

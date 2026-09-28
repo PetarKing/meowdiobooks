@@ -2,9 +2,12 @@
 .voice-cast-workbench { gap: 24px; }
 .voice-stage-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
 .voice-stage-heading h1 { margin: 0; font: 500 clamp(30px, 3vw, 42px)/1.1 var(--font-display); }
-.voice-cast-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; }
+.voice-cast-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 0 16px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
 .voice-cast-progress { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0; color: var(--muted); font: 650 12px/1.4 var(--font-sans); }
 .voice-cast-progress span { display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+.voice-cast-progress span b { font: inherit; }
+.voice-cast-progress span small { color: inherit; font: 500 10px/1.3 var(--font-sans); opacity: .86; }
+.voice-cast-progress span small::before { content: "· "; }
 .voice-cast-progress span::before { content: ""; width: 7px; height: 7px; flex: 0 0 auto; border-radius: 50%; background: var(--green); }
 .voice-cast-progress .pending { color: var(--gilt-ink); }
 .voice-cast-progress .pending::before { background: var(--gilt-ink); }

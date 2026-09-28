@@ -113,11 +113,11 @@ describe("CastIdentityReview", () => {
     expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Inspect Narrator" })).toBeInTheDocument();
-    expect(screen.getByText("1 source labels need confirmation")).toBeInTheDocument();
+    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
     expect(screen.getByText("1 of 14 cast members shown")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "ready" } });
     expect(screen.getByText("No cast members match these filters.")).toBeInTheDocument();
-    expect(screen.getByText("1 source labels need confirmation")).toBeInTheDocument();
+    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("searchbox", { name: "Search cast" }).closest(".collection-toolbar")!).getByRole("button", { name: "Clear" }));
     expect(search).toHaveFocus();
     expect(screen.getByText("14 of 14 cast members shown")).toBeInTheDocument();
@@ -170,22 +170,26 @@ describe("CastIdentityReview", () => {
     expect(autoGrouped).toHaveClass("auto-grouped");
     expect(autoGrouped).not.toHaveClass("qwen-review");
     expect(autoGrouped).toHaveTextContent("Required · Check this merge");
-    expect(screen.getByText("Confirm required source labels before you can continue.")).toBeInTheDocument();
+    expect(screen.getByText("2 required · blocks continue")).toBeInTheDocument();
+    expect(screen.getByText("1 suggested · optional")).toBeInTheDocument();
 
     const possibleMatch = screen.getByRole("button", { name: "Inspect fake Cecilus" });
-    expect(possibleMatch).toHaveClass("ready");
+    expect(possibleMatch).toHaveClass("has-suggestions");
     expect(possibleMatch).not.toHaveClass("auto-grouped");
     expect(possibleMatch).not.toHaveTextContent("Required");
+    expect(possibleMatch).toHaveTextContent("Review suggested");
     expect(screen.queryByText(/auto-grouped/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Qwen review|Qwen suggestion/i)).not.toBeInTheDocument();
 
     fireEvent.click(autoGrouped);
-    expect(screen.getByRole("dialog", { name: "Inspect Cecilus Segmunt" })).toHaveTextContent("Confirmation required");
+    expect(screen.getByRole("dialog", { name: "Inspect Cecilus Segmunt" })).toHaveTextContent("Required before continuing");
     fireEvent.click(screen.getByRole("button", { name: "Confirm grouping" }));
     expect(autoGrouped).not.toHaveClass("auto-grouped");
 
     fireEvent.click(possibleMatch);
     const possibleMatchDialog = screen.getByRole("dialog", { name: "Inspect fake Cecilus" });
+    expect(possibleMatchDialog).toHaveTextContent("Optional check");
+    expect(possibleMatchDialog).toHaveTextContent("You can continue without changing it.");
     expect(possibleMatchDialog).toHaveTextContent("Suggested matches");
     expect(within(possibleMatchDialog).queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
   });

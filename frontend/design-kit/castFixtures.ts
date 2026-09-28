@@ -106,11 +106,12 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
     };
   const identity = [
     "identity-review",
+    "review-spectrum-identities",
     "identity-inspector",
     "dense-identities",
     "voice-design",
   ].includes(variant);
-  return {
+  const fixture: CastArtifact = {
     revision: "cast-fixture-1",
     phase: identity ? "identity-review" : "audition-review",
     voiceModel: "qwen",
@@ -161,4 +162,20 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
       reviewRequired: false,
     }] : [])],
   };
+  if (variant === "review-spectrum-identities") {
+    fixture.dossiers.push({
+      label: "Royal Chorus",
+      occurrenceCount: 12,
+      firstAppearance: 12,
+      examples: [{ source: "Royal Chorus: ‘All together now.’", page: 12 }],
+    });
+    fixture.proposals.push({
+      label: "Royal Chorus",
+      category: "group",
+      canonicalName: "Royal Chorus",
+      reviewRequired: true,
+      reason: "This label may describe several speakers. Confirm whether it belongs to a group before auditions are generated.",
+    });
+  }
+  return fixture;
 }

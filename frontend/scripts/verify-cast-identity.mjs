@@ -32,7 +32,7 @@ try {
     assert(await queen.isVisible());
     assert((await queen.getAttribute('class')).includes('has-suggestions'));
     assert(!(await queen.getAttribute('class')).includes('needs-review'));
-    assert(await queen.getByText('Suggested matches', { exact: false }).isVisible());
+    assert(await queen.getByText('Review suggested', { exact: true }).isVisible());
     await page.screenshot({ path: `${out}/roster-${width}-${appearance}.png`, fullPage: false });
 
     await queen.click();

@@ -1,27 +1,22 @@
 /* Decorative, lower-contrast foliage carries the sanctuary into working stages.
    This layer has no hit target, meaning or effect on workflow state. */
 .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
-  background-image:
-    linear-gradient(to bottom,
-      color-mix(in srgb, var(--canvas) 58%, transparent),
-      color-mix(in srgb, var(--canvas) 75%, transparent) 190px,
-      var(--canvas) 440px),
-    url("../assets/brand/sanctuary-canopy.webp");
-  background-size: 100% 460px, clamp(390px, 48vw, 670px) auto;
-  background-position: right top, right -4px top -10px;
+  background-image: url("../assets/brand/sanctuary-canopy.webp");
+  background-size: clamp(390px, 48vw, 670px) auto;
+  background-position: right -4px top -10px;
   background-repeat: no-repeat;
   animation: sanctuary-canopy-sway 18s ease-in-out infinite alternate;
 }
 @keyframes sanctuary-canopy-sway {
-  to { background-position: right top, right 4px top 0; }
+  to { background-position: right 4px top 0; }
 }
 @media (max-width: 750px) {
   .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
-    background-size: 100% 320px, 390px auto;
-    background-position: right top, right -95px top -28px;
+    background-size: 390px auto;
+    background-position: right -95px top -28px;
   }
   @keyframes sanctuary-canopy-sway {
-    to { background-position: right top, right -85px top -20px; }
+    to { background-position: right -85px top -20px; }
   }
 }
 @media (prefers-reduced-motion: reduce) {

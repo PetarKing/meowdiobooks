@@ -1,6 +1,6 @@
 /* Cast is a ledger of identities and performances, not a periodic table. */
 .cast-workbench { display: grid; gap: 18px; }
-.cast-toolbar { align-items: flex-start; margin: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); gap: 20px; }
+.cast-toolbar { align-items: flex-start; margin: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: none; gap: 20px; }
 .cast-toolbar > div:first-child { flex: 1; min-width: 0; }
 .cast-toolbar > div b { font: 600 14px/1.4 var(--font-sans); }
 .cast-toolbar small { display: block; font-size: 12px; line-height: 1.5; margin-top: 6px; color: var(--muted); }

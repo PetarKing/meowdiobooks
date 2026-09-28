@@ -428,7 +428,10 @@ describe("CastVoiceReview", () => {
     expect(notes).toHaveAttribute("maxlength", "180");
     fireEvent.change(notes, { target: { value: "" } });
     expect(within(dialog).getByRole("button", { name: "Generate new audition →" })).toBeEnabled();
-    expect(dialog).toHaveTextContent("Settings apply to the next audition");
+    expect(within(dialog).getByRole("heading", { name: "Create a new audition" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /Back to auditions/ })).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("Your existing auditions stay available.");
+    expect(dialog).not.toHaveTextContent("Voice approved");
     fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
     expect(onRegenerate).toHaveBeenCalledWith("many", expect.objectContaining({ pace: "measured" }));
   });

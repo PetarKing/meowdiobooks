@@ -66,6 +66,22 @@
 .cast-board .cast-roster-identity.needs-review .cast-roster-portrait { --portrait-start: var(--danger-soft); --portrait-end: var(--sakura); }
 .cast-board .cast-roster-identity.needs-review .cast-roster-details { background: color-mix(in srgb, var(--danger-soft) 38%, var(--paper)); }
 .cast-board .cast-roster-identity .cast-tile-required { position: static; max-width: 100%; margin-top: 2px; padding: 3px 7px; border-radius: 3px; background: var(--danger-soft); color: var(--danger-ink); font: 700 10px/1.2 var(--font-sans); }
+.cast-board .cast-review-badge { display: inline-flex; max-width: 100%; align-self: flex-start; flex-wrap: wrap; gap: 3px 7px; margin-top: 6px; padding: 4px 8px; border-radius: 4px; font: 700 10px/1.25 var(--font-sans); letter-spacing: 0; text-transform: none; }
+.cast-board .cast-review-badge.required { background: var(--danger-soft); color: var(--danger-ink); }
+.cast-board .cast-review-badge.advisory { background: color-mix(in srgb, var(--gilt) 22%, var(--paper)); color: var(--gilt-ink); }
+.cast-board .cast-review-badge b { font: inherit; }
+.cast-board .cast-review-badge small { width: auto; color: inherit; font: 550 10px/1.25 var(--font-sans); white-space: nowrap; }
+.cast-review-key { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 10px 0 3px; color: var(--muted); font: 650 11px/1.3 var(--font-sans); }
+.cast-review-key span { display: inline-flex; align-items: center; gap: 7px; }
+.cast-review-key span::before { content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
+.cast-review-key .required { color: var(--danger-ink); }
+.cast-review-key .advisory { color: var(--gilt-ink); }
+.cast-review-explanation { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0; padding: 12px 28px; border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--ink); font: 450 12px/1.5 var(--font-sans); }
+.cast-review-explanation strong { font-weight: 750; white-space: nowrap; }
+.cast-review-explanation.required { border-left: 4px solid var(--danger-ink); background: color-mix(in srgb, var(--danger-soft) 40%, var(--paper)); }
+.cast-review-explanation.required strong { color: var(--danger-ink); }
+.cast-review-explanation.advisory { border-left: 4px solid var(--gilt-ink); background: color-mix(in srgb, var(--gilt) 10%, var(--paper)); }
+.cast-review-explanation.advisory strong { color: var(--gilt-ink); }
 .cast-board .cast-roster-identity.selected { outline: 3px solid var(--poppy); outline-offset: 2px; box-shadow: none; }
 .cast-board .cast-roster-identity.drop-target { outline: 3px solid var(--poppy); transform: translateY(-2px); }
 .cast-board .cast-roster-identity.cast-narrator-tile { border-color: var(--line-strong); }
@@ -77,6 +93,7 @@
   .cast-board .cast-roster-identity .cast-roster-portrait strong { font-size: 37px; }
   .cast-board .cast-roster-identity .cast-roster-details { min-height: 70px; padding: 11px 12px; }
   .cast-board .cast-roster-identity .cast-roster-details b { font-size: 16px; }
+  .cast-review-explanation { padding: 12px 16px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

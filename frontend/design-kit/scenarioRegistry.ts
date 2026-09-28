@@ -46,6 +46,7 @@ export type CastFixtureVariant =
   | "layered"
   | "layered-confirmed"
   | "missing-audition"
+  | "review-spectrum-identities"
   | "voice-design";
 
 export type DialogueFixtureVariant = "conflicts" | "standard";
@@ -514,6 +515,28 @@ const baselineScenarioMetadata = {
     castingPreviewAvailable: false,
     gatewayVariant: "default",
     story: { surface: "workflow", actions: [], heading: "Build the cast." },
+  },
+  "cast-review-states": {
+    label: "Cast · required and suggested review",
+    description: "Synthetic examples of a blocking identity decision, optional review, and ready cast members.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "review-spectrum-identities",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Build the cast." },
+  },
+  "cast-voice-review-states": {
+    label: "Voices · required and optional review",
+    description: "Synthetic missing audition, playable unapproved audition, and approved voice on one grid.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "missing-audition",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Voices" },
   },
   "cast-dense": {
     label: "Cast · 60 identities",

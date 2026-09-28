@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { createFixtureGateway, scenarios, snapshotFor } from './fixtures';
+import { castFor } from './castFixtures';
+import { strongConfirmationLabelsForCast } from '../src/castIdentity';
+import { decisionsForCast } from '../src/workflow/cast';
 
 describe('synthetic review gateway', () => {
   it('keeps mutations in one fixture instance and exports synthetic metadata only', async () => {
@@ -31,5 +34,17 @@ describe('synthetic review gateway', () => {
     expect(candidate.phase).toBe('identity-review');
     expect(candidate.identityDecisions).toBeUndefined();
     expect((await gateway.getBookSnapshot('kit-book')).cast).toEqual(accepted.cast);
+  });
+  it('exposes blocking, advisory, and ready cast examples without changing accepted data', () => {
+    const cast = castFor('review-spectrum-identities');
+    const blocking = strongConfirmationLabelsForCast(cast, decisionsForCast(cast));
+    expect(blocking).toContain('Royal Chorus');
+    expect(blocking).not.toContain('Queen of Hearts');
+    expect(cast.proposals.find(row => row.label === 'Queen of Hearts')?.reviewRequired).toBe(true);
+    expect(cast.proposals.find(row => row.label === 'Alice')?.reviewRequired).toBe(false);
+    const voices = castFor('missing-audition');
+    expect(voices.identities?.find(row => row.name === 'Alice')?.voiceCandidates).toEqual([]);
+    expect(voices.identities?.some(row => row.voiceAccepted)).toBe(true);
+    expect(voices.identities?.some(row => !row.voiceAccepted && Boolean(row.voicePreviewRevision))).toBe(true);
   });
 });

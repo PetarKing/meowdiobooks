@@ -66,8 +66,9 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
         </section>
       </div>
 
+      <div className="edition-selections">
       <section className="edition-contents" aria-labelledby="edition-contents-title">
-        <header><div><span className="eyebrow">{t("Choose audio")}</span><h2 id="edition-contents-title">{t("Chapters to include")}</h2></div><div className="edition-bulk"><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
+        <header><div><span className="eyebrow">{t("Choose audio")}</span><h2 id="edition-contents-title">{t("Chapters to include")}</h2></div><div className="edition-bulk"><span className="edition-selected-count" aria-live="polite">{t("{{count}} chapters selected", { count: selectedPlayable.length })}</span><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
         <div className="edition-chapters">{playableChapters.map((row) => {
           const index = (snapshot?.chapters ?? []).findIndex((chapter) => chapter.id === row.id);
           const audio = generatedByChapter.get(row.id)!;
@@ -81,6 +82,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
             <span className="edition-chapter-duration">{duration}</span>
           </label>;
         })}</div>
+        {playableChapters.length > 7 && <p className="edition-scroll-hint">↓ {t("Scroll to browse")}</p>}
       </section>
 
       <section className="edition-format" aria-labelledby="export-format-title">
@@ -97,6 +99,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
           })}
         </div>
       </section>
+      </div>
 
       <section className="edition-release" aria-label={t("Export summary")}>
         <div><span className="eyebrow">{t("Ready to create")}</span><h2>{selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}</h2><p>{exportSummary}</p></div>
