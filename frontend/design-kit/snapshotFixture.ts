@@ -8,9 +8,10 @@ export function snapshotFor(id: ScenarioId): WizardSnapshot {
   const completed: WizardSnapshot["book"]["completedStages"] = [
     ...metadata.completedStages,
   ];
-  const longExport = metadata.snapshotVariant === "export-long-book";
+  const denseGenerate = metadata.snapshotVariant === "generate-long-book";
+  const longExport = metadata.snapshotVariant === "export-long-book" || denseGenerate;
   const chapterTitles = longExport
-    ? Array.from({ length: 20 }, (_, i) => `Synthetic review chapter ${i + 1}`)
+    ? Array.from({ length: denseGenerate ? 120 : 20 }, (_, i) => `Synthetic review chapter ${i + 1}`)
     : [
         "Down the Rabbit-Hole",
         "The Pool of Tears",
@@ -38,7 +39,7 @@ export function snapshotFor(id: ScenarioId): WizardSnapshot {
       title: fixtureBook.title,
       author: "Lewis Carroll",
       filename: "alice.pdf",
-      pageCount: 120,
+      pageCount: denseGenerate ? 720 : 120,
       completedStages: completed,
     },
     activeArtifacts: {
@@ -178,7 +179,7 @@ export function snapshotFor(id: ScenarioId): WizardSnapshot {
     chapters,
     generatedChapters: (completed.includes("cast")
       ? longExport
-        ? chapters
+        ? denseGenerate ? chapters.slice(0,40) : chapters
         : chapters.slice(0, 3)
       : []
     ).map((c, i) => ({

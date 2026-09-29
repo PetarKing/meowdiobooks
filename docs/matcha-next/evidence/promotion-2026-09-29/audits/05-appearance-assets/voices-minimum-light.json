@@ -1,0 +1,63 @@
+{
+  "height": 844,
+  "overflow": 0,
+  "statuses": [
+    {
+      "clientWidth": 288,
+      "font": "650 11px / 15.4px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 288,
+      "text": "1 approved5 not yet approvedCan continue1 requiredBlocks continue",
+      "width": 288.00347900390625
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Audition requiredBlocks continue",
+      "width": 94.95660400390624
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Not yet approvedCan continue",
+      "width": 93.89757537841795
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Not yet approvedCan continue",
+      "width": 93.89757537841795
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Not yet approvedCan continue",
+      "width": 93.89757537841795
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Not yet approvedCan continue",
+      "width": 93.89757537841795
+    },
+    {
+      "clientWidth": 0,
+      "font": "700 11px / 13.2px \"Avenir Next\", Avenir, \"Segoe UI\", system-ui, sans-serif",
+      "fontSize": "11px",
+      "scrollWidth": 0,
+      "text": "Not yet approvedCan continue",
+      "width": 93.89757537841795
+    }
+  ],
+  "width": 320
+}

@@ -1,0 +1,185 @@
+{
+  "executedAt": "2026-09-27T21:26:46.824Z",
+  "results": [
+    {
+      "appearance": "light",
+      "width": 1440,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(45, 56, 37) none 0px",
+          "shadow": "rgb(164, 47, 77) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(164, 47, 77)",
+          "labelOutline": "rgb(94, 104, 79) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        }
+      ]
+    },
+    {
+      "appearance": "light",
+      "width": 900,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(45, 56, 37) none 0px",
+          "shadow": "rgb(164, 47, 77) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(164, 47, 77)",
+          "labelOutline": "rgb(94, 104, 79) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        }
+      ]
+    },
+    {
+      "appearance": "light",
+      "width": 390,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(45, 56, 37) none 0px",
+          "shadow": "rgb(164, 47, 77) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(164, 47, 77)",
+          "labelOutline": "rgb(94, 104, 79) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(0, 0, 0) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(0, 0, 0)",
+          "labelOutline": "rgb(164, 47, 77) solid 2px"
+        }
+      ]
+    },
+    {
+      "appearance": "dark",
+      "width": 1440,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(240, 244, 230) none 0px",
+          "shadow": "rgb(238, 156, 180) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(238, 156, 180)",
+          "labelOutline": "rgb(189, 201, 173) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        }
+      ]
+    },
+    {
+      "appearance": "dark",
+      "width": 900,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(240, 244, 230) none 0px",
+          "shadow": "rgb(238, 156, 180) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(238, 156, 180)",
+          "labelOutline": "rgb(189, 201, 173) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        }
+      ]
+    },
+    {
+      "appearance": "dark",
+      "width": 390,
+      "controls": [
+        {
+          "selector": "edition-field",
+          "inputFocusVisible": true,
+          "outline": "rgb(240, 244, 230) none 0px",
+          "shadow": "rgb(238, 156, 180) 0px 2px 0px 0px",
+          "borderBottomColor": "rgb(238, 156, 180)",
+          "labelOutline": "rgb(189, 201, 173) none 0px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        },
+        {
+          "selector": "selected",
+          "inputFocusVisible": true,
+          "outline": "rgb(255, 255, 255) none 0px",
+          "shadow": "none",
+          "borderBottomColor": "rgb(255, 255, 255)",
+          "labelOutline": "rgb(238, 156, 180) solid 2px"
+        }
+      ]
+    }
+  ]
+}

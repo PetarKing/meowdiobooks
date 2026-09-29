@@ -166,6 +166,7 @@ from .workflow.commands import (
     command_for_stage,
 )
 from .workflow.runner import WorkflowRunner
+from .workflow.runtime import commit_publication
 from .workflow.defaults import PUBLIC_WORKFLOW
 from .workspace import BookWorkspace
 
@@ -240,6 +241,79 @@ _STAGE_KIND = {
 _generated_chapters = generated_chapters
 _MAX_VOICE_SAMPLE_BYTES = 25_000_000
 ChapterAudioSource = Callable[[str, str, str, Path], AbstractContextManager[Path]]
+
+
+def _voice_candidates_for(voice: dict[str, Any]) -> list[dict[str, Any]]:
+    """Keep legacy single-preview Cast rows in the editable audition collection."""
+
+    candidates = [
+        deepcopy(row)
+        for row in voice.get("voiceCandidates", [])
+        if isinstance(row, dict) and row.get("revision")
+    ]
+    if candidates or not voice.get("voicePreviewRevision"):
+        return candidates
+    return [{
+        "revision": voice["voicePreviewRevision"],
+        "previewUrl": voice.get("previewUrl"),
+        "referenceText": voice.get("referenceText"),
+        "referenceAudio": voice.get("referenceAudio"),
+        "referenceMode": voice.get("referenceMode"),
+        "direction": voice.get("voiceDirection"),
+        "voiceSettings": deepcopy(voice.get("voiceSettings")),
+    }]
+
+
+def _append_voice_auditions(
+    target: dict[str, Any], updated: dict[str, Any]
+) -> dict[str, Any]:
+    """Append new revisions without allowing an adapter to rewrite earlier auditions."""
+
+    candidates = _voice_candidates_for(target)
+    known = {str(row["revision"]) for row in candidates}
+    for row in _voice_candidates_for(updated):
+        revision = str(row["revision"])
+        if revision in known:
+            continue
+        row["parentRevision"] = candidates[-1]["revision"] if candidates else None
+        candidates.append(row)
+        known.add(revision)
+    return {**updated, "voiceCandidates": candidates}
+
+
+def _validate_voice_audio(
+    package: Path, character_id: str, candidate: dict[str, Any]
+) -> None:
+    """Require exact, nonempty local preview/reference files before committing metadata."""
+
+    revision = str(candidate.get("voicePreviewRevision") or candidate.get("revision") or "")
+    if not revision or any(not (letter.isalnum() or letter in "-_") for letter in revision):
+        raise CastContractError("Voice audition has an invalid revision")
+    if not candidate.get("previewUrl"):
+        raise CastContractError("Voice audition has no playable preview")
+    mode = str(candidate.get("referenceMode") or "transcript-conditioned")
+    if mode not in {"transcript-conditioned", "speaker-embedding"}:
+        raise CastContractError("Voice audition has an unsupported reference mode")
+    if mode == "transcript-conditioned" and not str(candidate.get("referenceText") or "").strip():
+        raise CastContractError("Voice audition has no reference transcript")
+    reference_relative = candidate.get("referenceAudio") or Path("voices") / character_id / f"{revision}.wav"
+    reference = (package / str(reference_relative)).resolve()
+    voices = (package / "voices").resolve()
+    if (
+        voices not in reference.parents
+        or reference.name not in {f"{revision}.wav", f"{revision}.reference.wav"}
+    ):
+        raise CastContractError("Voice audition reference does not match its revision")
+    preview = reference.with_name(f"{revision}.wav")
+    for audio in {preview, reference}:
+        if not audio.is_file() or not audio.stat().st_size:
+            raise CastContractError("Voice audition audio is missing or empty")
+
+
+def _require_current_voice_draft(package: Path, revision: str) -> None:
+    history = artifact_history(package, "cast")
+    if not history or str(history[-1].get("revision")) != revision:
+        raise CastContractError("The Voice draft changed. Refresh before adding or removing auditions")
 
 
 def _generate_voice_candidates(
@@ -451,13 +525,20 @@ def create_app_v2(
     def write_cast_candidate(
         package: Path, payload: dict[str, Any]
     ) -> tuple[Path, dict[str, Any]]:
+        history = artifact_history(package, "cast")
+        previous = history[-1] if history else {}
         path, artifact = write_artifact(package, "cast", payload, publish=False)
         keep = set(cast_voice_revisions(artifact))
+        keep.update(cast_voice_revisions(previous))
         try:
             keep.update(cast_voice_revisions(read_artifact(package, "cast")))
         except ValueError:
             pass
-        retain_cast_voice_revisions(package, frozenset(keep))
+        try:
+            retain_cast_voice_revisions(package, frozenset(keep))
+        except Exception:
+            path.unlink(missing_ok=True)
+            raise
         return path, artifact
 
     def current_voice_recipe_version(model_id: str) -> str:
@@ -629,6 +710,30 @@ def create_app_v2(
         return _candidate_result(book.id, WizardStage.REVIEW, path, artifact)
 
     def process_cast(command: BuildCast, report) -> dict[str, object]:
+        package = package_for(command.book_id)
+        history = artifact_history(package, "cast")
+        keep = set(cast_voice_revisions(history[-1] if history else {}))
+        try:
+            keep.update(cast_voice_revisions(read_artifact(package, "cast")))
+        except ValueError:
+            pass
+        try:
+            return build_cast_candidate(command, report)
+        except Exception:
+            # A successful upload may have advanced the draft while this provider was busy.
+            current_history = artifact_history(package, "cast")
+            keep.update(cast_voice_revisions(current_history[-1] if current_history else {}))
+            try:
+                keep.update(cast_voice_revisions(read_artifact(package, "cast")))
+            except ValueError:
+                pass
+            try:
+                retain_cast_voice_revisions(package, frozenset(keep))
+            except Exception:
+                logger.exception("Could not clean up an unsuccessful Cast audition")
+            raise
+
+    def build_cast_candidate(command: BuildCast, report) -> dict[str, object]:
         book = require_book(command.book_id)
         package = package_for(book.id)
         dialogue = read_artifact(package, "dialogue")
@@ -641,6 +746,19 @@ def create_app_v2(
         if proposal_revision and force_reclassify:
             raise CastContractError("Cast reclassification cannot reuse an existing proposal")
         revision = uuid4().hex
+
+        def finish(payload: dict[str, Any], message: str, voice_base: str = ""):
+            def publish() -> dict[str, object]:
+                validate_cast_proposal_inputs(
+                    payload, read_artifact(package, "dialogue"), read_artifact(package, "review")
+                )
+                if voice_base:
+                    _require_current_voice_draft(package, voice_base)
+                path, artifact = write_cast_candidate(package, payload)
+                return _candidate_result(book.id, WizardStage.CAST, path, artifact)
+
+            return commit_publication(report, publish, message)
+
         if not proposal_revision:
             reusable = None
             if not force_reclassify:
@@ -653,9 +771,7 @@ def create_app_v2(
                     default_voice_model=default_voice_id,
                 )
             if reusable is not None:
-                path, artifact = write_cast_candidate(package, reusable)
-                report(100, "Existing cast and auditions ready for review")
-                return _candidate_result(book.id, WizardStage.CAST, path, artifact)
+                return finish(reusable, "Existing cast and auditions ready for review")
             report(2, "Building contextual identity dossiers")
             spans = list(dialogue.get("spans", []))
             extraction = read_artifact(package, "extraction")
@@ -695,6 +811,7 @@ def create_app_v2(
                     raise CastContractError(
                         "Generate the cast auditions before regenerating one voice"
                     )
+                _require_current_voice_draft(package, proposal_revision)
                 model_id = str(proposal.get("voiceModel", default_voice_id))
                 language = normalize_language(proposal.get("language", "english"))
                 current_recipe_version = current_voice_recipe_version(model_id)
@@ -718,8 +835,16 @@ def create_app_v2(
                         raise CastContractError("Voice reuse is unavailable")
                     report(2, "Reusing the selected voice")
                     updated = validated_imported_voices({character_id: cast_voice_reuse.import_voice(
-                        book.id, package, target, settings["sourceVoice"], language, model_id,
+                        book.id, package, deepcopy(target), settings["sourceVoice"], language, model_id,
                     )}, [target])[character_id]
+                    updated = _append_voice_auditions(target, updated)
+                    known = {row["revision"] for row in _voice_candidates_for(target)}
+                    candidates = _voice_candidates_for(updated)
+                    if updated.get("voicePreviewRevision") not in {row["revision"] for row in candidates}:
+                        raise CastContractError("Imported voice did not return a selectable revision")
+                    for row in candidates:
+                        if row["revision"] not in known:
+                            _validate_voice_audio(package, character_id, row)
                     body = {
                         **proposal, "revision": revision, "phase": "audition-review",
                         "status": "needs-voice-review",
@@ -727,12 +852,11 @@ def create_app_v2(
                         "identities": [updated if str(row.get("characterId")) == character_id else row
                                        for row in proposal.get("identities", [])],
                     }
-                    path, artifact = write_cast_candidate(package, body)
-                    report(100, "Reused voice ready for review")
-                    return _candidate_result(book.id, WizardStage.CAST, path, artifact)
+                    return finish(body, "Reused voice ready for review", proposal_revision)
                 character = {
-                    **target,
+                    **deepcopy(target),
                     "id": character_id,
+                    "voiceCandidates": _voice_candidates_for(target),
                     "voiceSettings": validate_voice_settings(
                         settings.get("voiceSettings")
                         or target.get("voiceSettings")
@@ -749,7 +873,6 @@ def create_app_v2(
                     "referenceAudio",
                     "referenceMode",
                     "referenceText",
-                    "voiceCandidates",
                     "voicePreviewRevision",
                     "voiceRevision",
                 ):
@@ -766,10 +889,23 @@ def create_app_v2(
                     character["voiceSettings"], language=language
                 )
                 report(2, f"Regenerating the {target.get('name', character_id)} audition")
-                generated = voice_auditioner(
+                generated_rows = voice_auditioner(
                     repo_root, package, book.id, [character], report, language, model_id
-                )[0]
-                updated = _audition_identity(generated, package, base=target)
+                )
+                if not isinstance(generated_rows, list) or len(generated_rows) != 1 or not isinstance(generated_rows[0], dict):
+                    raise CastContractError("Voice audition did not return one cast voice")
+                generated = generated_rows[0]
+                if str(generated.get("id") or generated.get("characterId")) != character_id:
+                    raise CastContractError("Voice audition returned a different cast identity")
+                updated = _append_voice_auditions(
+                    target, _audition_identity(generated, package, base=target)
+                )
+                known = {row["revision"] for row in _voice_candidates_for(target)}
+                added = [row for row in _voice_candidates_for(updated) if row["revision"] not in known]
+                if not added or updated.get("voicePreviewRevision") not in {row["revision"] for row in added}:
+                    raise CastContractError("Voice audition did not return a new selectable revision")
+                for row in added:
+                    _validate_voice_audio(package, character_id, row)
                 identities = [
                     updated if str(row.get("characterId")) == character_id else row
                     for row in proposal.get("identities", [])
@@ -782,9 +918,7 @@ def create_app_v2(
                     "narrator": updated if character_id == "narrator" else proposal.get("narrator"),
                     "identities": identities,
                 }
-                path, artifact = write_cast_candidate(package, body)
-                report(100, "Voice audition ready for review")
-                return _candidate_result(book.id, WizardStage.CAST, path, artifact)
+                return finish(body, "Voice audition ready for review", proposal_revision)
 
             raw_decisions = settings.get("identityDecisions", proposal.get("identityDecisions", []))
             if not isinstance(raw_decisions, list):
@@ -1137,9 +1271,7 @@ def create_app_v2(
                 "identityDecisions": raw_decisions,
                 "sourceBookIds": source_book_ids,
             }
-        path, artifact = write_cast_candidate(package, body)
-        report(100, "Cast candidate ready for review")
-        return _candidate_result(book.id, WizardStage.CAST, path, artifact)
+        return finish(body, "Cast candidate ready for review")
 
     def ensure_recording_script(book_id: str) -> dict[str, Any]:
         """Return the current cached script, rebuilding only when accepted inputs changed."""
@@ -1594,6 +1726,7 @@ def create_app_v2(
                         "chapters": json.loads(raw_chapters),
                         "title": form.get("title"),
                         "author": form.get("author"),
+                        "description": form.get("description"),
                         "coverPage": form.get("coverPage") or 1,
                         "preset": form.get("preset") or AudioExportPreset.M4B_HIGH,
                     }
@@ -1696,6 +1829,7 @@ def create_app_v2(
         author = (
             (body.author or "").strip() or metadata.get("author") or book.author or "Meowdiobooks"
         )
+        description = body.description.strip() if body.description is not None else None
         temp_root = root / "tmp"
         temp_root.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix=f"m4b-{book.id}-", dir=temp_root))
@@ -1739,6 +1873,7 @@ def create_app_v2(
                     output,
                     title=title,
                     author=author,
+                    description=description,
                     cover=cover,
                     preset=body.preset,
                 )
@@ -1763,6 +1898,7 @@ def create_app_v2(
             book_id=book.id,
             title=title,
             author=author,
+            description=description,
             filename=destination.name,
             file_path=str(destination),
             chapter_count=len(export_chapters),
@@ -2078,6 +2214,13 @@ def create_app_v2(
             raise HTTPException(status_code=404, detail=str(error)) from error
         if candidate.get("phase") != "audition-review":
             raise HTTPException(status_code=409, detail="Voice samples require an editable Voice draft")
+        try:
+            validate_cast_proposal_inputs(
+                candidate, read_artifact(package, "dialogue"), read_artifact(package, "review")
+            )
+            _require_current_voice_draft(package, revision)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
         model_id = str(candidate.get("voiceModel") or default_voice_id)
         if str(candidate.get("auditionPackRecipeVersion", "")) != current_voice_recipe_version(
             model_id
@@ -2208,7 +2351,21 @@ def create_app_v2(
             "identities": identities,
         }
         try:
+            _validate_voice_audio(package, character_id, voice_candidate)
+        except ValueError as error:
+            output.unlink(missing_ok=True)
+            reference_output.unlink(missing_ok=True)
+            raise HTTPException(status_code=422, detail=str(error)) from error
+        try:
+            validate_cast_proposal_inputs(
+                candidate, read_artifact(package, "dialogue"), read_artifact(package, "review")
+            )
+            _require_current_voice_draft(package, revision)
             _path, artifact = write_cast_candidate(package, body)
+        except ValueError as error:
+            output.unlink(missing_ok=True)
+            reference_output.unlink(missing_ok=True)
+            raise HTTPException(status_code=409, detail=str(error)) from error
         except Exception:
             output.unlink(missing_ok=True)
             reference_output.unlink(missing_ok=True)
@@ -2235,6 +2392,13 @@ def create_app_v2(
             raise HTTPException(status_code=404, detail=str(error)) from error
         if candidate.get("phase") != "audition-review":
             raise HTTPException(status_code=409, detail="Auditions require an editable Voice draft")
+        try:
+            validate_cast_proposal_inputs(
+                candidate, read_artifact(package, "dialogue"), read_artifact(package, "review")
+            )
+            _require_current_voice_draft(package, revision)
+        except ValueError as error:
+            raise HTTPException(status_code=409, detail=str(error)) from error
 
         rows = [candidate.get("narrator"), *candidate.get("identities", [])]
         target = next(
@@ -2405,6 +2569,9 @@ def create_app_v2(
                         "The audition recipe changed; regenerate the complete audition pack first"
                     )
                 accepted_payload = _accept_voice_revisions(candidate, body.decisions, uuid4().hex)
+                for voice in [accepted_payload.get("narrator"), *accepted_payload.get("identities", [])]:
+                    if isinstance(voice, dict) and voice.get("acceptedVoiceRevision"):
+                        _validate_voice_audio(package_for(book_id), str(voice["characterId"]), voice)
                 path, accepted_payload = write_artifact(
                     package_for(book_id), "cast", accepted_payload, publish=False
                 )
@@ -2571,6 +2738,7 @@ def _library_export_payload(item: LibraryExport, *, package: Path | None = None)
         "bookId": item.book_id,
         "title": item.title,
         "author": item.author,
+        "description": item.description,
         "filename": item.filename,
         "location": item.file_path,
         "chapterCount": item.chapter_count,

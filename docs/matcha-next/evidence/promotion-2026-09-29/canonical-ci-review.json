@@ -1,0 +1,894 @@
+{
+  "cases": [
+    "home",
+    "library",
+    "library-empty",
+    "library-error",
+    "library-refresh-error",
+    "extract",
+    "dialogue",
+    "dialogue-results",
+    "dialogue-running",
+    "review",
+    "review-final",
+    "review-recovery",
+    "cast-identities",
+    "cast-review-states",
+    "cast-voice-review-states",
+    "cast-inspector",
+    "cast-voices-dense",
+    "generate",
+    "generate-long-book",
+    "generate-running",
+    "generate-failed",
+    "export",
+    "export-long-book",
+    "phase-help"
+  ],
+  "results": [
+    {
+      "scenario": "home",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-empty",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-error",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-refresh-error",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "extract",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-results",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-running",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-final",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-recovery",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-identities",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-review-states",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voice-review-states",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-inspector",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voices-dense",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-long-book",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-running",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-failed",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export-long-book",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "phase-help",
+      "appearance": "light",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "home",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-empty",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-error",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-refresh-error",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "extract",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-results",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-running",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-final",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-recovery",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-identities",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-review-states",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voice-review-states",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-inspector",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voices-dense",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-long-book",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-running",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-failed",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export-long-book",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "phase-help",
+      "appearance": "dark",
+      "width": 1440,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "home",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-empty",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-error",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-refresh-error",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "extract",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-results",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-running",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-final",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-recovery",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-identities",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-review-states",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voice-review-states",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-inspector",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voices-dense",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-long-book",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-running",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-failed",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export-long-book",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "phase-help",
+      "appearance": "light",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "home",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-empty",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-error",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "library-refresh-error",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "extract",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-results",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "dialogue-running",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-final",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "review-recovery",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-identities",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-review-states",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voice-review-states",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-inspector",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "cast-voices-dense",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-long-book",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-running",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "generate-failed",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "export-long-book",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    },
+    {
+      "scenario": "phase-help",
+      "appearance": "dark",
+      "width": 390,
+      "passed": true,
+      "errors": [],
+      "overflow": -15,
+      "violations": []
+    }
+  ]
+}

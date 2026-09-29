@@ -1,0 +1,334 @@
+[
+  {
+    "width": 320,
+    "theme": "light",
+    "scenario": "home",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cl": "",
+        "text": "05生成→",
+        "left": 324.84375,
+        "right": 382.390625,
+        "scroll": 58,
+        "client": 58
+      },
+      {
+        "tag": "B",
+        "cl": "",
+        "text": "05",
+        "left": 324.84375,
+        "right": 336.75,
+        "scroll": 12,
+        "client": 12
+      },
+      {
+        "tag": "I",
+        "cl": "",
+        "text": "→",
+        "left": 373.203125,
+        "right": 382.390625,
+        "scroll": 9,
+        "client": 9
+      },
+      {
+        "tag": "SPAN",
+        "cl": "",
+        "text": "06导出",
+        "left": 394.390625,
+        "right": 434.75,
+        "scroll": 40,
+        "client": 40
+      },
+      {
+        "tag": "B",
+        "cl": "",
+        "text": "06",
+        "left": 394.390625,
+        "right": 406.296875,
+        "scroll": 12,
+        "client": 12
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "scenario": "review",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "scenario": "cast-inspector",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 320,
+    "theme": "light",
+    "scenario": "generate-long-book",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "scenario": "home",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": [
+      {
+        "tag": "SPAN",
+        "cl": "",
+        "text": "05生成→",
+        "left": 324.84375,
+        "right": 382.390625,
+        "scroll": 58,
+        "client": 58
+      },
+      {
+        "tag": "B",
+        "cl": "",
+        "text": "05",
+        "left": 324.84375,
+        "right": 336.75,
+        "scroll": 12,
+        "client": 12
+      },
+      {
+        "tag": "I",
+        "cl": "",
+        "text": "→",
+        "left": 373.203125,
+        "right": 382.390625,
+        "scroll": 9,
+        "client": 9
+      },
+      {
+        "tag": "SPAN",
+        "cl": "",
+        "text": "06导出",
+        "left": 394.390625,
+        "right": 434.75,
+        "scroll": 40,
+        "client": 40
+      },
+      {
+        "tag": "B",
+        "cl": "",
+        "text": "06",
+        "left": 394.390625,
+        "right": 406.296875,
+        "scroll": 12,
+        "client": 12
+      }
+    ]
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "scenario": "review",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "scenario": "cast-inspector",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 320,
+    "theme": "dark",
+    "scenario": "generate-long-book",
+    "actualWidth": 320,
+    "docWidth": 320,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "light",
+    "scenario": "home",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "light",
+    "scenario": "review",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "light",
+    "scenario": "cast-inspector",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "light",
+    "scenario": "generate-long-book",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "dark",
+    "scenario": "home",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "dark",
+    "scenario": "review",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "dark",
+    "scenario": "cast-inspector",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 900,
+    "theme": "dark",
+    "scenario": "generate-long-book",
+    "actualWidth": 900,
+    "docWidth": 900,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "light",
+    "scenario": "home",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "light",
+    "scenario": "review",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "light",
+    "scenario": "cast-inspector",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "light",
+    "scenario": "generate-long-book",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "dark",
+    "scenario": "home",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "dark",
+    "scenario": "review",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "dark",
+    "scenario": "cast-inspector",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  },
+  {
+    "width": 720,
+    "theme": "dark",
+    "scenario": "generate-long-book",
+    "actualWidth": 720,
+    "docWidth": 720,
+    "lang": "zh-CN",
+    "bodyStart": "Component workshop ↗\nPreview\nCast · audition inspector\nCast · audition missing\nCast · accepted summary\nExtract · accepted summary\nDialogue · accepted summary\nReview · accepted summary\nGenerate · older",
+    "overflow": []
+  }
+]

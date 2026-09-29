@@ -30,6 +30,7 @@ export type SnapshotVariant =
   | "dialogue-routing-unconfigured"
   | "dialogue-structural"
   | "export-long-book"
+  | "generate-long-book"
   | "generate-split"
   | "generate-stale"
   | "review-boundaries"
@@ -45,6 +46,7 @@ export type CastFixtureVariant =
   | "layered"
   | "layered-confirmed"
   | "missing-audition"
+  | "review-spectrum-identities"
   | "voice-design";
 
 export type DialogueFixtureVariant = "conflicts" | "standard";
@@ -57,6 +59,7 @@ export type GatewayVariant =
   | "generate-failed"
   | "generate-running"
   | "home-error"
+  | "home-shelf"
   | "library-error"
   | "library-loading"
   | "library-missing-cover"
@@ -119,7 +122,7 @@ const throughCast = [
  * The scenario ID, catalogue copy, data, gateway and entry behavior share one
  * exhaustive definition. ScenarioId and the public catalogue are derived below.
  */
-export const scenarioMetadata = {
+const baselineScenarioMetadata = {
   "cast-inspector": {
     label: "Cast · audition inspector",
     description: "Audition attempts, settings and generation controls.",
@@ -132,7 +135,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-alice-voice"],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   "cast-missing": {
@@ -147,7 +150,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-alice-voice"],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   "cast-accepted": {
@@ -226,7 +229,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "generate-player": {
@@ -241,7 +244,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-player"],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "generate-split": {
@@ -256,7 +259,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["open-split"],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   "phase-help": {
@@ -271,7 +274,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["phase-help"],
-      heading: "Did we read the source correctly?",
+      heading: "Check the extracted text",
     },
   },
   "cast-voices": {
@@ -287,7 +290,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   home: {
@@ -393,7 +396,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Did we read the source correctly?",
+      heading: "Check the extracted text",
     },
   },
   dialogue: {
@@ -454,7 +457,22 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["scan-review"],
-      heading: "Review the decisions that affect your audiobook.",
+      heading: "Review your manuscript",
+    },
+  },
+  "review-intro": {
+    label: "Review · scan invitation",
+    description: "Unscanned manuscript and source-check invitation.",
+    completedStages: throughDialogue,
+    snapshotVariant: "review-warnings",
+    castFixture: "auditions",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: {
+      surface: "workflow",
+      actions: [],
+      heading: "Check for issues",
     },
   },
   "review-boundaries": {
@@ -469,7 +487,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["scan-review"],
-      heading: "Review the decisions that affect your audiobook.",
+      heading: "Review your manuscript",
     },
   },
   "review-final": {
@@ -498,6 +516,28 @@ export const scenarioMetadata = {
     gatewayVariant: "default",
     story: { surface: "workflow", actions: [], heading: "Build the cast." },
   },
+  "cast-review-states": {
+    label: "Cast · required and suggested review",
+    description: "Synthetic examples of a blocking identity decision, optional review, and ready cast members.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "review-spectrum-identities",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Build the cast." },
+  },
+  "cast-voice-review-states": {
+    label: "Voices · required and optional review",
+    description: "Synthetic missing audition, playable unapproved audition, and approved voice on one grid.",
+    completedStages: throughReview,
+    snapshotVariant: "default",
+    castFixture: "missing-audition",
+    dialogueFixture: "standard",
+    castingPreviewAvailable: false,
+    gatewayVariant: "default",
+    story: { surface: "workflow", actions: [], heading: "Voices" },
+  },
   "cast-dense": {
     label: "Cast · 60 identities",
     description:
@@ -522,7 +562,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Choose the cast voices.",
+      heading: "Voices",
     },
   },
   generate: {
@@ -538,7 +578,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Bring every chapter to life.",
+      heading: "Record your chapters",
     },
   },
   export: {
@@ -553,7 +593,7 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["export"],
-      heading: "Package your audiobook.",
+      heading: "Prepare your audiobook",
     },
   },
   "export-long-book": {
@@ -569,9 +609,23 @@ export const scenarioMetadata = {
     story: {
       surface: "workflow",
       actions: ["export"],
-      heading: "Package your audiobook.",
+      heading: "Prepare your audiobook",
     },
   },
+} as const satisfies Record<string, ScenarioMetadata>;
+
+/** Failure and recovery variants use the same real pages and in-memory gateway. */
+export const scenarioMetadata = {
+  ...baselineScenarioMetadata,
+  "home-shelf": { ...baselineScenarioMetadata.home, label: "Create · six local books", description: "Responsive shelf of six synthetic local drafts.", gatewayVariant: "home-shelf" },
+  "generate-long-book": { ...baselineScenarioMetadata.generate, label: "Generate · 120 chapters", description: "A long synthetic book for tracklist selection, estimates and listening.", snapshotVariant: "generate-long-book" },
+  "library-missing-cover": { ...baselineScenarioMetadata.library, label: "Library · missing cover", description: "A broken cover resolves to the readable production fallback.", gatewayVariant: "library-missing-cover" },
+  "library-refresh-error": { ...baselineScenarioMetadata.library, label: "Library · refresh failed", description: "Saved editions remain visible after a failed refresh.", gatewayVariant: "library-refresh-error" },
+  "dialogue-running": { ...baselineScenarioMetadata.dialogue, label: "Dialogue · running", description: "Cancelable progress while the transcript is being built.", gatewayVariant: "dialogue-running", story: { ...baselineScenarioMetadata.dialogue.story, actions: ["build-dialogue"] } },
+  "generate-running": { ...baselineScenarioMetadata.generate, label: "Generate · running", description: "Chapter progress with saved audio retained.", gatewayVariant: "generate-running", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
+  "generate-failed": { ...baselineScenarioMetadata.generate, label: "Generate · failed", description: "Generation failure preserves chapters and offers recovery.", gatewayVariant: "generate-failed", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
+  "cast-sample-pending": { ...baselineScenarioMetadata["cast-inspector"], label: "Cast · sample upload", description: "Sample upload stays pending; unavailable confirmation cannot proceed.", gatewayVariant: "sample-upload-pending", story: { ...baselineScenarioMetadata["cast-inspector"].story, actions: ["open-alice-voice", "configure-sample", "create-sample"] } },
+  "review-recovery": { ...baselineScenarioMetadata.review, label: "Review · recovery", description: "Unsafe source coverage requires rebuilding Dialogue before acceptance.", snapshotVariant: "review-recovery", story: { ...baselineScenarioMetadata.review.story, actions: [], heading: "Dialogue needs rebuilding" } },
 } as const satisfies Record<string, ScenarioMetadata>;
 
 export type ScenarioId = keyof typeof scenarioMetadata;

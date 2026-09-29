@@ -1,0 +1,551 @@
+{
+  "preview": "http://127.0.0.1:6006",
+  "locale": "en",
+  "generatedAt": "2026-09-27T19:57:13.137Z",
+  "results": [
+    {
+      "story": "foundations-presentation-contract--isolated-palette",
+      "name": "Isolated Palette",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--isolated-palette-1440.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--product-palette",
+      "name": "Product Palette",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--product-palette-1440.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--appearance-siblings",
+      "name": "Appearance Siblings",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--appearance-siblings-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--actions",
+      "name": "Actions",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--actions-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--choices",
+      "name": "Choices",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--choices-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--surfaces-and-status",
+      "name": "Surfaces And Status",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--surfaces-and-status-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--keyboard-tabs",
+      "name": "Keyboard Tabs",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--keyboard-tabs-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--language",
+      "name": "Language",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--language-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--dialog",
+      "name": "Dialog",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--dialog-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--button-playground",
+      "name": "Button Playground",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--button-playground-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--panel-playground",
+      "name": "Panel Playground",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--panel-playground-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--collections",
+      "name": "Collections",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--collections-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-dialogue-routing--configured",
+      "name": "Configured",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-dialogue-routing--configured-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-dialogue-routing--credential-unavailable",
+      "name": "Credential Unavailable",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-dialogue-routing--credential-unavailable-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--introduction",
+      "name": "Introduction",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--introduction-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--empty",
+      "name": "Empty",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--empty-1440.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--preparation",
+      "name": "Preparation",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--preparation-1440.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--isolated-palette",
+      "name": "Isolated Palette",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--isolated-palette-390.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--product-palette",
+      "name": "Product Palette",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--product-palette-390.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--appearance-siblings",
+      "name": "Appearance Siblings",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--appearance-siblings-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--actions",
+      "name": "Actions",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--actions-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--choices",
+      "name": "Choices",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--choices-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--surfaces-and-status",
+      "name": "Surfaces And Status",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--surfaces-and-status-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--keyboard-tabs",
+      "name": "Keyboard Tabs",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--keyboard-tabs-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--language",
+      "name": "Language",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--language-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--dialog",
+      "name": "Dialog",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--dialog-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--button-playground",
+      "name": "Button Playground",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--button-playground-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--panel-playground",
+      "name": "Panel Playground",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--panel-playground-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-studio-primitives--collections",
+      "name": "Collections",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-studio-primitives--collections-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-dialogue-routing--configured",
+      "name": "Configured",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-dialogue-routing--configured-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-dialogue-routing--credential-unavailable",
+      "name": "Credential Unavailable",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-dialogue-routing--credential-unavailable-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--introduction",
+      "name": "Introduction",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--introduction-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--empty",
+      "name": "Empty",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--empty-390.png",
+      "passed": true
+    },
+    {
+      "story": "components-workflow-compositions--preparation",
+      "name": "Preparation",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "components-workflow-compositions--preparation-390.png",
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,78 @@
+{
+  "base": "http://127.0.0.1:5179/studio.html",
+  "source": {
+    "head": "2aeeac9adeebd924918e81eddba63c56fa291305",
+    "trackedChanges": ""
+  },
+  "generatedAt": "2026-09-26T21:35:07.794Z",
+  "method": "Chromium emulated prefers-color-scheme changes; no host OS settings changed",
+  "observations": [
+    {
+      "name": "system-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(244, 241, 235)",
+      "text": "rgb(37, 43, 44)"
+    },
+    {
+      "name": "system-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(24, 30, 32)",
+      "text": "rgb(241, 238, 229)"
+    },
+    {
+      "name": "explicit-light-on-dark-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(244, 241, 235)",
+      "text": "rgb(37, 43, 44)"
+    },
+    {
+      "name": "explicit-light-on-light-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(244, 241, 235)",
+      "text": "rgb(37, 43, 44)"
+    },
+    {
+      "name": "explicit-dark-on-light-os",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(24, 30, 32)",
+      "text": "rgb(241, 238, 229)"
+    },
+    {
+      "name": "explicit-dark-after-reload",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(24, 30, 32)",
+      "text": "rgb(241, 238, 229)"
+    },
+    {
+      "name": "system-resumed-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(244, 241, 235)",
+      "text": "rgb(37, 43, 44)"
+    },
+    {
+      "name": "system-resumed-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(24, 30, 32)",
+      "text": "rgb(241, 238, 229)"
+    }
+  ],
+  "errors": [],
+  "apiRequests": [],
+  "passed": true
+}

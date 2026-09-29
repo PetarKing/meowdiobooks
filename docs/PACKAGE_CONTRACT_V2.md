@@ -167,8 +167,11 @@ decisions block auditions. Missing or unaccepted narrator/character voices and i
 routes block later phases. Layered routing never changes label, alias, or identity semantics. One Cast
 revision never mixes auditions from different recipe versions.
 
-The product has one usable Cast voice set per book. Regenerating one cast member replaces that
-member's editable audition set instead of appending another reusable generation lineage. While a
+The product has one usable Cast voice set per book. Creating another audition for one cast member
+appends its immutable revision to that member's current audition set in chronological order. Earlier
+auditions remain available for playback and selection while the voice model, language and whole-pack
+recipe still match. This does not create another independently reusable Cast lineage. A changed
+recipe requires a complete compatible pack as described above. While a
 complete replacement Cast remains a draft, the last accepted Cast stays usable. Accepting the
 replacement atomically makes it the only Cast allowed to drive new generation and deletes voice WAVs
 that are unreachable from it. Superseded Cast JSON remains inspectable, but its previews may be
@@ -213,6 +216,16 @@ progress, cancellation requests and errors. Heavy local model work is serialized
 immediately. Running work stops cooperatively at its next progress or handler boundary, and a pending
 cancellation wins over a concurrent successful return. Cancellation and failure do not publish partial
 phase artifacts.
+
+Cast's final publication uses the optional `PublicationReporter.commit` boundary. The
+job-store atomic update serializes cancellation with publishing the draft and recording
+success: a cancellation recorded first prevents publication; a committed success is
+terminal and cannot subsequently be canceled or overwritten by the worker. Ordinary
+callable progress reporters remain supported for direct runs with a final cooperative
+checkpoint. Adding or removing auditions also requires the current editable Cast
+revision, checked before provider work and again before publication. A stale browser
+tab cannot replace a newer audition collection. Failed work cleans its unused audio
+while retaining both accepted and current draft auditions.
 
 Dialogue output must contain exactly one valid result for every focused unresolved/unlabelled target
 ID and no result for context-only IDs. Missing, duplicate, invented or malformed rows fail validation.

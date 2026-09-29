@@ -84,17 +84,15 @@ jobs:
       - name: Packaged host compatibility
         run: npm run test:consumer
 
-      - name: Compare accepted source on desktop and phone
-        env:
-          BASE_REF: ${{ github.event.pull_request.base.sha }}
-        run: npm run visual:parity -- "$BASE_REF" /tmp/meowdiobooks-visual-parity
+      - name: Review canonical screens on desktop and phone in both appearances
+        run: npm run visual:review -- /tmp/meowdiobooks-visual-review
 
-      - name: Upload visual comparison evidence
+      - name: Upload visual review evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: product-visual-parity
+          name: product-visual-review
           path: |
-            /tmp/meowdiobooks-visual-parity/report.json
-            /tmp/meowdiobooks-visual-parity/*.png
+            /tmp/meowdiobooks-visual-review/report.json
+            /tmp/meowdiobooks-visual-review/*.png
           retention-days: 7

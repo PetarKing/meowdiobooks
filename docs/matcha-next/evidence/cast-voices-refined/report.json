@@ -1,0 +1,51 @@
+{
+  "base": "http://127.0.0.1:5180/studio.html",
+  "executedAt": "2026-09-28T08:59:52.206Z",
+  "scope": "Synthetic design fixture; no backend generation or persisted revisions.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "centered": true,
+      "newVoice": true,
+      "designedPlayback": true,
+      "requiredVisible": true,
+      "axe": "0 scoped violations",
+      "overflow": 0,
+      "innerOverflow": 0
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "centered": true,
+      "newVoice": true,
+      "designedPlayback": true,
+      "requiredVisible": true,
+      "axe": "0 scoped violations",
+      "overflow": 0,
+      "innerOverflow": 0
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "centered": false,
+      "newVoice": true,
+      "designedPlayback": true,
+      "requiredVisible": true,
+      "axe": "0 scoped violations",
+      "overflow": 0,
+      "innerOverflow": 0
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "centered": false,
+      "newVoice": true,
+      "designedPlayback": true,
+      "requiredVisible": true,
+      "axe": "0 scoped violations",
+      "overflow": 0,
+      "innerOverflow": 0
+    }
+  ]
+}

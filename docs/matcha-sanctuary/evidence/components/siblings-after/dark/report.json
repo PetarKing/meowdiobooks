@@ -1,0 +1,39 @@
+{
+  "preview": "http://127.0.0.1:6006",
+  "locale": "en",
+  "generatedAt": "2026-09-27T19:58:56.239Z",
+  "results": [
+    {
+      "story": "foundations-presentation-contract--appearance-siblings",
+      "name": "Appearance Siblings",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--appearance-siblings-1440.png",
+      "passed": true
+    },
+    {
+      "story": "foundations-presentation-contract--appearance-siblings",
+      "name": "Appearance Siblings",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "foundations-presentation-contract--appearance-siblings-390.png",
+      "passed": true
+    }
+  ]
+}

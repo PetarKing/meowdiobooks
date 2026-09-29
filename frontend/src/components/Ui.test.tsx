@@ -1,9 +1,22 @@
 import { createRef, useState } from "react";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { Button, Choice, InspectorDialog } from "./Ui";
+import { Button, Choice, InspectorDialog, Panel, Tag } from "./Ui";
 
 describe("shared actions", () => {
+  it("retains the busy action label, blocks duplicate commands and can recover", () => {
+    const action = vi.fn();
+    const { rerender } = render(<Button busy onClick={action}>Create audition</Button>);
+    const button = screen.getByRole('button', { name: 'Create audition' });
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toBeDisabled();
+    fireEvent.click(button);
+    expect(action).not.toHaveBeenCalled();
+    rerender(<Button busy={false} onClick={action}>Create audition</Button>);
+    expect(button).not.toBeDisabled();
+    fireEvent.click(button);
+    expect(action).toHaveBeenCalledTimes(1);
+  });
   it("preserves native disabled, submit and ref behavior without accidental form submission", () => {
     const submit = vi.fn((event) => event.preventDefault());
     const action = vi.fn();
@@ -52,6 +65,15 @@ describe("shared actions", () => {
       "primary",
       "ghost",
     );
+  });
+});
+
+describe('composable presentation sections', () => {
+  it('preserves native section and status attributes with optional plain surfaces', () => {
+    render(<Panel title="Your cast" variant="plain" aria-label="Cast workspace" className="cast-section"><Tag role="status" tone="good" aria-live="polite">Ready to record</Tag></Panel>);
+    expect(screen.getByRole('region', { name: 'Cast workspace' })).toHaveClass('panel', 'panel-plain', 'cast-section');
+    expect(screen.getByRole('heading', { name: 'Your cast' })).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
   });
 });
 

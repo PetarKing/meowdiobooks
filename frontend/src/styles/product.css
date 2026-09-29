@@ -1,10 +1,24 @@
 /* Public full-product entry. Keep these unlayered, in accepted-main order.
    Consumers load this once before their own ordinary CSS overrides. */
+@import "./appearance.css";
 @import "../components/LanguagePicker.css";
 @import "../components/CastingChoice.css";
 @import "../components/CastIdentityReview.css";
 @import "../styles.css";
 @import "../media.css";
 @import "../components/dialog-surface.css";
+@import "./primitives.css";
+
+@import "./pages.css";
+@import "./cast-workbench.css";
+@import "./studio.css";
+@import "./review-extract-stage.css";
+@import "./generate-stage.css";
+@import "./export-stage.css";
+@import "./cast-stage.css";
+@import "./cast-roster.css";
+@import "./voice-create.css";
+@import "./atmosphere.css";
+@import "./roster-motion.css";
 
 [data-presentation-root] { color: var(--color-ink, var(--ink)); }

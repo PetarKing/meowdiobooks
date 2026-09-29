@@ -101,8 +101,7 @@ export const baselineContrastExceptions: Record<string, string[]> = {
     ".applied > p",
     ".candidate-applied-badge",
     ".primary",
-    "button[aria-label=\"Cast & voices In progress\"] > span > strong",
-    "button[aria-label=\"Select Audition 2\"] > span:nth-child(2) > small"
+    "button[aria-label=\"Cast & voices In progress\"] > span > strong"
   ],
   "cast-missing": [
     "button[aria-label=\"Cast & voices In progress\"] > span > strong"

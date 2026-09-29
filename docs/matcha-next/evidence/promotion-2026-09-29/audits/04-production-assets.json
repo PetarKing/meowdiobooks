@@ -1,0 +1,50 @@
+{
+  "sourceRevision": "4c8038470c052e09b229c8b00648ce041933689f",
+  "compression": "gzip level 6, mtime 0; compressed image sizes are diagnostic, not assumed transport encoding",
+  "files": [
+    {
+      "path": "frontend/dist/assets/index-BHk--K32.css",
+      "bytes": 358124,
+      "gzipLevel6Bytes": 58563,
+      "sha256": "6bdabe0d2fd594ae8a739489aee4eddceed418ce8c85b767de7807958f0899c4"
+    },
+    {
+      "path": "frontend/dist/assets/index-DGfzVYD1.js",
+      "bytes": 586731,
+      "gzipLevel6Bytes": 179563,
+      "sha256": "df6652c6508a1234566adaf47317fc91852038ea8d425b132bca1902f773a71f"
+    },
+    {
+      "path": "frontend/dist/assets/matcha-kami-sanctuary-BxuHqbb4.webp",
+      "bytes": 539118,
+      "gzipLevel6Bytes": 539301,
+      "sha256": "d76cf0ec437836e35256b6350b50ce504fe424fe9d83d216da31b433614521c0"
+    },
+    {
+      "path": "frontend/dist/assets/meowdiobooks-mark-CyMFyiVy.png",
+      "bytes": 174333,
+      "gzipLevel6Bytes": 172597,
+      "sha256": "25298d4e56159c8beba8da5b8005b36889b0b738431605f237425e3f885b768c"
+    },
+    {
+      "path": "frontend/dist/assets/sanctuary-canopy-DQGDoQNf.webp",
+      "bytes": 299380,
+      "gzipLevel6Bytes": 298748,
+      "sha256": "d0009986ac82f05a637fcac8739cb59442dc093bac4f13ce5f32f76e6ec3e2e0"
+    },
+    {
+      "path": "frontend/dist/favicon.png",
+      "bytes": 30971,
+      "gzipLevel6Bytes": 30607,
+      "sha256": "87840c46b19958714cc510aa3ac60f7c97c09d112efe42015950b3c58804d404"
+    },
+    {
+      "path": "frontend/dist/index.html",
+      "bytes": 569,
+      "gzipLevel6Bytes": 367,
+      "sha256": "a667d67abe7b952494d77c5b7ddc3671682b41ba60ee03d5b6a1be6aeb20a6d5"
+    }
+  ],
+  "rawTotalBytes": 1989226,
+  "gzipJsCssBytes": 238126
+}

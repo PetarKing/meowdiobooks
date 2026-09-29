@@ -1,0 +1,110 @@
+/* Matcha & Cherry appearance is local to each presentation root. Semantic host
+   palette values remain inline and take precedence. Decorative temple colors are
+   separate from workflow status colors; host styles remain ordinary unlayered CSS. */
+:root, [data-presentation-root] {
+  --folio-canvas: #f1f2e8;
+  --folio-paper: #fefff8;
+  --folio-soft: #e6ead8;
+  --folio-ink: #2d3825;
+  --folio-muted: #5e684f;
+  --folio-action: #a42f4d;
+  --folio-action-hover: #85233d;
+  --folio-border: #c7cfb7;
+  --folio-border-strong: #7e8b6a;
+  --folio-success: #436627;
+  --folio-warning: #765516;
+  --folio-danger: #ac3039;
+  --action-ink: #ffffff;
+  --danger-action: #ac3039;
+  --danger-action-hover: #8c242c;
+  --danger-action-ink: #ffffff;
+  --inverse-surface: #2d3825;
+  --inverse-ink: #fefff8;
+  --inverse-muted: #d1d9be;
+  --cover-start: #3c502b;
+  --cover-end: #293725;
+  --matcha: #a5b779;
+  --matcha-soft: #e6ead8;
+  --cherry: #a42f4d;
+  --sakura: #e6bbc8;
+  --gilt: #b5954d;
+  --gilt-ink: #625020;
+  --honey: #d5be7c;
+  --honey-dark: #765516;
+  --overlay: rgba(15, 24, 13, .64);
+  --shadow-color: 28 40 20;
+  color-scheme: light;
+}
+[data-presentation-root][data-appearance="dark"] {
+  --folio-canvas: #15262a;
+  --folio-paper: #253c3d;
+  --folio-soft: #34504e;
+  --folio-ink: #faf3e6;
+  --folio-muted: #ccd7d0;
+  --folio-action: #f49bb6;
+  --folio-action-hover: #ffd0df;
+  --folio-border: #627e78;
+  --folio-border-strong: #a3beb4;
+  --folio-success: #b6dcac;
+  --folio-warning: #edc985;
+  --folio-danger: #f6a29c;
+  --action-ink: #15262a;
+  --danger-action: #f6a29c;
+  --danger-action-hover: #ffc7bc;
+  --danger-action-ink: #15262a;
+  --inverse-surface: #112226;
+  --inverse-ink: #faf3e6;
+  --inverse-muted: #ccd7d0;
+  --cover-start: #4c6660;
+  --cover-end: #253f42;
+  --matcha: #b6dcac;
+  --matcha-soft: #34504e;
+  --cherry: #f49bb6;
+  --sakura: #a7607b;
+  --gilt: #edc985;
+  --gilt-ink: #f9dc95;
+  --honey: #edc985;
+  --honey-dark: #edc985;
+  --overlay: rgba(6, 15, 19, .76);
+  --shadow-color: 0 0 0;
+  color-scheme: dark;
+}
+:root, [data-presentation-root] {
+  --canvas: var(--folio-canvas);
+  --cream: var(--canvas);
+  --paper: var(--color-paper, var(--folio-paper));
+  --surface-raised: var(--paper);
+  --surface-soft: var(--folio-soft);
+  --ink: var(--color-ink, var(--folio-ink));
+  --ink-soft: var(--ink);
+  --muted: var(--color-muted, var(--folio-muted));
+  --poppy: var(--color-action, var(--folio-action));
+  --poppy-dark: var(--color-action-hover, var(--folio-action-hover));
+  --rose: var(--poppy);
+  --rose-dark: var(--poppy-dark);
+  --plum: var(--poppy-dark);
+  --blush: color-mix(in srgb, var(--poppy) 9%, var(--paper));
+  --lavender: var(--blush); /* Legacy public alias retained for host compatibility. */
+  --line: var(--color-border, var(--folio-border));
+  --line-strong: var(--folio-border-strong);
+  --green: var(--color-success, var(--folio-success));
+  --green-soft: color-mix(in srgb, var(--green) 11%, var(--paper));
+  --success-border: color-mix(in srgb, var(--green) 44%, var(--paper));
+  --amber: var(--color-warning, var(--folio-warning));
+  --warning-ink: var(--amber);
+  --warning-soft: color-mix(in srgb, var(--amber) 11%, var(--paper));
+  --warning-border: color-mix(in srgb, var(--amber) 46%, var(--paper));
+  --danger-ink: var(--folio-danger);
+  --danger-soft: color-mix(in srgb, var(--danger-ink) 9%, var(--paper));
+  --danger-border: color-mix(in srgb, var(--danger-ink) 44%, var(--paper));
+  --highlight: color-mix(in srgb, var(--amber) 16%, var(--paper));
+  --shadow-sm: 0 4px 14px rgb(var(--shadow-color) / .07);
+  --shadow: 0 16px 44px rgb(var(--shadow-color) / .1);
+  --shadow-lg: 0 28px 80px rgb(var(--shadow-color) / .24);
+  --focus: 0 0 0 2px var(--poppy);
+}
+[data-presentation-root] { background: var(--canvas); color: var(--ink); }
+.theme-toggle { display: grid; place-items: center; width: 44px; height: 44px; padding: 10px; color: var(--ink); background: transparent; border: 0; border-radius: 50%; cursor: pointer; transition: background 160ms ease, color 160ms ease; }
+.theme-toggle:hover { background: var(--surface-soft); color: var(--poppy); }
+.theme-toggle svg { display: block; width: 21px; height: 21px; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+@media (prefers-reduced-motion: reduce) { .theme-toggle { transition: none; } }

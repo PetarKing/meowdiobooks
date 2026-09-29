@@ -17,6 +17,45 @@ class JobCancellationRequested(RuntimeError):
     """Stop cooperative work at the next safe progress boundary."""
 
 
+class _JobReporter:
+    def __init__(self, store: ModelStore[Job], job_id: str) -> None:
+        self.store = store
+        self.job_id = job_id
+
+    def __call__(self, progress: float, message: str | None = None) -> None:
+        def apply(current: Job) -> Job:
+            if current.cancel_requested_at is not None:
+                raise JobCancellationRequested
+            if current.status == JobStatus.RUNNING:
+                current.progress = min(100, max(current.progress, progress))
+                current.message = message
+                current.updated_at = utc_now()
+            return current
+
+        self.store.update(self.job_id, apply)
+
+    def commit(self, publish: Callable[[], dict[str, object]]) -> dict[str, object]:
+        """Cancellation and final publication contend on the same atomic store update."""
+
+        def apply(current: Job) -> Job:
+            if current.cancel_requested_at is not None:
+                raise JobCancellationRequested
+            if current.status != JobStatus.RUNNING:
+                raise RuntimeError("Only a running job may commit its result")
+            current.result = publish()
+            current.status = JobStatus.SUCCEEDED
+            current.progress = 100
+            current.message = "Complete"
+            current.finished_at = utc_now()
+            current.updated_at = current.finished_at
+            return current
+
+        committed = self.store.update(self.job_id, apply)
+        if committed is None:
+            raise RuntimeError("Job disappeared before publication")
+        return committed.result or {}
+
+
 class JobQueue:
     def __init__(
         self,
@@ -148,17 +187,7 @@ class JobQueue:
             if handler is None:
                 raise ValueError(f"No handler registered for job kind: {job.kind}")
 
-            def report(progress: float, message: str | None = None) -> None:
-                def apply(current: Job) -> Job:
-                    if current.cancel_requested_at is not None:
-                        raise JobCancellationRequested
-                    if current.status == JobStatus.RUNNING:
-                        current.progress = min(100, max(current.progress, progress))
-                        current.message = message
-                        current.updated_at = utc_now()
-                    return current
-
-                self.store.update(job.id, apply)
+            report = _JobReporter(self.store, job.id)
 
             if self._before_run is not None:
                 self._before_run(job)
@@ -173,6 +202,8 @@ class JobQueue:
             failure = exc
 
             def fail(current: Job) -> Job:
+                if current.status == JobStatus.SUCCEEDED:
+                    return current
                 if isinstance(failure, JobCancellationRequested) or current.cancel_requested_at:
                     return self._finish_canceled(current)
                 current.status = JobStatus.FAILED
@@ -192,6 +223,8 @@ class JobQueue:
             return
 
         def succeed(current: Job) -> Job:
+            if current.status == JobStatus.SUCCEEDED:
+                return current
             if current.cancel_requested_at is not None:
                 return self._finish_canceled(current)
             current.status = JobStatus.SUCCEEDED

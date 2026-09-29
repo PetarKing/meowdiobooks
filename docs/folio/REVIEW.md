@@ -1,0 +1,52 @@
+# Design critique and review rubric
+
+## Baseline and rejected candidate
+
+The Nocturne candidate `688d07e` was explicitly rejected by the user. Its screenshots and previous green checks are historical evidence, not acceptance. The rebuild must improve the working experience as well as restore the warm identity. This review uses rendered evidence and observed synthetic interactions; it does not certify real generation, export, or product adoption.
+
+The accepted foundation is `a9b7922`. Its retained screenshot [Home at 1440px](../design-foundation/evidence/home-1440-candidate.png) preserves the production presentation extracted from `d3855c3`. Compare it with [rejected Home](../nocturne/screenshots/home-desktop.png): the production hero occupies approximately 245px, with import beginning around y379 and the resume row around y615. Nocturne expands the hero to approximately 426px, pushes import to y619 and resume to y875, and adds no task capability in that space. Its floating book and monumental temple also abandon the cozy cat and recording equipment that connect the brand to making audiobooks.
+
+The rejected [Cast desktop](../nocturne/screenshots/cast-voices-desktop.png) and [Review desktop](../nocturne/screenshots/review-desktop.png) use enormous task headings and successive instruction sections. Their first usable evidence arrives roughly halfway down the screen. On the live 61-member synthetic cast fixture, the sole required group was the 22nd member; the warning said it needed review while the default list hid it below the viewport. The Required filter worked, but reaching the blocker still required discovering that filter.
+
+The [rejected Cast phone](../nocturne/screenshots/cast-voices-phone.png) and [Dialogue phone](../nocturne/screenshots/dialogue-phone.png) show the fixed Create/Library bar across cards and decision content. The accepted [phone inspector](../design-foundation/evidence/cast-inspector-390-candidate.png) has the same inherited overlap across voice fields. Restoring production colors alone would preserve this defect. The phone Cast screen also repeats stage information in the icon rail, progress summary and page eyebrow.
+
+The rejected [Library](../nocturne/screenshots/library-desktop.png) leaves most of the right half unused while two oversized cards repeat the same generic cover. Cover fallback must help distinguish books without implying generated or sourced artwork. A practical library should bring title, edition/chapter scope, availability, and open/reveal actions together.
+
+## Review rubric
+
+1. **Work is visible immediately.** A task screen's header and introduction should usually fit within roughly 160px. The first viewport contains the decision and relevant evidence. Home at 1440×900 exposes import and resume; at 390×844 it exposes import. Integrating a button into an oversized billboard is insufficient.
+2. **Identity serves the work.** Warm paper, coral action, ink/plum text, and sage acceptance connect to the existing brand. Charm belongs in contextual art and small narrative moments. The dark appearance uses warm charcoal and peach/coral without becoming another cosmic art direction. Status remains understandable without color.
+3. **Each state explains the next decision.** Within ten seconds, a user can identify what is ready, what blocks progress, what an action changes, and what comes next. Required cast work is actionable before optional/default bulk approval. Review shows evidence, group scope, and resolution together. Older audio, running jobs, failure, recovery, accepted summaries and empty states get equally deliberate treatment.
+4. **Density reflects the task.** Large cast collections need searchable rows and explicit statuses. Small ensembles retain a clear default selection and audition entry point. Generation uses an aligned track list with title, chapter/page range, readiness, listening time and estimated generation time. Export presents edition scope and settings as a manifest. Library preserves each book's identity and edition scope.
+5. **Mobile preserves access and context.** No fixed navigation or action bar covers controls, focused fields, or final content. One named stage indication is enough. Dialogs cover background navigation and task actions; editing remains clear and draft work survives. Long titles, Chinese copy, large casts and 20 chapters are reviewed at phone size.
+6. **Reusable source supports real states.** Shared controls expose hover, focus, selected, disabled, loading and error behavior. Production and Storybook render the same components. Screen geometry is chosen for its actual task rather than forcing every page into identical cards. Sibling palettes and host overrides remain valid.
+7. **Motion explains a change.** Playback, progress, selection, and transitions may provide purposeful feedback. Reduced motion retains all meaning. Ambient decoration must earn its space and cannot substitute for coherent composition.
+
+## Review method and limits
+
+Inspect actual runtime screenshots in both appearances, desktop and phone; exercise key decisions and failure states. Record concrete shortcomings and fixes below. Automated accessibility, interaction and build checks support their own contracts; their counts are not design criteria. Synthetic silent audio does not prove listening quality. A local preview is not user approval, merge, release, or deployment.
+
+## Rebuild findings
+
+Independent hands-on review used the live synthetic studio on 26 September 2026, in light and dark appearances, at measured CSS widths of 1440px and approximately 390px. The browser's viewport override required accounting for its 0.75 device scale; DOM dimensions were checked instead of inferring viewport size from exported screenshot pixels. Home, Extract, Dialogue, Review, Cast identity, Cast voices, Generate, Export and Library were visually inspected. The following observations describe the rebuild in progress, not user acceptance.
+
+### Observed improvements
+
+- Home brings PDF import into its introduction and shows resume work in the desktop viewport. Phone exposes import and resume without a large art block. The warm light identity and charcoal/peach dark identity remain consistent across working screens.
+- Review now displays its queue, manuscript context, decision scope, and resolution together at 1440px. An inherited `flex: 1 0 210px` initially turned each vertical queue item into a 210px panel; that was reported and fixed. The initial 1500px side-by-side breakpoint also placed resolution around y867 at 1440px; the corrected breakpoint and compact source spacing make the decision visible.
+- The 61-member Cast voice state puts the required group first and offers a direct **Review required voices** action. Executing it opens the required inspector. Confirming suggested layers changes Required from 1 to 0, individual approval from 20 to 21, retains 40 ready defaults, and enables the continuation action. This was observed in the synthetic gateway, not inferred from color.
+- The standard voice inspector presents existing auditions before generation settings. Applied and candidate states remain distinct. On phone, editing Performance notes scrolled the focused field into view at approximately y594–697 within an 844px viewport; the generation action remained available and no product navigation covered the field.
+- The required-group inspector initially overflowed through its long cast-select option. After repair, the select's right edge measured approximately x357 inside the 391px viewport, and the dropdown arrow was visible.
+- Generate uses aligned track rows with explicit Playable/To make states and named Listening/Generation estimates. A chapter player opened in the dark appearance and closing it returned to the initiating track. Scrolling the phone list exposed the final selected chapters and action receipt without a fixed footer covering the last track.
+- Export's chapter selection and edition preview expose scope and file details together. The 20-chapter dark fixture retained readable chapter selection, real source-page imagery, and title/author settings. These observations do not prove filesystem export.
+- Library's first revision retained oversized generic jacket placeholders and clipped the selected-edition title. The second revision replaced these with compact horizontal editions and full bibliographic titles/scope. Both complete and selected-chapter editions can now be distinguished at a glance.
+- Phone navigation moved to the header. Language selection was initially removed at the narrow breakpoint; after review it was restored, and switching to Chinese was exercised. Cast identity now leads with opening a member to inspect names/source labels; desktop drag help does not dominate the phone screen.
+- Phone recovery initially retained a narrow two-column explanatory note that pushed the recovery action down. Stacking that note made **Rebuild Dialogue** visible in the first fixture viewport and preserved the explanation that audio was not changed.
+
+### Material issue found during execution
+
+The executed failed-generation phone fixture initially kept focus at the generation action around `scrollY=919`, while the global error alert sat at approximately `top=-642`, `bottom=-548`. The user could see the generation button without a visible failure explanation. An action-local error was requested and implemented while retaining the announced global alert. Independent re-execution showed **Generation needs attention** and the explanation that the first three chapters remain saved at approximately y412–497 inside the 844px phone viewport, beside the focused generation action. The visual feedback defect is resolved in the synthetic fixture.
+
+### Design judgment and remaining limits
+
+The rebuild is materially more useful and coherent than Nocturne: decisions lead, blockers are actionable, evidence has room, and the palette supports both appearances. This is an independent critique, not a claim that the user's requested visual bar has been accepted. A compact phone book/wave emblem was added after the first entrance review; it now gives the otherwise restrained phone composition a recording cue without displacing import and resume. Real narration quality, backend stage acceptance, export persistence and consumer adoption were not exercised by this visual review. Full automated scenario matrices are recorded separately by their owners.

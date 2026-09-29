@@ -1,0 +1,59 @@
+{
+  "url": "http://127.0.0.1:5180/studio.html",
+  "executedAt": "2026-09-28T08:54:32.171Z",
+  "scope": "Synthetic Cast identity fixture; Attach changes draft decisions, not accepted backend state.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "queenHint": true,
+      "matchesOpen": true,
+      "attachChangesGroup": true,
+      "inspectorHeight": 609.984375,
+      "scopedAxeViolations": [],
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": [],
+      "nativeDialogs": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "queenHint": true,
+      "matchesOpen": true,
+      "attachChangesGroup": true,
+      "inspectorHeight": 609.984375,
+      "scopedAxeViolations": [],
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": [],
+      "nativeDialogs": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "queenHint": true,
+      "matchesOpen": true,
+      "attachChangesGroup": true,
+      "inspectorHeight": 844,
+      "scopedAxeViolations": [],
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": [],
+      "nativeDialogs": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "queenHint": true,
+      "matchesOpen": true,
+      "attachChangesGroup": true,
+      "inspectorHeight": 844,
+      "scopedAxeViolations": [],
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": [],
+      "nativeDialogs": []
+    }
+  ]
+}

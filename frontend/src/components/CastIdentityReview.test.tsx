@@ -3,6 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CastArtifact } from "../api/contracts";
 import type { IdentityDecision } from "../castIdentity";
+import { castFor } from "../../design-kit/castFixtures";
 import { CastIdentityReview } from "./CastIdentityReview";
 
 const cast: CastArtifact = {
@@ -29,6 +30,15 @@ function Harness({ onReclassify }: { onReclassify?: () => void } = {}) {
     <CastIdentityReview cast={cast} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[{ id: "qwen", label: "Qwen", supportedLanguages: ["english"] }]} voiceModel="qwen" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} onReclassify={onReclassify} />
     <output data-testid="decisions">{JSON.stringify(decisions)}</output>
   </>;
+}
+
+function FixtureHarness() {
+  const fixture = castFor("identity-review");
+  const [decisions, setDecisions] = useState<Record<string, IdentityDecision>>(Object.fromEntries(
+    fixture.proposals.map((row) => [row.label, { label: row.label, category: row.category, canonicalName: row.canonicalName, aliases: [], primaryLabel: row.label }]),
+  ));
+  const [resolved, setResolved] = useState<string[]>([]);
+  return <CastIdentityReview cast={fixture} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} hideVoiceSettings />;
 }
 
 function OverloadedHarness() {
@@ -88,7 +98,34 @@ function dragOverAt(target: Element, clientY: number, dataTransfer: ReturnType<t
   fireEvent(target, event);
 }
 
+function EnsembleHarness() {
+  const ensemble: CastArtifact = { revision: "ensemble", phase: "identity-review", dossiers: [], proposals: Array.from({ length: 14 }, (_, index) => ({ label: index === 0 ? "Moonlight" : `Label ${index}`, category: index === 0 ? "group" : "character", canonicalName: index === 0 ? "Émilia" : `Member ${index}`, reviewRequired: index === 0 })) };
+  const [decisions, setDecisions] = useState<Record<string, IdentityDecision>>(Object.fromEntries(ensemble.proposals.map((row) => [row.label, { label: row.label, category: row.category, canonicalName: row.canonicalName, aliases: [], primaryLabel: row.label }])));
+  const [resolved, setResolved] = useState<string[]>([]);
+  return <CastIdentityReview cast={ensemble} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={vi.fn()} onLanguageChange={vi.fn()} hideVoiceSettings />;
+}
+
 describe("CastIdentityReview", () => {
+  it("filters a large cast by source labels without concealing outstanding confirmations", () => {
+    render(<EnsembleHarness />);
+    const search = screen.getByRole("searchbox", { name: "Search cast" });
+    fireEvent.change(search, { target: { value: "moonLIGHT" } });
+    expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Inspect Narrator" })).toBeInTheDocument();
+    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
+    expect(screen.getByText("1 of 14 cast members shown")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "ready" } });
+    expect(screen.getByText("No cast members match these filters.")).toBeInTheDocument();
+    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
+    fireEvent.click(within(screen.getByRole("searchbox", { name: "Search cast" }).closest(".collection-toolbar")!).getByRole("button", { name: "Clear" }));
+    expect(search).toHaveFocus();
+    expect(screen.getByText("14 of 14 cast members shown")).toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "required" } });
+    expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
+  });
+
   afterEach(() => vi.restoreAllMocks());
 
   it("keeps reclassification hidden unless cast editing explicitly enables it", () => {
@@ -133,23 +170,27 @@ describe("CastIdentityReview", () => {
     expect(autoGrouped).toHaveClass("auto-grouped");
     expect(autoGrouped).not.toHaveClass("qwen-review");
     expect(autoGrouped).toHaveTextContent("Required · Check this merge");
-    expect(screen.getByText("Red cards marked Required must be confirmed before you can continue.")).toBeInTheDocument();
+    expect(screen.getByText("2 required · blocks continue")).toBeInTheDocument();
+    expect(screen.getByText("1 suggested · optional")).toBeInTheDocument();
 
     const possibleMatch = screen.getByRole("button", { name: "Inspect fake Cecilus" });
-    expect(possibleMatch).toHaveClass("ready");
+    expect(possibleMatch).toHaveClass("has-suggestions");
     expect(possibleMatch).not.toHaveClass("auto-grouped");
     expect(possibleMatch).not.toHaveTextContent("Required");
+    expect(possibleMatch).toHaveTextContent("Review suggested");
     expect(screen.queryByText(/auto-grouped/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Qwen review|Qwen suggestion/i)).not.toBeInTheDocument();
 
     fireEvent.click(autoGrouped);
-    expect(screen.getByRole("dialog", { name: "Inspect Cecilus Segmunt" })).toHaveTextContent("Confirmation required");
+    expect(screen.getByRole("dialog", { name: "Inspect Cecilus Segmunt" })).toHaveTextContent("Required before continuing");
     fireEvent.click(screen.getByRole("button", { name: "Confirm grouping" }));
     expect(autoGrouped).not.toHaveClass("auto-grouped");
 
     fireEvent.click(possibleMatch);
     const possibleMatchDialog = screen.getByRole("dialog", { name: "Inspect fake Cecilus" });
-    expect(possibleMatchDialog).toHaveTextContent("Ready");
+    expect(possibleMatchDialog).toHaveTextContent("Optional check");
+    expect(possibleMatchDialog).toHaveTextContent("You can continue without changing it.");
+    expect(possibleMatchDialog).toHaveTextContent("Suggested matches");
     expect(within(possibleMatchDialog).queryByRole("button", { name: /Confirm/ })).not.toBeInTheDocument();
   });
 
@@ -167,22 +208,48 @@ describe("CastIdentityReview", () => {
     render(<Harness />);
     const board = screen.getByRole("region", { name: "Cast members" });
     expect(within(board).getAllByRole("button")).toHaveLength(4);
-    expect(screen.getByRole("button", { name: "Inspect Narrator" })).not.toHaveAttribute("draggable", "true");
+    const narrator = screen.getByRole("button", { name: "Inspect Narrator" });
+    expect(narrator).not.toHaveAttribute("draggable", "true");
+    expect(narrator).toHaveTextContent("Normal book prose");
+    expect(narrator).not.toHaveTextContent("reassigned labels");
     expect(screen.getByText("3 source labels are currently grouped into 3 cast members. Narrator is separate.")).toBeInTheDocument();
+
+    fireEvent.click(narrator);
+    const narratorDialog = screen.getByRole("dialog", { name: "Inspect Narrator" });
+    expect(narratorDialog).toHaveTextContent("Permanent primary");
+    expect(narratorDialog).not.toHaveTextContent("No speaker labels reassigned");
+    expect(narratorDialog).not.toHaveTextContent("0 assigned");
+    expect(narratorDialog).not.toHaveTextContent("0 dialogue lines");
+    fireEvent.click(within(narratorDialog).getByRole("button", { name: "Close cast member" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
     expect(screen.getByRole("dialog", { name: "Inspect Cecilus" })).toHaveTextContent("Cecilus: Run!");
-    const suggestions = screen.getByText("Suggested matches").closest("details")!;
-    expect(suggestions).not.toHaveAttribute("open");
-    fireEvent.click(within(suggestions).getByText("Suggested matches"));
+    const suggestions = screen.getByRole("dialog", { name: "Inspect Cecilus" }).querySelector<HTMLDetailsElement>(".cast-match-panel")!;
+    expect(suggestions).toHaveAttribute("open");
     expect(within(suggestions).getByRole("button", { name: "Attach" })).toBeInTheDocument();
+  });
+
+  it("shows actionable Queen suggestions in the grid and attaches a real source label", () => {
+    render(<FixtureHarness />);
+    const queen = screen.getByRole("button", { name: "Inspect Queen of Hearts" });
+    expect(queen).toHaveClass("has-suggestions");
+    expect(queen).not.toHaveClass("needs-review");
+    fireEvent.click(queen);
+    const inspector = screen.getByRole("dialog", { name: "Inspect Queen of Hearts" });
+    expect(inspector).toHaveTextContent("Suggested matches");
+    const suggestions = inspector.querySelector<HTMLDetailsElement>(".cast-match-panel")!;
+    expect(suggestions).toHaveAttribute("open");
+    expect(within(suggestions).getByText("Queen")).toBeInTheDocument();
+    fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
+    expect(within(inspector).getByText("Queen", { selector: ".cast-alias-card b" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Inspect Queen" })).not.toBeInTheDocument();
+    expect(queen).not.toHaveClass("has-suggestions");
   });
 
   it("keeps the current cast member open when a secondary label is detached", () => {
     render(<Harness />);
     fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
-    const suggestions = screen.getByText("Suggested matches").closest("details")!;
-    fireEvent.click(within(suggestions).getByText("Suggested matches"));
+    const suggestions = screen.getByRole("dialog", { name: "Inspect Cecilus" }).querySelector<HTMLDetailsElement>(".cast-match-panel")!;
     fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
 
     const dialog = screen.getByRole("dialog", { name: "Inspect Cecilus" });
@@ -235,7 +302,7 @@ describe("CastIdentityReview", () => {
     fireEvent.drop(target, { dataTransfer });
 
     expect(screen.queryByRole("button", { name: "Inspect Cecilus" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Inspect Emilia" })).toHaveTextContent("2 labels");
+    expect(screen.getByRole("button", { name: "Inspect Emilia" })).toHaveTextContent("14 lines");
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Emilia");
 
     expect(screen.getByText("Merged Cecilus into Emilia.")).toBeInTheDocument();

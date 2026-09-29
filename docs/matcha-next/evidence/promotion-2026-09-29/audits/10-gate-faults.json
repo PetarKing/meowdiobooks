@@ -1,0 +1,96 @@
+{
+  "technique": "Actual orchestration code, injected in-memory browser and filesystem adapters; no real browser/UI or network",
+  "cases": 24,
+  "results": [
+    {
+      "fault": "healthy",
+      "failed": false,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 0,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "overflow",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "axe",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "console",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "pageerror",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "requestfailed",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "readiness",
+      "failed": true,
+      "exception": null,
+      "rendered": 96,
+      "failedRecords": 1,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "screenshot",
+      "failed": true,
+      "exception": "injected screenshot failure",
+      "rendered": 1,
+      "failedRecords": null,
+      "serverClosed": true,
+      "browserClosed": true
+    },
+    {
+      "fault": "launch",
+      "failed": true,
+      "exception": "injected launch failure",
+      "rendered": 0,
+      "failedRecords": null,
+      "serverClosed": true,
+      "browserClosed": "not-started"
+    },
+    {
+      "fault": "missing-scenario",
+      "failed": true,
+      "exception": "Missing release scenario: home",
+      "rendered": 0,
+      "failedRecords": null,
+      "serverClosed": "not-started",
+      "browserClosed": "not-started"
+    }
+  ]
+}

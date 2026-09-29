@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { DialogSurface } from "./DialogSurface";
+import { usePresentationPortalAttributes } from "./presentationContext";
 import { createPortal } from "react-dom";
 import { useTranslation } from "react-i18next";
 import type { WizardStage } from "../api/contracts";
@@ -86,9 +88,9 @@ const guides: Record<GuideStage, PhaseGuide> = {
 
 export function PhaseHelp({ stage }: { stage: GuideStage }) {
   const { t } = useTranslation();
+  const presentation = usePresentationPortalAttributes();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const dialogRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
   const guide = guides[stage];
@@ -99,40 +101,10 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
     [...move.cue].length > 3 ? "is-compact" : "",
   ].filter(Boolean).join(" ");
 
-  const close = useCallback(() => {
-    setOpen(false);
-    window.requestAnimationFrame(() => triggerRef.current?.focus());
-  }, []);
+  const close = () => setOpen(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    closeRef.current?.focus();
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        close();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const focusable = [...(dialogRef.current?.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])') ?? [])]
-        .filter((element) => !element.hasAttribute("disabled"));
-      if (!focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
-      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [close, open]);
-
-  const dialog = open ? createPortal(<div className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
-    <section ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`phase-help phase-help-${stage}`}>
+  const dialog = open ? createPortal(<div {...presentation} className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+    <DialogSurface onDismiss={close} initialFocusRef={closeRef} returnFocusRef={triggerRef} aria-labelledby={titleId} className={`phase-help phase-help-${stage}`}>
       <header className="phase-help-head" role="none">
         <div className="phase-help-number" aria-hidden="true">{guide.number}</div>
         <div><span className="eyebrow">{t("A quick guide to {{phase}}", { phase: t(guide.label) })}</span><h2 id={titleId}>{t(guide.title)}</h2></div>
@@ -154,11 +126,11 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
           <ul>{guide.moves.map((move) => <li key={move.title}><span className={cueClassName(move)} aria-hidden="true">{move.cueSub ? <><b>{move.cue}</b><small>{move.cueSub}</small></> : move.cue}</span><p><strong>{t(move.title)}.</strong> {t(move.detail)}</p></li>)}</ul>
         </section>
       </div>
-    </section>
+    </DialogSurface>
   </div>, document.body) : null;
 
   return <>
-    <button ref={triggerRef} type="button" className="phase-help-trigger" aria-label={t("About {{phase}}", { phase: t(guide.label) })} aria-haspopup="dialog" onClick={() => setOpen(true)}>(?)</button>
+    <button ref={triggerRef} type="button" className="phase-help-trigger" aria-label={t("About {{phase}}", { phase: t(guide.label) })} aria-haspopup="dialog" onClick={() => setOpen(true)}>?</button>
     {dialog}
   </>;
 }

@@ -63,6 +63,7 @@ def package_audio_export(
     author: str,
     cover: Path,
     preset: AudioExportPreset,
+    description: str | None = None,
     ffmpeg: str | None = None,
 ) -> Path:
     """Package selected WAV revisions using one allowlisted audiobook preset."""
@@ -73,6 +74,7 @@ def package_audio_export(
             output,
             title=title,
             author=author,
+            description=description,
             cover=cover,
             bitrate=profile.bitrate,
             ffmpeg=ffmpeg,
@@ -82,6 +84,7 @@ def package_audio_export(
         output,
         title=title,
         author=author,
+        description=description,
         cover=cover,
         bitrate=profile.bitrate,
         ffmpeg=ffmpeg,
@@ -95,6 +98,7 @@ def package_m4b(
     title: str,
     author: str,
     cover: Path,
+    description: str | None = None,
     bitrate: str = "128k",
     ffmpeg: str | None = None,
 ) -> Path:
@@ -121,7 +125,13 @@ def package_m4b(
         encoding="utf-8",
     )
     metadata_path.write_text(
-        _ffmetadata(title=title, author=author, chapters=chapters, durations_ms=durations),
+        _ffmetadata(
+            title=title,
+            author=author,
+            description=description,
+            chapters=chapters,
+            durations_ms=durations,
+        ),
         encoding="utf-8",
     )
 
@@ -195,6 +205,7 @@ def package_mp3_chapters(
     title: str,
     author: str,
     cover: Path,
+    description: str | None = None,
     bitrate: str = "96k",
     ffmpeg: str | None = None,
 ) -> Path:
@@ -252,6 +263,8 @@ def package_mp3_chapters(
                 f"artist={author}",
                 "-metadata",
                 f"album={title}",
+                *(["-metadata", f"description={description}"] if description else []),
+                *(["-metadata", f"comment={description}"] if description else []),
                 "-metadata",
                 "genre=Audiobook",
                 "-metadata",
@@ -393,7 +406,12 @@ def _wav_duration_ms(path: Path) -> int:
 
 
 def _ffmetadata(
-    *, title: str, author: str, chapters: list[M4BChapter], durations_ms: list[int]
+    *,
+    title: str,
+    author: str,
+    description: str | None,
+    chapters: list[M4BChapter],
+    durations_ms: list[int],
 ) -> str:
     lines = [
         ";FFMETADATA1",
@@ -402,6 +420,9 @@ def _ffmetadata(
         f"album={_metadata_escape(title)}",
         "genre=Audiobook",
     ]
+    if description:
+        lines.append(f"description={_metadata_escape(description)}")
+        lines.append(f"comment={_metadata_escape(description)}")
     start = 0
     for chapter, duration in zip(chapters, durations_ms, strict=True):
         end = start + duration

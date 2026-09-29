@@ -1,0 +1,174 @@
+[
+  {
+    "appearance": "light",
+    "colorScheme": "light",
+    "elements": [
+      {
+        "ancestors": [
+          {
+            "color": "rgb(254, 255, 248)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(241, 242, 232)",
+            "image": "none"
+          }
+        ],
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(45, 56, 37)",
+        "font": "16px",
+        "text": "Source evidence, listening and publishing share the same appearance."
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(254, 255, 248)",
+            "image": "none"
+          }
+        ],
+        "background": "rgb(164, 47, 77)",
+        "color": "rgb(255, 255, 255)",
+        "font": "13px",
+        "text": "Continue"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(254, 255, 248)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.915412 0.934 0.882392)",
+        "color": "rgb(67, 102, 39)",
+        "font": "12px",
+        "text": "Accepted"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(254, 255, 248)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.937412 0.926667 0.875059)",
+        "color": "rgb(118, 85, 22)",
+        "font": "12px",
+        "text": "Review needed"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgb(254, 255, 248)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(241, 242, 232)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.967137 0.926941 0.905137)",
+        "color": "rgb(172, 48, 57)",
+        "font": "16px",
+        "text": "The source could not be read."
+      }
+    ]
+  },
+  {
+    "appearance": "dark",
+    "colorScheme": "dark",
+    "elements": [
+      {
+        "ancestors": [
+          {
+            "color": "rgb(37, 60, 61)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(21, 38, 42)",
+            "image": "none"
+          }
+        ],
+        "background": "rgba(0, 0, 0, 0)",
+        "color": "rgb(250, 243, 230)",
+        "font": "16px",
+        "text": "Source evidence, listening and publishing share the same appearance."
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(37, 60, 61)",
+            "image": "none"
+          }
+        ],
+        "background": "rgb(244, 155, 182)",
+        "color": "rgb(21, 38, 42)",
+        "font": "13px",
+        "text": "Continue"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(37, 60, 61)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.207647 0.304314 0.287098)",
+        "color": "rgb(182, 220, 172)",
+        "font": "12px",
+        "text": "Accepted"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgba(0, 0, 0, 0)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(37, 60, 61)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.231373 0.296118 0.270274)",
+        "color": "rgb(237, 201, 133)",
+        "font": "12px",
+        "text": "Review needed"
+      },
+      {
+        "ancestors": [
+          {
+            "color": "rgb(37, 60, 61)",
+            "image": "none"
+          },
+          {
+            "color": "rgb(21, 38, 42)",
+            "image": "none"
+          }
+        ],
+        "background": "color(srgb 0.218863 0.271294 0.272745)",
+        "color": "rgb(246, 162, 156)",
+        "font": "16px",
+        "text": "The source could not be read."
+      }
+    ]
+  }
+]

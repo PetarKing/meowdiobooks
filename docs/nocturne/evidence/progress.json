@@ -1,0 +1,23 @@
+[
+  {
+    "scenario": "dialogue-running",
+    "initialFocus": "passed",
+    "tabTrap": "passed",
+    "escapePreservesWork": "passed",
+    "scrollRestoration": "not exercised: intentionally pending fixture has no completion control"
+  },
+  {
+    "scenario": "generate-running",
+    "initialFocus": "passed",
+    "tabTrap": "passed",
+    "escapePreservesWork": "passed",
+    "scrollRestoration": "passed after cancellation"
+  },
+  {
+    "scenario": "cast-sample-pending",
+    "initialFocus": "passed",
+    "tabTrap": "passed",
+    "escapePreservesWork": "passed",
+    "scrollRestoration": "not exercised: intentionally pending fixture has no completion control"
+  }
+]

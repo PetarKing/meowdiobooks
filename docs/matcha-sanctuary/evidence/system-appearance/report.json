@@ -1,0 +1,78 @@
+{
+  "base": "http://127.0.0.1:5179/studio.html",
+  "source": {
+    "head": "72d08cabdd993ba3826edc71230c436353f54a21",
+    "trackedChanges": "M frontend/src/App.tsx\n M frontend/src/components/StudioHero.tsx\n M frontend/src/styles/README.md\n M frontend/src/styles/appearance.css\n M frontend/src/styles/pages.css\n M frontend/src/styles/studio.css\n?? frontend/src/assets/brand/matcha-kami-sanctuary.webp"
+  },
+  "generatedAt": "2026-09-27T19:56:53.997Z",
+  "method": "Chromium emulated prefers-color-scheme changes; no host OS settings changed",
+  "observations": [
+    {
+      "name": "system-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "system-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "explicit-light-on-dark-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "explicit-light-on-light-os",
+      "preference": "light",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "explicit-dark-on-light-os",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "explicit-dark-after-reload",
+      "preference": "dark",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    },
+    {
+      "name": "system-resumed-light",
+      "preference": "system",
+      "appearance": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)",
+      "text": "rgb(45, 56, 37)"
+    },
+    {
+      "name": "system-resumed-dark",
+      "preference": "system",
+      "appearance": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(29, 38, 27)",
+      "text": "rgb(240, 244, 230)"
+    }
+  ],
+  "errors": [],
+  "apiRequests": [],
+  "passed": true
+}

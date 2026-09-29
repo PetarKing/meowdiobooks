@@ -310,6 +310,7 @@ export class HttpWizardApi implements WorkflowGateway {
     body.append("chapters", JSON.stringify(chapters));
     if (options.title) body.append("title", options.title);
     if (options.author) body.append("author", options.author);
+    if (options.description !== undefined) body.append("description", options.description);
     if (options.cover) body.append("cover", options.cover);
     if (options.coverPage) body.append("coverPage", String(options.coverPage));
     if ("preset" in options) body.append("preset", (options as AudioExportOptions).preset);

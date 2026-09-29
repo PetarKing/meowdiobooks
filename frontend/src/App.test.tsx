@@ -107,8 +107,9 @@ describe('v2 wizard', () => {
 
   it('shows only released product navigation', async () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: 'Create' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Library' })).toBeInTheDocument()
+    const productNavigation = within(screen.getByRole('navigation', { name: 'Product areas' }))
+    expect(productNavigation.getByRole('button', { name: 'Create' })).toBeInTheDocument()
+    expect(productNavigation.getByRole('button', { name: 'Library' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Player/ })).not.toBeInTheDocument()
     expect(screen.queryByText(/Coming soon/)).not.toBeInTheDocument()
   })
@@ -122,7 +123,7 @@ describe('v2 wizard', () => {
     }])
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
     expect(screen.getByText('12 chapters')).toBeInTheDocument()
@@ -135,6 +136,53 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.revealLibraryExport).toHaveBeenCalledWith('export-1'))
   })
 
+  it('distinguishes an initial Library failure from empty and recovers with retry', async () => {
+    const edition = {
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'Alice.m4b',
+      location: '/library/Alice.m4b', chapterCount: 12, partial: false,
+      sizeBytes: 12 * 1024 * 1024, createdAt: '2026-07-13T14:00:00Z',
+    }
+    vi.mocked(wizardApi.listLibrary).mockRejectedValueOnce(new Error('Library could not be loaded. Try again.')).mockResolvedValueOnce([edition])
+    window.history.replaceState({}, "", "/library")
+
+    render(<App />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Library could not be loaded. Try again.')
+    expect(screen.queryByRole('heading', { name: 'No audiobooks yet.' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(wizardApi.listLibrary).toHaveBeenCalledTimes(2)
+    fireEvent.error(screen.getByAltText('Cover of Alice'))
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open audiobook' })).toBeEnabled()
+    expect(screen.queryByAltText('Cover of Alice')).not.toBeInTheDocument()
+  })
+
+  it('preserves last good Library editions through a failed refresh and retry', async () => {
+    const editions = [{
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'Alice.m4b',
+      location: '/library/Alice.m4b', chapterCount: 12, partial: false,
+      sizeBytes: 12 * 1024 * 1024, createdAt: '2026-07-13T14:00:00Z',
+    }]
+    let finishRetry!: (value: typeof editions) => void
+    vi.mocked(wizardApi.listLibrary).mockResolvedValueOnce(editions).mockRejectedValueOnce(new Error('Library could not be loaded. Try again.')).mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve }))
+    render(<App />)
+    await screen.findByRole('button', { name: 'Library, 1 audiobooks' })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Library could not be loaded. Try again.')
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: 'Loading audiobooks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    finishRetry(editions)
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
+    expect(wizardApi.listLibrary).toHaveBeenCalledTimes(3)
+  })
+
   it('summarizes a selected chapter edition without dumping a long list', async () => {
     vi.mocked(wizardApi.listLibrary).mockResolvedValue([{
       id: 'export-2', bookId: 'book-1', title: 'Alice: A Shorter Journey', author: 'Lewis Carroll', filename: 'Alice selected.m4b',
@@ -144,7 +192,7 @@ describe('v2 wizard', () => {
     }])
     render(<App />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
 
     expect(await screen.findByText('Chapters 1–3 & 7')).toBeInTheDocument()
     expect(screen.queryByText('Down the Rabbit-Hole · The Pool of Tears + 2 more')).not.toBeInTheDocument()
@@ -159,7 +207,7 @@ describe('v2 wizard', () => {
     const renderLibraryActions = vi.fn(() => <button>Download M4B</button>)
     render(<App renderLibraryActions={renderLibraryActions} />)
 
-    fireEvent.click(await screen.findByRole('button', { name: /Library/ }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
 
     expect(await screen.findByRole('button', { name: 'Download M4B' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Open audiobook' })).not.toBeInTheDocument()
@@ -197,7 +245,7 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: 'Generate Complete' })).toHaveClass('done')
     expect(screen.getByRole('complementary', { name: 'Wizard stages' })).toContainElement(nav)
     expect(screen.getByRole('heading', { level: 2, name: 'Down the Rabbit-Hole' })).toBeInTheDocument()
-    expect(screen.getByText('Bring every chapter to life.')).toBeInTheDocument()
+    expect(screen.getByText('Record your chapters')).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
   })
 
@@ -294,7 +342,7 @@ describe('v2 wizard', () => {
   it('recommends LiteParse and keeps the extraction previews in one matched comparison row', async () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
 
-    expect(screen.getByRole('heading', { name: 'Did we read the source correctly?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /LiteParse Recommended Fast spatial parser/ })).toHaveClass('selected')
     const comparison = screen.getByText('ORIGINAL PAGE').closest('.compare')
     expect(comparison).toHaveClass('extract-compare')
@@ -388,10 +436,21 @@ describe('v2 wizard', () => {
     expect(player.querySelector('audio')).toHaveAttribute('src', '/chapter.wav')
     expect(screen.queryByRole('button', { name: /Open WAV/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument()
-    fireEvent.click(within(player).getByRole('button', { name: 'Close player' }))
-    expect(chapter.querySelector('.chapter-book-mark')).toHaveTextContent('Chapter01')
+    expect(player).toHaveFocus()
+    fireEvent.keyDown(player, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Down the Rabbit-Hole' })).not.toBeInTheDocument()
+    const allTab = screen.getByRole('tab', { name: 'All 1' })
+    allTab.focus()
+    fireEvent.keyDown(allTab, { key: 'ArrowRight' })
+    expect(screen.getByRole('tab', { name: 'To make 0' })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: 'To make 0' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('No chapters in this view.')).toBeInTheDocument()
+    fireEvent.keyDown(screen.getByRole('tab', { name: 'To make 0' }), { key: 'Home' })
+    expect(allTab).toHaveFocus()
+    expect(chapter.querySelector('.chapter-track-number')).toHaveTextContent('01')
     expect(chapter.querySelector('img')).not.toBeInTheDocument()
-    expect(document.querySelector('.generate-cover-stack img')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')
+    expect(document.querySelector('.generate-cover-stack')).not.toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!).getByText('Playable')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Continue to Export/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /M4B/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Technical details')).not.toBeInTheDocument()
@@ -532,6 +591,112 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeChecked()
   })
 
+  it('keeps a generation failure beside its retry action and preserves saved audio', async () => {
+    await open({ ...base,
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears', startPage: 13, endPage: 24 }],
+      recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, chapters: [
+        ...faithfulSummary.chapters,
+        { chapterId: 'chapter-2', totalCharacters: 900, retainedCharacters: 900, dialogueSpans: 2, narratorFallbackSpans: 0, retainedPercent: 100, estimatedSeconds: 60, empty: false },
+      ] } },
+    })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-failed', status: 'failed', error: 'Synthesis interrupted; saved tracks are unchanged.' })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    expect(await within(action).findByText('Synthesis interrupted; saved tracks are unchanged.')).toBeVisible()
+    expect(within(action).getByText('Generation needs attention')).toBeInTheDocument()
+    expect(within(action).getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Synthesis interrupted; saved tracks are unchanged.')
+  })
+
+  it.each(['immediate', 'polled'] as const)('selects the newly generated tracks and carries that selection to Export after %s completion', async (completion) => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      chapters: [...base.chapters,
+        { id: 'chapter-2', title: 'The Pool of Tears', startPage: 13, endPage: 24 },
+        { id: 'chapter-3', title: 'A Caucus-Race', startPage: 25, endPage: 36 },
+      ],
+    }
+    await open(snapshot)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' }))
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: [
+      ...snapshot.generatedChapters,
+      { chapterId: 'chapter-2', revision: 'new-audio-2', audioUrl: '/new-2.wav', audioSeconds: 60, current: true, staleReasons: [] },
+    ] })
+    const finished: Job = { id: 'generate-selection', kind: 'v2:generate', status: 'succeeded', result: { chapters: [{ chapterId: 'chapter-2', revision: 'new-audio-2' }] } }
+    vi.mocked(wizardApi.processStage).mockResolvedValue(completion === 'immediate' ? finished : { ...finished, status: 'running', progress: 20 })
+    vi.mocked(wizardApi.getJob).mockResolvedValue(finished)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 2' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeInTheDocument()
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    expect(within(action).getByRole('button', { name: 'Continue to Export →' })).toHaveClass('primary')
+    fireEvent.click(within(action).getByRole('button', { name: 'Continue to Export →' }))
+
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Chapter 02, 1 min' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-2', revision: 'new-audio-2' }], expect.anything()))
+  })
+
+  it('keeps a regenerated current track selected for Export with its new revision', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regenerate-current', kind: 'v2:generate', status: 'succeeded' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, generatedChapters: [{ ...base.generatedChapters[0], revision: 'audio-replacement' }] })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-1', revision: 'audio-replacement' }], expect.anything()))
+  })
+
+  it.each(['failed', 'canceled'] as const)('preserves saved tracks and selects only unfinished requests for retry after a partially %s job', async (status) => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      chapters: [...base.chapters,
+        { id: 'chapter-2', title: 'The Pool of Tears' },
+        { id: 'chapter-3', title: 'A Caucus-Race' },
+      ],
+    }
+    await open(snapshot)
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-partial', kind: 'v2:generate', status, error: 'Stopped after saving Chapter 2.' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: [
+      ...snapshot.generatedChapters,
+      { chapterId: 'chapter-2', revision: 'saved-audio-2', audioUrl: '/saved-2.wav', current: true, staleReasons: [] },
+    ] })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 2 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled())
+    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Listen to The Pool of Tears' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Stopped after saving Chapter 2.')
+  })
+
+  it('keeps an unchanged current recording selected for retry if regeneration fails', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regeneration-failed', status: 'failed', error: 'Previous recording is still available.' })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+    await screen.findByRole('alert')
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked())
+    expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+  })
+
   it('blocks navigation behind a full-screen chapter generation dialog', async () => {
     await open()
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
@@ -552,7 +717,11 @@ describe('v2 wizard', () => {
     expect(document.querySelector('.topbar')).toHaveAttribute('inert')
     expect(document.querySelector('.workspace')).toHaveAttribute('inert')
     expect(document.body).toHaveStyle({ overflow: 'hidden' })
-    expect(document.activeElement).toBe(dialog.querySelector('.generation-modal'))
+    expect(document.activeElement).toBe(dialog)
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(within(dialog).getByRole('button', { name: 'Cancel audio generation' })).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(within(dialog).getByRole('button', { name: 'Cancel audio generation' })).toHaveFocus()
     expect(within(dialog).getByRole('progressbar', { name: 'Chapter generation progress' })).toBeInTheDocument()
     expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
     expect(within(dialog).getByText('≈ 1 min')).toBeInTheDocument()
@@ -737,11 +906,12 @@ describe('v2 wizard', () => {
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
     fireEvent.click(within(nav).getByText('Export').closest('button')!)
 
-    expect(screen.getByRole('heading', { name: 'Package your audiobook.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
     expect(screen.getByLabelText('Title')).toHaveValue('Alice')
     expect(screen.getByLabelText('Author')).toHaveValue('Lewis Carroll')
+    expect(screen.getByLabelText('Description')).toHaveValue('Generated by Meowdiobooks')
     expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
-    expect(screen.queryByText('Down the Rabbit-Hole')).not.toBeInTheDocument()
+    expect(screen.getByText('Down the Rabbit-Hole')).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /High-quality M4B/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /Smaller M4B/ })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: /MP3 chapters.*ZIP download/ })).not.toBeChecked()
@@ -759,8 +929,17 @@ describe('v2 wizard', () => {
     const title = screen.getByLabelText('Title')
     title.focus()
     fireEvent.change(title, { target: { value: 'Alice — Audiobook' } })
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'A personal recording of Alice.' } })
     expect(title).toHaveFocus()
+    const preview = screen.getByRole('region', { name: 'Audiobook preview' })
+    expect(screen.getByLabelText('Title')).toHaveValue('Alice — Audiobook')
+    expect(screen.getByLabelText('Author')).toHaveValue('Lewis Carroll')
+    expect(within(preview).getByText('Front page')).toBeInTheDocument()
     const coverPage = screen.getByLabelText('PDF cover page')
+    fireEvent.click(screen.getByRole('button', { name: 'Next cover page' }))
+    expect(coverPage).toHaveValue(2)
+    fireEvent.click(screen.getByRole('button', { name: 'Previous cover page' }))
+    expect(coverPage).toHaveValue(1)
     fireEvent.change(coverPage, { target: { value: '' } })
     expect(coverPage).toHaveValue(null)
     expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')
@@ -771,7 +950,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Create smaller M4B →' }))
     await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [
       { chapterId: 'chapter-1', revision: 'audio-1' },
-    ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', cover: undefined, coverPage: 7, preset: 'm4b-compact' }))
+    ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', description: 'A personal recording of Alice.', cover: undefined, coverPage: 7, preset: 'm4b-compact' }))
     expect(wizardApi.createM4bExport).not.toHaveBeenCalled()
     expect(wizardApi.exportM4b).not.toHaveBeenCalled()
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
@@ -786,7 +965,32 @@ describe('v2 wizard', () => {
     const exportButton = within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export').closest('button')!
     expect(exportButton).toBeEnabled()
     fireEvent.click(exportButton)
-    expect(screen.getByRole('heading', { name: 'Package your audiobook.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
+  })
+
+  it('starts Export with the next book’s details after switching local books', async () => {
+    const moonlit: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, id: 'book-2', title: 'The Moonlit Temple', author: 'M. Cat', filename: 'temple.pdf' },
+    }
+    await open(base, [
+      { id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 },
+      { id: 'book-2', title: 'The Moonlit Temple', source_name: 'temple.pdf', source_kind: 'pdf', page_count: 90 },
+    ])
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export').closest('button')!)
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Personal Alice' } })
+    fireEvent.change(screen.getByLabelText('Description'), { target: { value: 'Only for Alice' } })
+    fireEvent.change(screen.getByLabelText('PDF cover page'), { target: { value: '7' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Go to Home' }))
+
+    vi.mocked(wizardApi.getBookSnapshot).mockImplementation(async (bookId) => bookId === 'book-2' ? moonlit : base)
+    fireEvent.click(await screen.findByRole('button', { name: /The Moonlit Temple.*Continue/ }))
+    await waitFor(() => expect(wizardApi.getBookSnapshot).toHaveBeenCalledWith('book-2'))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export').closest('button')!)
+    expect(screen.getByLabelText('Title')).toHaveValue('The Moonlit Temple')
+    expect(screen.getByLabelText('Author')).toHaveValue('M. Cat')
+    expect(screen.getByLabelText('Description')).toHaveValue('Generated by Meowdiobooks')
+    expect(screen.getByLabelText('PDF cover page')).toHaveValue(1)
   })
 
   it('opens a concise, phase-specific guide from every wizard step', async () => {
@@ -1071,6 +1275,7 @@ describe('v2 wizard', () => {
     const rules = screen.getByRole('button', { name: 'Dialogue detection rules' })
     expect(rules).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByText('Who reads the unresolved dialogue?')).toBeInTheDocument()
+    expect(screen.queryByText('Labels that mean “speaker unknown”')).not.toBeInTheDocument()
 
     fireEvent.click(rules)
     expect(screen.getByText('Curly quotes')).toBeInTheDocument()
@@ -1151,7 +1356,7 @@ describe('v2 wizard', () => {
       conflictResolutions: [{ profileIds: ['inner', 'outer'], winnerProfileId: 'outer' }],
     })
     fireEvent.click(screen.getByRole('button', { name: 'Choose Named quote for all 1 overlap' }))
-    expect(screen.getByText('Selected for all 1 overlap')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose Named quote for all 1 overlap' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getAllByText('Detected speaker')).toHaveLength(2)
     expect(screen.getAllByText('Alice')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Apply choices and continue →' }))
@@ -1338,7 +1543,19 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
 
-    const dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
+    let dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
+    expect(dialog).toHaveFocus()
+    const closeChoice = within(dialog).getByRole('button', { name: 'Close speaker-check choice' })
+    closeChoice.focus()
+    fireEvent.keyDown(closeChoice, { key: 'Tab', shiftKey: true })
+    expect(within(dialog).getByRole('button', { name: /Luna Runs at api.openai.com/ })).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'Tab' })
+    expect(closeChoice).toHaveFocus()
+    fireEvent.keyDown(closeChoice, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '938 dialogue lines need a speaker check' })).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
+    dialog = screen.getByRole('dialog', { name: '938 dialogue lines need a speaker check' })
     expect(within(dialog).getByText('Everything stays local')).toBeInTheDocument()
     expect(within(dialog).getByText('May choose the wrong character')).toBeInTheDocument()
     expect(within(dialog).getByText('May miss a character and use Narrator')).toBeInTheDocument()
@@ -1358,12 +1575,12 @@ describe('v2 wizard', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Use Luna' }))
     expect(screen.queryByRole('dialog', { name: '938 dialogue lines need a speaker check' })).not.toBeInTheDocument()
     const processing = screen.getByRole('dialog', { name: 'Remote processing' })
-    expect(processing.firstElementChild).toHaveClass('dialogue-processing-modal')
+    expect(processing).toHaveClass('dialogue-processing-modal')
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'dialogue', expect.objectContaining({ attributionRoute: 'remote' })))
     finishRemoteLaunch({ id: 'job-dialogue', kind: 'v2:dialogue', status: 'queued' })
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('job-dialogue'))
     expect(screen.queryByRole('button', { name: 'Cancel queued job' })).not.toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'Remote processing' }).firstElementChild).toHaveClass('dialogue-processing-modal')
+    expect(screen.getByRole('dialog', { name: 'Remote processing' })).toHaveClass('dialogue-processing-modal')
     finishRemotePoll({ id: 'job-dialogue', kind: 'v2:dialogue', status: 'succeeded', result: { revision: 'dialogue-candidate' } })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Remote processing' })).not.toBeInTheDocument())
   })
@@ -1993,7 +2210,7 @@ describe('v2 wizard', () => {
     fireEvent.change(input!, { target: { files: [new File(['pdf'], 'alice.pdf', { type: 'application/pdf' })] } })
     fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
     await screen.findByRole('navigation', { name: 'Wizard stages' })
-    expect(screen.getByRole('heading', { name: 'Did we read the source correctly?' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByText('Step 1 · Extract')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Go to Home' }))
 
@@ -2267,26 +2484,48 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument())
   })
 
-  it('reopens an accepted cast as recovery work without flashing the processing overlay', async () => {
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-    const editable = {
-      ...base.cast!, revision: 'cast-editable', phase: 'audition-review' as const,
-    }
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'succeeded', result: { revision: 'cast-editable' } })
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue(editable)
-
+  it('prepares an editable accepted cast and opens voices after confirmation', async () => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'succeeded', result: { revision: 'cast-replacement' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({
+      ...base.cast!, revision: 'cast-replacement', phase: 'audition-review',
+    })
     await open()
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.getByText(/only the replacement can generate new audio/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
-
+    const trigger = screen.getByRole('button', { name: 'Change settings →' })
+    trigger.focus()
+    fireEvent.click(trigger)
+    const confirmation = screen.getByRole('dialog', { name: 'Change the cast?' })
+    expect(confirmation).toHaveTextContent('previous voices can no longer generate new audio')
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.keyDown(confirmation, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Change settings →' })).toBeInTheDocument()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Keep current cast' }))
+    expect(trigger).toHaveFocus()
+    fireEvent.click(trigger)
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
     expect(await screen.findByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review cast & voices →' })).not.toBeInTheDocument()
     expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', {})
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining(
-      'previous voices can no longer generate new audio',
-    ))
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-replacement')
+    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
+    expect(screen.getByRole('region', { name: 'Cast members' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel cast edits' }))
+    expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
+  })
+
+  it('keeps the accepted cast available when preparing its replacement fails', async () => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'failed', error: 'Could not prepare cast' })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not prepare cast')
+    expect(screen.getByRole('heading', { name: 'Cast and voices ready' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change settings →' })).toBeEnabled()
+    expect(screen.queryByRole('region', { name: 'Cast voice auditions' })).not.toBeInTheDocument()
   })
 
   it('reuses previously accepted auditions after a Review-only change', async () => {
@@ -2346,6 +2585,7 @@ describe('v2 wizard', () => {
     expect(within(nav).getByRole('button', { name: /Cast & voices Draft ready/ })).toBeInTheDocument()
     fireEvent.click(within(nav).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
 
     expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-draft')
@@ -2380,21 +2620,21 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getStageCandidate)
       .mockResolvedValueOnce(reusedCast)
       .mockResolvedValueOnce(freshCast)
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
-
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
-    expect(await screen.findByText('Your dialogue is unchanged. Previous cast and audition choices are kept.')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Voices' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reclassify from Dialogue' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '← Review cast' }))
     fireEvent.click(screen.getByRole('button', { name: 'Reclassify from Dialogue' }))
+    const confirmation = screen.getByRole('dialog', { name: 'Reclassify source labels?' })
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Reclassify labels →' }))
 
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenLastCalledWith('book-1', 'cast', { forceReclassify: true }))
     expect(await screen.findByRole('region', { name: 'Cast members' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Reclassify from Dialogue' })).not.toBeInTheDocument()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
-    confirm.mockRestore()
   })
 
   it('lets the user approve detected chapter starts in one clear action', async () => {
@@ -2547,7 +2787,7 @@ describe('v2 wizard', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
   })
 
-  it('reviews chapter boundaries and source warnings through one horizontal group workspace', async () => {
+  it('reviews chapter boundaries and source warnings through a semantic queue and focused evidence workspace', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
@@ -2569,8 +2809,8 @@ describe('v2 wizard', () => {
     const groups = await screen.findByRole('navigation', { name: 'Review groups' })
     expect(within(groups).getByRole('button', { name: /Chapter starts/ })).toBeInTheDocument()
     expect(within(groups).getByRole('button', { name: /Repeated page matter/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show previous review groups' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Show more review groups' })).toBeInTheDocument()
+    expect(groups.closest('.review-queue')).toBeInTheDocument()
+    expect(screen.getByText('Decision queue')).toBeInTheDocument()
 
     const workspace = document.querySelector('.review-workspace')
     fireEvent.click(within(groups).getByRole('button', { name: /Repeated page matter/ }))
@@ -2593,10 +2833,47 @@ describe('v2 wizard', () => {
     const scanButton = screen.getByRole('button', { name: 'Scan for issues →' })
     fireEvent.click(scanButton)
 
-    expect(scanButton).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Scan for issues →' })).not.toBeInTheDocument()
+    expect(screen.getByRole('status', { name: 'Scanning for issues…' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
     finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
     expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+  })
+
+  it('starts a fresh Review candidate from Change settings and keeps the accepted review until approval', async () => {
+    let finishScan!: (job: { id: string; status: 'succeeded'; result: { revision: string } }) => void
+    vi.mocked(wizardApi.processStage).mockReturnValue(new Promise((resolve) => { finishScan = resolve }))
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-replacement', warnings: [], boundaryCandidates: [] })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+
+    expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'review', {})
+    expect(screen.getByRole('status', { name: 'Scanning for issues…' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Scan for issues →' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+
+    finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-replacement' } })
+    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'review', 'review-replacement')
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+  })
+
+  it('lets a failed automatic Review scan retry in place', async () => {
+    vi.mocked(wizardApi.processStage)
+      .mockRejectedValueOnce(new Error('Review scan unavailable'))
+      .mockResolvedValueOnce({ id: 'review-job', status: 'succeeded', result: { revision: 'review-retry' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-retry', warnings: [], boundaryCandidates: [] })
+    await open()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Review scan unavailable')
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(2)
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
 
   it('shows one bounded context excerpt and explains retention separately from narrator assignment', async () => {
@@ -2770,7 +3047,8 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     const identityDialog = screen.getByRole('dialog', { name: 'Inspect Alice' })
-    expect(identityDialog).toHaveTextContent('Ready')
+    expect(identityDialog).toHaveTextContent('Review suggested')
+    expect(identityDialog).toHaveTextContent('Optional check')
     expect(within(identityDialog).queryByRole('button', { name: /Confirm/ })).not.toBeInTheDocument()
     expect(screen.getByText('Cast structure is ready')).toBeInTheDocument()
   })
@@ -2794,7 +3072,7 @@ describe('v2 wizard', () => {
     }
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
@@ -2820,13 +3098,14 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Open Narrator voice' })).not.toHaveAttribute('draggable')
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    expect(narratorDialog).toHaveTextContent('Tune and generate')
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    expect(within(narratorDialog).getByRole('button', { name: 'Create a new audition' })).toBeInTheDocument()
+    expect(narratorDialog).not.toHaveTextContent('Tune and generate')
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
     fireEvent.click(screen.getByRole('button', { name: 'Open Alice voice' }))
     const aliceDialog = screen.getByRole('dialog', { name: 'Alice voice' })
-    fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(aliceDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(aliceDialog)
     await waitFor(() => expect(screen.getByRole('button', { name: 'Accept cast & voices →' })).toBeEnabled())
@@ -2851,6 +3130,49 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: 'Accept suggestion' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
     expect(applyEdits).toBeEnabled()
+  })
+
+  it('starts a new audition directly without a replacement warning', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      cast: {
+        revision: 'auditions-ghost', phase: 'audition-review', dossiers: [], proposals: [],
+        narrator: { characterId: 'narrator', name: 'Narrator', voicePreviewRevision: 'nv1', previewUrl: '/n.wav' },
+        identities: [],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
+    expect(screen.queryByRole('dialog', { name: 'Create a replacement audition?' })).not.toBeInTheDocument()
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
+      proposalRevision: 'auditions-ghost', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
+    })))
+  })
+
+  it('creates a first audition directly without warning about replacing nonexistent auditions', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      cast: {
+        revision: 'first-audition', phase: 'audition-review', dossiers: [], proposals: [],
+        narrator: { characterId: 'narrator', name: 'Narrator' }, identities: [],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
+    expect(screen.queryByRole('dialog', { name: 'Create a replacement audition?' })).not.toBeInTheDocument()
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
+      proposalRevision: 'first-audition', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
+    })))
   })
 
   it('offers one complete pack refresh when the registered voice recipe changed', async () => {
@@ -2907,8 +3229,7 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Select Audition 1' }))
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
@@ -2957,6 +3278,7 @@ describe('v2 wizard', () => {
     })
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Open Alice voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
     fireEvent.click(screen.getByRole('radio', { name: /Clone from a sample/ }))
     const sample = new File(['voice'], 'alice.wav', { type: 'audio/wav' })
     fireEvent.change(screen.getByLabelText('Choose voice sample'), { target: { files: [sample] } })
@@ -2976,24 +3298,16 @@ describe('v2 wizard', () => {
     expect(await screen.findByText('Audition 2')).toBeInTheDocument()
     expect(screen.getByText('Cloned from a 4.0 sec sample')).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Approve Audition 2' })).toBeInTheDocument()
-      expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived', 'selected')
+      expect(screen.getByRole('button', { name: 'Apply Audition 2' })).toBeInTheDocument()
+      expect(screen.getByText('Audition 2').closest('article')).toHaveClass('sample-derived')
     })
 
-    const afterDelete: CastArtifact = {
-      ...uploaded,
-      revision: 'auditions-upload-3',
-      identities: [{
-        ...uploaded.identities![0],
-        voiceCandidates: [uploaded.identities![0].voiceCandidates![1]],
-      }],
-    }
-    vi.mocked(wizardApi.deleteVoiceAudition).mockResolvedValue(afterDelete)
-    fireEvent.click(screen.getByRole('button', { name: 'Delete Audition 1' }))
-    await waitFor(() => expect(wizardApi.deleteVoiceAudition).toHaveBeenCalledWith(
-      'book-1', 'auditions-upload-2', 'alice', 'av1',
-    ))
-    await waitFor(() => expect(screen.queryByRole('button', { name: /Delete Audition/ })).not.toBeInTheDocument())
+    expect(screen.queryByRole('button', { name: /Delete Audition/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Apply Audition 1' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply Audition 2' }))
+    expect(screen.getByRole('button', { name: 'Apply Audition 2' })).toHaveAttribute('aria-pressed', 'true')
+    expect(wizardApi.deleteVoiceAudition).not.toHaveBeenCalled()
+
   })
 
   it('accepts a confirmed layered group route instead of a disposable group audition', async () => {
@@ -3021,7 +3335,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Accept cast & voices →' })).toBeDisabled()
     const groupVoice = screen.getByRole('button', { name: 'Open Subaru & Cecilus voice' })
     expect(groupVoice).toHaveClass('voice-required', 'needs-review')
-    expect(groupVoice).toHaveTextContent('Required')
+    expect(groupVoice).toHaveAttribute('aria-description', 'Required: confirm suggested voices')
     expect(screen.getByText('1 voice still requires review')).toBeInTheDocument()
     fireEvent.click(groupVoice)
     expect(screen.getByRole('radio', { name: /Layer existing cast voices/ })).toHaveAttribute('aria-checked', 'true')
@@ -3053,7 +3367,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     const narratorDialog = screen.getByRole('dialog', { name: 'Narrator voice' })
-    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Approve Audition 1' }))
+    fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Apply Audition 1' }))
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
@@ -3064,7 +3378,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'auditions-3', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
     ]))
-    expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledTimes(1)
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledWith('book-1')
     expect(wizardApi.processStage).not.toHaveBeenCalled()
@@ -3074,7 +3388,7 @@ describe('v2 wizard', () => {
   it('reuses the cached final script when Generate opens again', async () => {
     await open()
 
-    expect(screen.getByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(wizardApi.prepareRecordingScript).not.toHaveBeenCalled()
   })
 
@@ -3088,7 +3402,7 @@ describe('v2 wizard', () => {
     await open(unprepared, undefined, undefined, base)
 
     expect(wizardApi.prepareRecordingScript).toHaveBeenCalledWith('book-1')
-    expect(screen.getByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(screen.queryByText(/Preparing your final script|Opening Generate/)).not.toBeInTheDocument()
   })
 
@@ -3126,10 +3440,29 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
     vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Bring every chapter to life.' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it.each(['result', 'payload'] as const)('restores a successful generation selection from its %s after refresh', async (context) => {
+    localStorage.setItem('meowdiobooks.activeJob', 'saved-generation')
+    vi.mocked(wizardApi.getJob).mockResolvedValue({
+      id: 'saved-generation', kind: 'v2:generate', status: 'succeeded',
+      payload: { book_id: 'book-1', ...(context === 'payload' ? { settings: { chapterIds: ['chapter-1'] } } : {}) },
+      result: context === 'result' ? { bookId: 'book-1', chapters: [{ chapterId: 'chapter-1', revision: 'audio-1' }] } : {},
+    })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 

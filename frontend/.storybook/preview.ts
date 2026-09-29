@@ -1,4 +1,5 @@
 import "../src/styles/product.css";
+import "./preview.css";
 import type { Preview } from "@storybook/react-vite";
 import i18n, { localePreferenceKey } from "../src/i18n";
 import { sidebarPreferenceKey } from "../src/workflow/navigation";

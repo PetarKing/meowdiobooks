@@ -1,0 +1,111 @@
+{
+  "url": "http://127.0.0.1:5179/studio.html",
+  "executedAt": "2026-09-28T06:47:59.974Z",
+  "scope": "Synthetic local home and Generate presentation; no backend operation.",
+  "results": [
+    {
+      "width": 1440,
+      "appearance": "light",
+      "homeBookCardWidth": 430.65625,
+      "sixBookCardWidths": [
+        430.65625,
+        430.671875,
+        430.65625,
+        430.65625,
+        430.671875,
+        430.65625
+      ],
+      "deleteDialog": "custom and Escape restores focus",
+      "nativeDialogs": [],
+      "mouseFocusUnboxed": true,
+      "keyboardFocus": {
+        "focused": true,
+        "focusVisible": true,
+        "outline": "none",
+        "background": "rgb(230, 234, 216)",
+        "shadow": "rgb(164, 47, 77) 0px -4px 0px 0px inset"
+      },
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 1440,
+      "appearance": "dark",
+      "homeBookCardWidth": 430.65625,
+      "sixBookCardWidths": [
+        430.65625,
+        430.671875,
+        430.65625,
+        430.65625,
+        430.671875,
+        430.65625
+      ],
+      "deleteDialog": "custom and Escape restores focus",
+      "nativeDialogs": [],
+      "mouseFocusUnboxed": true,
+      "keyboardFocus": {
+        "focused": true,
+        "focusVisible": true,
+        "outline": "none",
+        "background": "rgb(53, 67, 48)",
+        "shadow": "rgb(238, 156, 180) 0px -4px 0px 0px inset"
+      },
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "light",
+      "homeBookCardWidth": 358,
+      "sixBookCardWidths": [
+        358,
+        358,
+        358,
+        358,
+        358,
+        358
+      ],
+      "deleteDialog": "custom and Escape restores focus",
+      "nativeDialogs": [],
+      "mouseFocusUnboxed": true,
+      "keyboardFocus": {
+        "focused": true,
+        "focusVisible": true,
+        "outline": "none",
+        "background": "rgb(230, 234, 216)",
+        "shadow": "rgb(164, 47, 77) 0px -4px 0px 0px inset"
+      },
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": []
+    },
+    {
+      "width": 390,
+      "appearance": "dark",
+      "homeBookCardWidth": 358,
+      "sixBookCardWidths": [
+        358,
+        358,
+        358,
+        358,
+        358,
+        358
+      ],
+      "deleteDialog": "custom and Escape restores focus",
+      "nativeDialogs": [],
+      "mouseFocusUnboxed": true,
+      "keyboardFocus": {
+        "focused": true,
+        "focusVisible": true,
+        "outline": "none",
+        "background": "rgb(53, 67, 48)",
+        "shadow": "rgb(238, 156, 180) 0px -4px 0px 0px inset"
+      },
+      "overflow": 0,
+      "errors": [],
+      "apiRequests": []
+    }
+  ]
+}

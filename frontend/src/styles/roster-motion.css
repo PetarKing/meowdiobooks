@@ -1,0 +1,138 @@
+/* Shared Cast/Voices motion follows the illustrated dossier geometry.
+   The card stays planted: its status accent catches light and its curved
+   divider is drawn in ink. Home's wayfinding arrow moves independently. */
+.cast-board .cast-roster-card {
+  position: relative;
+  isolation: isolate;
+}
+.cast-board .cast-roster-card::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--roster-accent, var(--matcha)) 10%, transparent),
+    color-mix(in srgb, var(--roster-accent, var(--matcha)) 4%, transparent) 60%,
+    transparent 88%);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-22%);
+  transition: opacity 280ms ease, transform 440ms cubic-bezier(.2, .8, .2, 1);
+}
+.cast-board .cast-roster-card::before {
+  background-image: linear-gradient(180deg,
+    var(--roster-accent) 0%,
+    var(--roster-accent) 37%,
+    color-mix(in srgb, var(--paper) 42%, var(--roster-accent)) 50%,
+    var(--roster-accent) 63%,
+    var(--roster-accent) 100%);
+  background-size: 100% 220%;
+  background-position: 0 0;
+  transition: background-position 560ms cubic-bezier(.2, .8, .2, 1);
+}
+.cast-board .cast-roster-curve { z-index: 1; }
+.cast-board .cast-roster-curve :is(.curve-horizontal, .curve-vertical) { stroke-dasharray: 400; stroke-dashoffset: 0; }
+.cast-board .cast-roster-card > :where(.cast-roster-copy, .cast-roster-portrait, .voice-cast-tile) { z-index: 2; }
+.cast-board .cast-roster-card:is(:focus-visible, :has(:focus-visible))::after { opacity: 1; transform: translateX(0); }
+.cast-board .cast-roster-card:is(:focus-visible, :has(:focus-visible))::before { background-position: 0 100%; }
+.cast-board .cast-roster-card:is(:focus-visible, :has(:focus-visible)) .cast-roster-curve :is(.curve-horizontal, .curve-vertical) { animation: roster-curve-draw 620ms cubic-bezier(.2, .8, .2, 1) both; }
+.cast-board:not(.voice-cast-board) .cast-roster-identity:focus-visible { outline: 2px solid var(--poppy); outline-offset: 2px; }
+.cast-board:not(.voice-cast-board) .cast-roster-identity:active { background: var(--matcha-soft); }
+.voice-cast-board .voice-tile-portrait:active { background: var(--matcha-soft); }
+@keyframes roster-curve-draw { from { stroke-dashoffset: 400; opacity: .35; } to { stroke-dashoffset: 0; opacity: 1; } }
+@keyframes roster-curve-audio { 0%, 100% { stroke-width: 1.2; opacity: .5; } 50% { stroke-width: 1.8; opacity: .85; } }
+@keyframes roster-field-tide {
+  0%, 100% { fill: color-mix(in srgb, var(--roster-accent) 24%, var(--paper)); }
+  50% { fill: color-mix(in srgb, var(--roster-accent) 29%, var(--paper)); }
+}
+@keyframes voice-ink-bloom {
+  0%, 100% { opacity: .2; transform: scale(.8); }
+  50% { opacity: .48; transform: scale(1.05); }
+}
+.voice-cast-board .voice-tile-portrait::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--roster-accent) 42%, transparent) 0%, color-mix(in srgb, var(--roster-accent) 14%, transparent) 46%, transparent 73%);
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(.74);
+}
+.voice-cast-board .voice-tile-portrait:has(.voice-tile-wave)::before { animation: voice-ink-bloom 1900ms ease-in-out infinite; }
+.voice-cast-board .voice-tile-portrait:has(.voice-tile-wave) { color: var(--poppy); }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave { position: relative; z-index: 1; height: 38px; gap: 3px; animation: voice-wave-reveal 220ms ease both; }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+.voice-candidate-play-wave i { width: 3px; height: var(--wave-height,20px); animation: none; transform-origin: center; }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+.voice-candidate-play.playing .voice-candidate-play-wave i { animation: voice-wave-cadence var(--wave-duration,1120ms) ease-in-out var(--wave-delay,-190ms) infinite; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(1) { --wave-height: 10px; --wave-duration: 1160ms; --wave-delay: -320ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(2) { --wave-height: 22px; --wave-duration: 970ms; --wave-delay: -600ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(3) { --wave-height: 30px; --wave-duration: 1340ms; --wave-delay: -180ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(4) { --wave-height: 36px; --wave-duration: 1080ms; --wave-delay: -470ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(5) { --wave-height: 24px; --wave-duration: 1210ms; --wave-delay: -840ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(6) { --wave-height: 18px; --wave-duration: 890ms; --wave-delay: -230ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(7) { --wave-height: 8px; --wave-duration: 1120ms; --wave-delay: -720ms; }
+.voice-candidate-play-wave { height: 30px; gap: 2px; }
+.voice-candidate-play-wave i:nth-child(n) { width: 2px; height: calc(var(--wave-height,20px) * .6); }
+@keyframes voice-wave-cadence { 0%,100% { transform: scaleY(.42); } 25% { transform: scaleY(.8); } 55% { transform: scaleY(1); } 78% { transform: scaleY(.56); } }
+@keyframes voice-wave-reveal { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+.voice-new-audition-icon { transition: transform 360ms cubic-bezier(.2,.8,.2,1), color 220ms ease, background-color 220ms ease; }
+.voice-new-audition:is(:hover,:focus-visible) .voice-new-audition-icon { transform: rotate(90deg); color: var(--action-ink); background: var(--poppy); }
+
+@media (hover: hover) and (pointer: fine) {
+  .cast-board .cast-roster-card:hover::after { opacity: 1; transform: translateX(0); }
+  .cast-board .cast-roster-card:hover::before { background-position: 0 100%; }
+  .cast-board .cast-roster-card:hover .cast-roster-curve :is(.curve-horizontal, .curve-vertical) { animation: roster-curve-draw 620ms cubic-bezier(.2, .8, .2, 1) both; }
+  .cast-board .cast-roster-identity:hover { transform: none; box-shadow: none; }
+  .recent-books article { transform: none; transition: background-color 220ms ease, box-shadow 220ms ease; }
+  .recent-books article:hover { transform: none; }
+  .recent-books article:has(.recent-book-open:is(:hover, :focus-visible)) { background: color-mix(in srgb, var(--matcha-soft) 24%, var(--paper)); }
+  .recent-books .recent-book-open:hover .recent-book-arrow { color: var(--poppy); transform: translate(3px, -3px); }
+}
+.recent-books .recent-book-arrow { display: inline-block; transition: transform 320ms cubic-bezier(.2, .8, .2, 1), color 220ms ease; }
+.recent-books .recent-book-open:focus-visible .recent-book-arrow { color: var(--poppy); transform: translate(3px, -3px); }
+.voice-cast-board .cast-roster-card:has(.voice-tile-wave) .cast-roster-curve :is(.curve-horizontal, .curve-vertical) {
+  stroke: var(--poppy);
+  animation: roster-curve-audio 1900ms ease-in-out infinite;
+}
+.voice-cast-board .cast-roster-card:has(.voice-tile-wave) .cast-roster-field { animation: roster-field-tide 1900ms ease-in-out infinite; }
+
+@media (max-width: 600px) {
+  .cast-board .cast-roster-card::before {
+    background-image: linear-gradient(90deg,
+      var(--roster-accent) 0%,
+      var(--roster-accent) 37%,
+      color-mix(in srgb, var(--paper) 42%, var(--roster-accent)) 50%,
+      var(--roster-accent) 63%,
+      var(--roster-accent) 100%);
+    background-size: 220% 100%;
+    background-position: 0 0;
+  }
+  .cast-board .cast-roster-card:is(:focus-visible, :has(:focus-visible))::before { background-position: 100% 0; }
+}
+@media (max-width: 600px) and (hover: hover) and (pointer: fine) {
+  .cast-board .cast-roster-card:hover::before { background-position: 100% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cast-board .cast-roster-card::before,
+  .cast-board .cast-roster-card::after,
+  .cast-board .cast-roster-curve :is(.curve-horizontal, .curve-vertical),
+  .voice-cast-board .cast-roster-field,
+  .voice-cast-board .voice-tile-portrait::before,
+  .cast-board .cast-roster-identity,
+  .voice-cast-board .voice-tile-portrait .voice-tile-wave,
+  .voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+  .voice-candidate-play-wave i,
+  .voice-new-audition-icon,
+  .recent-books article,
+  .recent-books .recent-book-arrow {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .voice-cast-board .voice-tile-portrait:has(.voice-tile-wave)::before { opacity: .45; }
+}

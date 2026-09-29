@@ -1,0 +1,136 @@
+{
+  "preview": "http://127.0.0.1:6018",
+  "locale": "en",
+  "generatedAt": "2026-09-26T20:57:05.692Z",
+  "results": [
+    {
+      "story": "product-accepted-baseline--home",
+      "name": "Home",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--home-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--review",
+      "name": "Review",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--review-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--cast-voices",
+      "name": "Cast Voices",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-voices-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--cast-inspector",
+      "name": "Cast Inspector",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-inspector-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--home",
+      "name": "Home",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--home-390.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--review",
+      "name": "Review",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--review-390.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--cast-voices",
+      "name": "Cast Voices",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-voices-390.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--cast-inspector",
+      "name": "Cast Inspector",
+      "locale": "en",
+      "appearance": "dark",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-inspector-390.png",
+      "inspectorBottomScreenshot": "product-accepted-baseline--cast-inspector-390-inspector-bottom.png",
+      "passed": true
+    }
+  ]
+}

@@ -70,6 +70,7 @@ import {
   type WizardStep
 } from "../workflow/navigation";
 import {
+  DEFAULT_EXPORT_DESCRIPTION,
   decodeImage,
   message
 } from "../workflow/presentation";
@@ -142,6 +143,10 @@ export function useWorkflowModel({
   const [libraryExports, setLibraryExports] = useState<LibraryExport[]>([]);
 
   const [libraryReady, setLibraryReady] = useState(false);
+
+  const [libraryError, setLibraryError] = useState<string>();
+
+  const [libraryLoading, setLibraryLoading] = useState(false);
 
   const [openingBookId, setOpeningBookId] = useState<string>();
 
@@ -285,6 +290,10 @@ export function useWorkflowModel({
 
   const [exportAuthor, setExportAuthor] = useState("");
 
+  const [exportDescription, setExportDescription] = useState(() => t(DEFAULT_EXPORT_DESCRIPTION));
+
+  const exportBookId = useRef<string | undefined>(undefined);
+
   const [exportCover, setExportCover] = useState<File>();
 
   const [exportCoverPage, setExportCoverPage] = useState(1);
@@ -300,17 +309,17 @@ export function useWorkflowModel({
   const libraryRequest = useRef<Promise<void> | undefined>(undefined);
 
   const reviewStripRef = useRef<HTMLDivElement | null>(null);
-
-  const generationModalRef = useRef<HTMLDivElement | null>(null);
-
   const loadLibrary = useCallback(() => {
     if (libraryRequest.current) return libraryRequest.current;
+    setLibraryError(undefined);
+    setLibraryLoading(true);
     const request = gateway.listLibrary()
       .then(setLibraryExports)
-      .catch((reason) => setError(message(reason)))
+      .catch((reason) => setLibraryError(message(reason)))
       .finally(() => {
         if (libraryRequest.current === request) libraryRequest.current = undefined;
         setLibraryReady(true);
+        setLibraryLoading(false);
       });
     libraryRequest.current = request;
     return request;
@@ -414,7 +423,18 @@ export function useWorkflowModel({
       const bookId = typeof job.result?.bookId === "string"
         ? job.result.bookId
         : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
-      if (bookId) await restoreBookView(bookId);
+      if (bookId) {
+        const next = await restoreBookView(bookId);
+        if (job.kind === "v2:generate" && job.status === "succeeded") {
+          const settings = job.payload?.settings as Record<string, unknown> | undefined;
+          const requested = Array.isArray(settings?.chapterIds)
+            ? settings.chapterIds.filter((id): id is string => typeof id === "string")
+            : Array.isArray(job.result?.chapters)
+              ? job.result.chapters.flatMap((row) => typeof row?.chapterId === "string" ? [row.chapterId] : [])
+              : [];
+          selectCompletedChapters(next, requested);
+        }
+      }
     })
       .catch((reason) => setError(message(reason)))
       .finally(() => setBusy(false));
@@ -428,15 +448,6 @@ export function useWorkflowModel({
     window.addEventListener("beforeunload", guard);
     return () => window.removeEventListener("beforeunload", guard);
   }, [activeJob]);
-
-  useEffect(() => {
-    if (!generationInProgress) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    generationModalRef.current?.focus();
-    return () => { document.body.style.overflow = previousOverflow; };
-  }, [generationInProgress]);
-
   useEffect(() => {
     if (!listeningChapterId) return;
     const closePlayer = (event: KeyboardEvent) => {
@@ -527,12 +538,19 @@ export function useWorkflowModel({
       const pending = available.filter((id) => !generated.has(id));
       return current.length ? current.filter((id) => pending.includes(id)) : pending;
     });
+    const newExportBook = exportBookId.current !== next.book.id;
+    exportBookId.current = next.book.id;
     setExportChapterIds((current) => {
       const playable = next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId);
-      return current.length ? current.filter((id) => playable.includes(id)) : playable;
+      return newExportBook || !current.length ? playable : current.filter((id) => playable.includes(id));
     });
-    setExportTitle((current) => current || next.book.title || "");
-    setExportAuthor((current) => current || next.book.author || "");
+    setExportTitle((current) => newExportBook ? next.book.title || "" : current || next.book.title || "");
+    setExportAuthor((current) => newExportBook ? next.book.author || "" : current || next.book.author || "");
+    if (newExportBook) {
+      setExportDescription(t(DEFAULT_EXPORT_DESCRIPTION));
+      setExportCover(undefined);
+      setExportCoverPage(1);
+    }
     return next;
   }
 
@@ -692,6 +710,7 @@ export function useWorkflowModel({
     setStage(routeStage(nextStage(next.book.completedStages), next));
     navigateProduct("create");
     setHome(false);
+    return next;
   }
 
   async function openBook(local: LocalBook) {
@@ -938,6 +957,7 @@ export function useWorkflowModel({
     const availableChapters = (snapshot?.chapters ?? []).filter((chapter) => !unavailable.has(chapter.id));
     const estimates = new Map((snapshot?.recordingScript?.summary.chapters ?? []).map((chapter) => [chapter.chapterId, chapter.estimatedSeconds]));
     const selected = new Set(chapterIds);
+    const previousRevisions = new Map(snapshot?.generatedChapters.map((row) => [row.chapterId, row.revision]));
     setGenerationRun({
       chapterIds,
       estimatedAudioSeconds: availableChapters
@@ -954,15 +974,45 @@ export function useWorkflowModel({
       const completedJob = await runJob(await gateway.processStage(book.id, "generate", { chapterIds, language }));
       const sample = generationSample(completedJob);
       if (sample) setGenerationSamples((current) => [sample, ...current].sort((left, right) => right.finishedAt - left.finishedAt).slice(0, 3));
-      await hydrate(book.id);
+      const next = await hydrate(book.id);
+      selectCompletedChapters(next, chapterIds);
     } catch (reason) {
       setError(message(reason));
-      void hydrate(book.id).catch(() => undefined);
+      try {
+        const next = await hydrate(book.id);
+        // Each chapter is published atomically. A later failure can leave completed
+        // chapters saved; keep only unfinished requested tracks selected for retry.
+        const completed = new Set(next.generatedChapters
+          .filter((row) => row.current && row.revision !== previousRevisions.get(row.chapterId))
+          .map((row) => row.chapterId));
+        setSelectedChapters(chapterIds.filter((id) => !completed.has(id)));
+      } catch {
+        // Keep the original failure and local selection when refresh is unavailable.
+      }
     } finally {
       setGenerationInProgress(false);
       setGenerationRun(undefined);
       setBusy(false);
     }
+  }
+
+  function selectCompletedChapters(next: WizardSnapshot, chapterIds: string[]) {
+    const requested = new Set(chapterIds);
+    const playable = new Set(next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+    const completed = next.chapters.filter((row) => requested.has(row.id) && playable.has(row.id)).map((row) => row.id);
+    if (!completed.length) return;
+    setChapterFilter("generated");
+    setSelectedChapters(completed);
+    setExportChapterIds(completed);
+  }
+
+  function continueToExport(chapterIds?: string[]) {
+    const playable = new Set(snapshot?.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+    const selected = chapterIds ? new Set(chapterIds) : playable;
+    const chapters = (snapshot?.chapters ?? []).filter((row) => playable.has(row.id) && selected.has(row.id)).map((row) => row.id);
+    if (!chapters.length) return;
+    setExportChapterIds(chapters);
+    setStage(stageIndex("export"));
   }
 
   async function exportCurrent() {
@@ -972,7 +1022,7 @@ export function useWorkflowModel({
     if (!chapters.length) return;
     setExporting(true);
     try {
-      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), cover: exportCover, coverPage: exportCoverPage, preset: exportPreset };
+      const options = { title: exportTitle.trim(), author: exportAuthor.trim(), description: exportDescription.trim(), cover: exportCover, coverPage: exportCoverPage, preset: exportPreset };
       if (gateway.createAudioExport) await gateway.createAudioExport(book.id, chapters, options);
       else if (exportPreset === "m4b-high" && gateway.createM4bExport) await gateway.createM4bExport(book.id, chapters, options);
       else if (exportPreset === "m4b-high") await gateway.exportM4b(book.id, chapters, options);
@@ -1005,7 +1055,7 @@ export function useWorkflowModel({
       setError(message(reason));
     }
   }
-  return { castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationModalRef, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryExports, libraryReady, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
+  return { castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
 }
 
 export type WorkflowModel = ReturnType<typeof useWorkflowModel>;

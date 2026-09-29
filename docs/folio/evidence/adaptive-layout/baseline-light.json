@@ -1,0 +1,136 @@
+{
+  "preview": "http://127.0.0.1:6018",
+  "locale": "en",
+  "generatedAt": "2026-09-26T21:38:35.787Z",
+  "results": [
+    {
+      "story": "product-accepted-baseline--cast-inspector",
+      "name": "Cast Inspector",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-inspector-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate",
+      "name": "Generate",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate-long-book",
+      "name": "Generate Long Book",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-long-book-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate-failed",
+      "name": "Generate Failed",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-failed-1440.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--cast-inspector",
+      "name": "Cast Inspector",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--cast-inspector-390.png",
+      "inspectorBottomScreenshot": "product-accepted-baseline--cast-inspector-390-inspector-bottom.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate",
+      "name": "Generate",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-390.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate-long-book",
+      "name": "Generate Long Book",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-long-book-390.png",
+      "passed": true
+    },
+    {
+      "story": "product-accepted-baseline--generate-failed",
+      "name": "Generate Failed",
+      "locale": "en",
+      "appearance": "light",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "errors": [],
+      "horizontalOverflow": 0,
+      "imageFailures": [],
+      "violations": [],
+      "screenshot": "product-accepted-baseline--generate-failed-390.png",
+      "passed": true
+    }
+  ]
+}

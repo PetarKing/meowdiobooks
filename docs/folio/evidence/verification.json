@@ -1,0 +1,103 @@
+{
+  "date": "2026-09-26",
+  "branch": "codex/studio-rebuild",
+  "base": "688d07e (rejected Nocturne retained for history)",
+  "source": "Reviewed Folio candidate with local repairs on codex/studio-rebuild; no production adoption",
+  "unit": {
+    "files": 24,
+    "tests": 243,
+    "passed": true
+  },
+  "storybook": {
+    "files": 5,
+    "stories": 57,
+    "passed": true,
+    "finalRoutingRecheck": {
+      "stories": 2,
+      "passed": true,
+      "note": "After credential explanation and settled entrance visibility assertion"
+    }
+  },
+  "consumer": {
+    "packedFiles": 76,
+    "hostTypes": "passed",
+    "ordinaryEqualSpecificityOverrides": "passed for standalone primitives and App host"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 1,
+    "warning": "Existing LanguagePicker react-refresh/only-export-components"
+  },
+  "build": "passed; substantial shared JS and lazy Three chunk remain",
+  "rendered": {
+    "finalLight": 14,
+    "finalDark": 8,
+    "darkMatrix": 104,
+    "finalProblems": {
+      "axe": 0,
+      "horizontalOverflow": 0,
+      "runtime": 0
+    },
+    "lightMatrix": 104,
+    "chineseWorkflowFrames": 80,
+    "currentAuditionInspectorFrames": 4
+  },
+  "manual": "Appearance switch and reload persistence observed; System restored. Independent review documented separately.",
+  "limits": [
+    "Synthetic gateways and silent audition fixtures do not prove provider/audio quality or export persistence.",
+    "User aesthetic acceptance is pending.",
+    "No merge, push, release or deployment."
+  ],
+  "storybookTypes": "passed",
+  "manualPreviewLocale": {
+    "persistedChineseStates": 40,
+    "reload": "passed",
+    "apiRequests": 0,
+    "runtimeErrors": 0
+  },
+  "independentCompactReview": {
+    "chineseFrames": 24,
+    "widths": [
+      320,
+      900,
+      720
+    ],
+    "actual200PercentTextZoom": "not exercised"
+  },
+  "routing": "Shared modal focus lifecycle; configured/unavailable isolated stories and independent light/dark phone/desktop rechecks",
+  "independentRoutingReview": {
+    "states": 8,
+    "widths": [
+      390,
+      1440
+    ],
+    "appearances": [
+      "light",
+      "dark"
+    ],
+    "axe": 0,
+    "horizontalOverflow": 0,
+    "keyboard": "focus containment, Escape and opener restoration observed; local and remote action focus colors rechecked"
+  },
+  "adaptiveLayout": {
+    "enlargedDesktopFrames": 8,
+    "method": "Synthetic computed-font doubling; native browser zoom unverified",
+    "normalFrames": 16,
+    "normalViewports": [
+      390,
+      1440
+    ],
+    "finalPhoneActionWidth": 324,
+    "workflowBrowserRecheck": {
+      "stories": 40,
+      "passed": true
+    },
+    "consumerRecheck": "passed"
+  },
+  "systemAppearance": {
+    "liveEmulatedPreferenceTransitions": 8,
+    "settledSurfaceAndText": "passed",
+    "reload": "passed",
+    "hostOSSettingsChanged": false
+  }
+}

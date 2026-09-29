@@ -12,6 +12,7 @@ import type {
 } from "../api/contracts";
 import { PhaseHelp } from "../components/PhaseHelp";
 import { Panel, Tag } from "../components/Ui";
+import { StepIntro, WorkflowLaunch } from "../components/WorkflowPage";
 import {
   type WizardStep
 } from "../workflow/navigation";
@@ -25,11 +26,11 @@ export function StepEyebrow({ stage, children }: { stage: WizardStep; children: 
 }
 
 export function PageTitle({ stage, step, title, copy }: { stage: WizardStep; step: string; title: string; copy?: string; }) {
-  return <div className="page-title"><StepEyebrow stage={stage}>{step}</StepEyebrow><h1>{title}</h1>{copy && <p>{copy}</p>}</div>;
+  return <StepIntro eyebrow={<StepEyebrow stage={stage}>{step}</StepEyebrow>} title={title} copy={copy} />;
 }
 
 export function StageLaunch({ children }: { children: ReactNode; }) {
-  return <div className="stage-launch">{children}</div>;
+  return <WorkflowLaunch>{children}</WorkflowLaunch>;
 }
 
 export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
@@ -45,13 +46,13 @@ export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, r
 }) {
   const { t } = useTranslation();
   return <div className={`compare extract-compare page-comparison ${className}`.trim()}>
-    <div className="paper">
+    <div className="paper" tabIndex={0} role="region" aria-label={t("ORIGINAL PAGE")}>
       {imageControls ? <div className="paper-heading"><span>{t("ORIGINAL PAGE")}</span>{imageControls}</div> : <span>{t("ORIGINAL PAGE")}</span>}
       {imageUrl && (imageZoom
         ? <div className="pdf-preview-frame"><img src={imageUrl} alt={imageAlt} style={{ width: `${imageZoom}%` }} /></div>
         : <img src={imageUrl} alt={imageAlt} />)}
     </div>
-    <div className={`extracted ${rightClassName}`.trim()}><div className="page-comparison-heading"><span>{rightLabel}</span>{rightMeta}</div>{children}</div>
+    <div className={`extracted ${rightClassName}`.trim()} tabIndex={0} role="region" aria-label={rightLabel}><div className="page-comparison-heading"><span>{rightLabel}</span>{rightMeta}</div>{children}</div>
   </div>;
 }
 
@@ -98,13 +99,13 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
 export function AcceptedSummary({ stage, step, title, receipt, note, onRevise, children }: { stage: Exclude<WizardStage, "import">; step: string; title: string; revision?: unknown; receipt?: string; note?: string; onRevise: () => void; children: ReactNode; }) {
   const { t } = useTranslation();
   const actions = <div className="accepted-summary-badges"><Tag tone="good">{t("Complete")}</Tag>{receipt && <span className="accepted-cost-receipt" title={t("Estimated API cost from provider-reported usage")}>{receipt}</span>}</div>;
-  return <><PageTitle stage={stage} step={step} title={title} /><Panel actions={actions} title={t("Accepted settings")}><div className="accepted-summary">{children}</div><div className="summary-note">{note ?? t("Your accepted version stays in use until you approve a replacement.")}</div><div className="summary-actions"><span>{t("Accepted and ready for the next steps")}</span><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></Panel></>;
+  return <><PageTitle stage={stage} step={step} title={title} /><Panel variant="plain" actions={actions} title={t("Accepted settings")}><div className="accepted-summary">{children}</div><div className="summary-note">{note ?? t("Your accepted version stays in use until you approve a replacement.")}</div><div className="summary-actions"><span>{t("Accepted and ready for the next steps")}</span><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></Panel></>;
 }
 
 export function DialogueStructuralReview({ issues, choices, onChoose, onApply }: { issues: DialogueStructuralIssue[]; choices: Record<string, DialogueStructuralAction>; onChoose: (issueId: string, action: DialogueStructuralAction) => void; onApply: () => void; }) {
   const { t } = useTranslation();
   const ready = issues.every((issue) => Boolean(choices[issue.id]));
-  return <Panel eyebrow={t("Quick review")} title={issues.length === 1 ? t("1 interrupted dialogue turn needs your choice") : t("{{count}} interrupted dialogue turns need your choice", { count: issues.length })} actions={<Tag tone="warn">{t("Before AI")}</Tag>}><p className="panel-copy">{t("A new speaker label appears inside another detected line. Choose how to split the turns. The words stay unchanged.")}</p><div className="conflict-groups">{issues.map((issue, index) => {
+  return <Panel className="dialogue-preflight" eyebrow={t("Quick review")} title={issues.length === 1 ? t("1 interrupted dialogue turn needs your choice") : t("{{count}} interrupted dialogue turns need your choice", { count: issues.length })} actions={<Tag tone="warn">{t("Before AI")}</Tag>}><p className="panel-copy">{t("A new speaker label appears inside another detected line. Choose how to split the turns. The words stay unchanged.")}</p><div className="conflict-groups">{issues.map((issue, index) => {
     const selected = choices[issue.id];
     const split = issue.interpretations.split;
     const together = issue.interpretations["keep-together"];
@@ -122,7 +123,7 @@ export function DialogueConflictReview({ groups, regexes, choices, onChoose, onR
   const { t } = useTranslation();
   const ready = groups.every((group) => Boolean(choices[group.groupId]));
   const total = groups.reduce((count, group) => count + group.conflicts.length, 0);
-  return <Panel eyebrow={t("Quick review")} title={total === 1 ? t("1 overlapping dialogue match needs your choice") : t("{{count}} overlapping dialogue matches need your choice", { count: total })} actions={<Tag tone="warn">{t("Before AI")}</Tag>}><p className="panel-copy">{t("Two rules matched the same text. Choose which result to use for each group of overlaps. Both rules stay enabled.")}</p><DialogueConflictGroups groups={groups} regexes={regexes} choices={choices} onChoose={onChoose} /><div className="conflict-help">{t("Your choice applies only where these two rules overlap. Their other matches stay untouched.")}</div><div className="phase-action"><button className="ghost" onClick={onReviewRules}>{t("Review detection rules")}</button><button className="primary" disabled={!ready} onClick={onApply}>{t("Apply choices and continue")} →</button></div></Panel>;
+  return <Panel className="dialogue-preflight" eyebrow={t("Quick review")} title={total === 1 ? t("1 overlapping dialogue match needs your choice") : t("{{count}} overlapping dialogue matches need your choice", { count: total })} actions={<Tag tone="warn">{t("Before AI")}</Tag>}><p className="panel-copy">{t("Two rules matched the same text. Choose which result to use for each group of overlaps. Both rules stay enabled.")}</p><DialogueConflictGroups groups={groups} regexes={regexes} choices={choices} onChoose={onChoose} /><div className="conflict-help">{t("Your choice applies only where these two rules overlap. Their other matches stay untouched.")}</div><div className="phase-action"><button className="ghost" onClick={onReviewRules}>{t("Review detection rules")}</button><button className="primary" disabled={!ready} onClick={onApply}>{t("Apply choices and continue")} →</button></div></Panel>;
 }
 
 export function DialogueRulesSection({ regexes, open, strategy, attributionTargets, onToggle, onToggleRegex, onAddRegex, onError }: { regexes: DialogueRegex[]; open: boolean; strategy: DialogueStrategy; attributionTargets: DialogueAttributionTarget[]; onToggle: () => void; onToggleRegex: (id: string, enabled: boolean) => void; onAddRegex: (regex: { label: string; pattern: string; flags: string; }) => Promise<boolean>; onError: (message: string) => void; }) {
@@ -178,14 +179,14 @@ export function DialogueConflictGroups({ groups, regexes, choices, onChoose }: {
     const shownExamples = Math.min(group.conflicts.length, 4);
     return <article className="conflict-group" key={group.groupId}>
       <header>
-        <div className="conflict-group-heading"><small>{t("This choice applies to")}</small><b>{t("{{overlaps}} total", { overlaps: overlapLabel })}</b><span>{group.conflicts.length <= 4 ? t("Showing all {{count}} examples", { count: shownExamples }) : t("Showing {{count}} representative examples", { count: shownExamples })}</span></div>
+        <div className="conflict-group-heading"><small>{t("This choice applies to")}</small><b>{t("{{overlaps}} total", { overlaps: overlapLabel })}</b><span>{group.conflicts.length === 1 ? t("Showing 1 example") : group.conflicts.length <= 4 ? t("Showing all {{count}} examples", { count: shownExamples }) : t("Showing {{count}} representative examples", { count: shownExamples })}</span></div>
         <div className="conflict-choices" role="group" aria-label={t("Choose a result for {{count}} overlapping matches", { count: group.conflicts.length })}>
           {group.profileIds.map((profileId) => {
             const label = labels.get(profileId) ?? profileId;
             const isSelected = selected === profileId;
-            return <button key={profileId} type="button" className={isSelected ? "selected" : ""} aria-label={t("Choose {{label}} for all {{overlaps}}", { label, overlaps: overlapLabel })} aria-pressed={isSelected} onClick={() => onChoose(group.groupId, profileId)}><span className="conflict-choice-radio" aria-hidden="true">{isSelected ? "✓" : ""}</span><span><b>{label}</b><small>{t(isSelected ? "Selected for all {{overlaps}}" : "Choose for all {{overlaps}}", { overlaps: overlapLabel })}</small></span></button>;
+            return <button key={profileId} type="button" className={isSelected ? "selected" : ""} aria-label={t("Choose {{label}} for all {{overlaps}}", { label, overlaps: overlapLabel })} aria-pressed={isSelected} onClick={() => onChoose(group.groupId, profileId)}><span className="conflict-choice-radio" aria-hidden="true">{isSelected ? "✓" : ""}</span><span><b>{label}</b></span></button>;
           })}
-          <button type="button" className={selected === "narration" ? "selected" : ""} aria-label={t("Choose narration for all {{overlaps}}", { overlaps: overlapLabel })} aria-pressed={selected === "narration"} onClick={() => onChoose(group.groupId, "narration")}><span className="conflict-choice-radio" aria-hidden="true">{selected === "narration" ? "✓" : ""}</span><span><b>{t("Neither — leave as narration")}</b><small>{t(selected === "narration" ? "Selected for all {{overlaps}}" : "Choose for all {{overlaps}}", { overlaps: overlapLabel })}</small></span></button>
+          <button type="button" className={selected === "narration" ? "selected" : ""} aria-label={t("Choose narration for all {{overlaps}}", { overlaps: overlapLabel })} aria-pressed={selected === "narration"} onClick={() => onChoose(group.groupId, "narration")}><span className="conflict-choice-radio" aria-hidden="true">{selected === "narration" ? "✓" : ""}</span><span><b>{t("Neither — leave as narration")}</b></span></button>
         </div>
       </header>
       <div className="conflict-examples">{group.conflicts.slice(0, 4).map((conflict, index) => <section key={conflict.id} className="conflict-example" aria-label={t("Overlap example {{number}}", { number: index + 1 })}>

@@ -323,6 +323,7 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
             for row in snapshot["voiceModels"]
             if row["id"] == voice_model
         )
+        _, dialogue, review = _seed_reviewed_transcript(tmp_path, book_id)
         _, cast = write_artifact(
             package,
             "cast",
@@ -330,6 +331,8 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
                 "revision": "cast-upload-1",
                 "phase": "audition-review",
                 "status": "needs-voice-review",
+                "dialogueRevision": dialogue["revision"],
+                "reviewRevision": review["revision"],
                 "language": "english",
                 "voiceModel": voice_model,
                 "auditionPackRecipeVersion": voice_recipe_version,
@@ -774,10 +777,11 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             "Brisk, dry, and quietly amused"
             in regenerated_candidate["identities"][0]["voiceDirection"]
         )
-        assert len(regenerated_candidate["identities"][0]["voiceCandidates"]) == 1
-        assert not (
-            package / "voices" / alice_id / f"{original_alice_revision}.wav"
-        ).exists()
+        previous_auditions = candidate["identities"][0]["voiceCandidates"]
+        auditions = regenerated_candidate["identities"][0]["voiceCandidates"]
+        assert len(auditions) == len(previous_auditions) + 1
+        assert auditions[:-1] == previous_auditions
+        assert auditions[-1]["parentRevision"] == previous_auditions[-1]["revision"]
         stale_decisions = [
             {
                 "characterId": row["characterId"],
@@ -800,10 +804,10 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             ).status_code
             == 409
         )
-        assert (
-            _accept(client, book_id, "cast", regenerated["revision"], stale_decisions).status_code
-            == 409
-        )
+        # Earlier auditions remain valid choices after adding another candidate.
+        assert _accept_voice_revisions(
+            regenerated_candidate, stale_decisions, "choose-earlier"
+        )["identities"][0]["acceptedVoiceRevision"] == original_alice_revision
         current_decisions = [
             {
                 "characterId": row["characterId"],
@@ -871,6 +875,135 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             == regenerated_candidate["identities"][0]["voicePreviewRevision"]
         )
         assert render_calls[0]["sourceCoverage"] == {"status": "exact", "sourceSpanCount": 1}
+
+
+def test_new_auditions_preserve_default_choices_audio_and_accepted_cast_on_failure(tmp_path):
+    from copy import deepcopy
+
+    fail = [False]
+
+    def generated(_repo, package, _book_id, rows, report, _language, _model):
+        voice = rows[0]
+        if fail[0]:
+            fail[0] = False
+            raise RuntimeError("Synthetic audition provider failed")
+        revision = f"alice-{len(voice['voiceCandidates']) + 1}"
+        path = package / "voices" / "alice" / f"{revision}.wav"
+        path.write_bytes(revision.encode())
+        voice["voiceCandidates"][0]["direction"] = "Provider tried to rewrite an earlier audition."
+        # A provider may return just the new candidate rather than the whole collection.
+        return [{**voice, "voicePreviewRevision": revision, "previewUrl": f"/voice/{revision}",
+                 "referenceText": "New audition line.", "voice": voice["voiceDirection"],
+                 "voiceCandidates": [{"revision": revision, "previewUrl": f"/voice/{revision}",
+                                      "referenceText": "New audition line.",
+                                      "direction": voice["voiceDirection"],
+                                      "voiceSettings": deepcopy(voice["voiceSettings"])}]}]
+
+    class Reuse:
+        def import_voice(self, _book, package, target, _source, _language, _model):
+            relative = "voices/alice/alice-imported.wav"
+            (package / relative).write_bytes(b"imported-preview")
+            return {**target, "voicePreviewRevision": "alice-imported",
+                    "previewUrl": "/voice/alice-imported", "referenceAudio": relative,
+                    "voiceCandidates": [{"revision": "alice-imported",
+                                         "previewUrl": "/voice/alice-imported",
+                                         "referenceAudio": relative,
+                                         "referenceText": "Imported reference words.",
+                                         "direction": "An imported voice."}]}
+
+    with TestClient(create_app_v2(
+        tmp_path, voice_auditioner=generated, cast_voice_reuse=Reuse(),
+        default_voice_model="test", voice_languages=lambda *_: ["english"],
+        voice_models=lambda *_: [{"id": "test", "recipeVersion": "1"}],
+    )) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+        package, dialogue, review = _seed_reviewed_transcript(tmp_path, book_id)
+        voices = []
+        for character_id in ("narrator", "alice"):
+            candidates = []
+            for number in (1, 2, 3):
+                revision = f"{character_id}-{number}"
+                relative = f"voices/{character_id}/{revision}.wav"
+                path = package / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(revision.encode())
+                candidates.append({"revision": revision, "previewUrl": f"/voice/{revision}",
+                                   "referenceAudio": relative, "referenceText": "Original words.",
+                                   "direction": f"Original direction {number}."})
+            voices.append({"characterId": character_id, "name": character_id.title(),
+                           "category": "narrator" if character_id == "narrator" else "character",
+                           "lineCount": 0 if character_id == "narrator" else 1,
+                           "literalLabels": [] if character_id == "narrator" else ["Alice"],
+                           "voiceCandidates": candidates, "voicePreviewRevision": candidates[0]["revision"],
+                           "previewUrl": candidates[0]["previewUrl"], "referenceText": "Original words.",
+                           "referenceAudio": candidates[0]["referenceAudio"], "voiceAccepted": True,
+                           "acceptedVoiceRevision": candidates[0]["revision"]})
+        accepted_path, accepted = write_artifact(package, "cast", {
+            "revision": "accepted-before-addition", "phase": "accepted", "status": "accepted",
+            "dialogueRevision": dialogue["revision"], "reviewRevision": review["revision"],
+            "language": "english", "voiceModel": "test", "auditionPackRecipeVersion": "1",
+            "labelToCharacterId": {"Alice": "alice"}, "narrator": voices[0], "identities": [voices[1]],
+        })
+        accepted_bytes = accepted_path.read_bytes()
+        original = deepcopy(voices[1]["voiceCandidates"])
+        _, draft = write_artifact(package, "cast", {
+            **accepted, "revision": "editable-auditions", "phase": "audition-review",
+        }, publish=False)
+
+        def add(revision, **extra):
+            result = _process(client, book_id, "cast", {
+                "proposalRevision": revision, "characterId": "alice", **extra,
+            })
+            return client.get(
+                f"/api/books/{book_id}/stages/cast/candidates/{result['revision']}"
+            ).json()
+
+        first = add(draft["revision"])
+        first_candidates = first["identities"][0]["voiceCandidates"]
+        assert first_candidates[:3] == original
+        assert [row["revision"] for row in first_candidates] == [
+            "alice-1", "alice-2", "alice-3", "alice-4",
+        ]
+        assert first_candidates[-1]["parentRevision"] == "alice-3"
+        assert first["narrator"] == accepted["narrator"]
+
+        fail[0] = True
+        failed = client.post(f"/api/books/{book_id}/stages/cast/process", json={"settings": {
+            "proposalRevision": first["revision"], "characterId": "alice",
+        }}).json()
+        assert _wait(client, failed["id"])["status"] == "failed"
+        assert client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"]["cast"][
+            "revision"
+        ] == first["revision"]
+        assert accepted_path.read_bytes() == accepted_bytes
+        assert read_artifact(package, "cast")["revision"] == accepted["revision"]
+
+        second = add(first["revision"])
+        assert second["identities"][0]["voiceCandidates"][:-1] == first_candidates
+        assert second["identities"][0]["voiceCandidates"][-1]["parentRevision"] == "alice-4"
+        reused = add(second["revision"], sourceVoice={
+            "bookId": "source", "characterId": "source-alice", "revision": "source-revision",
+        })
+        all_candidates = reused["identities"][0]["voiceCandidates"]
+        assert all_candidates[:-1] == second["identities"][0]["voiceCandidates"]
+        assert all_candidates[-1]["revision"] == "alice-imported"
+        assert all_candidates[-1]["parentRevision"] == "alice-5"
+        assert all_candidates[-1]["referenceText"] == "Imported reference words."
+        assert accepted_path.read_bytes() == accepted_bytes
+
+        decisions = [{"characterId": "narrator", "voiceRevision": "narrator-1"},
+                     {"characterId": "alice", "voiceRevision": "unavailable"}]
+        assert _accept(client, book_id, "cast", reused["revision"], decisions).status_code == 409
+        decisions[-1]["voiceRevision"] = "alice-1"
+        assert _accept(client, book_id, "cast", reused["revision"], decisions).status_code == 200
+        published = read_artifact(package, "cast")
+        assert published["identities"][0]["acceptedVoiceRevision"] == "alice-1"
+        assert published["identities"][0]["voiceCandidates"] == all_candidates
+        for candidate in all_candidates:
+            assert (package / "voices" / "alice" / f"{candidate['revision']}.wav").is_file()
+        assert accepted_path.read_bytes() == accepted_bytes
 
 
 def test_opt_in_profile_audition_lines_are_stored_and_reused_for_regeneration(tmp_path):
@@ -1745,6 +1878,9 @@ def test_audio_recipe_or_model_refresh_reuses_language_bound_profiles(tmp_path):
         )
         for row in characters:
             revision = f"{recipe['version']}-{row['id']}-{len(audition_batches)}"
+            output = _package / "voices" / row["id"] / f"{revision}.wav"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"RIFF-test")
             row.update(
                 {
                     "voicePreviewRevision": revision,

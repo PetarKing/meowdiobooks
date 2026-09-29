@@ -2,16 +2,21 @@ import { DialogSurface } from "./DialogSurface";
 import { useEffect, useId, useRef, useState, type ComponentPropsWithRef, type ReactNode } from 'react'
 
 export type ButtonProps = ComponentPropsWithRef<"button"> & {
-  variant?: "primary" | "ghost" | "unstyled";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "unstyled";
   compact?: boolean;
+  /** Retains the action's label while preventing duplicate commands. */
+  busy?: boolean;
 };
 
 /** Shared action control. Unstyled keeps specialized tabs, tiles and icon controls intact. */
 export function Button({
   variant = "primary",
   compact = false,
+  busy = false,
   className,
   type = "button",
+  disabled,
+  children,
   ...props
 }: ButtonProps) {
   const classes = [
@@ -21,7 +26,10 @@ export function Button({
   ]
     .filter(Boolean)
     .join(" ");
-  return <button type={type} className={classes || undefined} {...props} />;
+  return <button type={type} className={classes || undefined} {...props} disabled={disabled || busy} aria-busy={busy || props['aria-busy']}>
+    {busy && <span className="action-spinner" aria-hidden="true" />}
+    {children}
+  </button>;
 }
 
 export function InspectorDialog({
@@ -60,8 +68,16 @@ export function InspectorDialog({
   );
 }
 
-export function Panel({ title, eyebrow, children, actions }: { title: string; eyebrow?: string; children: ReactNode; actions?: ReactNode }) {
-  return <section className="panel"><header className="panel-head"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h2>{title}</h2></div>{actions}</header>{children}</section>
+export type PanelProps = ComponentPropsWithRef<'section'> & {
+  title: string;
+  eyebrow?: string;
+  actions?: ReactNode;
+  variant?: 'surface' | 'plain' | 'inset';
+};
+
+/** One content section, with an optional surface when separation earns its place. */
+export function Panel({ title, eyebrow, children, actions, variant = 'surface', className, ...props }: PanelProps) {
+  return <section {...props} className={['panel', `panel-${variant}`, className].filter(Boolean).join(' ')}><header className="panel-head"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h2>{title}</h2></div>{actions}</header>{children}</section>
 }
 
 export function Choice({ selected, title, text, onClick, badge, detail, detailLabel }: { selected?: boolean; title: string; text: string; onClick?: () => void; badge?: string; detail?: string; detailLabel?: string }) {
@@ -112,4 +128,5 @@ export function Choice({ selected, title, text, onClick, badge, detail, detailLa
   </div>
 }
 
-export function Tag({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'good' | 'warn' | 'rose' }) { return <span className={`tag ${tone}`}>{children}</span> }
+export type TagProps = ComponentPropsWithRef<'span'> & { tone?: 'neutral' | 'good' | 'warn' | 'rose' };
+export function Tag({ children, tone = 'neutral', className, ...props }: TagProps) { return <span {...props} className={['tag', tone, className].filter(Boolean).join(' ')}>{children}</span> }

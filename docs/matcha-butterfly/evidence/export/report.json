@@ -1,0 +1,78 @@
+[
+  {
+    "width": 1440,
+    "appearance": "light",
+    "chapters": 20,
+    "rowClick": true,
+    "emptySelectionGate": true,
+    "emptyTitleGate": true,
+    "formats": [
+      "m4b-high",
+      "m4b-compact",
+      "mp3-chapters"
+    ],
+    "customCover": true,
+    "reset": true,
+    "pdfPage": true,
+    "overflow": 0,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "chapters": 20,
+    "rowClick": true,
+    "emptySelectionGate": true,
+    "emptyTitleGate": true,
+    "formats": [
+      "m4b-high",
+      "m4b-compact",
+      "mp3-chapters"
+    ],
+    "customCover": true,
+    "reset": true,
+    "pdfPage": true,
+    "overflow": 0,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "width": 390,
+    "appearance": "light",
+    "chapters": 20,
+    "rowClick": true,
+    "emptySelectionGate": true,
+    "emptyTitleGate": true,
+    "formats": [
+      "m4b-high",
+      "m4b-compact",
+      "mp3-chapters"
+    ],
+    "customCover": true,
+    "reset": true,
+    "pdfPage": true,
+    "overflow": 0,
+    "errors": [],
+    "violations": []
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "chapters": 20,
+    "rowClick": true,
+    "emptySelectionGate": true,
+    "emptyTitleGate": true,
+    "formats": [
+      "m4b-high",
+      "m4b-compact",
+      "mp3-chapters"
+    ],
+    "customCover": true,
+    "reset": true,
+    "pdfPage": true,
+    "overflow": 0,
+    "errors": [],
+    "violations": []
+  }
+]

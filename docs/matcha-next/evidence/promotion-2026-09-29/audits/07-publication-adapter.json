@@ -1,0 +1,43 @@
+{
+  "kind": "actual Cloud PostgresModelStore adapter with recording connection double; not a live PostgreSQL integration",
+  "cases": [
+    {
+      "case": "cancel before commit",
+      "published": [],
+      "events": [
+        "transaction enter",
+        "tenant-scoped SELECT FOR UPDATE",
+        "same-connection job put",
+        "transaction commit",
+        "transaction enter",
+        "tenant-scoped SELECT FOR UPDATE",
+        "transaction rollback"
+      ]
+    },
+    {
+      "case": "commit before cancel",
+      "published": [
+        "candidate"
+      ],
+      "status": "succeeded",
+      "events": [
+        "transaction enter",
+        "tenant-scoped SELECT FOR UPDATE",
+        "same-connection job put",
+        "transaction commit",
+        "transaction enter",
+        "tenant-scoped SELECT FOR UPDATE",
+        "transaction rollback"
+      ]
+    },
+    {
+      "case": "publication callback throws",
+      "status": "running",
+      "events": [
+        "transaction enter",
+        "tenant-scoped SELECT FOR UPDATE",
+        "transaction rollback"
+      ]
+    }
+  ]
+}

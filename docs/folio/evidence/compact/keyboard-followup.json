@@ -1,0 +1,227 @@
+[
+  {
+    "width": 320,
+    "header": {
+      "width": 136,
+      "scroll": 136,
+      "right": 152.15625,
+      "appearanceLeft": 156.546875
+    },
+    "before": "androgynous",
+    "after": "androgynous",
+    "rect": {
+      "left": 17,
+      "right": 154.5,
+      "top": 401.21875,
+      "bottom": 443.21875,
+      "width": 137.5
+    },
+    "tabs": [
+      {
+        "tag": "SELECT",
+        "name": "Age",
+        "inDialog": true,
+        "top": 401.21875,
+        "bottom": 443.21875
+      },
+      {
+        "tag": "SELECT",
+        "name": "Tone",
+        "inDialog": true,
+        "top": 476.21875,
+        "bottom": 518.21875
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pitch",
+        "inDialog": true,
+        "top": 476.21875,
+        "bottom": 518.21875
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pace",
+        "inDialog": true,
+        "top": 551.21875,
+        "bottom": 593.21875
+      },
+      {
+        "tag": "SELECT",
+        "name": "Energy",
+        "inDialog": true,
+        "top": 551.21875,
+        "bottom": 593.21875
+      },
+      {
+        "tag": "INPUT",
+        "name": "",
+        "inDialog": true,
+        "top": 650.21875,
+        "bottom": 692.21875
+      },
+      {
+        "tag": "TEXTAREA",
+        "name": "Performance notes",
+        "inDialog": true,
+        "top": 725.21875,
+        "bottom": 829.21875
+      }
+    ],
+    "focused": {
+      "top": 725.21875,
+      "bottom": 829.21875,
+      "value": "Keyboard audit only"
+    },
+    "closed": 0
+  },
+  {
+    "width": 900,
+    "header": {
+      "width": 50,
+      "scroll": 50,
+      "right": 74,
+      "appearanceLeft": 676.21875
+    },
+    "before": "androgynous",
+    "after": "androgynous",
+    "rect": {
+      "left": 509.859375,
+      "right": 684.921875,
+      "top": 362.765625,
+      "bottom": 404.765625,
+      "width": 175.0625
+    },
+    "tabs": [
+      {
+        "tag": "SELECT",
+        "name": "Age",
+        "inDialog": true,
+        "top": 362.765625,
+        "bottom": 404.765625
+      },
+      {
+        "tag": "SELECT",
+        "name": "Tone",
+        "inDialog": true,
+        "top": 437.765625,
+        "bottom": 479.765625
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pitch",
+        "inDialog": true,
+        "top": 437.765625,
+        "bottom": 479.765625
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pace",
+        "inDialog": true,
+        "top": 512.765625,
+        "bottom": 554.765625
+      },
+      {
+        "tag": "SELECT",
+        "name": "Energy",
+        "inDialog": true,
+        "top": 512.765625,
+        "bottom": 554.765625
+      },
+      {
+        "tag": "INPUT",
+        "name": "",
+        "inDialog": true,
+        "top": 611.765625,
+        "bottom": 653.765625
+      },
+      {
+        "tag": "TEXTAREA",
+        "name": "Performance notes",
+        "inDialog": true,
+        "top": 686.765625,
+        "bottom": 774.765625
+      }
+    ],
+    "focused": {
+      "top": 686.765625,
+      "bottom": 774.765625,
+      "value": "Keyboard audit only"
+    },
+    "closed": 0
+  },
+  {
+    "width": 720,
+    "header": {
+      "width": 41,
+      "scroll": 41,
+      "right": 57,
+      "appearanceLeft": 553.546875
+    },
+    "before": "androgynous",
+    "after": "androgynous",
+    "rect": {
+      "left": 17,
+      "right": 354.5,
+      "top": 400.84375,
+      "bottom": 442.84375,
+      "width": 337.5
+    },
+    "tabs": [
+      {
+        "tag": "SELECT",
+        "name": "Age",
+        "inDialog": true,
+        "top": 400.84375,
+        "bottom": 442.84375
+      },
+      {
+        "tag": "SELECT",
+        "name": "Tone",
+        "inDialog": true,
+        "top": 475.84375,
+        "bottom": 517.84375
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pitch",
+        "inDialog": true,
+        "top": 475.84375,
+        "bottom": 517.84375
+      },
+      {
+        "tag": "SELECT",
+        "name": "Pace",
+        "inDialog": true,
+        "top": 550.84375,
+        "bottom": 592.84375
+      },
+      {
+        "tag": "SELECT",
+        "name": "Energy",
+        "inDialog": true,
+        "top": 550.84375,
+        "bottom": 592.84375
+      },
+      {
+        "tag": "INPUT",
+        "name": "",
+        "inDialog": true,
+        "top": 649.84375,
+        "bottom": 691.84375
+      },
+      {
+        "tag": "TEXTAREA",
+        "name": "Performance notes",
+        "inDialog": true,
+        "top": 724.84375,
+        "bottom": 812.84375
+      }
+    ],
+    "focused": {
+      "top": 724.84375,
+      "bottom": 812.84375,
+      "value": "Keyboard audit only"
+    },
+    "closed": 0
+  }
+]

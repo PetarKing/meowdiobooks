@@ -1,0 +1,100 @@
+{
+  "scope": "Synthetic local Studio preview; semantic dark palette only, no backend or persistence",
+  "generatedAt": "2026-09-28T19:50:10.875Z",
+  "palettes": {
+    "light": {
+      "colors": {
+        "--folio-canvas": "#f1f2e8",
+        "--folio-paper": "#fefff8",
+        "--folio-soft": "#e6ead8",
+        "--folio-ink": "#2d3825",
+        "--folio-muted": "#5e684f",
+        "--folio-action": "#a42f4d",
+        "--folio-success": "#436627",
+        "--folio-warning": "#765516",
+        "--folio-danger": "#ac3039",
+        "--action-ink": "#ffffff",
+        "--gilt-ink": "#625020"
+      },
+      "contrast": {
+        "inkOnCanvas": 10.92,
+        "inkOnPaper": 12.25,
+        "mutedOnPaper": 5.85,
+        "inkOnSoft": 10.05,
+        "actionOnPaper": 6.75,
+        "actionInkOnAction": 6.79,
+        "successOnPaper": 6.59,
+        "warningOnPaper": 6.77,
+        "dangerOnPaper": 6.45,
+        "giltOnPaper": 7.77
+      }
+    },
+    "dark": {
+      "colors": {
+        "--folio-canvas": "#14231f",
+        "--folio-paper": "#26392e",
+        "--folio-soft": "#354d3b",
+        "--folio-ink": "#f8f4e7",
+        "--folio-muted": "#cbd5bb",
+        "--folio-action": "#f38ead",
+        "--folio-success": "#bfd99a",
+        "--folio-warning": "#e7c371",
+        "--folio-danger": "#f6a29c",
+        "--action-ink": "#14231f",
+        "--gilt-ink": "#f9dc95"
+      },
+      "contrast": {
+        "inkOnCanvas": 14.8,
+        "inkOnPaper": 11.18,
+        "mutedOnPaper": 8.07,
+        "inkOnSoft": 8.39,
+        "actionOnPaper": 5.44,
+        "actionInkOnAction": 7.2,
+        "successOnPaper": 7.97,
+        "warningOnPaper": 7.29,
+        "dangerOnPaper": 6.19,
+        "giltOnPaper": 9.2
+      }
+    }
+  },
+  "axe": {
+    "cast": [],
+    "voices": [],
+    "export": []
+  },
+  "preferenceTransitions": [
+    {
+      "preference": "system",
+      "os": "light",
+      "resolved": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)"
+    },
+    {
+      "preference": "system",
+      "os": "dark",
+      "resolved": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(20, 35, 31)"
+    },
+    {
+      "preference": "light",
+      "os": "dark",
+      "resolved": "light",
+      "colorScheme": "light",
+      "background": "rgb(241, 242, 232)"
+    },
+    {
+      "preference": "dark",
+      "os": "light",
+      "resolved": "dark",
+      "colorScheme": "dark",
+      "background": "rgb(20, 35, 31)"
+    }
+  ],
+  "hostOverride": {
+    "action": "#123456",
+    "paper": "rgb(47, 43, 40)",
+    "ink": "rgb(250, 250, 250)"
+  }
+}
