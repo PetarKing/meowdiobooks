@@ -1,0 +1,13 @@
+
+> meowdiobooks-workflow-ui@0.1.37 test
+> vitest run --run src/app/useAppearance.test.tsx src/components/ThemeToggle.test.tsx src/components/PresentationRoot.test.tsx src/components/PhaseHelp.test.tsx src/components/DialogSurface.test.tsx src/components/Ui.test.tsx
+
+
+ RUN  v4.1.11 /Users/petar.nedeljkovic/.codex/worktrees/99d6/Meowdiobooks/frontend
+
+
+ Test Files  6 passed (6)
+      Tests  29 passed (29)
+   Start at  21:48:27
+   Duration  2.74s (transform 1.09s, setup 8.83s, import 415ms, tests 706ms, environment 4.33s)
+

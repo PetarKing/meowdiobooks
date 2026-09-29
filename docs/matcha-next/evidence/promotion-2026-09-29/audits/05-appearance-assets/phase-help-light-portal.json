@@ -1,0 +1,9 @@
+{
+  "appearance": "light",
+  "background": "rgba(0, 0, 0, 0)",
+  "bodyOverflow": "hidden",
+  "color": "rgb(45, 56, 37)",
+  "colorScheme": "light",
+  "focus": "Close phase guide",
+  "isBodyPortal": true
+}

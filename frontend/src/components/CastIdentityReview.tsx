@@ -544,7 +544,7 @@ export function CastIdentityReview({
         key={group.key}
         name={group.name} symbol={suspicious ? "!" : tileSymbol(group)}
         portraitClassName={`portrait-tone-${groups.indexOf(group) % 4}`}
-        detail={t(group.occurrenceCount === 1 ? "{{lines}} line" : "{{lines}} lines", { lines: group.occurrenceCount })}
+        detail={t(group.occurrenceCount === 1 ? "{{count}} line" : "{{count}} lines", { count: group.occurrenceCount })}
         badge={group.needsReview ? <span className="cast-review-badge required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required review")}</span> : group.advisoryReview ? <span className="cast-review-badge advisory">{t("Review suggested")}</span> : undefined}
         cardClassName={`${group.needsReview ? "needs-review" : group.advisoryReview ? "has-suggestions" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[group.primaryLabel] = element; }}

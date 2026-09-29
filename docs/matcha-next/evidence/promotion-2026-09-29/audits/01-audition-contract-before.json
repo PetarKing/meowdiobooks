@@ -1,0 +1,74 @@
+{
+  "head": "9545014c8100f1e286baddc7a935c99145bffa8b",
+  "transport": "uvicorn TCP localhost + httpx2; isolated synthetic package per case",
+  "appSourceSHA256": "4a3a25ad1d512ce590d522f7f70b3fad7b65248f1d1bf6686fcbc3e70c13c79c",
+  "probeSHA256": "d72e386e2c432183edb8535a3243cb3ab921e8e8993af09f8bfbfba9be570ee6",
+  "records": [
+    {
+      "case": "chronological append + old selection + immutable bytes",
+      "job": "succeeded",
+      "choices": [
+        "alice-1",
+        "alice-2",
+        "alice-3",
+        "alice-4"
+      ],
+      "previewHTTP": {
+        "alice-1": 200,
+        "alice-2": 200,
+        "alice-3": 200,
+        "alice-4": 200
+      },
+      "acceptEarlierHTTP": 200
+    },
+    {
+      "case": "running cancel before provider return",
+      "job": "canceled",
+      "cancelHTTP": 200,
+      "newCastJSON": [
+        "8818696d3d6343e8a297adc970024475.json"
+      ],
+      "pendingCast": "8818696d3d6343e8a297adc970024475",
+      "activeCast": "accepted-before",
+      "newPreviewHTTP": 200
+    },
+    {
+      "case": "provider raises after writing WAV",
+      "job": "failed",
+      "castJSONCount": 2,
+      "pendingCast": "editable",
+      "orphanPreviewHTTP": 200
+    },
+    {
+      "case": "adapter returns complete metadata without WAV",
+      "job": "succeeded",
+      "previewHTTP": 404,
+      "acceptHTTP": 200,
+      "acceptedReferenceExists": false
+    },
+    {
+      "case": "running cancel during protocol-compliant import_voice",
+      "job": "canceled",
+      "cancelHTTP": 200,
+      "newCastJSON": [
+        "8f25c48fb7924d8dadd7d74587ee81f7.json"
+      ],
+      "pendingCast": "8f25c48fb7924d8dadd7d74587ee81f7",
+      "newPreviewHTTP": 200
+    },
+    {
+      "case": "clone stale upstream draft",
+      "cloneHTTP": 201,
+      "clonePreviewHTTP": 200,
+      "acceptHTTP": 409,
+      "acceptDetail": "Cast candidate references superseded inputs",
+      "newCastJSONCount": 3
+    },
+    {
+      "case": "clone provider failure cleanup",
+      "cloneHTTP": 422,
+      "voiceFilesUnchanged": true,
+      "castJSONCount": 2
+    }
+  ]
+}

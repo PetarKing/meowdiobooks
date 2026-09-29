@@ -1,0 +1,13 @@
+{
+  "revision": "90d6ff1c95d2f9b13c54aa682d85da36a2aae8e9",
+  "sourceSha256": {
+    "src/meowdiobooks/backend/app_v2.py": "2dc9bc5961f17ef88daaf42fee25a8c458fc94cceda93a432555f01e26861e54",
+    "src/meowdiobooks/backend/documents.py": "1f9cc9d4de1758de9ad6cdb293603445b77ba6c91006f386d75f50186eb21c71",
+    "src/meowdiobooks/backend/dialogue.py": "aca7339861c5e37fc07b1760cf3a37083fd9c830d31eb0be09106622bb7cdfa2",
+    "src/meowdiobooks/backend/dialogue_ai.py": "aa5ee1fbcfd5d397e821c56fbcb40e17337925b4ec8b2f60c945b499eda2b616",
+    "src/meowdiobooks/backend/review.py": "50555db534ba8a4d4114cff6d6059b11f60d5560f2454e8bd642a956b68275af",
+    "src/meowdiobooks/backend/tts_v2.py": "4966778c69db8e42f3717becb05281bf6c62ed7db6f8507dd8b08f5842747e3f",
+    "src/meowdiobooks/backend/m4b.py": "a95f776f4fe91b81c8975269f3f60ec15e375ccc0ead0bc71630792516350ae9",
+    "uv.lock": "37a0a7a20415333b8caaed55a7b5d24ad9360f89bd42a7f47115b0d2184f9b05"
+  }
+}
