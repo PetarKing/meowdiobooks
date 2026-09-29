@@ -1,11 +1,16 @@
 /* Cast is a ledger of identities and performances, not a periodic table. */
 .cast-workbench { display: grid; gap: 18px; }
-.cast-toolbar { align-items: flex-start; margin: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 9px; background: var(--paper); box-shadow: none; gap: 20px; }
+.cast-toolbar { align-items: flex-start; min-height: 0; height: auto; margin: 0; padding: 0 0 20px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; gap: 20px; }
 .cast-toolbar > div:first-child { flex: 1; min-width: 0; }
 .cast-toolbar > div b { font: 600 14px/1.4 var(--font-sans); }
 .cast-toolbar small { display: block; font-size: 12px; line-height: 1.5; margin-top: 6px; color: var(--muted); }
+.cast-toolbar .cast-toolbar-copy { align-self: center; gap: 0; }
+.cast-toolbar .desktop-drag-help { margin-top: 8px; font-size: 11px; }
 .cast-toolbar .cast-required-help { color: var(--danger-ink); }
 .cast-toolbar-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cast-toolbar > .cast-toolbar-actions { flex-direction: row; align-items: center; }
+.cast-toolbar-actions details { width: auto; max-width: 100%; }
+.cast-toolbar summary { width: auto; min-width: 0; min-height: 40px; padding: 10px 12px; border-radius: 6px; white-space: nowrap; }
 .voice-cast-toolbar { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 16px; }
 .voice-cast-toolbar .cast-receipt { display: flex; grid-column: 1/-1; gap: 30px; margin: 0; padding: 14px 0 0; border-top: 1px solid var(--line); }
 .cast-receipt div { display: flex; flex-direction: column-reverse; gap: 4px; }
@@ -105,7 +110,7 @@
 @media (max-width: 1000px) { .voice-cast-board .voice-cast-tile { grid-template-columns: 40px minmax(0,1fr); gap: 4px 14px; padding-right: 114px; }.voice-cast-board .voice-cast-tile > strong { grid-row: 1/3; }.voice-cast-board .voice-cast-tile > small { grid-column: 2; grid-row: 2; }.voice-cast-board .voice-cast-tile.voice-required .cast-tile-required { display: none; }.voice-cast-board .voice-cast-tile.voice-required > small { padding: 0; color: var(--danger-ink); } }
 @media (max-width: 750px) {
  .desktop-drag-help { display: none !important; }
- .cast-toolbar { flex-direction: column; padding: 16px; gap: 14px; }.cast-toolbar-actions { flex-direction: row; width: 100%; }.voice-cast-toolbar { grid-template-columns: 1fr; }.voice-cast-toolbar .primary { justify-self: start; }.voice-cast-toolbar .cast-receipt { grid-column: 1; gap: 18px; }.cast-receipt dt { max-width: 82px; font-size: 9px; }.cast-receipt dd { font-size: 18px; }.cast-receipt div:last-child { display: none; }
+ .cast-toolbar { flex-direction: column; padding: 0 0 16px; gap: 14px; }.cast-toolbar .cast-toolbar-copy { align-self: stretch; }.cast-toolbar-actions { flex-direction: row; width: 100%; }.voice-cast-toolbar { grid-template-columns: 1fr; }.voice-cast-toolbar .primary { justify-self: start; }.voice-cast-toolbar .cast-receipt { grid-column: 1; gap: 18px; }.cast-receipt dt { max-width: 82px; font-size: 9px; }.cast-receipt dd { font-size: 18px; }.cast-receipt div:last-child { display: none; }
  .collection-toolbar { gap: 10px; }.collection-filter { min-width: 130px; width: 130px; }.collection-search { min-width: 145px; }.collection-result { flex-basis: 100%; font-size: 10px; min-height: 30px; }
  .cast-board { grid-template-columns: 1fr; gap: 8px; }.voice-cast-board { gap: 0; }
  .cast-board .cast-tile { min-height: 84px; }.voice-cast-board .voice-cast-tile { min-height: 88px; padding: 15px 94px 15px 14px; grid-template-columns: 34px minmax(0,1fr); column-gap: 12px; }

@@ -399,7 +399,7 @@ describe("CastVoiceReview", () => {
     const stopPreview = screen.getByRole("button", { name: "Stop Many preview" });
     expect(stopPreview).toHaveAttribute("aria-pressed", "true");
     expect(within(stopPreview).queryByText("M")).not.toBeInTheDocument();
-    expect(stopPreview.querySelectorAll(".voice-tile-wave i")).toHaveLength(5);
+    expect(stopPreview.querySelector(".voice-tile-wave")).toBeInTheDocument();
     expect(stopPreview.querySelector(".voice-tile-play-cue")).toBeNull();
     expect(screen.queryByRole("dialog", { name: "Many voice" })).not.toBeInTheDocument();
     const audio = document.querySelector("audio.voice-tile-audio") as HTMLAudioElement;
@@ -435,7 +435,8 @@ describe("CastVoiceReview", () => {
     expect(within(dialog).getByRole("button", { name: "Generate new audition →" })).toBeEnabled();
     expect(within(dialog).getByRole("heading", { name: "Create a new audition" })).toBeInTheDocument();
     expect(within(dialog).getByRole("button", { name: /Back to auditions/ })).toBeInTheDocument();
-    expect(dialog).toHaveTextContent("Your existing auditions stay available.");
+    expect(dialog).toHaveTextContent("Shape a performance for Many.");
+    expect(dialog).not.toHaveTextContent("Your existing auditions stay available.");
     expect(dialog).not.toHaveTextContent("Voice approved");
     fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
     expect(onRegenerate).toHaveBeenCalledWith("many", expect.objectContaining({ pace: "measured" }));

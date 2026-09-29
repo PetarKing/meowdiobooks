@@ -29,7 +29,7 @@ export async function enterScenario(
 
   if (metadata.story.surface === "library") {
     if (metadata.gatewayVariant === "library-refresh-error")
-      await canvas.findByRole("button", { name: t("Library, {{count}} audiobooks", { count: 2 }) });
+      await canvas.findByRole("button", { name: t("Library, {{count}} audiobooks", { count: 2 }), hidden: true });
     await click(prefix("Library"));
     if (metadata.gatewayVariant === "library-error")
       await expect(await canvas.findByRole("alert")).toHaveTextContent(

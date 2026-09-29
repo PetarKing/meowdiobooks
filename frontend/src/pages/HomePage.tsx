@@ -29,7 +29,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
         </label>}
         {file && <p className="import-storage-note">{t("books.importStorageNotice", { ns: "edition" })}</p>}
       </section>
-      <button type="button" className="home-mobile-library" onClick={() => navigateProduct("library")}><span aria-hidden="true">▥</span>{t("Library")}<span aria-hidden="true">↗</span></button>
+      <button type="button" className="home-mobile-library" onClick={() => navigateProduct("library")}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h5v14H4zM10 5h5v14h-5zM17 5l3-.6 2.5 13.6-3 .6z" /></svg>{t("Library")}<span aria-hidden="true">↗</span></button>
     </StudioHero>
     <div className="home-flow">
       {localBooks.length > 0 && <section className="wip-shelf">
@@ -47,7 +47,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
                 </span>
                 <b className={opening ? "book-loading" : undefined}>{opening && <i aria-hidden="true" />} {t(opening ? "Opening…" : "Continue")} {!opening && <span className="recent-book-arrow" aria-hidden="true">↗</span>}</b>
               </button>
-              <button className="recent-book-delete" aria-label={t("Delete {{title}}", { title: row.title })} disabled={Boolean(openingBookId) || Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(row)}>{t("Delete")}</button>
+              <button className="recent-book-delete" aria-label={t("Delete {{title}}", { title: row.title })} title={t("Delete")} disabled={Boolean(openingBookId) || Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(row)}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" /></svg></button>
             </article>;
           })}</div>
         </Panel>

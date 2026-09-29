@@ -31,12 +31,12 @@
 .primary {
   background: var(--color-action, var(--poppy));
   color: var(--action-ink);
-  box-shadow: 0 4px 12px color-mix(in srgb, var(--color-action, var(--poppy)) 18%, transparent);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .16);
 }
 .primary:hover:not(:disabled) {
   background: var(--color-action-hover, var(--poppy-dark));
-  box-shadow: 0 7px 18px color-mix(in srgb, var(--color-action, var(--poppy)) 24%, transparent);
-  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .28), inset 0 -2px 0 rgb(0 0 0 / .08);
+  transform: none;
 }
 .secondary {
   border-color: var(--color-border, var(--line));
@@ -54,7 +54,7 @@
 .ghost:hover:not(:disabled) { background: var(--surface-soft); border-color: var(--color-action, var(--poppy)); box-shadow: none; }
 .danger { background:var(--danger-action); color:var(--danger-action-ink); }
 .danger:hover:not(:disabled) { background:var(--danger-action-hover); }
-:where(.primary, .secondary, .ghost, .danger):active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+:where(.primary, .secondary, .ghost, .danger):active:not(:disabled) { transform: scale(.985); box-shadow: none; }
 .primary:disabled, .secondary:disabled, .ghost:disabled, .danger:disabled { opacity: .52; box-shadow: none; cursor: not-allowed; transform: none; }
 .primary:focus-visible, .secondary:focus-visible, .ghost:focus-visible, .danger:focus-visible { outline: 3px solid var(--color-action, var(--poppy)); outline-offset: 3px; box-shadow: none; }
 .primary.compact, .secondary.compact, .ghost.compact, .danger.compact { min-height: 36px; padding: 8px 13px; font-size: 13px; }
@@ -73,7 +73,7 @@
 .tag.rose { background: var(--lavender); color: var(--color-action-hover, var(--poppy-dark)); }
 
 .choice { min-height: 106px; padding: 20px; gap: 10px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-muted, var(--muted)); background: var(--color-paper, var(--surface-raised)); box-shadow: none; }
-.choice:hover { border-color: var(--color-action, var(--poppy)); transform: translateY(-1px); box-shadow: none; }
+.choice:hover { border-color: var(--color-action, var(--poppy)); transform: none; box-shadow: none; }
 .choice.selected { padding: 19px; border-color: var(--color-action, var(--poppy)); background: var(--surface-soft); box-shadow: none; }
 .choice-title { font-family: var(--font-sans); font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
 .choice-title small { padding: 4px 6px; border-radius: 4px; font: 600 11px var(--font-sans); letter-spacing: .04em; background: var(--color-action, var(--poppy)); }
@@ -81,6 +81,12 @@
 .choice-info-trigger { width: 32px; height: 32px; border: 1px solid var(--color-border, var(--line)); font-size: 12px; font-weight: 600; background: var(--color-paper, var(--surface-raised)); color: var(--color-muted, var(--muted)); box-shadow: none; }
 .choice-tooltip { top: auto; right: 10px; bottom: calc(100% + 8px); left: 10px; padding: 12px 14px; border-color: transparent; border-radius: 10px; background: var(--inverse-surface); color: var(--inverse-ink); font-size: 13px; font-weight: 400; line-height: 1.55; transform: translateY(4px); }
 .choice-tooltip.visible { transform: translateY(0); }
+
+.phase-help-trigger { position: relative; isolation: isolate; width: 44px; height: 44px; margin: -10px 0; border: 0; background: transparent; color: var(--muted); font-size: 14px; font-weight: 600; box-shadow: none; }
+.phase-help-trigger::before { content: ""; position: absolute; z-index: -1; inset: 9px; border: 1px solid var(--line); border-radius: 50%; background: var(--paper); transition: border-color var(--motion-fast), background var(--motion-fast); }
+.phase-help-trigger:hover { transform: none; background: transparent; color: var(--poppy); box-shadow: none; }
+.phase-help-trigger:hover::before { border-color: var(--poppy); background: var(--blush); }
+.phase-help-trigger:focus-visible { outline: 2px solid var(--poppy); outline-offset: 0; }
 
 /* Evidence remains literal; emphasis must never hide the surrounding context. */
 .source-excerpt { font-family: var(--font-display); font-size: 17px; line-height: 1.7; color: var(--color-ink, var(--ink)); }
@@ -110,7 +116,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .choice.selected { padding: 17px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .primary, .secondary, .ghost, .danger, .choice, .choice-tooltip { transition: none; }
+  .primary, .secondary, .ghost, .danger, .choice, .choice-tooltip, .phase-help-trigger, .phase-help-trigger::before { transition: none; }
+  :is(.primary, .secondary, .ghost, .danger):active:not(:disabled) { transform: none; }
   .action-spinner { animation: none; }
 }
 

@@ -136,6 +136,53 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.revealLibraryExport).toHaveBeenCalledWith('export-1'))
   })
 
+  it('distinguishes an initial Library failure from empty and recovers with retry', async () => {
+    const edition = {
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'Alice.m4b',
+      location: '/library/Alice.m4b', chapterCount: 12, partial: false,
+      sizeBytes: 12 * 1024 * 1024, createdAt: '2026-07-13T14:00:00Z',
+    }
+    vi.mocked(wizardApi.listLibrary).mockRejectedValueOnce(new Error('Library could not be loaded. Try again.')).mockResolvedValueOnce([edition])
+    window.history.replaceState({}, "", "/library")
+
+    render(<App />)
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Library could not be loaded. Try again.')
+    expect(screen.queryByRole('heading', { name: 'No audiobooks yet.' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+
+    expect(await screen.findByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(wizardApi.listLibrary).toHaveBeenCalledTimes(2)
+    fireEvent.error(screen.getByAltText('Cover of Alice'))
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Open audiobook' })).toBeEnabled()
+    expect(screen.queryByAltText('Cover of Alice')).not.toBeInTheDocument()
+  })
+
+  it('preserves last good Library editions through a failed refresh and retry', async () => {
+    const editions = [{
+      id: 'export-1', bookId: 'book-1', title: 'Alice', author: 'Lewis Carroll', filename: 'Alice.m4b',
+      location: '/library/Alice.m4b', chapterCount: 12, partial: false,
+      sizeBytes: 12 * 1024 * 1024, createdAt: '2026-07-13T14:00:00Z',
+    }]
+    let finishRetry!: (value: typeof editions) => void
+    vi.mocked(wizardApi.listLibrary).mockResolvedValueOnce(editions).mockRejectedValueOnce(new Error('Library could not be loaded. Try again.')).mockImplementationOnce(() => new Promise((resolve) => { finishRetry = resolve }))
+    render(<App />)
+    await screen.findByRole('button', { name: 'Library, 1 audiobooks' })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: /Library/ }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Library could not be loaded. Try again.')
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
+    expect(screen.queryByRole('status', { name: 'Loading audiobooks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    finishRetry(editions)
+    await waitFor(() => expect(screen.queryByText('Loading…')).not.toBeInTheDocument())
+    expect(wizardApi.listLibrary).toHaveBeenCalledTimes(3)
+  })
+
   it('summarizes a selected chapter edition without dumping a long list', async () => {
     vi.mocked(wizardApi.listLibrary).mockResolvedValue([{
       id: 'export-2', bookId: 'book-1', title: 'Alice: A Shorter Journey', author: 'Lewis Carroll', filename: 'Alice selected.m4b',
@@ -1223,7 +1270,7 @@ describe('v2 wizard', () => {
       conflictResolutions: [{ profileIds: ['inner', 'outer'], winnerProfileId: 'outer' }],
     })
     fireEvent.click(screen.getByRole('button', { name: 'Choose Named quote for all 1 overlap' }))
-    expect(screen.getByText('Selected for all 1 overlap')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose Named quote for all 1 overlap' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getAllByText('Detected speaker')).toHaveLength(2)
     expect(screen.getAllByText('Alice')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Apply choices and continue →' }))
@@ -2939,7 +2986,7 @@ describe('v2 wizard', () => {
     }
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
@@ -3018,12 +3065,33 @@ describe('v2 wizard', () => {
     const confirmation = screen.getByRole('dialog', { name: 'Create a replacement audition?' })
     expect(confirmation).toHaveTextContent('replaces this cast member’s current audition set')
     expect(wizardApi.processStage).not.toHaveBeenCalled()
-    fireEvent.click(within(confirmation).getByRole('button', { name: 'Keep current cast' }))
+    fireEvent.click(within(confirmation).getByRole('button', { name: 'Keep current auditions' }))
     expect(wizardApi.processStage).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create audition →' }))
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
       proposalRevision: 'auditions-ghost', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
+    })))
+  })
+
+  it('creates a first audition directly without warning about replacing nonexistent auditions', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      cast: {
+        revision: 'first-audition', phase: 'audition-review', dossiers: [], proposals: [],
+        narrator: { characterId: 'narrator', name: 'Narrator' }, identities: [],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
+    expect(screen.queryByRole('dialog', { name: 'Create a replacement audition?' })).not.toBeInTheDocument()
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
+      proposalRevision: 'first-audition', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
     })))
   })
 

@@ -1,8 +1,8 @@
 /* Recording is an open score: one chapter, one generous selection target. */
-.generate-hero { gap: 40px; padding: 12px 0 36px; margin-bottom: 28px; border: 0; }
+.generate-hero { grid-template-columns: 1fr; gap: 28px; padding: 6px 0 24px; margin-bottom: 16px; border: 0; }
 .generate-hero-copy h1 { font: 500 clamp(36px, 4vw, 56px)/1.08 var(--font-display); letter-spacing: -.035em; }
 .generate-hero-copy p { max-width: 540px; margin-top: 14px; font-size: 15px; line-height: 1.65; }
-.generate-hero-stats { gap: 28px; }
+.generate-hero-stats { gap: clamp(28px, 4vw, 64px); width: max-content; max-width: 100%; }
 .generate-hero-stats div { padding: 0; border: 0; }
 .generate-hero-stats dt { font-size: 11px; letter-spacing: 0; }
 .generate-hero-stats dd { margin-top: 9px; font: 500 30px/1.2 var(--font-display); white-space: normal; }
@@ -17,7 +17,7 @@
 .chapter-library-controls, .chapter-library-controls button { font-size: 12px; }
 .chapter-library-controls button { min-height: 40px; border: 0; background: transparent; }
 .chapter-card-grid { border: 0; gap: 0; }
-.chapter-card { position: relative; isolation: isolate; grid-template-columns: 22px 40px minmax(0, 1fr) minmax(170px, 220px) 48px; gap: 22px; min-height: 120px; padding: 24px 20px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
+.chapter-card { position: relative; isolation: isolate; grid-template-columns: 22px 40px minmax(0, 1fr) minmax(170px, 220px) 48px; gap: 22px; min-height: 104px; padding: 20px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .chapter-card:hover:not(.unavailable) { background: color-mix(in srgb, var(--matcha-soft) 65%, transparent); }
 .chapter-card.selected, .chapter-card.has-audio.selected, .chapter-card.selected.generated, .chapter-card.selected.stale { background: color-mix(in srgb, var(--blush) 72%, transparent); box-shadow: none; }
 .chapter-card .chapter-row-target { position: absolute; z-index: 1; inset: 0; grid-column: auto; grid-row: auto; width: auto; height: auto; display: block; padding: 0; border: 0; border-radius: 0; cursor: pointer; }
@@ -26,7 +26,7 @@
 .chapter-row-target:has(input:focus-visible) { outline: 2px solid var(--poppy); outline-offset: -2px; }
 .chapter-row-target input:focus-visible { outline: 0; }
 .chapter-track-number { font: 500 23px/1 var(--font-display); color: var(--muted); }
-.chapter-card h3 { margin: 0; font: 500 26px/1.25 var(--font-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.chapter-card h3 { margin: 0; font: 500 24px/1.25 var(--font-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
 .chapter-card-meta { gap: 12px; margin-top: 10px; align-items: center; }
 .chapter-card-meta small, .track-status { font-size: 11px; }
 .chapter-stale-label { padding: 0; background: transparent; font-size: 11px; }

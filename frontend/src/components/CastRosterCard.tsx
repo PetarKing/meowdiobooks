@@ -23,12 +23,12 @@ export function CastRosterCard({
   portraitClassName = "", detailClassName = "", dataSharedVoiceGroup, style, inspectRef, inspectProps, previewProps,
 }: CastRosterCardProps) {
   const portrait = portraitContent ?? <strong aria-hidden="true">{symbol}</strong>;
-  const details = <><span className="cast-roster-name">{name}</span><span className="cast-roster-subline">{detail && <small className="cast-roster-meta">{detail}</small>}{badge && <span className="cast-roster-review">{badge}</span>}</span></>;
+  const details = <><span className="cast-roster-name">{name}</span>{(detail || badge) && <span className="cast-roster-subline">{detail && <small className="cast-roster-meta">{detail}</small>}{badge && <span className="cast-roster-review">{badge}</span>}</span>}</>;
   const curve = <svg className="cast-roster-curve" aria-hidden="true" viewBox="0 0 120 120" preserveAspectRatio="none">
     <path className="cast-roster-field field-horizontal" d="M26 -12 C102 26 111 69 17 134 L220 134 L220 -12 Z" />
     <path className="cast-roster-field field-vertical" d="M-15 10 C10 118 110 118 135 10 L135 -90 L-15 -90 Z" />
-    <path className="curve-horizontal" d="M26 -12 C102 26 111 69 17 134" />
-    <path className="curve-vertical" d="M-15 10 C10 118 110 118 135 10" />
+    <path className="curve-horizontal" vectorEffect="non-scaling-stroke" d="M26 -12 C102 26 111 69 17 134" />
+    <path className="curve-vertical" vectorEffect="non-scaling-stroke" d="M-15 10 C10 118 110 118 135 10" />
   </svg>;
 
   if (!previewProps) {

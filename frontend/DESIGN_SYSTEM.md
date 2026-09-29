@@ -6,12 +6,12 @@ The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Canvas | `#f1f2e8` | `#1d261b` |
-| Paper | `#fefff8` | `#293427` |
-| Copy | `#2d3825` | `#f0f4e6` |
-| Muted copy | `#5e684f` | `#bdc9ad` |
-| Primary action | `#a42f4d` | `#ee9cb4` |
-| Success | `#436627` | `#b4ce8f` |
+| Canvas | `#f1f2e8` | `#14231f` |
+| Paper | `#fefff8` | `#26392e` |
+| Copy | `#2d3825` | `#f8f4e7` |
+| Muted copy | `#5e684f` | `#cbd5bb` |
+| Primary action | `#a42f4d` | `#f38ead` |
+| Success | `#436627` | `#bfd99a` |
 
 The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance and persists locally. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
@@ -21,7 +21,7 @@ Working headings, home titles and bibliographic titles use the offline-safe edit
 
 The existing `src/assets/brand/meowdiobooks-mark.png` remains the application mark. `StudioHero` pairs live HTML copy and import controls with `matcha-kami-sanctuary.webp`: an original illustrated temple precinct, with the same glasses-wearing orange cat reading on its central dais. Sweeping rooflines, moss gardens, cherry lacquer, washi panels and layered architectural detail carry the maximalism. The same art remains visible on phone below the import action. It is decorative and hidden from assistive technology; no functional labels are baked into it.
 
-The artwork is generated with the built-in imagegen tool and encoded as a 539 KB WebP. [The exact prompt](../docs/matcha-sanctuary/ART-PROMPT.md) records provenance. The illustration depicts an imagined sanctuary, without claiming a real shrine or using decorative Japanese text. A second transparent lantern-and-blossom canopy extends the sanctuary into canonical working screens; it is excluded from custom semantic palette roots and stops moving under reduced motion. [Its provenance](../docs/matcha-next/ASSET-PROVENANCE.md) is recorded separately. The illustrations carry the architectural richness. The shell uses open space, botanical/status colors and simple separators. Avoid adding decorative frames around groups that already have their own controls. The old Three.js sculpture is no longer allocated by the home view.
+The artwork is generated with the built-in imagegen tool and encoded as a 539 KB WebP. [The exact prompt](../docs/matcha-sanctuary/ART-PROMPT.md) records provenance. The illustration depicts an imagined sanctuary, without claiming a real shrine or using decorative Japanese text. A second transparent lantern-and-blossom canopy extends the sanctuary into canonical working-screen headings. Layered background gradients fade it before working content without creating a stacking context that traps dialogs; it is excluded from custom semantic palette roots and stops moving under reduced motion. [Its provenance](../docs/matcha-next/ASSET-PROVENANCE.md) is recorded separately. The illustrations carry the architectural richness. The shell uses open space, botanical/status colors and simple separators. Avoid adding decorative frames around groups that already have their own controls. The old Three.js sculpture is no longer allocated by the home view.
 
 Artwork never substitutes for names, acceptance state, source evidence or actual audio. Neutral primitives must not import direction artwork.
 
@@ -30,7 +30,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 - Avatars represent cast identity; they do not replace names, roles, or acceptance state.
 - Color and shape must be deterministic from a stable character identifier, never list position. Initials remain the accessible fallback until durable portrait assets exist.
 - Emotional avatar states may decorate future playback, but must not alter Character or Review decisions.
-- In the current Cast roster, the initials are the preview play/pause button; a small sound motif replaces them only during playback. The separate name button opens the inspector. Selected and required marks remain visible without repeating status or line-count text on every card, and both controls retain accessible names and states.
+- In the current Cast roster, the initials are the preview Play/Stop target; a seven-bar sound motif replaces them only during playback. The small play cue disappears while playing, with no pause icon; clicking the same field stops playback and restores the initials. The separate name button opens the inspector. Selected and required marks remain visible without repeating status or line-count text on every card, and both controls retain accessible names and states.
 - Do not use generated portraits that imply unsupported age, gender, ethnicity, or story facts.
 
 ## Interaction and state
@@ -38,7 +38,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 - Every interactive element needs visible hover, keyboard focus, selected, and disabled treatment. Use one focus indicator per target. Whole-row Generate and Export selections own their indicator; their inner checkbox does not add another ring. Selection retains native checkmarks/radios alongside color.
 - Small confirmations can compose `DialogSurface` with `dialog-backdrop`, `dialog-card` and `dialog-actions` from the public primitive sheet. The card provides padding, bounded width/height and scrolling; full workbench inspectors keep their own geometry. `DialogSurface` itself owns the shared keyboard and scroll-lock lifecycle.
 - Loading preserves context: keep the initiating label, add progress when measurable, and prevent duplicate actions.
-- Empty states explain what unlocks the surface. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
+- Empty states explain what unlocks the surface. Library load failures have their own Retry state and never claim the library is empty; failed refresh retains the last successful editions. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
 - Progress and completion use calm, brief motion. The home sanctuary illustration is static and allocates no animation loop or WebGL context. The decorative canopy shifts by only a few pixels over 18 seconds and stops under reduced motion. Task screens use purposeful hover, selection and transition feedback. Never animate an acceptance state into ambiguity.
 - `prefers-reduced-motion` disables transforms, looping animation, and nonessential transitions. State changes must remain legible without motion.
 
@@ -106,7 +106,8 @@ frontend dependencies and Playwright Chromium; it removes its temporary project 
 - `styles/appearance.css` owns both scoped appearances, semantic defaults and native color schemes.
 - `styles/primitives.css` owns canonical shared controls. Use `Button`, `Panel`, `Choice`, `Tag`, `TabList`, `DialogSurface` and `SourceExcerpt` instead of inventing parallel variants.
 - `styles/pages.css` owns workflow geometry and compositions. `StepIntro`, `WorkflowLaunch` and `WorkflowEmpty` are production components with their own stories. Large cast collections share `CollectionToolbar`.
-- `styles/cast-workbench.css` preserves shared Cast geometry; `styles/cast-stage.css` owns the canonical character-select roster, audition cards, Ghost source switch and Cast confirmation styling. An audition card applies its exact revision immediately in draft UI; accepting the Cast stage remains a separate explicit workflow action.
+- `styles/cast-roster.css` owns the shared Cast/Voices card: curved tinted monogram field, status spine and consistent phone text alignment. `styles/roster-motion.css` owns its curve drawing, accent sheen and staggered playback cadence.
+- `styles/cast-workbench.css` preserves shared Cast geometry; `styles/cast-stage.css` owns the canonical character-select roster, audition cards, New voice source switch and Cast confirmation styling. An audition card applies its exact revision immediately in draft UI; accepting the Cast stage remains a separate explicit workflow action.
 - `styles/generate-stage.css` owns the selectable chapter score and generation footer. `styles/export-stage.css` owns the cover proof, book details, contents, format choices and creation receipt.
 - `styles/studio.css` owns the shell, entrance art and local-books shelf. `styles/review-extract-stage.css` owns the complete source-page preview and Review scan scene. `styles/atmosphere.css` owns decorative stage art; it checks the custom-palette marker on `PresentationRoot`. Keep this direction out of shared primitive source.
 - Update the owning canonical sheet; do not append ad hoc overrides to `product.css`. Some baseline declarations remain for legacy import compatibility; this is an explicit transition boundary, not a claim that all old CSS has been eliminated.

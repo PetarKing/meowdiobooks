@@ -505,7 +505,14 @@ export function CastIdentityReview({
 
   return <div ref={workbenchRef} className="cast-workbench">
     <div className="cast-toolbar">
-      <div><b>{remaining ? t(remaining === 1 ? "1 source label needs confirmation" : "{{count}} source labels need confirmation", { count: remaining }) : t("Cast structure is ready")}</b><small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small><p className="cast-review-key" aria-label={t("Cast review status")}><span className="required">{t("{{count}} required · blocks continue", { count: remaining })}</span><span className="advisory">{t("{{count}} suggested · optional", { count: advisoryCount })}</span></p><small className="desktop-drag-help">{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small></div>
+      <div className="cast-toolbar-copy">
+        <p className="cast-review-key" aria-label={t("Cast review status")}>
+          {remaining > 0 ? <><span className="visually-hidden">{t(remaining === 1 ? "1 source label needs confirmation" : "{{count}} source labels need confirmation", { count: remaining })}</span><span className="required">{t("{{count}} required · blocks continue", { count: remaining })}</span></> : <span className="ready">{t("Cast structure is ready")}</span>}
+          {advisoryCount > 0 && <span className="advisory">{t("{{count}} suggested · optional", { count: advisoryCount })}</span>}
+        </p>
+        <small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>
+        <small className="desktop-drag-help">{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small>
+      </div>
       <div className="cast-toolbar-actions">
         {remaining > 0 && <button type="button" className="primary compact" onClick={() => { const next = groups.find(group => group.needsReview); if (next) openInspector(next.primaryLabel); }}>{t("Review required identities")} →</button>}
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}

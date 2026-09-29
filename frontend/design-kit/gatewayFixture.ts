@@ -46,6 +46,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   ] : [fixtureBook];
   const canceledJobs = new Set<string>();
   let castCandidate: CastArtifact | undefined;
+  let auditionSequence = 0;
   const exports = [
     "library-populated",
     "library-missing-cover",
@@ -97,14 +98,16 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
             reusedFromRevision: undefined,
           };
         } else {
+          const draft = structuredClone(castCandidate ?? snapshot.cast!);
           const voice = [
-            snapshot.cast?.narrator,
-            ...(snapshot.cast?.identities ?? []),
+            draft.narrator,
+            ...(draft.identities ?? []),
           ].find((row) => row?.characterId === voiceSettings.characterId);
           if (voice) {
-            const revision = `${voice.characterId}-preview-${(voice.voiceCandidates?.length ?? 0) + 1}`;
+            const revision = `${voice.characterId}-new-audition-${++auditionSequence}`;
+            // Match production regeneration: replace this voice's auditions,
+            // while keeping the accepted snapshot and other cast voices intact.
             voice.voiceCandidates = [
-              ...(voice.voiceCandidates ?? []),
               {
                 revision,
                 previewUrl: silentWav,
@@ -117,11 +120,13 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
               },
             ];
             voice.voicePreviewRevision = revision;
+            voice.voiceAccepted = false;
+            voice.acceptedVoiceRevision = undefined;
             voice.voiceSettings =
               voiceSettings.voiceSettings ?? voice.voiceSettings;
           }
           castCandidate = {
-            ...structuredClone(snapshot.cast!),
+            ...draft,
             revision: "cast-fixture-draft",
             phase: "audition-review",
           };

@@ -9,8 +9,12 @@
 .voice-inspector-creating .voice-inspector-body > .voice-audition-settings { padding: 22px 28px 28px; }
 .voice-inspector-creating .voice-create-intro { max-width: none; margin: 0 0 18px; font-size: 13px; }
 .voice-inspector-creating .voice-source-choices { margin-bottom: 20px; gap: 10px; }
-.voice-inspector-creating .voice-source-choices button { min-height: 62px; padding: 10px 14px; border-radius: 7px; }
-.voice-inspector-creating .voice-source-choices button.selected { padding: 10px 14px; box-shadow: none; border: 2px solid var(--poppy); }
+.voice-inspector-creating .voice-source-choices button { position: relative; min-height: 62px; padding: 10px 14px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; transition: background-color 180ms ease; }
+.voice-inspector-creating .voice-source-choices button::after { content: ""; position: absolute; right: 0; bottom: -1px; left: 0; height: 3px; background: var(--poppy); transform: scaleX(0); transform-origin: left; transition: transform 240ms cubic-bezier(.2,.8,.2,1); }
+.voice-inspector-creating .voice-source-choices button.selected { padding: 10px 14px; border: 0; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--sakura) 14%, transparent); box-shadow: none; }
+.voice-inspector-creating .voice-source-choices button.selected::after { transform: scaleX(1); }
+.voice-inspector-creating .voice-source-choices button:hover { background: color-mix(in srgb, var(--sakura) 9%, transparent); }
+.voice-inspector-creating .voice-source-choices button:focus-visible { outline: 2px solid var(--poppy); outline-offset: 3px; }
 .voice-inspector-creating .voice-source-choices button > span { width: 27px; height: 27px; }
 .voice-inspector-creating .voice-source-choices b { font-size: 13px; }
 .voice-inspector-creating .voice-source-choices small { font-size: 11px; }
@@ -33,11 +37,11 @@
   .voice-inspector-creating .cast-inspector-head h2 { font-size: 25px; }
   .voice-inspector-creating .cast-inspector-actions { display: contents; }
   .voice-inspector-creating .voice-create-back { grid-column: 1 / -1; grid-row: 2; justify-self: start; min-height: 32px; }
-  .voice-inspector-creating .cast-inspector-close { grid-column: 2; grid-row: 1; }
+  .voice-inspector-creating .cast-inspector-close { grid-column: 2; grid-row: 1; align-self: start; justify-self: end; }
   .voice-inspector-creating .voice-inspector-body > .voice-audition-settings { padding: 18px 18px 28px; }
   .voice-inspector-creating .voice-source-choices { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .voice-inspector-creating .voice-source-choices button { grid-template-columns: 1fr; align-content: start; min-height: 84px; gap: 4px; padding: 11px; }
-  .voice-inspector-creating .voice-source-choices button.selected { padding: 10px; }
+  .voice-inspector-creating .voice-source-choices button.selected { padding: 11px; }
   .voice-inspector-creating .voice-source-choices button > span,
   .voice-inspector-creating .voice-source-choices b,
   .voice-inspector-creating .voice-source-choices small { grid-column: 1; grid-row: auto; }
@@ -46,4 +50,9 @@
   .voice-inspector-creating .voice-trait-column:last-child { grid-column: auto; }
   .voice-inspector-creating .voice-trait-column:last-child .voice-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .voice-inspector-creating .regenerate-voice-action { width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .voice-inspector-creating .voice-source-choices button,
+  .voice-inspector-creating .voice-source-choices button::after { transition: none; }
 }

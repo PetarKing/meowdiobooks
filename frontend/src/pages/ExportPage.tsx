@@ -68,9 +68,9 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
         <section className="edition-details" aria-labelledby="edition-details-title">
           <header><div><span className="eyebrow">{t("Book details")}</span><h2 id="edition-details-title" className="visually-hidden">{t("Book details")}</h2></div><button type="button" className="edition-reset" aria-label={t("Reset book details")} title={t("Reset book details")} onClick={() => { setExportTitle(book?.title ?? ""); setExportAuthor(book?.author ?? ""); setExportDescription(t(DEFAULT_EXPORT_DESCRIPTION)); setExportCover(undefined); setExportCoverPage(1); }}><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 11a8 8 0 1 1-2.4-5.7" /><path d="M20 4v5h-5" /></svg></button></header>
           <div className="edition-editable-identity">
-            <label className="edition-field edition-title-field"><span>{t("Title")}</span><textarea aria-label={t("Title")} value={exportTitle} rows={2} maxLength={500} onChange={(event) => setExportTitle(event.target.value)} /></label>
-            <label className="edition-field edition-author-field">{t("Author")}<input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
-            <label className="edition-field edition-description-field">{t("Description")}<textarea aria-label={t("Description")} value={exportDescription} maxLength={2000} rows={2} onChange={(event) => setExportDescription(event.target.value)} /></label>
+            <label className="edition-field edition-title-field"><EditionFieldLabel>{t("Title")}</EditionFieldLabel><textarea aria-label={t("Title")} value={exportTitle} rows={2} maxLength={500} onChange={(event) => setExportTitle(event.target.value)} /></label>
+            <label className="edition-field edition-author-field"><EditionFieldLabel>{t("Author")}</EditionFieldLabel><input value={exportAuthor} maxLength={500} onChange={(event) => setExportAuthor(event.target.value)} /></label>
+            <label className="edition-field edition-description-field"><EditionFieldLabel>{t("Description")}</EditionFieldLabel><textarea aria-label={t("Description")} value={exportDescription} maxLength={2000} rows={2} onChange={(event) => setExportDescription(event.target.value)} /></label>
           </div>
           <div className="edition-proof-facts"><span>{t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) })}</span><span>{exportChoices.find((choice) => choice.preset === exportPreset)?.title}</span></div>
         </section>
@@ -127,6 +127,10 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
       </div>
     </>}
   </div>;
+}
+
+function EditionFieldLabel({ children }: { children: string }) {
+  return <span className="edition-field-label">{children}<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="m15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15v5Z" /></svg></span>;
 }
 
 function ExportRelease({ ariaLabel, eyebrow, title, summary, action, compactAction, progress, exporting, disabled, onCreate }: {

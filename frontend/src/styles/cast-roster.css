@@ -63,7 +63,7 @@
 }
 .cast-board .cast-roster-identity .cast-roster-portrait strong,
 .voice-cast-board .cast-roster-card .cast-roster-portrait.voice-tile-portrait strong {
-  color: inherit; font: 500 clamp(35px,3.5vw,46px)/1 var(--font-display); letter-spacing: -.095em;
+  color: inherit; font: 500 clamp(35px,3.5vw,46px)/1 var(--font-display); letter-spacing: -.065em;
 }
 .voice-cast-board .voice-cast-tile.cast-roster-copy { gap: 7px; }
 .voice-cast-board .voice-tile-portrait:focus-visible,
@@ -88,11 +88,12 @@
 .cast-board .cast-roster-identity.dragging { opacity: .55; }
 
 /* The same status colors explain the cards and the review toolbar. */
-.cast-review-key { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 10px 0 3px; color: var(--muted); font: 650 11px/1.3 var(--font-sans); }
+.cast-review-key { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 0 0 3px; color: var(--muted); font: 650 12px/1.4 var(--font-sans); }
 .cast-review-key span { display: inline-flex; align-items: center; gap: 7px; }
 .cast-review-key span::before { content: ""; width: 8px; height: 8px; flex: 0 0 auto; border-radius: 50%; background: currentColor; }
 .cast-review-key .required { color: var(--danger-ink); }
 .cast-review-key .advisory { color: var(--gilt-ink); }
+.cast-review-key .ready { color: var(--green); }
 .cast-review-explanation { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0; padding: 12px 28px; border-bottom: 1px solid var(--line); background: var(--surface-soft); color: var(--ink); font: 450 12px/1.5 var(--font-sans); }
 .cast-review-explanation strong { font-weight: 750; white-space: nowrap; }
 .cast-review-explanation.required { border-left: 4px solid var(--danger-ink); background: color-mix(in srgb, var(--danger-soft) 40%, var(--paper)); }
@@ -116,7 +117,7 @@
   .cast-board .cast-roster-curve .field-vertical,
   .cast-board .cast-roster-curve .curve-vertical { display: block; }
   .cast-board .cast-roster-copy,
-  .voice-cast-board .voice-cast-tile.cast-roster-copy { grid-column: 1; grid-row: 2; align-self: end; }
+  .voice-cast-board .voice-cast-tile.cast-roster-copy { grid-column: 1; grid-row: 2; align-self: start; }
   .cast-board .cast-roster-identity .cast-roster-portrait,
   .voice-cast-board .cast-roster-card .cast-roster-portrait.voice-tile-portrait {
     grid-column: 1; grid-row: 1; width: 100%; height: 87px; align-self: start;

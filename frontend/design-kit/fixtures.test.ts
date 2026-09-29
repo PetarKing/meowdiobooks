@@ -5,6 +5,24 @@ import { strongConfirmationLabelsForCast } from '../src/castIdentity';
 import { decisionsForCast } from '../src/workflow/cast';
 
 describe('synthetic review gateway', () => {
+  it('replaces only the regenerated audition set without mutating the accepted snapshot', async () => {
+    const gateway = createFixtureGateway('cast-accepted');
+    const accepted = await gateway.getBookSnapshot('kit-book');
+    const characterId = accepted.cast!.identities![0].characterId;
+    const settings = { characterId, proposalRevision: accepted.cast!.revision };
+    const first = await gateway.processStage('kit-book', 'cast', settings);
+    const draft = await gateway.getStageCandidate('kit-book', 'cast', first.result!.revision!);
+    const voice = draft.identities!.find(row => row.characterId === characterId)!;
+    expect(voice.voiceCandidates).toHaveLength(1);
+    expect(voice.voicePreviewRevision).not.toBe(accepted.cast!.identities![0].voicePreviewRevision);
+    expect(voice.voiceAccepted).toBe(false);
+    expect(draft.narrator).toEqual(accepted.cast!.narrator);
+    expect((await gateway.getBookSnapshot('kit-book')).cast).toEqual(accepted.cast);
+    const second = await gateway.processStage('kit-book', 'cast', settings);
+    const next = await gateway.getStageCandidate('kit-book', 'cast', second.result!.revision!);
+    expect(next.identities![0].voiceCandidates).toHaveLength(1);
+    expect(next.identities![0].voicePreviewRevision).not.toBe(voice.voicePreviewRevision);
+  });
   it('keeps mutations in one fixture instance and exports synthetic metadata only', async () => {
     const first = createFixtureGateway('generate');
     const other = createFixtureGateway('generate');

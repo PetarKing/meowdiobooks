@@ -523,7 +523,7 @@ export function CastVoiceReview({
           detailClassName={`${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-pending voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
           dataSharedVoiceGroup={sharedGroupId}
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
-          portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /></span> : undefined}
+          portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span> : undefined}
           portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true">▶</span> : undefined}
           badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b><small>{t(required ? "Blocks continue" : "Can continue")}</small></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
@@ -587,8 +587,8 @@ export function CastVoiceReview({
           </section>}
 
           {inspectedRoute.kind === "dedicated" && auditionMode === "auditions" && <section className="voice-candidates-section">
-            <div className="cast-section-heading"><div><small>{t("Choose an audition")}</small><h3>{t("Voice auditions")}</h3></div><span>{inspectedCandidates.length}</span></div>
-            {inspectedCandidates.length > 0 && <blockquote>{inspected.referenceText || t("No audition text is available.")}</blockquote>}
+            <div className="cast-section-heading"><h3>{t("Voice auditions")}</h3><span>{inspectedCandidates.length}</span></div>
+            {inspectedCandidates.length > 0 && (inspected.referenceText ? <blockquote>{inspected.referenceText}</blockquote> : <p className="cast-muted voice-no-script">{t("No audition text is available.")}</p>)}
             <p className="voice-candidates-help">{t(inspectedCandidates.length > 0 ? "Listen, then choose a voice. Your choice applies immediately and can be changed." : "No auditions yet. Create one to hear this cast member.")}</p>
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
               const applied = candidate.revision === approvedRevision;
@@ -597,14 +597,14 @@ export function CastVoiceReview({
                 <div className="voice-candidate-actions">
                   <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={applied} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
                     <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
-                    {applied && <strong className="candidate-applied-badge">{t("✓ Applied")}</strong>}
+                    {applied && <strong className="candidate-applied-badge"><span aria-hidden="true">✓</span><span className="visually-hidden">{t("✓ Applied")}</span></strong>}
                   </button>
                 </div>
                 {candidate.previewUrl
                   ? <button type="button" ref={candidate.revision === newAuditionRevision ? newAuditionPlayRef : undefined} className={`voice-candidate-play ${playingCandidate ? "playing" : ""}`} aria-label={t("{{action}} Audition {{number}}", { action: t(playingCandidate ? "Stop" : "Play"), number })} aria-pressed={playingCandidate} onClick={() => toggleCandidatePreview(candidate)}>
                     <span className="voice-candidate-play-icon" aria-hidden="true">{playingCandidate ? "■" : "▶"}</span>
                     <span>{t(playingCandidate ? "Stop audition" : "Play audition")}</span>
-                    <span className="voice-candidate-play-wave" aria-hidden="true"><i /><i /><i /><i /></span>
+                    <span className="voice-candidate-play-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
                   </button>
                   : <small className="cast-muted">{t("No playable audio.")}</small>}
               </article>;
@@ -618,7 +618,7 @@ export function CastVoiceReview({
           </section>}
 
           {inspectedRoute.kind === "dedicated" && settings && auditionMode === "create" && <section className="voice-settings-section voice-audition-settings">
-            <p className="voice-create-intro">{t("Shape a performance for {{name}}. Your existing auditions stay available.", { name: inspected.name })}</p>
+            <p className="voice-create-intro">{t("Shape a performance for {{name}}.", { name: inspected.name })}</p>
             {onUpload && <div className="voice-source-choices" role="radiogroup" aria-label={t("Audition source")}>
               <button type="button" role="radio" aria-checked={auditionSource === "designed"} className={auditionSource === "designed" ? "selected" : ""} onClick={() => setAuditionSource("designed")}><span aria-hidden="true">✦</span><b>{t("Design a voice")}</b><small>{t("Shape its character and delivery.")}</small></button>
               <button type="button" role="radio" aria-checked={auditionSource === "sample"} className={auditionSource === "sample" ? "selected" : ""} onClick={() => setAuditionSource("sample")}><span aria-hidden="true">♫</span><b>{t("Clone from a sample")}</b><small>{t("Use one speaker as the reference.")}</small></button>

@@ -130,7 +130,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
   </div>, document.body) : null;
 
   return <>
-    <button ref={triggerRef} type="button" className="phase-help-trigger" aria-label={t("About {{phase}}", { phase: t(guide.label) })} aria-haspopup="dialog" onClick={() => setOpen(true)}>(?)</button>
+    <button ref={triggerRef} type="button" className="phase-help-trigger" aria-label={t("About {{phase}}", { phase: t(guide.label) })} aria-haspopup="dialog" onClick={() => setOpen(true)}>?</button>
     {dialog}
   </>;
 }

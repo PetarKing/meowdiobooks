@@ -1,3 +1,4 @@
+import { useState } from "react";
 import sanctuary from "../assets/brand/matcha-kami-sanctuary.webp";
 import { libraryCoverImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
@@ -6,26 +7,36 @@ import {
   formatLibraryChapters,
   formatLibraryDate,
   formatLibraryExport,
-  monogram
+  localizeErrorMessage
 } from "../workflow/presentation";
 import { WorkflowEmpty } from "../components/WorkflowPage";
 import { LibrarySkeleton } from "./LibrarySkeleton";
 
-export type LibraryPageModel = Pick<WorkflowModel, "gateway" | "libraryExports" | "libraryReady" | "navigateProduct" | "openLibraryItem" | "renderLibraryActions" | "revealLibraryItem" | "t" | "uiLocale">;
+export type LibraryPageModel = Pick<WorkflowModel, "gateway" | "libraryError" | "libraryExports" | "libraryLoading" | "libraryReady" | "navigateProduct" | "openLibraryItem" | "refreshLibrary" | "renderLibraryActions" | "revealLibraryItem" | "t" | "uiLocale">;
+
+function LibraryCover({ src, alt }: { src: string; alt: string }) {
+  const [unavailable, setUnavailable] = useState(false);
+  return <div className="library-cover" data-unavailable={unavailable || undefined}>
+    <svg className="library-cover-fallback" viewBox="0 0 80 80" fill="none" aria-hidden="true"><circle cx="40" cy="40" r="31" /><path d="M24 46V36a16 16 0 0 1 32 0v10M24 38h5v15h-5zM51 38h5v15h-5zM36 36v16M40 31v26M44 37v14" /></svg>
+    {!unavailable && <img src={src} alt={alt} loading="lazy" onError={() => setUnavailable(true)} />}
+  </div>;
+}
 
 export function LibraryPage({ model }: { model: LibraryPageModel; }) {
-  const { gateway, libraryExports, libraryReady, navigateProduct, openLibraryItem, renderLibraryActions, revealLibraryItem, t, uiLocale } = model;
-  return <section className="library-page">
+  const { gateway, libraryError, libraryExports, libraryLoading, libraryReady, navigateProduct, openLibraryItem, refreshLibrary, renderLibraryActions, revealLibraryItem, t, uiLocale } = model;
+  const loadingFirstEditions = !libraryReady || (libraryLoading && !libraryExports.length);
+  return <section className="library-page" aria-busy={libraryLoading}>
     <header className="library-head">
       <div className="library-head-copy"><span className="eyebrow">{t("Finished editions")}</span><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
 
-      {(!libraryReady || libraryExports.length > 0) && <span className="library-count">{!libraryReady ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>}
+      {(loadingFirstEditions || libraryExports.length > 0) && <span className="library-count" aria-live="polite">{libraryLoading ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>}
     </header>
-    {!libraryReady ? <LibrarySkeleton model={{ t }} /> : libraryExports.length ? <div className="library-grid">{libraryExports.map((item) => <article key={item.id} className="library-book">
-      <div className="library-cover"><span>{monogram(item.title)}</span><img src={libraryCoverImageUrl(gateway, item.id)} alt={t("Cover of {{title}}", { title: item.title })} loading="lazy" onError={(event) => { event.currentTarget.hidden = true; }} /></div>
+    {libraryError && <div className={`library-load-error ${libraryExports.length ? "has-editions" : ""}`} role="alert"><span className="library-error-symbol" aria-hidden="true">↻</span><p>{localizeErrorMessage(libraryError, t)}</p><button className="ghost" disabled={libraryLoading} onClick={() => void refreshLibrary()}>{t("Try again")} <span aria-hidden="true">↗</span></button></div>}
+    {loadingFirstEditions ? <LibrarySkeleton model={{ t }} /> : libraryExports.length ? <div className="library-grid">{libraryExports.map((item) => <article key={item.id} className="library-book">
+      <LibraryCover key={libraryCoverImageUrl(gateway, item.id)} src={libraryCoverImageUrl(gateway, item.id)} alt={t("Cover of {{title}}", { title: item.title })} />
       <div className="library-book-copy"><span className="library-format">{formatLibraryExport(item, t)}</span><h2>{item.title}</h2><p>{item.author}</p><div className="library-chapters"><b>{formatLibraryChapters(item, t)}</b></div><div className="library-meta"><span>{formatFileSize(item.sizeBytes)}</span><span>{formatLibraryDate(item.createdAt, uiLocale)}</span></div></div>
       <div className="library-actions">{renderLibraryActions ? renderLibraryActions(item) : <><button className="primary" onClick={() => void openLibraryItem(item.id)}>{t("library.openAction", { ns: "edition" })}</button><button className="ghost" onClick={() => void revealLibraryItem(item.id)}>{t("library.revealAction", { ns: "edition" })}</button></>}</div>
-    </article>)}</div> : <div className="library-empty-composition"><WorkflowEmpty className="library-empty" symbol="♪" title={t("No audiobooks yet.")} copy={t("Create an audiobook in Export and it will appear here automatically.")}><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></WorkflowEmpty><div className="library-empty-art" aria-hidden="true"><img src={sanctuary} alt="" /></div></div>}
+    </article>)}</div> : !libraryError && <div className="library-empty-composition"><WorkflowEmpty className="library-empty" symbol="♪" title={t("No audiobooks yet.")} copy={t("Create an audiobook in Export and it will appear here automatically.")}><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></WorkflowEmpty><div className="library-empty-art" aria-hidden="true"><img src={sanctuary} alt="" /></div></div>}
   </section>;
 
 }

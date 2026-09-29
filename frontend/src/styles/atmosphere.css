@@ -1,22 +1,17 @@
-/* Decorative, lower-contrast foliage carries the sanctuary into working stages.
-   This layer has no hit target, meaning or effect on workflow state. */
+/* The canvas gradient fades the sanctuary vignette before working content.
+   Background layers do not create a stacking context or cover modal controls. */
 .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
-  background-image: url("../assets/brand/sanctuary-canopy.webp");
-  background-size: clamp(390px, 48vw, 670px) auto;
-  background-position: right -4px top -10px;
+  background-image: linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 32%, transparent), var(--canvas) 225px), url("../assets/brand/sanctuary-canopy.webp");
+  background-size: 100% 100%, clamp(330px, 40vw, 580px) auto;
+  background-position: 0 0, right 0 top 0;
   background-repeat: no-repeat;
   animation: sanctuary-canopy-sway 18s ease-in-out infinite alternate;
 }
-@keyframes sanctuary-canopy-sway {
-  to { background-position: right 4px top 0; }
-}
+@keyframes sanctuary-canopy-sway { to { background-position: 0 0, right 3px top 2px; } }
 @media (max-width: 750px) {
   .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
-    background-size: 390px auto;
-    background-position: right -95px top -28px;
-  }
-  @keyframes sanctuary-canopy-sway {
-    to { background-position: right -85px top -20px; }
+    background-image: linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 66%, transparent), var(--canvas) 145px), url("../assets/brand/sanctuary-canopy.webp");
+    background-size: 100% 100%, min(270px, 100%) auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {

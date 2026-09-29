@@ -41,14 +41,14 @@
 .cast-board:not(.voice-cast-board) .cast-roster-identity:active { background: var(--matcha-soft); }
 .voice-cast-board .voice-tile-portrait:active { background: var(--matcha-soft); }
 @keyframes roster-curve-draw { from { stroke-dashoffset: 400; opacity: .35; } to { stroke-dashoffset: 0; opacity: 1; } }
-@keyframes roster-curve-audio { 0%, 100% { stroke-width: 1.4; opacity: .45; } 50% { stroke-width: 2.6; opacity: .9; } }
+@keyframes roster-curve-audio { 0%, 100% { stroke-width: 1.2; opacity: .5; } 50% { stroke-width: 1.8; opacity: .85; } }
 @keyframes roster-field-tide {
   0%, 100% { fill: color-mix(in srgb, var(--roster-accent) 24%, var(--paper)); }
-  50% { fill: color-mix(in srgb, var(--roster-accent) 34%, var(--paper)); }
+  50% { fill: color-mix(in srgb, var(--roster-accent) 29%, var(--paper)); }
 }
 @keyframes voice-ink-bloom {
-  0%, 100% { opacity: .3; transform: scale(.74); }
-  50% { opacity: .82; transform: scale(1.12); }
+  0%, 100% { opacity: .2; transform: scale(.8); }
+  50% { opacity: .48; transform: scale(1.05); }
 }
 .voice-cast-board .voice-tile-portrait::before {
   content: "";
@@ -63,8 +63,24 @@
 }
 .voice-cast-board .voice-tile-portrait:has(.voice-tile-wave)::before { animation: voice-ink-bloom 1900ms ease-in-out infinite; }
 .voice-cast-board .voice-tile-portrait:has(.voice-tile-wave) { color: var(--poppy); }
-.voice-cast-board .voice-tile-portrait .voice-tile-wave { position: relative; z-index: 1; height: 36px; gap: 4px; }
-.voice-cast-board .voice-tile-portrait .voice-tile-wave i { width: 3px; height: 28px; }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave { position: relative; z-index: 1; height: 38px; gap: 3px; animation: voice-wave-reveal 220ms ease both; }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+.voice-candidate-play-wave i { width: 3px; height: var(--wave-height,20px); animation: none; transform-origin: center; }
+.voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+.voice-candidate-play.playing .voice-candidate-play-wave i { animation: voice-wave-cadence var(--wave-duration,1120ms) ease-in-out var(--wave-delay,-190ms) infinite; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(1) { --wave-height: 10px; --wave-duration: 1160ms; --wave-delay: -320ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(2) { --wave-height: 22px; --wave-duration: 970ms; --wave-delay: -600ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(3) { --wave-height: 30px; --wave-duration: 1340ms; --wave-delay: -180ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(4) { --wave-height: 36px; --wave-duration: 1080ms; --wave-delay: -470ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(5) { --wave-height: 24px; --wave-duration: 1210ms; --wave-delay: -840ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(6) { --wave-height: 18px; --wave-duration: 890ms; --wave-delay: -230ms; }
+:is(.voice-tile-wave, .voice-candidate-play-wave) i:nth-child(7) { --wave-height: 8px; --wave-duration: 1120ms; --wave-delay: -720ms; }
+.voice-candidate-play-wave { height: 30px; gap: 2px; }
+.voice-candidate-play-wave i:nth-child(n) { width: 2px; height: calc(var(--wave-height,20px) * .6); }
+@keyframes voice-wave-cadence { 0%,100% { transform: scaleY(.42); } 25% { transform: scaleY(.8); } 55% { transform: scaleY(1); } 78% { transform: scaleY(.56); } }
+@keyframes voice-wave-reveal { from { opacity: 0; filter: blur(2px); } to { opacity: 1; filter: blur(0); } }
+.voice-new-audition-icon { transition: transform 360ms cubic-bezier(.2,.8,.2,1), color 220ms ease, background-color 220ms ease; }
+.voice-new-audition:is(:hover,:focus-visible) .voice-new-audition-icon { transform: rotate(90deg); color: var(--action-ink); background: var(--poppy); }
 
 @media (hover: hover) and (pointer: fine) {
   .cast-board .cast-roster-card:hover::after { opacity: 1; transform: translateX(0); }
@@ -108,6 +124,10 @@
   .voice-cast-board .cast-roster-field,
   .voice-cast-board .voice-tile-portrait::before,
   .cast-board .cast-roster-identity,
+  .voice-cast-board .voice-tile-portrait .voice-tile-wave,
+  .voice-cast-board .voice-tile-portrait .voice-tile-wave i,
+  .voice-candidate-play-wave i,
+  .voice-new-audition-icon,
   .recent-books article,
   .recent-books .recent-book-arrow {
     animation: none !important;
