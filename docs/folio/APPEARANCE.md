@@ -1,22 +1,27 @@
-# Folio appearance contract
+# Studio appearance contract
 
-Folio has two complete visual appearances: warm paper with graphite copy and vermilion actions,
-and charcoal with ivory copy and peach actions. Both retain separate teal success, amber attention
-and red destructive/error states. Appearance changes presentation only.
+The canonical Studio has two complete visual appearances: pale matcha paper with botanical copy
+and cherry actions, and deep teal with ivory copy and pink actions. Both retain separate success,
+attention and destructive/error states. The current colors live in
+[`frontend/src/styles/appearance.css`](../../frontend/src/styles/appearance.css).
+Appearance changes presentation only.
 
 ## Preference and host control
 
-The default `App` header exposes an accessible native **Light / Dark / System** select. System follows
-`prefers-color-scheme` and updates when the operating-system preference changes. User choices persist
-under `meowdiobooks.appearance` in browser local storage. Malformed or unavailable storage falls back
-to System; blocked writes still allow changing the current UI. This preference is not part of book,
-workflow, accepted artifacts or backend state.
+The default `App` header exposes one icon button named **Toggle dark mode**, with `aria-pressed`
+reflecting the resolved appearance. With no saved preference, System follows `prefers-color-scheme`
+and updates when the operating-system preference changes. Clicking the button chooses the opposite
+explicit Light or Dark appearance and persists it under `meowdiobooks.appearance` in browser local
+storage. The default header does not expose a separate System option. Malformed or unavailable
+storage falls back to System; blocked writes still allow changing the current UI. This preference
+is not part of book, workflow, accepted artifacts or backend state.
 
 Hosts can supply `appearance?: 'light' | 'dark' | 'system'` and
-`onAppearanceChange?: (appearance) => void`. A supplied appearance is authoritative, and selecting
-another option invokes the callback without changing or persisting the controlled value. The host
-may expose its own control when using a custom header. Deterministic previews explicitly choose
-Light or Dark rather than relying on OS or stored preferences.
+`onAppearanceChange?: (appearance) => void`. A supplied appearance is authoritative. Clicking the
+default toggle invokes the callback with the opposite resolved Light or Dark value without changing
+or persisting the controlled value. The public host contract still supports System; a host may
+expose its own control, including a System choice, when using a custom header. Deterministic previews
+explicitly choose Light or Dark rather than relying on OS or stored preferences.
 
 ## Scoped CSS and portals
 
@@ -33,8 +38,8 @@ provides defaults; it does not rewrite palette values. Hosts retain ordinary CSS
 The public legacy `styles.css` imports the same appearance defaults, while the canonical `product.css`
 imports the complete product compositions. Existing edition translations retain their 31-key contract.
 
-The default primary foreground is `--action-ink`: ivory on the light vermilion action and graphite on
-the dark peach action. A host supplying another action palette may set that ordinary CSS token to its
+The default primary foreground is `--action-ink`: white on the light cherry action and deep teal on
+the dark pink action. A host supplying another action palette may set that ordinary CSS token to its
 own matching foreground. Destructive actions use separate `--danger-action` and
 `--danger-action-ink` tokens. Source highlights explicitly set both foreground and background;
 HTML's default black `<mark>` foreground must not leak into Dark.
@@ -43,7 +48,8 @@ HTML's default black `<mark>` foreground must not leak into Dark.
 
 - `src/app/useAppearance.test.tsx` verifies restored and invalid preferences, blocked storage,
   controlled host settings, system updates and listener cleanup.
-- `src/components/ThemeToggle.test.tsx` verifies the accessible native three-option choice.
+- `src/components/ThemeToggle.test.tsx` verifies the accessible single icon, pressed state and
+  explicit Light/Dark toggle behavior.
 - `src/components/PresentationRoot.test.tsx` verifies sibling isolation, supplied palette preservation
   and the existing nesting prohibition.
 - `src/components/PhaseHelp.test.tsx` verifies portal appearance and custom-token propagation without
@@ -67,6 +73,13 @@ Component and product Storybook frames support `?appearance=light` and `?appeara
 repeatable desktop and phone review. `scripts/review-design.mjs` receives appearance as its sixth
 command argument after preview URL, output directory, story filter and locale.
 
-## Live preference transition follow-up
+## Historical live preference transition evidence
 
-The isolated [System appearance check](evidence/system-appearance/report.json) exercised eight transitions against `2aeeac9`: System followed live emulated light/dark OS preferences; explicit Light and Dark stayed explicit; Dark persisted after reload; returning to System resumed following the OS preference. The verifier waits for settled background and text colors as well as the appearance attribute and native color scheme. No actual OS setting, user tab preference, provider or production API was changed. Reproduce with `node frontend/scripts/verify-system-appearance.mjs`.
+The isolated [System appearance check](evidence/system-appearance/report.json) exercised eight
+transitions against historical Folio revision `2aeeac9`: System followed live emulated light/dark OS
+preferences; explicit Light and Dark stayed explicit; Dark persisted after reload; returning to
+System resumed following the OS preference. That evidence used the former three-option control and
+does not demonstrate a System option in the current header. The current hook's System and controlled
+host behavior are covered by `src/app/useAppearance.test.tsx`. The historical verifier waits for
+settled colors, appearance and native color scheme, and changes no actual OS setting, provider or
+production API.

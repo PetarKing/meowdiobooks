@@ -49,7 +49,17 @@ try {
           await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode().catch(() => {}))); });
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           await page.addScriptTag({ path: path.join(root, 'node_modules/axe-core/axe.min.js') });
-          const violations = await page.evaluate(async () => (await window.axe.run('#storybook-root')).violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })) })));
+          const violations = await page.evaluate(async () => {
+            // Storybook also audits the story. Wait for that run rather than racing it.
+            for (let attempt = 0; attempt < 12; attempt++) {
+              try {
+                return (await window.axe.run('#storybook-root')).violations.map(({ id, nodes }) => ({ id, nodes: nodes.map(({ target, failureSummary }) => ({ target, failureSummary })) }));
+              } catch (error) {
+                if (!String(error).includes('Axe is already running') || attempt === 11) throw error;
+                await new Promise(resolve => setTimeout(resolve, 250));
+              }
+            }
+          });
           result = { ...result, overflow, violations, passed: errors.length === 0 && overflow <= 1 && violations.length === 0 };
         } catch (error) { errors.push(error.message); }
         await page.screenshot({ path: path.join(out, `${id}-${viewport.width}-${appearance}.png`), fullPage: true, animations: 'disabled' });
