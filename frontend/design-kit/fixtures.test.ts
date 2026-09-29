@@ -5,7 +5,7 @@ import { strongConfirmationLabelsForCast } from '../src/castIdentity';
 import { decisionsForCast } from '../src/workflow/cast';
 
 describe('synthetic review gateway', () => {
-  it('replaces only the regenerated audition set without mutating the accepted snapshot', async () => {
+  it('appends auditions chronologically without mutating earlier candidates or the accepted snapshot', async () => {
     const gateway = createFixtureGateway('cast-accepted');
     const accepted = await gateway.getBookSnapshot('kit-book');
     const characterId = accepted.cast!.identities![0].characterId;
@@ -13,14 +13,18 @@ describe('synthetic review gateway', () => {
     const first = await gateway.processStage('kit-book', 'cast', settings);
     const draft = await gateway.getStageCandidate('kit-book', 'cast', first.result!.revision!);
     const voice = draft.identities!.find(row => row.characterId === characterId)!;
-    expect(voice.voiceCandidates).toHaveLength(1);
+    const earlier = accepted.cast!.identities![0].voiceCandidates!;
+    expect(earlier).toHaveLength(3);
+    expect(voice.voiceCandidates).toHaveLength(earlier.length + 1);
+    expect(voice.voiceCandidates!.slice(0, earlier.length)).toEqual(earlier);
     expect(voice.voicePreviewRevision).not.toBe(accepted.cast!.identities![0].voicePreviewRevision);
     expect(voice.voiceAccepted).toBe(false);
     expect(draft.narrator).toEqual(accepted.cast!.narrator);
     expect((await gateway.getBookSnapshot('kit-book')).cast).toEqual(accepted.cast);
     const second = await gateway.processStage('kit-book', 'cast', settings);
     const next = await gateway.getStageCandidate('kit-book', 'cast', second.result!.revision!);
-    expect(next.identities![0].voiceCandidates).toHaveLength(1);
+    expect(next.identities![0].voiceCandidates).toHaveLength(earlier.length + 2);
+    expect(next.identities![0].voiceCandidates!.slice(0, -1)).toEqual(voice.voiceCandidates);
     expect(next.identities![0].voicePreviewRevision).not.toBe(voice.voicePreviewRevision);
   });
   it('keeps mutations in one fixture instance and exports synthetic metadata only', async () => {

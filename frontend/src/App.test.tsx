@@ -611,6 +611,92 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Synthesis interrupted; saved tracks are unchanged.')
   })
 
+  it.each(['immediate', 'polled'] as const)('selects the newly generated tracks and carries that selection to Export after %s completion', async (completion) => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      chapters: [...base.chapters,
+        { id: 'chapter-2', title: 'The Pool of Tears', startPage: 13, endPage: 24 },
+        { id: 'chapter-3', title: 'A Caucus-Race', startPage: 25, endPage: 36 },
+      ],
+    }
+    await open(snapshot)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' }))
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: [
+      ...snapshot.generatedChapters,
+      { chapterId: 'chapter-2', revision: 'new-audio-2', audioUrl: '/new-2.wav', audioSeconds: 60, current: true, staleReasons: [] },
+    ] })
+    const finished: Job = { id: 'generate-selection', kind: 'v2:generate', status: 'succeeded', result: { chapters: [{ chapterId: 'chapter-2', revision: 'new-audio-2' }] } }
+    vi.mocked(wizardApi.processStage).mockResolvedValue(completion === 'immediate' ? finished : { ...finished, status: 'running', progress: 20 })
+    vi.mocked(wizardApi.getJob).mockResolvedValue(finished)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 2' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeInTheDocument()
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    expect(within(action).getByRole('button', { name: 'Continue to Export →' })).toHaveClass('primary')
+    fireEvent.click(within(action).getByRole('button', { name: 'Continue to Export →' }))
+
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Chapter 02, 1 min' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-2', revision: 'new-audio-2' }], expect.anything()))
+  })
+
+  it('keeps a regenerated current track selected for Export with its new revision', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regenerate-current', kind: 'v2:generate', status: 'succeeded' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, generatedChapters: [{ ...base.generatedChapters[0], revision: 'audio-replacement' }] })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-1', revision: 'audio-replacement' }], expect.anything()))
+  })
+
+  it.each(['failed', 'canceled'] as const)('preserves saved tracks and selects only unfinished requests for retry after a partially %s job', async (status) => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      chapters: [...base.chapters,
+        { id: 'chapter-2', title: 'The Pool of Tears' },
+        { id: 'chapter-3', title: 'A Caucus-Race' },
+      ],
+    }
+    await open(snapshot)
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-partial', kind: 'v2:generate', status, error: 'Stopped after saving Chapter 2.' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: [
+      ...snapshot.generatedChapters,
+      { chapterId: 'chapter-2', revision: 'saved-audio-2', audioUrl: '/saved-2.wav', current: true, staleReasons: [] },
+    ] })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 2 selected →' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled())
+    expect(screen.getByRole('tab', { name: 'All 3' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).toBeChecked()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Listen to The Pool of Tears' })).toBeEnabled()
+    expect(screen.getByRole('alert')).toHaveTextContent('Stopped after saving Chapter 2.')
+  })
+
+  it('keeps an unchanged current recording selected for retry if regeneration fails', async () => {
+    await open()
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regeneration-failed', status: 'failed', error: 'Previous recording is still available.' })
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+    await screen.findByRole('alert')
+    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked())
+    expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+  })
+
   it('blocks navigation behind a full-screen chapter generation dialog', async () => {
     await open()
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
@@ -3062,13 +3148,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Narrator voice' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create a new audition' }))
     fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
-    const confirmation = screen.getByRole('dialog', { name: 'Create a replacement audition?' })
-    expect(confirmation).toHaveTextContent('replaces this cast member’s current audition set')
-    expect(wizardApi.processStage).not.toHaveBeenCalled()
-    fireEvent.click(within(confirmation).getByRole('button', { name: 'Keep current auditions' }))
-    expect(wizardApi.processStage).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Generate new audition →' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Create audition →' }))
+    expect(screen.queryByRole('dialog', { name: 'Create a replacement audition?' })).not.toBeInTheDocument()
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({
       proposalRevision: 'auditions-ghost', characterId: 'narrator', voiceSettings: expect.objectContaining({ tone: 'warm' }),
     })))
@@ -3364,6 +3444,25 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
     expect(screen.getByText('Step 5 · Generate')).toBeInTheDocument()
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it.each(['result', 'payload'] as const)('restores a successful generation selection from its %s after refresh', async (context) => {
+    localStorage.setItem('meowdiobooks.activeJob', 'saved-generation')
+    vi.mocked(wizardApi.getJob).mockResolvedValue({
+      id: 'saved-generation', kind: 'v2:generate', status: 'succeeded',
+      payload: { book_id: 'book-1', ...(context === 'payload' ? { settings: { chapterIds: ['chapter-1'] } } : {}) },
+      result: context === 'result' ? { bookId: 'book-1', chapters: [{ chapterId: 'chapter-1', revision: 'audio-1' }] } : {},
+    })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
+    render(<App />)
+
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true'))
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 

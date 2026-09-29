@@ -459,7 +459,7 @@ describe("CastVoiceReview", () => {
     expect(dialog).not.toHaveTextContent("Create a new audition →");
   });
 
-  it("returns to the newest playable audition after generating a replacement", async () => {
+  it("returns to the new playable audition and keeps candidates in chronological order", async () => {
     const props = { bookId: "book-1", selections: {}, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
     const view = render(<CastVoiceReview {...props} cast={cast} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
@@ -472,6 +472,11 @@ describe("CastVoiceReview", () => {
     const play = await within(dialog).findByRole("button", { name: "Play Audition 4" });
     expect(play).toHaveFocus();
     expect(within(dialog).getByRole("button", { name: "Apply Audition 4" })).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("button", { name: /^Apply Audition/ }).map((button) => button.getAttribute("aria-label"))).toEqual([
+      "Apply Audition 1", "Apply Audition 2", "Apply Audition 3", "Apply Audition 4",
+    ]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Apply Audition 1" }));
+    expect(props.onApprove).toHaveBeenCalledWith("many", "many-1");
   });
 
   it("applies any preserved candidate on click and keeps the inspector open for comparison", () => {

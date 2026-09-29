@@ -6,12 +6,12 @@ The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Canvas | `#f1f2e8` | `#14231f` |
-| Paper | `#fefff8` | `#26392e` |
-| Copy | `#2d3825` | `#f8f4e7` |
-| Muted copy | `#5e684f` | `#cbd5bb` |
-| Primary action | `#a42f4d` | `#f38ead` |
-| Success | `#436627` | `#bfd99a` |
+| Canvas | `#f1f2e8` | `#15262a` |
+| Paper | `#fefff8` | `#253c3d` |
+| Copy | `#2d3825` | `#faf3e6` |
+| Muted copy | `#5e684f` | `#ccd7d0` |
+| Primary action | `#a42f4d` | `#f49bb6` |
+| Success | `#436627` | `#b6dcac` |
 
 The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance and persists locally. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
@@ -30,7 +30,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 - Avatars represent cast identity; they do not replace names, roles, or acceptance state.
 - Color and shape must be deterministic from a stable character identifier, never list position. Initials remain the accessible fallback until durable portrait assets exist.
 - Emotional avatar states may decorate future playback, but must not alter Character or Review decisions.
-- In the current Cast roster, the initials are the preview Play/Stop target; a seven-bar sound motif replaces them only during playback. The small play cue disappears while playing, with no pause icon; clicking the same field stops playback and restores the initials. The separate name button opens the inspector. Selected and required marks remain visible without repeating status or line-count text on every card, and both controls retain accessible names and states.
+- In the current Cast roster, the initials are the preview Play/Stop target; a seven-bar sound motif replaces them only during playback. The small play cue disappears while playing, with no pause icon; clicking the same field stops playback and restores the initials. The rest of the complete card surface opens the inspector, including its padding. Selected and required marks remain visible without repeating status or line-count text on every card, and both controls retain accessible names and states.
 - Do not use generated portraits that imply unsupported age, gender, ethnicity, or story facts.
 
 ## Interaction and state

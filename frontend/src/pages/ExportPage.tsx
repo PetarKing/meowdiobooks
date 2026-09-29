@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from "react";
 import type {
   AudioExportPreset
 } from "../api/contracts";
 import { sourcePageImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
 import { WorkflowEmpty } from "../components/WorkflowPage";
+import { useFloatingActionDock } from "../components/useFloatingActionDock";
 import { PdfCoverPageInput, StepEyebrow } from "../pages/shared";
 import {
   chapterDuration
@@ -137,33 +137,7 @@ function ExportRelease({ ariaLabel, eyebrow, title, summary, action, compactActi
   ariaLabel: string; eyebrow: string; title: string; summary: string; action: string; compactAction: string; progress: string;
   exporting: boolean; disabled: boolean; onCreate: () => void;
 }) {
-  const anchorRef = useRef<HTMLSpanElement>(null);
-  const [floating, setFloating] = useState(false);
-
-  useEffect(() => {
-    const anchor = anchorRef.current;
-    const output = anchor?.parentElement;
-    if (!anchor || !output) return;
-    let frame = 0;
-    const update = () => {
-      if (frame) return;
-      frame = window.requestAnimationFrame(() => {
-        frame = 0;
-        const viewportBottom = window.innerHeight - 12;
-        const outputTop = output.getBoundingClientRect().top;
-        const naturalTop = anchor.getBoundingClientRect().top;
-        setFloating(outputTop < viewportBottom - 64 && naturalTop > viewportBottom - 100);
-      });
-    };
-    update();
-    window.addEventListener("scroll", update, { passive: true });
-    window.addEventListener("resize", update);
-    return () => {
-      window.removeEventListener("scroll", update);
-      window.removeEventListener("resize", update);
-      window.cancelAnimationFrame(frame);
-    };
-  }, []);
+  const { anchorRef, floating } = useFloatingActionDock();
 
   return <>
     <span ref={anchorRef} className="edition-release-anchor" aria-hidden="true" />

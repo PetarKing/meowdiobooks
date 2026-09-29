@@ -41,7 +41,6 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   const [confirmation, setConfirmation] = useState<
     | { kind: "replacement" }
     | { kind: "reclassify" }
-    | { kind: "regenerate"; characterId: string; voiceSettings: VoiceSettings }
   >();
 
   function beginCastReplacement() {
@@ -110,20 +109,17 @@ export function CastPage({ model }: { model: CastPageModel; }) {
   const confirmationDialog = confirmation && <div className="process-overlay">
     <DialogSurface as="div" className="process-modal cast-confirmation-modal" aria-labelledby="cast-confirmation-title" onDismiss={() => setConfirmation(undefined)}>
       <span className="eyebrow">{t("Cast decision")}</span>
-      <h2 id="cast-confirmation-title">{t(confirmation.kind === "replacement" ? "Change the cast?" : confirmation.kind === "reclassify" ? "Reclassify source labels?" : "Create a replacement audition?")}</h2>
+      <h2 id="cast-confirmation-title">{t(confirmation.kind === "replacement" ? "Change the cast?" : "Reclassify source labels?")}</h2>
       <p>{t(confirmation.kind === "replacement"
         ? "Changing the cast or voices creates a replacement. After you accept it, the previous voices can no longer generate new audio. Existing generated audio and Library exports stay available. Continue?"
-        : confirmation.kind === "reclassify"
-          ? "Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Once you accept the replacement, only its voices can generate new audio."
-          : "Regenerating replaces this cast member’s current audition set. Existing generated audio and Library exports stay available. Continue?")}</p>
+        : "Reclassify source labels from the accepted Dialogue? Current draft cast edits will be replaced. Once you accept the replacement, only its voices can generate new audio.")}</p>
       <div className="cast-default-actions">
-        <button type="button" className="ghost" onClick={() => setConfirmation(undefined)}>{t(confirmation.kind === "regenerate" ? "Keep current auditions" : "Keep current cast")}</button>
+        <button type="button" className="ghost" onClick={() => setConfirmation(undefined)}>{t("Keep current cast")}</button>
         <button type="button" className="primary" onClick={() => {
           setConfirmation(undefined);
           if (confirmation.kind === "replacement") confirmCastReplacement();
-          else if (confirmation.kind === "reclassify") confirmReclassifyCast();
-          else confirmRegenerate(confirmation.characterId, confirmation.voiceSettings);
-        }}>{t(confirmation.kind === "replacement" ? "Change cast" : confirmation.kind === "reclassify" ? "Reclassify labels" : "Create audition")} →</button>
+          else confirmReclassifyCast();
+        }}>{t(confirmation.kind === "replacement" ? "Change cast" : "Reclassify labels")} →</button>
       </div>
     </DialogSurface>
   </div>;
@@ -276,16 +272,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           setVoiceSelections((selected) => { const next = { ...selected }; delete next[characterId]; return next; });
         }).catch((reason) => setError(message(reason))).finally(() => setRegeneratingCharacterId(undefined));
       }}
-      onRegenerate={(characterId, voiceSettings) => {
-        const voice = voiceById[characterId];
-        // Only replacements discard an audition set. A first audition has
-        // nothing to replace, so the creation action starts it immediately.
-        if (voice?.voiceCandidates?.length || voice?.voicePreviewRevision) {
-          setConfirmation({ kind: "regenerate", characterId, voiceSettings });
-        } else {
-          confirmRegenerate(characterId, voiceSettings);
-        }
-      }}
+      onRegenerate={confirmRegenerate}
     />
     <div className="phase-action cast-voice-final-action">
       <span>{unavailableVoices.length > 0

@@ -22,7 +22,7 @@
 .collection-search { flex: 1; min-width: 160px; }.collection-filter { min-width: 180px; }
 .collection-search, .collection-filter { display: grid; gap: 7px; }
 .collection-toolbar label > span { font-size: 11px; font-weight: 550; color: var(--muted); }
-.collection-toolbar input, .collection-toolbar select { width: 100%; min-height: 40px; padding: 9px 12px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background: var(--paper); font-size: 13px; }
+.collection-toolbar input, .collection-toolbar select { width: 100%; min-height: 40px; padding-block: 9px; padding-inline-start: 12px; border: 1px solid var(--line-strong); border-radius: 7px; color: var(--ink); background-color: var(--paper); font-size: 13px; }
 .collection-result { display: flex; align-items: center; gap: 12px; min-height: 40px; font-size: 11px; color: var(--muted); }
 .collection-empty { display: grid; justify-items: start; gap: 10px; padding: 28px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); }
 .cast-board { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
@@ -92,7 +92,7 @@
 .voice-trait-columns { grid-template-columns: 1fr; gap: 14px; }
 .voice-trait-column, .voice-trait-column:first-child, .voice-trait-column:last-child { padding: 0; border: 0; }
 .voice-trait-column h4 { display: none; }.voice-trait-column .voice-fields { gap: 12px; }
-.voice-settings-section label { font-size: 11px; font-weight: 550; text-transform: none; }.voice-fields input, .voice-fields select, .voice-fields textarea { background: var(--paper); border-color: var(--line-strong); font-size: 13px; }
+.voice-settings-section label { font-size: 11px; font-weight: 550; text-transform: none; }.voice-fields input, .voice-fields select, .voice-fields textarea { background-color: var(--paper); border-color: var(--line-strong); font-size: 13px; }
 .voice-direction-group .voice-fields { grid-template-columns: 1fr; }
 .voice-regenerate-footer { flex-direction: column; align-items: stretch; gap: 14px; }.voice-regenerate-footer small { font-size: 11px; }.regenerate-voice-action { min-width: 0; }
 .voice-source-choices button, .voice-route-choices button { padding: 14px; border-radius: 7px; }

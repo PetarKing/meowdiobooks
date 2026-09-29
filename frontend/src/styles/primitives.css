@@ -72,10 +72,10 @@
 .tag.warn { background: var(--warning-soft); color: var(--warning-ink); }
 .tag.rose { background: var(--lavender); color: var(--color-action-hover, var(--poppy-dark)); }
 
-.choice { min-height: 106px; padding: 20px; gap: 10px; border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-muted, var(--muted)); background: var(--color-paper, var(--surface-raised)); box-shadow: none; }
+.choice { min-height: 106px; padding: 19px; gap: 10px; border: 2px solid var(--color-border, var(--line)); border-radius: 12px; font-size: 13px; line-height: 1.5; color: var(--color-muted, var(--muted)); background: var(--color-paper, var(--surface-raised)); box-shadow: none; }
 .choice:hover { border-color: var(--color-action, var(--poppy)); transform: none; box-shadow: none; }
 .choice.selected { padding: 19px; border-color: var(--color-action, var(--poppy)); background: var(--surface-soft); box-shadow: none; }
-.choice-title { font-family: var(--font-sans); font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
+.choice-title { min-height: 25px; flex-wrap: wrap; font-family: var(--font-sans); font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
 .choice-title small { padding: 4px 6px; border-radius: 4px; font: 600 11px var(--font-sans); letter-spacing: .04em; background: var(--color-action, var(--poppy)); }
 .choice-info { top: 10px; right: 10px; }
 .choice-info-trigger { width: 32px; height: 32px; border: 1px solid var(--color-border, var(--line)); font-size: 12px; font-weight: 600; background: var(--color-paper, var(--surface-raised)); color: var(--color-muted, var(--muted)); box-shadow: none; }
@@ -105,6 +105,13 @@
 .narration-language-menu .language-flags button:hover, .narration-language-menu .language-flags button:focus-visible { background: var(--surface-soft); }
 :where(audio) { width: 100%; min-width: 0; border-radius: 10px; }
 button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 3px; box-shadow: none; }
+/* Native select behavior, with a predictable inset chevron and text clearance. */
+select:not([multiple]) {
+  appearance: none; padding-inline-end: 38px;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-muted, var(--muted)) 50%), linear-gradient(135deg, var(--color-muted, var(--muted)) 50%, transparent 50%);
+  background-position: right 21px center, right 15px center;
+  background-size: 6px 6px; background-repeat: no-repeat;
+}
 
 @media (max-width: 600px) {
   .panel { padding: 24px 20px; border-radius: 4px; }
@@ -113,7 +120,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .panel-head h2 { font-size: 23px; }
   .primary.compact, .secondary.compact, .ghost.compact, .danger.compact { min-height: 44px; }
   .choice { min-height: 100px; padding: 18px; }
-  .choice.selected { padding: 17px; }
+  .choice, .choice.selected { padding: 17px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .primary, .secondary, .ghost, .danger, .choice, .choice-tooltip, .phase-help-trigger, .phase-help-trigger::before { transition: none; }

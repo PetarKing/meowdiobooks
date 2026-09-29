@@ -3,6 +3,8 @@ import { DialogSurface } from "../components/DialogSurface";
 import { TabList } from "../components/TabList";
 import { WorkflowEmpty } from "../components/WorkflowPage";
 import { ChapterAudioPlayer } from "../components/ChapterAudioPlayer";
+import { useFloatingActionDock } from "../components/useFloatingActionDock";
+import type { ReactNode } from "react";
 import { StepEyebrow } from "../pages/shared";
 import {
   averageGenerationMultiplier,
@@ -12,10 +14,10 @@ import {
   targetChapterPartSeconds
 } from "../workflow/generation";
 
-export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "error" | "chapterFilter" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "setStage" | "snapshot" | "splitChapterId" | "splitLongChapter" | "stageIndex" | "t">;
+export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "error" | "chapterFilter" | "continueToExport" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "snapshot" | "splitChapterId" | "splitLongChapter" | "t">;
 
 export function GeneratePage({ model }: { model: GeneratePageModel; }) {
-  const { busy, error, chapterFilter, generateChapters, generationEstimatePolicy, generationSamples, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, setStage, snapshot, splitChapterId, splitLongChapter, stageIndex, t } = model;
+  const { busy, error, chapterFilter, continueToExport, generateChapters, generationEstimatePolicy, generationSamples, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, snapshot, splitChapterId, splitLongChapter, t } = model;
   if (!snapshot?.recordingScript) return null;
   const generated = snapshot?.generatedChapters ?? [];
   const chapters = snapshot?.chapters ?? [];
@@ -24,6 +26,8 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
   const generatedByChapter = new Map(generated.map((row) => [row.chapterId, row]));
   const availableChapters = chapters.filter((chapter) => !unavailableChapters.has(chapter.id));
   const currentGenerated = generated.filter((row) => row.current);
+  const exportSelected = chapterFilter === "generated" && selectedChapters.length > 0
+    && selectedChapters.every((id) => generatedByChapter.get(id)?.current);
   const historicalMultiplier = averageGenerationMultiplier(generationSamples);
   const remainingAudioSeconds = availableChapters
     .filter((chapter) => !generatedByChapter.get(chapter.id)?.current)
@@ -120,16 +124,16 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
         </article>;
       })}</div>
       {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
-      {(availableChapters.length > 0 || currentGenerated.length > 0) && <section className="generation-selection" aria-label={t("Generation action")}>
+      {(availableChapters.length > 0 || currentGenerated.length > 0) && <GenerationActionDock ariaLabel={t("Generation action")}>
         {error && <p className="generation-error"><b>{t("Generation needs attention")}</b><span>{t(error, { defaultValue: error })}</span></p>}
         <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
-        {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div><div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
+        {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div>{!exportSelected && <div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div>}</dl>}
         <div className="generation-selection-actions">
           {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">↯</span><span>{t("Split this into shorter chapters?")}</span></button>}
-          {selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" onClick={() => setStage(stageIndex("export"))}>{t("Continue to Export")}</button>}
-          <button className="primary" disabled={busy || (!selectedChapters.length && !currentGenerated.length)} onClick={() => selectedChapters.length ? void generateChapters(selectedChapters) : setStage(stageIndex("export"))}>{busy ? t("Generating…") : selectedChapters.length ? `${t("Generate {{count}} selected", { count: selectedChapters.length })} →` : currentGenerated.length ? `${t("Continue to Export")} →` : t("Select chapters above")}</button>
+          {selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" disabled={busy} onClick={() => exportSelected ? void generateChapters(selectedChapters) : continueToExport()}>{exportSelected ? t("Generate {{count}} selected", { count: selectedChapters.length }) : t("Continue to Export")}</button>}
+          <button className="primary" disabled={busy || (!selectedChapters.length && !currentGenerated.length)} onClick={() => exportSelected ? continueToExport(selectedChapters) : selectedChapters.length ? void generateChapters(selectedChapters) : continueToExport()}>{busy ? t("Generating…") : exportSelected ? `${t("Continue to Export")} →` : selectedChapters.length ? `${t("Generate {{count}} selected", { count: selectedChapters.length })} →` : currentGenerated.length ? `${t("Continue to Export")} →` : t("Select chapters above")}</button>
         </div>
-      </section>}
+      </GenerationActionDock>}
     </section>
 
     {splitChapter && <div className="chapter-player-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !busy) setSplitChapterId(undefined); }}>
@@ -153,4 +157,12 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
     </div>}
   </>;
 
+}
+
+function GenerationActionDock({ ariaLabel, children }: { ariaLabel: string; children: ReactNode }) {
+  const { anchorRef, floating } = useFloatingActionDock();
+  return <>
+    <span ref={anchorRef} className="generation-selection-anchor" aria-hidden="true" />
+    <section className={`generation-selection${floating ? " is-floating" : ""}`} aria-label={ariaLabel}>{children}</section>
+  </>;
 }

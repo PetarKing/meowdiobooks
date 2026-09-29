@@ -1,5 +1,6 @@
 import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
+import { DismissibleDetails } from "./DismissibleDetails";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog as InspectorShell } from "./Ui";
 import {
@@ -516,13 +517,13 @@ export function CastIdentityReview({
       <div className="cast-toolbar-actions">
         {remaining > 0 && <button type="button" className="primary compact" onClick={() => { const next = groups.find(group => group.needsReview); if (next) openInspector(next.primaryLabel); }}>{t("Review required identities")} →</button>}
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
-        {!hideVoiceSettings && <details>
+        {!hideVoiceSettings && <DismissibleDetails>
           <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
           <div className="cast-audio-settings">
             {!hideVoiceModel && <label>{t("Voice model")}<select aria-label={t("Voice model")} value={voiceModel} onChange={(event) => onVoiceModelChange(event.target.value)}>{voiceModels.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}</select></label>}
             <LanguageFlags languages={selectedModel?.supportedLanguages ?? []} language={language} onChange={onLanguageChange} />
           </div>
-        </details>}
+        </DismissibleDetails>}
       </div>
     </div>
 

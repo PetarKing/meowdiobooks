@@ -17,7 +17,7 @@ function Tracklist({ generate = vi.fn() }: { generate?: GeneratePageModel["gener
     gateway: createFixtureGateway("generate-stale"), book: snapshot.book, snapshot,
     busy: false, error: "", chapterFilter, selectedChapters, listeningChapterId, splitChapterId,
     setChapterFilter, setSelectedChapters, setListeningChapterId, setSplitChapterId,
-    generateChapters: generate, splitLongChapter: vi.fn(), setStage: vi.fn(), stageIndex: () => 5,
+    generateChapters: generate, splitLongChapter: vi.fn(), continueToExport: vi.fn(),
     generationSamples: [], generationEstimatePolicy: publicGenerationEstimatePolicy, t,
   }} />;
 }

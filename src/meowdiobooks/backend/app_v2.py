@@ -242,6 +242,44 @@ _MAX_VOICE_SAMPLE_BYTES = 25_000_000
 ChapterAudioSource = Callable[[str, str, str, Path], AbstractContextManager[Path]]
 
 
+def _voice_candidates_for(voice: dict[str, Any]) -> list[dict[str, Any]]:
+    """Keep legacy single-preview Cast rows in the editable audition collection."""
+
+    candidates = [
+        deepcopy(row)
+        for row in voice.get("voiceCandidates", [])
+        if isinstance(row, dict) and row.get("revision")
+    ]
+    if candidates or not voice.get("voicePreviewRevision"):
+        return candidates
+    return [{
+        "revision": voice["voicePreviewRevision"],
+        "previewUrl": voice.get("previewUrl"),
+        "referenceText": voice.get("referenceText"),
+        "referenceAudio": voice.get("referenceAudio"),
+        "referenceMode": voice.get("referenceMode"),
+        "direction": voice.get("voiceDirection"),
+        "voiceSettings": deepcopy(voice.get("voiceSettings")),
+    }]
+
+
+def _append_voice_auditions(
+    target: dict[str, Any], updated: dict[str, Any]
+) -> dict[str, Any]:
+    """Append new revisions without allowing an adapter to rewrite earlier auditions."""
+
+    candidates = _voice_candidates_for(target)
+    known = {str(row["revision"]) for row in candidates}
+    for row in _voice_candidates_for(updated):
+        revision = str(row["revision"])
+        if revision in known:
+            continue
+        row["parentRevision"] = candidates[-1]["revision"] if candidates else None
+        candidates.append(row)
+        known.add(revision)
+    return {**updated, "voiceCandidates": candidates}
+
+
 def _generate_voice_candidates(
     *,
     voice_auditioner: Callable[..., list[dict[str, Any]]],
@@ -718,8 +756,9 @@ def create_app_v2(
                         raise CastContractError("Voice reuse is unavailable")
                     report(2, "Reusing the selected voice")
                     updated = validated_imported_voices({character_id: cast_voice_reuse.import_voice(
-                        book.id, package, target, settings["sourceVoice"], language, model_id,
+                        book.id, package, deepcopy(target), settings["sourceVoice"], language, model_id,
                     )}, [target])[character_id]
+                    updated = _append_voice_auditions(target, updated)
                     body = {
                         **proposal, "revision": revision, "phase": "audition-review",
                         "status": "needs-voice-review",
@@ -731,8 +770,9 @@ def create_app_v2(
                     report(100, "Reused voice ready for review")
                     return _candidate_result(book.id, WizardStage.CAST, path, artifact)
                 character = {
-                    **target,
+                    **deepcopy(target),
                     "id": character_id,
+                    "voiceCandidates": _voice_candidates_for(target),
                     "voiceSettings": validate_voice_settings(
                         settings.get("voiceSettings")
                         or target.get("voiceSettings")
@@ -749,7 +789,6 @@ def create_app_v2(
                     "referenceAudio",
                     "referenceMode",
                     "referenceText",
-                    "voiceCandidates",
                     "voicePreviewRevision",
                     "voiceRevision",
                 ):
@@ -769,7 +808,9 @@ def create_app_v2(
                 generated = voice_auditioner(
                     repo_root, package, book.id, [character], report, language, model_id
                 )[0]
-                updated = _audition_identity(generated, package, base=target)
+                updated = _append_voice_auditions(
+                    target, _audition_identity(generated, package, base=target)
+                )
                 identities = [
                     updated if str(row.get("characterId")) == character_id else row
                     for row in proposal.get("identities", [])

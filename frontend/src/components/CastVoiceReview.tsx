@@ -590,7 +590,8 @@ export function CastVoiceReview({
             <div className="cast-section-heading"><h3>{t("Voice auditions")}</h3><span>{inspectedCandidates.length}</span></div>
             {inspectedCandidates.length > 0 && (inspected.referenceText ? <blockquote>{inspected.referenceText}</blockquote> : <p className="cast-muted voice-no-script">{t("No audition text is available.")}</p>)}
             <p className="voice-candidates-help">{t(inspectedCandidates.length > 0 ? "Listen, then choose a voice. Your choice applies immediately and can be changed." : "No auditions yet. Create one to hear this cast member.")}</p>
-            <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => ({ candidate, number: index + 1 })).reverse().map(({ candidate, number }) => {
+            <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => {
+              const number = index + 1;
               const applied = candidate.revision === approvedRevision;
               const playingCandidate = playingCandidateRevision === candidate.revision;
               return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied selected" : ""}`}>

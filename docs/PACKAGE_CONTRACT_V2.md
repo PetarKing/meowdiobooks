@@ -167,8 +167,11 @@ decisions block auditions. Missing or unaccepted narrator/character voices and i
 routes block later phases. Layered routing never changes label, alias, or identity semantics. One Cast
 revision never mixes auditions from different recipe versions.
 
-The product has one usable Cast voice set per book. Regenerating one cast member replaces that
-member's editable audition set instead of appending another reusable generation lineage. While a
+The product has one usable Cast voice set per book. Creating another audition for one cast member
+appends its immutable revision to that member's current audition set in chronological order. Earlier
+auditions remain available for playback and selection while the voice model, language and whole-pack
+recipe still match. This does not create another independently reusable Cast lineage. A changed
+recipe requires a complete compatible pack as described above. While a
 complete replacement Cast remains a draft, the last accepted Cast stays usable. Accepting the
 replacement atomically makes it the only Cast allowed to drive new generation and deletes voice WAVs
 that are unreachable from it. Superseded Cast JSON remains inspectable, but its previews may be

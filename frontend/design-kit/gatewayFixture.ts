@@ -105,9 +105,17 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
           ].find((row) => row?.characterId === voiceSettings.characterId);
           if (voice) {
             const revision = `${voice.characterId}-new-audition-${++auditionSequence}`;
-            // Match production regeneration: replace this voice's auditions,
-            // while keeping the accepted snapshot and other cast voices intact.
+            // New auditions extend the editable collection in creation order.
+            // The accepted snapshot and other cast voices remain unchanged.
+            const candidates = voice.voiceCandidates?.length ? voice.voiceCandidates : voice.voicePreviewRevision ? [{
+              revision: voice.voicePreviewRevision,
+              previewUrl: voice.previewUrl ?? "",
+              referenceText: voice.referenceText,
+              direction: voice.voiceDirection ?? "",
+              voiceSettings: voice.voiceSettings,
+            }] : [];
             voice.voiceCandidates = [
+              ...candidates,
               {
                 revision,
                 previewUrl: silentWav,
