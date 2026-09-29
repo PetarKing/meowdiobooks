@@ -217,6 +217,16 @@ immediately. Running work stops cooperatively at its next progress or handler bo
 cancellation wins over a concurrent successful return. Cancellation and failure do not publish partial
 phase artifacts.
 
+Cast's final publication uses the optional `PublicationReporter.commit` boundary. The
+job-store atomic update serializes cancellation with publishing the draft and recording
+success: a cancellation recorded first prevents publication; a committed success is
+terminal and cannot subsequently be canceled or overwritten by the worker. Ordinary
+callable progress reporters remain supported for direct runs with a final cooperative
+checkpoint. Adding or removing auditions also requires the current editable Cast
+revision, checked before provider work and again before publication. A stale browser
+tab cannot replace a newer audition collection. Failed work cleans its unused audio
+while retaining both accepted and current draft auditions.
+
 Dialogue output must contain exactly one valid result for every focused unresolved/unlabelled target
 ID and no result for context-only IDs. Missing, duplicate, invented or malformed rows fail validation.
 TTS retries are bounded; exhausted retries fail the chapter revision.

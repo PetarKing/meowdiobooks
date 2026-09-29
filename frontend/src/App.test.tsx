@@ -3132,7 +3132,7 @@ describe('v2 wizard', () => {
     expect(applyEdits).toBeEnabled()
   })
 
-  it('confirms a new audition in the designed dialog before starting generation', async () => {
+  it('starts a new audition directly without a replacement warning', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },

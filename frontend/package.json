@@ -30,6 +30,7 @@
     "test-storybook": "vitest run --config vitest.storybook.config.ts",
     "storybook:check": "tsc -p stories/tsconfig.json",
     "visual:parity": "node scripts/visual-parity.mjs",
+    "visual:review": "node scripts/visual-review.mjs",
     "test:consumer": "node scripts/verify-host-consumer.mjs",
     "studio": "vite --mode studio --host 127.0.0.1 --port 5179 --open /studio.html"
   },

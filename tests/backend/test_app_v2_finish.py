@@ -323,6 +323,7 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
             for row in snapshot["voiceModels"]
             if row["id"] == voice_model
         )
+        _, dialogue, review = _seed_reviewed_transcript(tmp_path, book_id)
         _, cast = write_artifact(
             package,
             "cast",
@@ -330,6 +331,8 @@ def test_voice_sample_upload_generates_audition_and_is_deleted_with_book(tmp_pat
                 "revision": "cast-upload-1",
                 "phase": "audition-review",
                 "status": "needs-voice-review",
+                "dialogueRevision": dialogue["revision"],
+                "reviewRevision": review["revision"],
                 "language": "english",
                 "voiceModel": voice_model,
                 "auditionPackRecipeVersion": voice_recipe_version,
@@ -1875,6 +1878,9 @@ def test_audio_recipe_or_model_refresh_reuses_language_bound_profiles(tmp_path):
         )
         for row in characters:
             revision = f"{recipe['version']}-{row['id']}-{len(audition_batches)}"
+            output = _package / "voices" / row["id"] / f"{revision}.wav"
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_bytes(b"RIFF-test")
             row.update(
                 {
                     "voicePreviewRevision": revision,

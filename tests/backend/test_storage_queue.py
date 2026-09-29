@@ -1,9 +1,11 @@
 import time
 import threading
+import pytest
 
 from meowdiobooks.backend.models import Book, Job, JobStatus, StageRevision, WizardStage
 from meowdiobooks.backend.queue import JobQueue
 from meowdiobooks.backend.storage import JsonStore
+from meowdiobooks.backend.workflow.runtime import commit_publication
 
 
 def wait_for(store: JsonStore[Job], job_id: str, status: JobStatus) -> Job:
@@ -241,3 +243,82 @@ def test_retry_payload_is_rebound_to_the_new_attempt(tmp_path):
         queue.stop()
 
     assert completed.result["_job_id"] == retried.id
+
+
+def test_cancellation_before_publication_prevents_callback_execution(tmp_path):
+    store = JsonStore(tmp_path / "jobs.json", Job)
+    started, release = threading.Event(), threading.Event()
+    published = []
+
+    def handler(_payload, report):
+        started.set()
+        assert release.wait(2)
+        return commit_publication(report, lambda: published.append(True) or {"ok": True}, "Ready")
+
+    queue = JobQueue(store, {"publish": handler})
+    queue.start()
+    try:
+        job = queue.enqueue("publish")
+        assert started.wait(2)
+        queue.cancel(job.id)
+        release.set()
+        wait_for(store, job.id, JobStatus.CANCELED)
+    finally:
+        release.set()
+        queue.stop()
+    assert published == []
+
+
+@pytest.mark.parametrize("after_commit_error", [False, True])
+def test_publication_wins_cancellation_race_and_committed_result_is_not_downgraded(tmp_path, after_commit_error):
+    store = JsonStore(tmp_path / "jobs.json", Job)
+    publishing, release = threading.Event(), threading.Event()
+    cancel_started = threading.Event()
+    cancellation_errors = []
+
+    def handler(_payload, report):
+        def publish():
+            publishing.set()
+            assert release.wait(2)
+            return {"committed": True}
+        commit_publication(report, publish, "Ready")
+        if after_commit_error:
+            raise RuntimeError("An error after the irrevocable publication boundary")
+        return {"must_not_replace_committed_result": True}
+
+    queue = JobQueue(store, {"publish": handler})
+    queue.start()
+    job = queue.enqueue("publish")
+    assert publishing.wait(2)
+
+    def cancel():
+        cancel_started.set()
+        try:
+            queue.cancel(job.id)
+        except ValueError as error:
+            cancellation_errors.append(str(error))
+
+    thread = threading.Thread(target=cancel)
+    thread.start()
+    try:
+        assert cancel_started.wait(2)
+        thread.join(0.02)
+        assert thread.is_alive(), "Cancellation must wait for the atomic publication update"
+        release.set()
+        thread.join(2)
+        completed = wait_for(store, job.id, JobStatus.SUCCEEDED)
+    finally:
+        release.set()
+        thread.join(2)
+        queue.stop()
+    assert cancellation_errors == ["Only queued or running jobs can be canceled"]
+    assert completed.result == {"committed": True}
+    assert completed.error is None
+
+
+def test_direct_reporters_remain_compatible_with_final_publication():
+    observed = []
+    result = commit_publication(lambda progress, message: observed.append((progress, message)),
+                                lambda: {"published": True}, "Ready")
+    assert observed == [(100, "Ready")]
+    assert result == {"published": True}
