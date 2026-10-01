@@ -1,0 +1,14 @@
+{
+  "engine": "WebKit 26.6 / Playwright1.63",
+  "mobileEmulation": "iPhone 13",
+  "selectedAfterTapAndChange": "french",
+  "style": {
+    "fontSize": "16px",
+    "height": 48,
+    "width": 220,
+    "backgroundImage": "none"
+  },
+  "emptyLanguagesDisabled": true,
+  "recoveredValue": "english",
+  "pageErrors": []
+}

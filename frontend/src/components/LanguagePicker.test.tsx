@@ -1,33 +1,58 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import { NarrationLanguagePicker } from "./LanguagePicker";
+import { LanguageFlags, NarrationLanguagePicker } from "./LanguagePicker";
 
 describe("NarrationLanguagePicker", () => {
-  it("shows flags and closes after an explicit choice", () => {
+  it("uses a native choice and waits for an explicit language selection", () => {
     const onChange = vi.fn();
-    render(<NarrationLanguagePicker languages={["english", "french"]} language="" onChange={onChange} />);
-    const trigger = screen.getByRole("button", { name: "Narration language" });
-    const details = trigger.closest("details")!;
-    expect(trigger).toHaveTextContent("Choose language");
-    fireEvent.click(trigger);
-    expect(details).toHaveAttribute("open");
-    expect(screen.getByRole("button", { name: "english" })).toHaveTextContent("🇬🇧");
+    const { container } = render(<NarrationLanguagePicker languages={["english", "french"]} language="" onChange={onChange} />);
+    const picker = screen.getByRole("combobox", { name: "Narration language" });
+    expect(picker).toHaveValue("");
+    expect(screen.getByRole("option", { name: "Choose language" })).toBeDisabled();
+    expect(container.querySelector(".narration-language-flag")).toHaveTextContent("🌐");
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(picker, { target: { value: "french" } });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("french");
+  });
+
+  it("shows the selected flag without a custom blur lifecycle", () => {
+    const onChange = vi.fn();
+    const { container } = render(<NarrationLanguagePicker languages={["english", "french"]} language="french" onChange={onChange} />);
+    const picker = screen.getByRole("combobox", { name: "Narration language" });
+    expect(picker).toHaveValue("french");
+    expect(container.querySelector(".narration-language-flag")).toHaveTextContent("🇫🇷");
+    fireEvent.blur(picker, { relatedTarget: null });
+    expect(picker).toHaveValue("french");
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("explains an unavailable language list and recovers when models load", () => {
+    const onChange = vi.fn();
+    const { rerender } = render(<NarrationLanguagePicker languages={[]} language="" onChange={onChange} />);
+    expect(screen.getByRole("combobox", { name: "Narration language" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("No narration languages available.");
+    rerender(<NarrationLanguagePicker languages={["english"]} language="" onChange={onChange} />);
+    const picker = screen.getByRole("combobox", { name: "Narration language" });
+    expect(picker).toBeEnabled();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.change(picker, { target: { value: "english" } });
+    expect(onChange).toHaveBeenCalledExactlyOnceWith("english");
+  });
+
+  it("keeps an unavailable bound language visible without silently changing it", () => {
+    const onChange = vi.fn();
+    render(<NarrationLanguagePicker languages={["english"]} language="french" onChange={onChange} />);
+    expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("french");
+    expect(screen.getByRole("option", { name: "french · Unavailable" })).toBeDisabled();
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps the flag-button picker available for its other consumers", () => {
+    const onChange = vi.fn();
+    render(<LanguageFlags languages={["english", "french"]} language="english" onChange={onChange} />);
+    expect(screen.getByRole("button", { name: "english" })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "french" }));
     expect(onChange).toHaveBeenCalledExactlyOnceWith("french");
-    expect(details).not.toHaveAttribute("open");
-    expect(trigger).toHaveFocus();
-  });
-  it("shows the selected flag and supports Escape without changing language", () => {
-    const onChange = vi.fn();
-    render(<NarrationLanguagePicker languages={["english", "french"]} language="french" onChange={onChange} />);
-    const trigger = screen.getByRole("button", { name: "Narration language" });
-    expect(trigger).toHaveTextContent("🇫🇷french");
-    fireEvent.click(trigger);
-    const english = screen.getByRole("button", { name: "english" });
-    english.focus();
-    fireEvent.keyDown(english, { key: "Escape" });
-    expect(trigger.closest("details")).not.toHaveAttribute("open");
-    expect(trigger).toHaveFocus();
-    expect(onChange).not.toHaveBeenCalled();
   });
 });

@@ -394,9 +394,25 @@
 .scope-intro { margin-bottom: 14px; }
 .attribution-scopes legend { font-size: 10px; font-weight: 600; letter-spacing: .03em; text-transform: none; }
 .attribution-scopes:disabled { opacity: 1; filter: none; background: transparent; }
-.attribution-scopes label.unavailable { opacity: 1; }
+.attribution-scopes .scope-option { padding: 2px 0 10px; border-top: 1px solid var(--line); }
+.attribution-scopes .scope-target { display: grid; grid-template-columns: 20px minmax(0,1fr); align-items: start; gap: 10px; min-height: 44px; padding: 12px 4px 8px; border-radius: 6px; }
+.attribution-scopes label.scope-target { cursor: pointer; }
+.attribution-scopes label.scope-target:hover { background: var(--surface-soft); }
+.attribution-scopes .scope-target > input { width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--poppy); cursor: pointer; }
+.attribution-scopes label.scope-target:has(input:focus-visible) { outline: 2px solid var(--poppy); outline-offset: 2px; }
+.attribution-scopes .scope-target > span { min-width: 0; }
+.attribution-scopes .scope-target b { font-size: 13px; line-height: 1.5; }
+.attribution-scopes .scope-target small { font-size: 11px; }
+.attribution-scopes .scope-option.unavailable .scope-target { padding-bottom: 0; }
+.attribution-scopes .scope-none { color: var(--muted); text-align: center; font-size: 16px; }
+.attribution-scopes:disabled label.scope-target { cursor: default; }
+.attribution-scopes:disabled label.scope-target:hover { background: transparent; }
 .attribution-scopes input:disabled { opacity: .5; }
-.attribution-scopes .scope-example { padding: 0; margin-top: 8px; border: 0; border-radius: 0; background: transparent; }
+.attribution-scopes .scope-example { padding: 0; margin: 4px 0 0 34px; border: 0; border-radius: 0; background: transparent; }
+.attribution-scopes .scope-example summary { display: flex; align-items: center; gap: 6px; width: fit-content; min-height: 32px; font: 500 11px var(--font-sans); }
+.attribution-scopes .scope-example summary::before { content: "+"; color: var(--poppy); font-size: 14px; }
+.attribution-scopes .scope-example[open] summary::before { content: "−"; }
+.attribution-scopes .scope-example summary::marker, .attribution-scopes .scope-example summary::-webkit-details-marker { display: none; content: ""; }
 @media (max-width: 700px) {
   .chapter-card .chapter-estimates, .chapter-card.generated .chapter-estimates, .chapter-card.stale .chapter-estimates { grid-column: 3 / 5; grid-row: 2; }
   .chapter-estimates > div { min-width: 0; }

@@ -22,3 +22,5 @@
 @import "./roster-motion.css";
 
 [data-presentation-root] { color: var(--color-ink, var(--ink)); }
+/* Programmatic page-navigation focus is a reading position, not a control ring. */
+.workspace > main[tabindex="-1"]:focus { outline: none; }

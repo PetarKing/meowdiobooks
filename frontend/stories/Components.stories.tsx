@@ -92,14 +92,10 @@ export const Language: Story = {
   render: () => <LanguageExample />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
-    const trigger = canvas.getByRole('button', { name: 'Narration language' })
-    await userEvent.click(trigger)
-    await userEvent.click(canvas.getByRole('button', { name: /german/i }))
-    await expect(trigger).toHaveTextContent(/german/i)
-    await expect(trigger).toHaveFocus()
-    await userEvent.click(trigger)
-    await userEvent.keyboard('{Escape}')
-    await expect(trigger.closest('details')).not.toHaveAttribute('open')
+    const selector = canvas.getByRole('combobox', { name: 'Narration language' })
+    await userEvent.selectOptions(selector, 'german')
+    await expect(selector).toHaveValue('german')
+    await expect(selector).toHaveFocus()
   },
 }
 

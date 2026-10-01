@@ -16,9 +16,12 @@ export function HomePage({ model }: { model: HomePageModel; }) {
         <h2 id="quick-import-title" className="visually-hidden">{t(file ? "Ready to begin" : "Start another book")}</h2>
         {file ? <div className="quick-import-ready">
           <div className="file-receipt">
-            <span className="recent-cover">PDF</span>
-            <span><strong>{file.name}</strong><small>{(file.size / 1024 / 1024).toFixed(2)} MB</small></span>
-            <button className="text-button" onClick={() => setFile(undefined)}>{t("Choose another")}</button>
+            <span className="import-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z" /><path d="M14 3v5h5M8 13h8M8 17h5" /></svg><small>PDF</small></span>
+            <span className="import-file-details"><strong title={file.name}>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
+            <label className="import-file-replace" title={t("Choose another")}>
+              <input className="visually-hidden" type="file" accept=".pdf,application/pdf" aria-label={t("Choose another PDF")} disabled={busy} onChange={(event) => { const replacement = event.target.files?.[0]; if (replacement) setFile(replacement); }} />
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h14m-4-4 4 4-4 4M19 16H5m4-4-4 4 4 4" /></svg>
+            </label>
           </div>
           <button className="primary" disabled={busy} onClick={() => void importBook()}>{t("Import PDF")} →</button>
         </div> : <label className="quick-upload">
