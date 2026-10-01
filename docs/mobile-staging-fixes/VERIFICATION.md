@@ -26,6 +26,11 @@ accepted artifacts, persisted audition bindings, or backend contracts were chang
 - **Navigation:** changing the wizard step or cast phase resets document scroll and
   focuses the main region. Snapshot refreshes and clicking the current step do not.
   The main region has no decorative focus outline; control focus rings remain visible.
+- **Library spacing:** a 1160px reading width keeps wide-screen editions together,
+  while fluid 84–120px covers leave more room for phone titles. Tablet actions remain
+  beside their book details, and phone actions use a full-width row. The two-column
+  threshold, header spacing, and long author names no longer produce awkward gaps.
+  Cast and Voices styles and Library content/actions retain their existing design.
 
 ## Executed checks
 
@@ -37,6 +42,7 @@ accepted artifacts, persisted audition bindings, or backend contracts were chang
 | `npm --prefix frontend run storybook:check` | Passed |
 | `npm --prefix frontend run test:consumer` | Packed source, host TypeScript, primitive and App header overrides passed |
 | `PYTHONPATH=src python -m pytest tests/backend/test_dialogue_v2.py tests/backend/test_dialogue_ai.py -q` | 41 dialogue + 30 attribution tests passed, run separately |
+| Backend suite excluding model/decoder execution; Ruff | 483 passed, 3 deselected; lint passed |
 | `python docs/mobile-staging-fixes/verify-narrator-samples.py` | All three public-domain PDFs passed |
 | `git diff --check` | Passed |
 
@@ -82,6 +88,7 @@ the Playwright Chromium and WebKit runtimes installed for the locked version.
 - [First casting visit](evidence/casting-first-visit-mobile-webkit.png)
 - [Selected narration language](evidence/casting-selected-language-mobile-webkit.png)
 - [Public sample comparison](evidence/narrator-sample-comparison.json)
+- [Responsive Library proof](library/README.md)
 
 All attached evidence uses synthetic fixtures or the repository's public-domain sample
 set. WebKit emulation is not physical iPhone Safari verification. The initial remote
