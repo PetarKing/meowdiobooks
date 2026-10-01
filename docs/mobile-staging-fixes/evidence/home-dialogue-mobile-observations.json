@@ -1,0 +1,78 @@
+[
+  {
+    "engine": "chromium",
+    "width": 390,
+    "receiptBounds": {
+      "x": 16,
+      "y": 349.359375,
+      "width": 358,
+      "height": 76
+    },
+    "replacementBounds": {
+      "x": 318,
+      "y": 365.359375,
+      "width": 44,
+      "height": 44
+    },
+    "overflow": {
+      "body": 390,
+      "document": 390,
+      "viewport": 390
+    },
+    "calls": [
+      {
+        "stage": "dialogue",
+        "settings": {
+          "strategy": "narrate",
+          "attributionTargets": [],
+          "openSpeakerPatterns": [
+            "^\\?+$"
+          ],
+          "conflictResolutions": [],
+          "structuralResolutions": [],
+          "regexes": [],
+          "attributionRoute": "local"
+        }
+      }
+    ],
+    "errors": []
+  },
+  {
+    "engine": "chromium",
+    "width": 320,
+    "receiptBounds": {
+      "x": 16,
+      "y": 370.796875,
+      "width": 288,
+      "height": 84.59375
+    },
+    "replacementBounds": {
+      "x": 248,
+      "y": 391.09375,
+      "width": 44,
+      "height": 44
+    },
+    "overflow": {
+      "body": 320,
+      "document": 320,
+      "viewport": 320
+    },
+    "calls": [
+      {
+        "stage": "dialogue",
+        "settings": {
+          "strategy": "narrate",
+          "attributionTargets": [],
+          "openSpeakerPatterns": [
+            "^\\?+$"
+          ],
+          "conflictResolutions": [],
+          "structuralResolutions": [],
+          "regexes": [],
+          "attributionRoute": "local"
+        }
+      }
+    ],
+    "errors": []
+  }
+]

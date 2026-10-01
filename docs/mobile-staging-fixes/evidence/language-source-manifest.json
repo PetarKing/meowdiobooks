@@ -1,0 +1,12 @@
+{
+  "baselineRevision": "e89137192435ad496230f8cf3ff1adec9f98ab36",
+  "afterSource": "working tree candidate, file hashes bind exact inspected content",
+  "sha256": {
+    "frontend/src/components/LanguagePicker.tsx": "b16d821dc4644d2e62e36fe92b5704130823cc0eb6f336d5cd74b957a1964db5",
+    "frontend/src/components/LanguagePicker.css": "af6b64ee9545d2c829c8652f897b1a07fea7ebcf4819bf8ebc02da5aceda8e5b",
+    "frontend/src/components/LanguagePicker.test.tsx": "910ddba7962afd1e6e7231130f838df5cfb56092b9ab79c9c9becc47e1403cc4"
+  },
+  "engine": "WebKit 26.6 revision2359 / Playwright 1.63.0",
+  "profile": "iPhone 13, 390x664 CSS viewport, touch enabled, en-GB",
+  "data": "Synthetic languages only. No book/account data, staging requests or provider calls."
+}

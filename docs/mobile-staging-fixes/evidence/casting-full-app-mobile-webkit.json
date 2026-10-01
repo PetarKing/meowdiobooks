@@ -1,0 +1,101 @@
+{
+  "capturedAt": "2026-10-01T19:41:10.519Z",
+  "baselineRevision": "e89137192435ad496230f8cf3ff1adec9f98ab36",
+  "candidateSourceSha256": {
+    "frontend/src/App.tsx": "826f99a9aee056dc37f863c8f5c6ad4b433b3cf5f929c5af2c4995c8c0678c3a",
+    "frontend/src/app/usePageNavigation.ts": "42d3b8bd0eb63e367845717a38bd0688c8b19049f8122ee7af5ba870f8e52359",
+    "frontend/src/app/useWorkflowModel.ts": "683c3f914ebde4d275f97ab985008f82268ceacd481a40ca3c5ecb17fa85a440",
+    "frontend/src/pages/CastPage.tsx": "708ec06f4b4ae276404585aaa22000ebdf7669dff945d36b0116ae45187756c0",
+    "frontend/src/components/CastingChoice.tsx": "abf215322db73efd8b9c24478d0e30e7d9f063729d18cef51000ce21859f9ca2",
+    "frontend/src/components/CastingChoice.css": "311112173a5cdaf26355f7f1f40b5938a8cefc615991e00254614cf0a251f4db",
+    "frontend/src/components/LanguagePicker.tsx": "b16d821dc4644d2e62e36fe92b5704130823cc0eb6f336d5cd74b957a1964db5",
+    "frontend/src/components/LanguagePicker.css": "af6b64ee9545d2c829c8652f897b1a07fea7ebcf4819bf8ebc02da5aceda8e5b",
+    "frontend/src/workflow/voiceSelection.ts": "832ac7fe1110a38b77950ac2b5997e80e21776e3a94e692b4865b25cea0a5f80",
+    "frontend/src/styles/product.css": "449afb66fdf4e5b72ce4f73d62e53478a5571931948bc5a81770fe4759674e30",
+    "frontend/src/styles/pages.css": "60e0a38aadf5ed598ab30fe952721fd8e51f848cdf6dc9aba38de60555cd71eb"
+  },
+  "engine": "WebKit26.6 revision2359 / Playwright1.63.0",
+  "profile": {
+    "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.6 Mobile/15E148 Safari/604.1",
+    "viewport": {
+      "width": 390,
+      "height": 664
+    },
+    "screen": {
+      "width": 390,
+      "height": 844
+    },
+    "deviceScaleFactor": 3,
+    "isMobile": true,
+    "hasTouch": true,
+    "defaultBrowserType": "webkit"
+  },
+  "fixture": "Real App with injected synthetic60-identity gateway; all provider/backend methods remain local synthetic functions",
+  "results": [
+    {
+      "failStatus": 0,
+      "initialScroll": 6315,
+      "navigation": {
+        "scrollY": 0,
+        "mainFocused": true,
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "horizontalOverflow": false
+      },
+      "requiresExplicitLanguage": true,
+      "disabledWhileLanguageQuoteUpdates": true,
+      "selectedLanguage": "french",
+      "continueEnabled": true,
+      "lastSettings": {
+        "proposalRevision": "cast-fixture-1",
+        "identityDecisions": 60,
+        "voiceModel": "studio",
+        "language": "french",
+        "sourceBookIds": []
+      },
+      "requestCount": 2,
+      "processCallCount": 0,
+      "languageStyle": {
+        "height": 48,
+        "fontSize": "16px",
+        "backgroundImage": "none"
+      },
+      "pageErrors": []
+    },
+    {
+      "failStatus": 422,
+      "initialScroll": 6315,
+      "navigation": {
+        "scrollY": 0,
+        "mainFocused": true,
+        "outlineStyle": "none",
+        "outlineWidth": "3px",
+        "horizontalOverflow": false
+      },
+      "requiresExplicitLanguage": true,
+      "disabledWhileLanguageQuoteUpdates": true,
+      "selectedLanguage": "french",
+      "continueEnabled": true,
+      "lastSettings": {
+        "proposalRevision": "cast-fixture-1",
+        "identityDecisions": 60,
+        "voiceModel": "studio",
+        "language": "french",
+        "sourceBookIds": []
+      },
+      "requestCount": 2,
+      "processCallCount": 0,
+      "languageStyle": {
+        "height": 48,
+        "fontSize": "16px",
+        "backgroundImage": "none"
+      },
+      "pageErrors": []
+    }
+  ],
+  "requestPaths": [
+    "/",
+    "/audit.css",
+    "/audit.js"
+  ]
+}

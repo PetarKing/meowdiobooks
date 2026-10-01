@@ -76,3 +76,9 @@
 .casting-choice:not(:has(.reuse-open)) > .casting-footer { margin-top:24px; border:0; border-top:1px solid var(--line); border-radius:0; padding-inline:0; background:transparent; }
 .reuse-open .casting-radio { display:inline; }
 .reuse-open .casting-option-heading { justify-content:center; gap:10px; }
+.casting-preview-error { flex-wrap:wrap; }
+.casting-error-detail { display:block; max-width:42ch; margin-top:4px; }
+@media (max-width:600px) {
+  .casting-footer:has(.casting-preview-error) { flex-direction:column; align-items:stretch; }
+  .casting-footer:has(.casting-preview-error) > .primary { width:100%; }
+}

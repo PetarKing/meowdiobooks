@@ -12,6 +12,7 @@ import { CastIdentityReview } from "../components/CastIdentityReview";
 import { CastingChoice } from "../components/CastingChoice";
 import { CastVoiceReview } from "../components/CastVoiceReview";
 import { NarrationLanguagePicker } from "../components/LanguagePicker";
+import { draftVoiceSelection } from "../workflow/voiceSelection";
 import { AcceptedSummary, PageTitle, StageLaunch } from "../pages/shared";
 import { confirmedVoiceRoutesForCast, voiceRoutesForCast } from "../voiceRoutes";
 import {
@@ -136,11 +137,15 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     setVoiceRoutes(voiceRoutesForCast(cast));
     setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast));
     setNarratorDirection(cast.narrator?.voiceDirection ?? defaultNarratorDirection);
-    if (cast.voiceModel) setVoiceModel(cast.voiceModel);
-    const modelId = cast.voiceModel ?? voiceModel;
-    const supported = snapshot?.voiceModels.find((row) => row.id === modelId)?.supportedLanguages ?? [];
-    if (cast.language && supported.includes(cast.language)) setLanguage(cast.language);
-    else if (cast.detectedLanguage && supported.includes(cast.detectedLanguage)) setLanguage(cast.detectedLanguage);
+    if (cast.phase === "identity-review") {
+      const selection = draftVoiceSelection(snapshot?.voiceModels ?? [], [cast.voiceModel, voiceModel], [cast.language, cast.detectedLanguage, language]);
+      setVoiceModel(selection.modelId);
+      setLanguage(selection.language);
+      setNarrationLanguageConfirmed(false);
+    } else {
+      if (cast.voiceModel) setVoiceModel(cast.voiceModel);
+      if (cast.language) setLanguage(cast.language);
+    }
   }).catch((reason) => setError(message(reason)))}>{t(hasPreviousCast ? "Review cast & voices" : "Find characters")} →</button></StageLaunch>{confirmationDialog}</>;
   if (completed.includes("cast") && !revising) { const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean); return <><AcceptedSummary stage="cast" step={t("Step 4")} title={t("Cast and voices ready")} revision={snapshot?.activeArtifacts.cast} onRevise={beginCastReplacement} note={t("Changing the cast or voices creates a replacement. Once accepted, only the replacement can generate new audio. Existing generated audio and Library exports stay available.")}><span><b>{voices.length}</b><small>{t("Assigned voices")}</small></span><span><b>{t(snapshot?.voiceSelection.language ?? "—")}</b><small>{t("Audition language")}</small></span><span><b>{snapshot?.voiceModels.find((row) => row.id === snapshot.voiceSelection.modelId)?.label ?? snapshot?.voiceSelection.modelId ?? "—"}</b><small>{t("Voice model")}</small></span></AcceptedSummary>{confirmationDialog}</>; }
   if (current.phase === "identity-review" || editingCast || current.auditionPackRefreshRequired) {
@@ -169,9 +174,9 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Design the voices")} />
         <div className="voice-design-language">
           <div><label>{t("Narration language")}</label><p>{t("The language your audiobook will be spoken in.")}</p></div>
-          <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
+          <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { updateCastingPreview(false); setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
         </div>
-        <CastingChoice gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onSourcesChange={(ids) => { setCastGenerationPaused(false); setCastingSources({ bookId: book.id, ids }); }} onModelChange={changeCastingModel} action={<button className="primary" disabled={!castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
+        <CastingChoice models={snapshot?.voiceModels} gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onSourcesChange={(ids) => { setCastGenerationPaused(false); setCastingSources({ bookId: book.id, ids }); }} onModelChange={changeCastingModel} action={<button className="primary" disabled={!castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
         {confirmationDialog}
       </section>;
     }

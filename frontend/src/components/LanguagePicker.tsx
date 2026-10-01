@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { useTranslation } from "react-i18next";
 import "./LanguagePicker.css";
 
@@ -19,21 +18,20 @@ export function LanguageFlags({ languages, language, onChange }: LanguageProps) 
 
 export function NarrationLanguagePicker({ languages, language, onChange }: LanguageProps) {
   const { t } = useTranslation();
-  const disclosure = useRef<HTMLDetailsElement>(null);
-  const trigger = useRef<HTMLElement>(null);
-  function close() {
-    if (disclosure.current) disclosure.current.open = false;
-    trigger.current?.focus();
-  }
-  return <details className="narration-language-picker" ref={disclosure} onKeyDown={(event) => {
-    if (event.key === "Escape") { event.preventDefault(); close(); }
-  }} onBlur={(event) => {
-    if (!event.currentTarget.contains(event.relatedTarget as Node | null)) event.currentTarget.open = false;
-  }}>
-    <summary ref={trigger} role="button" aria-label={t("Narration language")}>
-      <span className="narration-language-value"><span aria-hidden="true">{language ? languageFlags[language] ?? "🌐" : "🌐"}</span><span>{t(language || "Choose language")}</span></span>
+  const unavailable = languages.length === 0;
+  const selectedUnavailable = !!language && !languages.includes(language);
+  return <div className="narration-language-picker">
+    <div className="narration-language-control">
+      <span className="narration-language-flag" aria-hidden="true">{language ? languageFlags[language] ?? "🌐" : "🌐"}</span>
+      <select aria-label={t("Narration language")} value={language} disabled={unavailable} onChange={(event) => {
+        if (languages.includes(event.currentTarget.value)) onChange(event.currentTarget.value);
+      }}>
+        <option value="" disabled>{t(unavailable ? "Languages unavailable" : "Choose language")}</option>
+        {selectedUnavailable && <option value={language} disabled>{t(language)} · {t("Unavailable")}</option>}
+        {languages.map((row) => <option key={row} value={row}>{t(row)}</option>)}
+      </select>
       <svg className="narration-language-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="m4 6 4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-    </summary>
-    <div className="narration-language-menu"><LanguageFlags languages={languages} language={language} onChange={(value) => { onChange(value); close(); }} /></div>
-  </details>;
+    </div>
+    {unavailable && <small className="narration-language-unavailable" role="status">{t("No narration languages available.")}</small>}
+  </div>;
 }

@@ -1,0 +1,46 @@
+{
+  "selected": "",
+  "open": null,
+  "events": [
+    {
+      "type": "pointerdown",
+      "tag": "SPAN",
+      "text": "Choose language"
+    },
+    {
+      "type": "pointerup",
+      "tag": "SPAN",
+      "text": "Choose language"
+    },
+    {
+      "type": "focusin",
+      "tag": "SUMMARY",
+      "text": "🌐Choose language"
+    },
+    {
+      "type": "click",
+      "tag": "SPAN",
+      "text": "Choose language"
+    },
+    {
+      "type": "pointerdown",
+      "tag": "BUTTON",
+      "text": "🇫🇷french"
+    },
+    {
+      "type": "pointerup",
+      "tag": "BUTTON",
+      "text": "🇫🇷french"
+    },
+    {
+      "type": "focusout",
+      "tag": "SUMMARY",
+      "text": "🌐Choose language"
+    },
+    {
+      "type": "click",
+      "tag": "BODY",
+      "text": "🌐Choose languageBook language🇬🇧english🇫🇷french🇯🇵japanese"
+    }
+  ]
+}

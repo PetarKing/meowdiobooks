@@ -76,6 +76,7 @@ import {
 } from "../workflow/presentation";
 import type { AppProps, WorkflowCapabilities } from "./contracts";
 import { dialogueCorrections } from "./dialogueCorrections";
+import { draftVoiceSelection } from "../workflow/voiceSelection";
 
 const emptyDialogue: DialogueArtifact = {
   regexes: [],
@@ -524,13 +525,18 @@ export function useWorkflowModel({
     setDesigningVoices(resumeMatchesProposal);
     setNarrationLanguageConfirmed(Boolean((resumeMatchesProposal && recoverableCast?.language) || (restoredCast?.phase !== "identity-review" && restoredCast?.language)));
     setListeningChapterId(undefined);
-    const model = (
+    const savedModel = (
       resumeMatchesProposal ? recoverableCast?.modelId : undefined
     ) ?? restoredCast?.voiceModel ?? next.voiceSelection.modelId ?? next.voiceModels[0]?.id;
-    setVoiceModel(model ?? "");
-    const supported = next.voiceModels.find((row) => row.id === model)?.supportedLanguages ?? [];
+    const supported = next.voiceModels.find((row) => row.id === savedModel)?.supportedLanguages ?? [];
     const detected = restoredCast?.detectedLanguage;
-    setLanguage((resumeMatchesProposal ? recoverableCast?.language : undefined) ?? restoredCast?.language ?? next.voiceSelection.language ?? (detected && supported.includes(detected) ? detected : supported.includes("english") ? "english" : supported[0] ?? ""));
+    const savedLanguage = (resumeMatchesProposal ? recoverableCast?.language : undefined) ?? restoredCast?.language ?? next.voiceSelection.language;
+    const boundAuditions = resumeMatchesProposal || (restoredCast && restoredCast.phase !== "identity-review");
+    const selection = boundAuditions
+      ? { modelId: savedModel ?? "", language: savedLanguage ?? (detected && supported.includes(detected) ? detected : supported.includes("english") ? "english" : supported[0] ?? "") }
+      : draftVoiceSelection(next.voiceModels, [savedModel, next.voiceSelection.modelId], [savedLanguage, detected]);
+    setVoiceModel(selection.modelId);
+    setLanguage(selection.language);
     setSelectedChapters((current) => {
       const unavailable = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
       const available = next.chapters.map((row) => row.id).filter((id) => !unavailable.has(id));
@@ -768,15 +774,16 @@ export function useWorkflowModel({
     }
   }
 
-  function runDialogueTranscript(route: DialogueAttributionRoute) {
+  function runDialogueTranscript(route: DialogueAttributionRoute, source = dialogue) {
     setDialogueProcessingRoute(route);
     setDialogueLaunchPending(true);
     setProcessMessage("Preparing speaker check");
     setProgress(0);
     setDialogueRouteChoiceOpen(false);
-    const targets = availableAttributionTargets(dialogue, attributionTargets);
+    const targets = availableAttributionTargets(source, attributionTargets);
+    const strategy = targets.length ? dialogueStrategy : "narrate";
     const settings = {
-      ...dialogueSettings(dialogue, dialogueStrategy, targets),
+      ...dialogueSettings(source, strategy, targets),
       attributionRoute: route,
     };
     setDialogueInitialDecisions([]);
@@ -843,6 +850,10 @@ export function useWorkflowModel({
   async function requestDialogueTranscript() {
     if (!book || busy) return;
     let currentDialogue = dialogue;
+    if (dialogueStrategy === "narrate" || availableAttributionTargets(currentDialogue, attributionTargets).length === 0) {
+      runDialogueTranscript("local");
+      return;
+    }
     if (dialogueStrategy === "fill-gaps" && !currentDialogue.routing) {
       setBusy(true);
       try {
@@ -862,6 +873,10 @@ export function useWorkflowModel({
         setBusy(false);
       }
     }
+    if (availableAttributionTargets(currentDialogue, attributionTargets).length === 0) {
+      runDialogueTranscript("local", currentDialogue);
+      return;
+    }
     const routing = currentDialogue.routing;
     if (dialogueStrategy === "fill-gaps" && !routing) {
       setError("Speaker-check choices could not be loaded. Try again.");
@@ -872,14 +887,14 @@ export function useWorkflowModel({
       return;
     }
     if (dialogueStrategy === "fill-gaps" && !capabilities.localDialogueAttribution) {
-      if (routing?.remote?.credentialConfigured) runDialogueTranscript("remote");
+      if (routing?.remote?.credentialConfigured) runDialogueTranscript("remote", currentDialogue);
       else setError("Speaker-check choices could not be loaded. Try again.");
       return;
     }
     const preferred = routing?.defaultRoute === "remote" && routing.remote?.credentialConfigured
       ? "remote"
       : "local";
-    runDialogueTranscript(preferred);
+    runDialogueTranscript(preferred, currentDialogue);
   }
 
   const activeJourneyStep = stages[stage];

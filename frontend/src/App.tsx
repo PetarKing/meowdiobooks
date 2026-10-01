@@ -3,6 +3,7 @@ import type { AppProps } from "./app/contracts";
 import { useAppearance } from "./app/useAppearance";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useWorkflowModel } from "./app/useWorkflowModel";
+import { usePageNavigation } from "./app/usePageNavigation";
 import brandMark from "./assets/brand/meowdiobooks-mark.png";
 import { DialogSurface } from "./components/DialogSurface";
 import { DialogueRoutingChoice } from "./components/DialogueRoutingChoice";
@@ -77,6 +78,10 @@ export default function App(props: AppProps) {
           : null;
 
   const view = productView === "create" ? createView : LibraryPage({ model });
+  const main = usePageNavigation(JSON.stringify([
+    productView, home, book?.id, stage,
+    model.designingVoices, model.editingCast, model.castCandidate?.phase,
+  ]));
 
   return <PresentationRoot className="app-shell" palette={props.presentationPalette} appearance={resolvedAppearance}>
     {renderHeader ? renderHeader({ productView, libraryCount: libraryExports.length, navigate: navigateProduct }) : <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
@@ -102,7 +107,7 @@ export default function App(props: AppProps) {
         <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
         <nav aria-label={t("Wizard stages")}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const locked = index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} aria-current={stage === index ? "step" : undefined} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={`${label} · ${localizedStatus}`} className={`${stage === index ? "active" : ""} ${done ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(routeStage(index))}><b>{done ? "✓" : locked ? "·" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
       </aside>}
-      <main className={!showWizard ? "home-main" : stage <= stageIndex("review") ? "review-wide" : ""}>
+      <main ref={main} tabIndex={-1} className={!showWizard ? "home-main" : stage <= stageIndex("review") ? "review-wide" : ""}>
         {showWizard && activeJourneyStep && <div className="mobile-progress" role="status" aria-label={t("Workflow progress")}>
           <span>{t("Step {{current}} of {{total}} · {{stage}}", { current: stage + 1, total: stages.length, stage: t(activeJourneyStep.label) })}</span>
           <strong aria-hidden="true">{stage + 1} / {stages.length}</strong>
