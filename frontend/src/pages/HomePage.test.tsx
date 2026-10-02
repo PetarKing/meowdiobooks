@@ -10,7 +10,7 @@ function ImportPage({ importing = vi.fn(), busy = false }: { importing?: HomePag
   const { t } = useTranslation();
   const [file, setFile] = useState<File | undefined>(original);
   return <HomePage model={{
-    books: [], busy, file, setFile, importBook: importing, deletingBookId: undefined,
+    books: [], booksError: false, booksLoading: false, refreshBooks: vi.fn(), busy, file, setFile, importBook: importing, deletingBookId: undefined,
     openingBookId: undefined, navigateProduct: vi.fn(), openBook: vi.fn(), setBookPendingDeletion: vi.fn(), t,
   }} />;
 }

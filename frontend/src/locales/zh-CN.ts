@@ -231,6 +231,8 @@ const zhCN: Record<string, string> = {
   "{{count}} audiobooks": "{{count}} 本有声书",
   "Cover of {{title}}": "《{{title}}》的封面",
   "Try again": "重试",
+  "Loading books…": "正在加载书籍…",
+  "Your books could not be loaded. Try again.": "无法加载您的书籍。请重试。",
   "No audiobooks yet.": "还没有有声书。",
   "Create an M4B in Export and it will appear here automatically.": "在“导出”中创建 M4B 后，它会自动出现在这里。",
   "Back to creating": "返回制作",
