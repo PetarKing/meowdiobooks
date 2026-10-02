@@ -3,12 +3,11 @@ import { StudioHero } from "../components/StudioHero";
 import { Panel } from "../components/Ui";
 import { formatFileSize } from "../workflow/presentation";
 
-export type HomePageModel = Pick<WorkflowModel, "books" | "busy" | "deletingBookId" | "file" | "importBook" | "navigateProduct" | "openBook" | "openingBookId" | "setBookPendingDeletion" | "setFile" | "t">;
+export type HomePageModel = Pick<WorkflowModel, "books" | "booksError" | "booksLoading" | "refreshBooks" | "busy" | "deletingBookId" | "file" | "importBook" | "navigateProduct" | "openBook" | "openingBookId" | "setBookPendingDeletion" | "setFile" | "t">;
 
 export function HomePage({ model }: { model: HomePageModel; }) {
-  const { books, busy, deletingBookId, file, importBook, navigateProduct, openBook, openingBookId, setBookPendingDeletion, setFile, t } = model;
-  const localBooks = books.filter((row) => row.source_name);
-  const totalAssetBytes = localBooks.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
+  const { books, booksError, booksLoading, refreshBooks, busy, deletingBookId, file, importBook, navigateProduct, openBook, openingBookId, setBookPendingDeletion, setFile, t } = model;
+  const totalAssetBytes = books.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
 
   return <>
     <StudioHero eyebrow={t("Your audiobook studio")} title={<>{t("From page")}<br /><em>{t("to performance.")}</em></>} description={t("Turn a PDF into an audiobook, with control at every step.")}>
@@ -35,12 +34,18 @@ export function HomePage({ model }: { model: HomePageModel; }) {
       <button type="button" className="home-mobile-library" onClick={() => navigateProduct("library")}><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M4 5h5v14H4zM10 5h5v14h-5zM17 5l3-.6 2.5 13.6-3 .6z" /></svg>{t("Library")}<span aria-hidden="true">↗</span></button>
     </StudioHero>
     <div className="home-flow">
-      {localBooks.length > 0 && <section className="wip-shelf">
+      {booksLoading && <p role="status">{t("Loading books…")}</p>}
+      {booksError && <div className="library-load-error" role="alert">
+        <span className="library-error-symbol" aria-hidden="true">↻</span>
+        <p>{t("Your books could not be loaded. Try again.")}</p>
+        <button className="ghost" disabled={booksLoading} onClick={() => void refreshBooks()}>{t("Try again")}</button>
+      </div>}
+      {books.length > 0 && <section className="wip-shelf">
         <Panel eyebrow={t("Work in progress")} title={t("books.workingTitle", { ns: "edition" })} actions={<div className="local-assets-summary">
-          <b>{localBooks.length === 1 ? t("1 book") : t("{{count}} books", { count: localBooks.length })}</b>
+          <b>{books.length === 1 ? t("1 book") : t("{{count}} books", { count: books.length })}</b>
           <span>{t("{{size}} used", { size: formatFileSize(totalAssetBytes) })}</span>
         </div>}>
-          <div className="recent-books">{localBooks.map((row) => {
+          <div className="recent-books">{books.map((row) => {
             const opening = openingBookId === row.id;
             return <article key={row.id}>
               <button className="recent-book-open" disabled={Boolean(openingBookId) || Boolean(deletingBookId)} aria-busy={opening} onClick={() => void openBook(row)}>

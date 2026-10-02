@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
-import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, WizardSnapshot, WizardStage } from './api/contracts'
+import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, WorkflowGateway, WizardSnapshot, WizardStage } from './api/contracts'
 import { buildReviewWarningDecisions } from './reviewDecisions'
 import { publicJourney } from './workflow/navigation'
 
@@ -2219,6 +2219,57 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Start another book' })).toBeInTheDocument()
     expect(screen.queryByText('Ready to begin')).not.toBeInTheDocument()
     expect(wizardApi.listBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([null, '', 'alice.pdf'])('restores a dialogue-stage book after remount with source filename %s', async (sourceName) => {
+    vi.mocked(wizardApi.listBooks).mockResolvedValue([{ id: 'book-1', title: 'Alice', source_name: sourceName, source_kind: 'pdf', page_count: 120 }])
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({
+      ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, cast: undefined, recordingScript: undefined,
+      generatedChapters: [],
+    })
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([{ page: 1, reason: 'opening' }])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
+    const first = render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /Alice.*Continue/ }))
+    await screen.findByRole('navigation', { name: 'Wizard stages' })
+    first.unmount()
+    render(<App />)
+    fireEvent.click(await screen.findByRole('button', { name: /Alice.*Continue/ }))
+    await screen.findByRole('navigation', { name: 'Wizard stages' })
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(2)
+    expect(wizardApi.importBook).not.toHaveBeenCalled()
+    expect(screen.getByText('Step 3 · Review')).toBeInTheDocument()
+  })
+
+  it('loads a replacement gateway and ignores the previous pending book list', async () => {
+    let finishPrevious!: (value: Awaited<ReturnType<typeof wizardApi.listBooks>>) => void
+    const previous = Object.create(wizardApi) as WorkflowGateway
+    previous.listBooks = vi.fn(() => new Promise<Awaited<ReturnType<typeof wizardApi.listBooks>>>(resolve => { finishPrevious = resolve }))
+    const current = Object.create(wizardApi) as WorkflowGateway
+    current.listBooks = vi.fn().mockResolvedValue([{ id: 'current', title: 'Current book', source_name: null, source_kind: 'pdf', page_count: 120 }])
+    const view = render(<App gateway={previous} />)
+    view.rerender(<App gateway={current} />)
+    expect(await screen.findByRole('button', { name: /Current book.*Continue/ })).toBeEnabled()
+    finishPrevious([{ id: 'old', title: 'Previous book', source_name: 'old.pdf', source_kind: 'pdf', page_count: 120 }])
+    await waitFor(() => expect(screen.queryByText('Loading books…')).not.toBeInTheDocument())
+    expect(screen.queryByText('Previous book')).not.toBeInTheDocument()
+    expect(screen.getByText('Current book')).toBeInTheDocument()
+    expect(current.listBooks).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows a failed working-book load and lets the user retry without reimporting', async () => {
+    let finishRetry!: (value: Awaited<ReturnType<typeof wizardApi.listBooks>>) => void
+    vi.mocked(wizardApi.listBooks).mockRejectedValueOnce(new Error('Offline')).mockImplementationOnce(() => new Promise(resolve => { finishRetry = resolve }))
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Your books could not be loaded. Try again.')
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Loading books…')
+    finishRetry([{ id: 'book-1', title: 'Alice', source_name: null, source_kind: 'pdf', page_count: 120 }])
+    expect(await screen.findByRole('button', { name: /Alice.*Continue/ })).toBeEnabled()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('Loading books…')).not.toBeInTheDocument()
+    expect(wizardApi.listBooks).toHaveBeenCalledTimes(2)
   })
 
   it('shows working storage and explains deletion without touching Library exports', async () => {
