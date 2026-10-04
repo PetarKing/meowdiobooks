@@ -48,6 +48,9 @@ for(const engine of [chromium,webkit]){
    }
    const status=page.locator('.book-return');await status.waitFor({timeout:12000}).catch(async e=>{console.error(await page.locator('body').innerText());await page.screenshot({path:out+'/debug-'+engine.name()+'-'+scenario+'.png'});throw e});
    assert(await page.getByRole('heading',{name:'Opening your book',exact:true}).isVisible());
+   // The delayed snapshot makes this a sustained wait. Decoration is deliberately
+   // absent for ordinary short restores; wait for its threshold before testing it.
+   await status.locator('.book-return-art').waitFor();
    if(scenario==='delayed-module'){
     await page.waitForTimeout(400);assert(held>0,'Lazy module intercepted');assert.equal(await status.locator('.book-return-static').count(),0,'No alternate book is shown while warming');assert.equal(await status.locator('canvas').count(),0);
     assert.equal(await status.locator('.book-return-static svg').count(),0,'Old SVG book is removed');

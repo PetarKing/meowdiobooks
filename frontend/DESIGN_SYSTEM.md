@@ -103,6 +103,12 @@ an ordinary equal-specificity `.primary` rule imported afterward. It requires in
 frontend dependencies and Playwright Chromium; it removes its temporary project on exit.
 
 
+Book returns show a quiet localized status immediately. Book art and its atmosphere appear only
+after 800 ms of unresolved restoration; this is a decoration threshold, never a minimum wait or
+a reason to delay content. The return cover stays until an active job's authenticated scope is known,
+so ordinary default selections cannot appear as the resumed request. Graphics are optional: failed
+loading or WebGL keeps the readable status, and completion or navigation removes the scene.
+
 ## Iteration ownership
 
 - `styles.css` contains public token defaults and the existing shared layout baseline. `media.css` preserves the legacy responsive contract.

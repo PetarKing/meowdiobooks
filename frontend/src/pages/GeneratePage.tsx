@@ -138,7 +138,14 @@ export function GeneratePage({ model, purchase }: { model: GeneratePageModel; pu
         {selectedPendingChapterIds.length > 0 && <dl>{selectedPendingChapterIds.length > 1 && <div className="generation-listening-estimate"><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div>}<div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
         <div className="generation-selection-actions">
           {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">↯</span><span>{t("Split this into shorter chapters?")}</span></button>}
-          {selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" disabled={busy} onClick={() => exportSelected ? void generateChapters(selectedChapters) : continueToExport()}>{exportSelected ? t("Regenerate {{count}} selected", { count: selectedChapters.length }) : t("Continue to Export")}</button>}
+          {exportSelected && <details key={selectedChapters.join("|")} className="generation-more-options" onBlur={(event) => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }} onKeyDown={(event) => { if (event.key === "Escape") { event.currentTarget.open = false; event.currentTarget.querySelector("summary")?.focus(); event.stopPropagation(); } }}>
+            <summary aria-disabled={busy} onClick={(event) => { if (busy) event.preventDefault(); }}>{t("More options")}</summary>
+            <div className="generation-more-options-panel">
+              <p>{t("Make new recordings for the selected chapters.")}</p>
+              <button className="ghost" type="button" disabled={busy} onClick={(event) => { event.currentTarget.closest("details")!.open = false; void generateChapters(selectedChapters); }}>{t("Regenerate {{count}} selected", { count: selectedChapters.length })}</button>
+            </div>
+          </details>}
+          {!exportSelected && selectedChapters.length > 0 && currentGenerated.length > 0 && <button className="ghost" type="button" disabled={busy} onClick={() => continueToExport()}>{t("Continue to Export")}</button>}
           <button className="primary" disabled={busy || (!selectedChapters.length && !currentGenerated.length)} onClick={() => exportSelected ? continueToExport(selectedChapters) : selectedPendingChapterIds.length ? void generateChapters(selectedPendingChapterIds) : continueToExport()}>{busy ? t("Generating…") : exportSelected ? `${t("Continue to Export")} →` : selectedPendingChapterIds.length ? `${t("Generate {{count}} selected", { count: selectedPendingChapterIds.length })} →` : currentGenerated.length ? `${t("Continue to Export")} →` : t("Select chapters above")}</button>
         </div>
       </GenerationActionDock>}
@@ -187,13 +194,21 @@ function GenerationActionDock({ ariaLabel, compact, children }: { ariaLabel: str
       anchor.style.height = `${Math.max(32, window.innerHeight - naturalTop - dock.getBoundingClientRect().height - bottomInset)}px`;
     };
     update();
-    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);
+    // Writing the observed parent's height during ResizeObserver delivery creates
+    // a resize loop notification. Coalesce subsequent changes into the next frame.
+    let frame: number | undefined;
+    const scheduleUpdate = () => {
+      if (frame !== undefined) return;
+      frame = window.requestAnimationFrame(() => { frame = undefined; update(); });
+    };
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(scheduleUpdate);
     observer?.observe(dock);
     if (anchor.parentElement) observer?.observe(anchor.parentElement);
-    window.addEventListener("resize", update);
+    window.addEventListener("resize", scheduleUpdate);
     return () => {
       observer?.disconnect();
-      window.removeEventListener("resize", update);
+      window.removeEventListener("resize", scheduleUpdate);
+      if (frame !== undefined) window.cancelAnimationFrame(frame);
       anchor.style.removeProperty("height");
     };
   }, [anchorRef]);

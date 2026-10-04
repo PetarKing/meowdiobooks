@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
@@ -7,6 +8,29 @@ import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, Work
 import { buildReviewWarningDecisions } from './reviewDecisions'
 import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
 import { workflowStorageKey } from './workflow/workflowLocation'
+
+describe('first return paint', () => {
+  it('shows quiet restoration before effects run for an explicit book return', () => {
+    const html = renderToString(<App workflowPersistenceNamespace="first-paint" initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
+    expect(html).toContain('book-return-quiet')
+    expect(html).toContain('Opening your book')
+    expect(html).not.toContain('book-return-art')
+    expect(html).not.toContain('From page')
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('uses only the current account saved location on the first paint', () => {
+    persistWorkflowReturn('book-1', 'generate', { namespace: 'account-a' })
+    expect(renderToString(<App workflowPersistenceNamespace="account-a" />)).toContain('book-return-quiet')
+    expect(renderToString(<App workflowPersistenceNamespace="account-b" />)).not.toContain('book-return-quiet')
+  })
+
+  it.each(['home', 'library'] as const)('keeps an explicit %s visit ahead of an old job marker', view => {
+    localStorage.setItem(workflowStorageKey('location', 'first-paint'), JSON.stringify({ view: view === 'home' ? 'create' : 'library', home: true }))
+    localStorage.setItem(workflowStorageKey('activeJob', 'first-paint'), 'old-job')
+    expect(renderToString(<App workflowPersistenceNamespace="first-paint" />)).not.toContain('book-return-quiet')
+  })
+})
 
 vi.mock('./api/client', () => ({ wizardApi: {
   importBook: vi.fn(), getBookSnapshot: vi.fn(), previewExtraction: vi.fn(), previewDialogue: vi.fn(),
@@ -3714,6 +3738,49 @@ describe('v2 wizard', () => {
     expect(wizardApi.getJob).not.toHaveBeenCalled()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
     expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+  })
+
+  it('starts independent pending candidate and Dialogue preview reads together after the authoritative snapshot', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract'] },
+      pendingCandidates: {
+        extraction: { revision: 'e-pending' }, dialogue: { revision: 'd-pending' },
+        review: { revision: 'r-pending' }, cast: { revision: 'c-pending' },
+      },
+    }
+    let release!: () => void
+    const waiting = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getStageCandidate).mockImplementation(async (_bookId, stage, revision) => {
+      await waiting
+      return stage === 'cast' ? base.cast! : { revision, spans: [], resultSummary: {}, warnings: [] }
+    })
+    vi.mocked(wizardApi.previewDialogue).mockImplementation(async () => { await waiting; return base.dialogue! })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'dialogue' }} />)
+    // None of the five reads resolves yet: a waterfall cannot reach this point.
+    await waitFor(() => expect(wizardApi.getStageCandidate).toHaveBeenCalledTimes(4))
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(1)
+    expect(wizardApi.previewDialogue).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument()
+    release()
+    expect(await screen.findByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('keeps a candidate read failure retryable without publishing an incomplete hydrated view', async () => {
+    const snapshot: WizardSnapshot = { ...base, pendingCandidates: {
+      extraction: { revision: 'e-pending' }, review: { revision: 'r-pending' },
+    } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getStageCandidate).mockRejectedValue(new Error('Saved candidate unavailable'))
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Saved candidate unavailable')
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('heading', { name: 'Record your chapters' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(localStorage.getItem('meowdiobooks.workflowLocation')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
   it('restores one authenticated generation request before showing its pending selection or progress', async () => {

@@ -606,6 +606,8 @@ const zhCN: Record<string, string> = {
   "Generating…": "正在生成…",
   "Generate {{count}} selected": "生成所选 {{count}} 章",
   "Regenerate {{count}} selected": "重新生成所选 {{count}} 章",
+  "More options": "更多选项",
+  "Make new recordings for the selected chapters.": "为所选章节制作新的录音。",
   "1 selected chapter is already generated and will be kept.": "所选章节中有 1 章已生成，将保留现有录音。",
   "{{count}} selected chapters are already generated and will be kept.": "所选章节中有 {{count}} 章已生成，将保留现有录音。",
   "Select chapters above": "请在上方选择章节",
