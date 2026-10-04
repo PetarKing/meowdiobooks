@@ -1,5 +1,6 @@
+import { DialogBackdrop } from "./DialogBackdrop";
 import { DialogSurface } from "./DialogSurface";
-import { useEffect, useId, useRef, useState, type ComponentPropsWithRef, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ComponentPropsWithRef, type ReactNode, type RefObject } from 'react'
 
 export type ButtonProps = ComponentPropsWithRef<"button"> & {
   variant?: "primary" | "secondary" | "ghost" | "danger" | "unstyled";
@@ -38,9 +39,11 @@ export function InspectorDialog({
   onClose,
   onClosed,
   className,
+  surfaceRef,
   children,
 }: {
   label: string;
+  surfaceRef?: RefObject<HTMLElement | null>;
   closing: boolean;
   onClose: () => void;
   onClosed: () => void;
@@ -48,7 +51,7 @@ export function InspectorDialog({
   children: ReactNode;
 }) {
   return (
-    <div
+    <DialogBackdrop
       className={`cast-inspector-backdrop ${closing ? "closing" : ""}`}
       onClick={(event) => {
         if (event.target === event.currentTarget) onClose();
@@ -56,6 +59,7 @@ export function InspectorDialog({
     >
       <DialogSurface
         onDismiss={onClose}
+        surfaceRef={surfaceRef}
         className={`cast-inspector ${className ?? ""} ${closing ? "closing" : ""}`}
         aria-label={label}
         onAnimationEnd={(event) => {
@@ -64,7 +68,7 @@ export function InspectorDialog({
       >
         {children}
       </DialogSurface>
-    </div>
+    </DialogBackdrop>
   );
 }
 

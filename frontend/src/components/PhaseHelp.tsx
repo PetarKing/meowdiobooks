@@ -1,7 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { DialogSurface } from "./DialogSurface";
-import { usePresentationPortalAttributes } from "./presentationContext";
-import { createPortal } from "react-dom";
+import { DialogBackdrop } from "./DialogBackdrop";
 import { useTranslation } from "react-i18next";
 import type { WizardStage } from "../api/contracts";
 
@@ -88,7 +87,6 @@ const guides: Record<GuideStage, PhaseGuide> = {
 
 export function PhaseHelp({ stage }: { stage: GuideStage }) {
   const { t } = useTranslation();
-  const presentation = usePresentationPortalAttributes();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const titleId = useId();
@@ -102,7 +100,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
 
   const close = () => setOpen(false);
 
-  const dialog = open ? createPortal(<div {...presentation} className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
+  const dialog = open ? <DialogBackdrop className="phase-help-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
     <DialogSurface onDismiss={close} returnFocusRef={triggerRef} aria-labelledby={titleId} className={`phase-help phase-help-${stage}`}>
       <header className="phase-help-head" role="none">
         <div className="phase-help-number" aria-hidden="true">{guide.number}</div>
@@ -125,7 +123,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
         </section>
       </div>
     </DialogSurface>
-  </div>, document.body) : null;
+  </DialogBackdrop> : null;
 
   return <>
     <button ref={triggerRef} type="button" className="phase-help-trigger" aria-label={t("About {{phase}}", { phase: t(guide.label) })} aria-haspopup="dialog" onClick={() => setOpen(true)}>?</button>

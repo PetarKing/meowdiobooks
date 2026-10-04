@@ -294,12 +294,16 @@ export function CastIdentityReview({
     closeTimer.current = undefined;
     setInspectorOpen(false);
     setInspectorClosing(false);
+  }
+
+  useEffect(() => {
+    if (inspectorOpen || !focusAfterClose.current) return;
     if (focusAfterClose.current) {
       const target = tileRefs.current[focusAfterClose.current] ?? workbenchRef.current?.querySelector<HTMLInputElement>(".collection-search input");
       target?.focus();
     }
     focusAfterClose.current = undefined;
-  }
+  }, [inspectorOpen]);
 
   function closeInspectorAfterDecision() {
     setInspectorClosing(true);

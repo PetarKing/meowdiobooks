@@ -565,6 +565,7 @@ const zhCN: Record<string, string> = {
   "Bring every chapter to life.": "让每个章节都鲜活起来。",
   "Each selected chapter becomes its own audio track to review before export.": "每个所选章节都会成为独立音轨，可在导出前审核。",
   "Playable": "可播放",
+  "Purchased": "已购买",
   "of {{count}}": "共 {{count}}",
   "Audio to make": "待制作音频",
   "Still to make": "仍待制作",

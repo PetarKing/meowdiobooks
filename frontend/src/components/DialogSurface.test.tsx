@@ -1,10 +1,111 @@
 import { createRef, useRef, useState } from "react";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { DialogSurface } from "./DialogSurface";
+import { DialogBackdrop } from "./DialogBackdrop";
+import { PresentationRoot } from "./PresentationRoot";
 import { Button } from "./Ui";
 
 describe("shared modal surface", () => {
+  it("portals outside shell stacking contexts and retains appearance and palette", () => {
+    const { container } = render(<PresentationRoot appearance="dark" palette={{ paper: "#234567" }}>
+      <DialogBackdrop data-testid="backdrop"><DialogSurface aria-label="Confirm"><button>Continue</button></DialogSurface></DialogBackdrop>
+    </PresentationRoot>);
+    const backdrop = screen.getByTestId("backdrop");
+    expect(backdrop.parentElement).toBe(document.body);
+    expect(container).not.toContainElement(backdrop);
+    expect(backdrop).toHaveAttribute("data-appearance", "dark");
+    expect(backdrop.style.getPropertyValue("--color-paper")).toBe("#234567");
+  });
+
+  it("isolates background and late siblings, blocks stray focus and restores original inert", async () => {
+    const preserved = document.createElement("aside");
+    preserved.setAttribute("inert", "original");
+    document.body.append(preserved);
+    const { unmount } = render(<><button data-testid="background">Background</button>
+      <DialogBackdrop><DialogSurface aria-label="Decision"><button>Continue</button></DialogSurface></DialogBackdrop>
+    </>);
+    const dialog = screen.getByRole("dialog");
+    expect(screen.getByTestId("background").closest("[inert]")).not.toBeNull();
+    screen.getByTestId("background").focus();
+    expect(dialog).toHaveFocus();
+    const late = document.createElement("button");
+    document.body.append(late);
+    await waitFor(() => expect(late).toHaveAttribute("inert"));
+    unmount();
+    expect(late).not.toHaveAttribute("inert");
+    expect(preserved).toHaveAttribute("inert", "original");
+    late.remove();
+    preserved.remove();
+  });
+
+  it("locks both document scroll containers and restores scroll position and inline priorities", () => {
+    document.documentElement.style.setProperty("overflow", "auto", "important");
+    document.documentElement.style.setProperty("scrollbar-gutter", "stable", "important");
+    document.body.style.setProperty("position", "relative", "important");
+    document.body.style.setProperty("top", "3px");
+    let scrollY = 240;
+    const offset = vi.spyOn(window, "scrollY", "get").mockImplementation(() => scrollY);
+    const scrollTo = vi.spyOn(window, "scrollTo");
+    const { unmount } = render(<DialogSurface aria-label="Decision" />);
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.top).toBe("-240px");
+    expect(document.documentElement.style.getPropertyValue("scrollbar-gutter")).toBe("auto");
+    scrollY = 0;
+    unmount();
+    expect(scrollTo).toHaveBeenLastCalledWith(0, 240);
+    expect(document.documentElement.style.overflow).toBe("auto");
+    expect(document.documentElement.style.getPropertyPriority("overflow")).toBe("important");
+    expect(document.documentElement.style.getPropertyValue("scrollbar-gutter")).toBe("stable");
+    expect(document.documentElement.style.getPropertyPriority("scrollbar-gutter")).toBe("important");
+    expect(document.body.style.position).toBe("relative");
+    expect(document.body.style.getPropertyPriority("position")).toBe("important");
+    expect(document.body.style.top).toBe("3px");
+    offset.mockRestore();
+    scrollTo.mockRestore();
+    document.documentElement.style.removeProperty("overflow");
+    document.documentElement.style.removeProperty("scrollbar-gutter");
+    document.body.style.removeProperty("position");
+    document.body.style.removeProperty("top");
+  });
+
+  it("keeps only the last portal active and traps Shift-Tab without including hidden controls", () => {
+    const first = render(<DialogBackdrop><DialogSurface aria-label="First"><button>Earlier</button></DialogSurface></DialogBackdrop>);
+    const second = render(<DialogBackdrop><DialogSurface aria-label="Second"><button hidden>Hidden</button><button>Safe</button><button>Confirm</button></DialogSurface></DialogBackdrop>);
+    const earlier = screen.getByText("Earlier");
+    expect(earlier.closest("[inert]")).not.toBeNull();
+    fireEvent.keyDown(document, { key: "Tab", shiftKey: true });
+    expect(screen.getByRole("button", { name: "Confirm" })).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Safe" })).toHaveFocus();
+    first.unmount();
+    expect(document.body.style.position).toBe("fixed");
+    second.unmount();
+    expect(document.body.style.position).toBe("");
+  });
+
+  it("shares focus, inert isolation and scroll locks across separately bundled entry copies", async () => {
+    // Re-evaluate the entry and its internal modules just as separate Vite App
+    // and /ui dependency chunks do, while retaining the live first entry.
+    vi.resetModules();
+    const { DialogSurface: HostSurface } = await import("./DialogSurface");
+    const workflow = render(<DialogSurface aria-label="Core progress"><button>Core control</button></DialogSurface>);
+    const host = render(<DialogBackdrop><HostSurface aria-label="Host funding"><button>Host action</button></HostSurface></DialogBackdrop>);
+    const funding = screen.getByRole("dialog", { name: "Host funding" });
+    expect(funding).toHaveFocus();
+    expect(funding.closest("[inert]")).toBeNull();
+    workflow.unmount();
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.documentElement.style.overflow).toBe("hidden");
+    expect(funding).toHaveFocus();
+    fireEvent.keyDown(document, { key: "Tab" });
+    expect(screen.getByRole("button", { name: "Host action" })).toHaveFocus();
+    host.unmount();
+    expect(document.body.style.position).toBe("");
+    expect(document.documentElement.style.overflow).toBe("");
+  });
+
   it("leaves initial focus in the topmost modal when nested modals mount together", () => {
     render(
       <DialogSurface aria-label="Outer">

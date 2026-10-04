@@ -1,3 +1,4 @@
+import { DialogBackdrop } from "./components/DialogBackdrop";
 import { type CSSProperties, type ReactNode } from "react";
 import type { AppProps } from "./app/contracts";
 import { useAppearance } from "./app/useAppearance";
@@ -31,7 +32,7 @@ import {
   localizeProcessMessage,
   monogram
 } from "./workflow/presentation";
-export type { AppProps, WorkflowCapabilities, WorkflowHeaderContext, WorkflowStepOverrideProps } from "./app/contracts";
+export type { AppProps, GenerationPurchasePresentation, WorkflowCapabilities, WorkflowHeaderContext, WorkflowStepOverrideProps } from "./app/contracts";
 
 function ProductTabIcon({ view }: { view: ProductView; }) {
   if (view === "create") {
@@ -50,7 +51,7 @@ export default function App(props: AppProps) {
     dialogue: DialoguePage({ model }),
     review: ReviewPage({ model }),
     cast: <CastPage key="cast" model={model} />,
-    generate: <GeneratePage key="generate" model={model} />,
+    generate: <GeneratePage key="generate" model={model} purchase={props.generationPurchase} />,
     export: ExportPage({ model }),
   };
 
@@ -119,9 +120,9 @@ export default function App(props: AppProps) {
       </main>
     </div>
     {dialogueRouteChoiceOpen && dialogue.routing && <DialogueRoutingChoice routing={dialogue.routing} onChoose={runDialogueTranscript} onClose={() => setDialogueRouteChoiceOpen(false)} />}
-    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition) && <div className="process-overlay"><DialogSurface aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} className={`process-modal ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{showCancelActiveJob && !dialogueProcessing && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}</DialogSurface></div>}
-    {uploadingCharacterId && <div className="process-overlay"><DialogSurface aria-labelledby="voice-clone-progress-title" className="process-modal"><span className="eyebrow">{t("processing.contextLabel", { ns: "edition" })}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("voiceClone.progressDescription", { ns: "edition" })}</p></DialogSurface></div>}
-    {generationInProgress && <div className="process-overlay generation-overlay">
+    {(((activeJob || dialogueLaunchPending) && !processingOverlaySuppressed && stage !== stageIndex("generate")) || extractionTransition || reviewTransition) && <DialogBackdrop className="process-overlay"><DialogSurface aria-label={t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteDialogLabel" : "processing.dialogLabel", { ns: "edition" })} className={`process-modal ${dialogueProcessing ? "dialogue-processing-modal" : ""}`}><span className="eyebrow">{t(dialogueProcessing && dialogueProcessingRoute === "remote" ? "processing.remoteContextLabel" : "processing.contextLabel", { ns: "edition" })}</span><h2>{processMessage ? localizeProcessMessage(processMessage, t) : t("processing.fallbackMessage", { ns: "edition" })}</h2><div className={`processing-track determinate ${dialogueLaunchPending || activeJob?.status === "running" || extractionTransition || reviewTransition ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Processing progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div><p>{reviewTransition ? t("Saving your choices and opening Cast & voices…") : t("{{progress}}% complete · Accepted work stays unchanged.", { progress: Math.round(progress) })}</p>{showCancelActiveJob && !dialogueProcessing && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}</DialogSurface></DialogBackdrop>}
+    {uploadingCharacterId && <DialogBackdrop className="process-overlay"><DialogSurface aria-labelledby="voice-clone-progress-title" className="process-modal"><span className="eyebrow">{t("processing.contextLabel", { ns: "edition" })}</span><h2 id="voice-clone-progress-title">{t("Creating cloned audition…")}</h2><div className="processing-track active" style={{ "--progress": "42%" } as CSSProperties} role="progressbar" aria-label={t("Cloned audition generation progress")}><i style={{ width: "42%" }} /></div><p>{t("voiceClone.progressDescription", { ns: "edition" })}</p></DialogSurface></DialogBackdrop>}
+    {generationInProgress && <DialogBackdrop className="process-overlay generation-overlay">
       <DialogSurface className="process-modal generation-modal" aria-labelledby="generation-progress-title">
         <span className="eyebrow">{t("Making your audiobook")}</span>
         <h2 id="generation-progress-title">{t(processMessage === reconnectingJobMessage ? reconnectingJobMessage : progress >= 100 ? "Finishing your chapter audio…" : "Making your selected chapters…")}</h2>
@@ -133,7 +134,7 @@ export default function App(props: AppProps) {
         <p className="generation-modal-note">{t("processing.keepOpenNotice", { ns: "edition" })}</p>
         {showCancelActiveJob && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}
       </DialogSurface>
-    </div>}
-    {bookPendingDeletion && <div className="process-overlay"><DialogSurface className="process-modal delete-book-modal" aria-labelledby="delete-book-title" onDismiss={deletingBookId ? undefined : () => setBookPendingDeletion(undefined)}><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished exports stay in Library.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></DialogSurface></div>}
+    </DialogBackdrop>}
+    {bookPendingDeletion && <DialogBackdrop className="process-overlay"><DialogSurface className="process-modal delete-book-modal" aria-labelledby="delete-book-title" onDismiss={deletingBookId ? undefined : () => setBookPendingDeletion(undefined)}><span className="eyebrow">{t("books.deleteWorkingEyebrow", { ns: "edition" })}</span><h2 id="delete-book-title">{t("Delete “{{title}}”?", { title: bookPendingDeletion.title })}</h2><p>{t("books.deleteWorkingDescription", { ns: "edition" })}</p><p className="library-safe-note"><b>{t("Finished exports stay in Library.")}</b></p><div className="delete-book-actions"><button className="ghost" disabled={Boolean(deletingBookId)} onClick={() => setBookPendingDeletion(undefined)}>{t("Keep book")}</button><button className="danger" disabled={Boolean(deletingBookId)} onClick={() => void deleteBook(bookPendingDeletion)}>{t(deletingBookId ? "Deleting…" : "Delete working files")}</button></div></DialogSurface></DialogBackdrop>}
   </PresentationRoot>;
 }

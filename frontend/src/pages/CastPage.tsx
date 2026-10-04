@@ -1,3 +1,4 @@
+import { DialogBackdrop } from "../components/DialogBackdrop";
 import { useState } from "react";
 import { DialogSurface } from "../components/DialogSurface";
 import { PhaseHelp } from "../components/PhaseHelp";
@@ -107,7 +108,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     }).catch((reason) => setError(message(reason))).finally(() => setRegeneratingCharacterId(undefined));
   }
 
-  const confirmationDialog = confirmation && <div className="process-overlay">
+  const confirmationDialog = confirmation && <DialogBackdrop className="process-overlay">
     <DialogSurface as="div" className="process-modal cast-confirmation-modal" aria-labelledby="cast-confirmation-title" onDismiss={() => setConfirmation(undefined)}>
       <h2 id="cast-confirmation-title">{t(confirmation.kind === "replacement" ? "Change the cast?" : "Reclassify source labels?")}</h2>
       <p>{t(confirmation.kind === "replacement"
@@ -122,7 +123,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         }}>{t(confirmation.kind === "replacement" ? "Change cast" : "Reclassify labels")} →</button>
       </div>
     </DialogSurface>
-  </div>;
+  </DialogBackdrop>;
 
   if (!current) return <><PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t(hasPreviousCast ? "Review your cast." : "Build your cast.")} copy={t(hasPreviousCast ? "Confirm your existing cast against the updated review." : "Confirm which names belong to each character, then choose their voices.")} /><StageLaunch><button className="primary" onClick={() => void processCandidate("cast", {}, !hasPreviousCast).then((candidate) => {
     const cast = candidate as unknown as CastArtifact;
@@ -295,7 +296,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         <button className="primary" disabled={busy || unavailableVoices.length > 0} onClick={requestCastAcceptance}>{t("Accept cast & voices")} →</button>
       </div>
     </div>
-    {confirmDefaultVoices && <div className="process-overlay">
+    {confirmDefaultVoices && <DialogBackdrop className="process-overlay">
       <DialogSurface as="div" className="process-modal cast-default-modal" aria-labelledby="default-voices-title" onDismiss={() => setConfirmDefaultVoices(false)}>
         <h2 id="default-voices-title">{unapprovedVoices.length === 1 ? t("Approve 1 remaining voice?") : t("Approve {{count}} remaining voices?", { count: unapprovedVoices.length })}</h2>
         <p>{unapprovedVoices.length === 1
@@ -307,7 +308,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
           <button className="primary" onClick={submitCastVoices}>{t("Approve remaining & accept")} →</button>
         </div>
       </DialogSurface>
-    </div>}
+    </DialogBackdrop>}
     {confirmationDialog}
   </>;
 

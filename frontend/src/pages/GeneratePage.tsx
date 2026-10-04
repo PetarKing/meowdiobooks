@@ -1,5 +1,7 @@
 import type { WorkflowModel } from "../app/useWorkflowModel";
+import type { GenerationPurchasePresentation } from "../app/contracts";
 import { DialogSurface } from "../components/DialogSurface";
+import { DialogBackdrop } from "../components/DialogBackdrop";
 import { TabList } from "../components/TabList";
 import { WorkflowEmpty } from "../components/WorkflowPage";
 import { ChapterAudioPlayer } from "../components/ChapterAudioPlayer";
@@ -16,13 +18,23 @@ import {
 
 export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "error" | "chapterFilter" | "continueToExport" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "snapshot" | "splitChapterId" | "splitLongChapter" | "t">;
 
-export function GeneratePage({ model }: { model: GeneratePageModel; }) {
+export function GeneratePage({ model, purchase }: { model: GeneratePageModel; purchase?: GenerationPurchasePresentation; }) {
   const { busy, error, chapterFilter, continueToExport, generateChapters, generationEstimatePolicy, generationSamples, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, snapshot, splitChapterId, splitLongChapter, t } = model;
   if (!snapshot?.recordingScript) return null;
   const generated = snapshot?.generatedChapters ?? [];
   const chapters = snapshot?.chapters ?? [];
   const scriptChapters = new Map(snapshot.recordingScript.summary.chapters.map((row) => [row.chapterId, row]));
   const unavailableChapters = new Set(snapshot.recordingScript.summary.emptyChapterIds);
+  const purchasedChapters = new Set(
+    purchase?.bookId === snapshot.book.id && snapshot.cast?.phase === "accepted" && purchase.castRevision === snapshot.cast.revision
+      && purchase.extractionRevision === snapshot.activeArtifacts.extraction
+      && purchase.dialogueRevision === snapshot.activeArtifacts.dialogue
+      && purchase.reviewRevision === snapshot.activeArtifacts.review
+      && purchase.castRevision === snapshot.activeArtifacts.cast
+      && purchase.scriptRevision === (snapshot.recordingScript.revision ?? null)
+      ? purchase.chapterIds
+      : [],
+  );
   const generatedByChapter = new Map(generated.map((row) => [row.chapterId, row]));
   const availableChapters = chapters.filter((chapter) => !unavailableChapters.has(chapter.id));
   const currentGenerated = generated.filter((row) => row.current);
@@ -75,6 +87,7 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
         <StepEyebrow stage="generate">{t("Step 5 · Generate")}</StepEyebrow>
         <h1>{t("Record your chapters")}</h1>
       </div>
+
     </section>
 
     <section className="chapter-library" aria-label={t("Chapters")}>
@@ -92,6 +105,7 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
       <div id="chapter-filter-panel" role={showFilters ? "tabpanel" : undefined} aria-labelledby={showFilters ? `chapter-filter-panel-${chapterFilter}` : undefined} className={`chapter-card-grid ${selectedChapters.length ? "has-selection" : ""}`}>{visibleChapters.map((row) => {
         const playable = generatedByChapter.get(row.id);
         const unavailable = unavailableChapters.has(row.id);
+        const purchased = !unavailable && purchasedChapters.has(row.id);
         const selected = !unavailable && selectedChapters.includes(row.id);
         const chapterNumber = chapters.findIndex((chapter) => chapter.id === row.id) + 1;
         const nextChapter = chapters[chapterNumber];
@@ -99,7 +113,7 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
         const pageRange = row.startPage ? t("Pages {{start}}–{{end}}", { start: row.startPage, end: Math.max(row.startPage, inferredEndPage ?? row.startPage) }) : undefined;
         const estimatedSeconds = scriptChapters.get(row.id)?.estimatedSeconds ?? (row.estimatedCharacters ?? 0) / 15;
         const audioSeconds = playable?.audioSeconds ?? estimatedSeconds;
-        return <article key={row.id} className={`chapter-card ${selected ? "selected" : ""} ${playable?.current ? "generated" : ""} ${playable ? "has-audio" : ""} ${playable && !playable.current ? "stale" : ""} ${unavailable ? "unavailable" : ""}`}>
+        return <article key={row.id} className={`chapter-card ${selected ? "selected" : ""} ${purchased ? "purchased" : ""} ${playable?.current ? "generated" : ""} ${playable ? "has-audio" : ""} ${playable && !playable.current ? "stale" : ""} ${unavailable ? "unavailable" : ""}`}>
           {/* The native label is the whole track target. Listen stays its own sibling action. */}
           <label className="chapter-select chapter-row-target">
             <input aria-label={t("Select {{title}}", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} type="checkbox" disabled={unavailable} checked={selected} onChange={(event) => setSelectedChapters(event.target.checked ? [...new Set([...selectedChapters, row.id])] : selectedChapters.filter((id) => id !== row.id))} />
@@ -110,7 +124,8 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
           {playable && <button type="button" className="chapter-listen" aria-label={t(playable.current ? "Listen to {{title}}" : "Listen to {{title}} (older recording)", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} onClick={() => setListeningChapterId(row.id)}>▶</button>}
           <div className="chapter-card-body">
             <h3 aria-level={2}>{row.title || t("Chapter {{number}}", { number: chapterNumber })}</h3>
-            <div className="chapter-card-meta"><span className={`track-status ${playable?.current ? "ready" : unavailable ? "unavailable" : ""}`}>{t(unavailable ? "No audio" : playable?.current ? "Playable" : playable ? "Older recording" : "To make")}</span>{pageRange && <small>{pageRange}</small>}</div>
+            <div className="chapter-card-meta"><span className={`track-status ${playable?.current ? "ready" : unavailable ? "unavailable" : ""}`}>{t(unavailable ? "No audio" : playable?.current ? "Playable" : playable ? "Older recording" : "To make")}</span>{purchased && <span className="chapter-purchased-label"><span aria-hidden="true">✦</span>{t("Purchased")}</span>}{pageRange && <small>{pageRange}</small>}</div>
+
           </div>
           {!unavailable && <dl className="chapter-estimates"><div><dt>{t("Listening")}</dt><dd>{chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div></dl>}
         </article>;
@@ -128,7 +143,7 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
       </GenerationActionDock>}
     </section>
 
-    {splitChapter && <div className="chapter-player-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target && !busy) setSplitChapterId(undefined); }}>
+    {splitChapter && <DialogBackdrop className="chapter-player-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target && !busy) setSplitChapterId(undefined); }}>
       <DialogSurface className="chapter-split-modal" aria-labelledby="chapter-split-title" onDismiss={busy ? undefined : () => setSplitChapterId(undefined)}>
         <button type="button" className="chapter-player-close" aria-label={t("Close chapter split")} disabled={busy} onClick={() => setSplitChapterId(undefined)}>×</button>
         <div className="chapter-split-heading"><span aria-hidden="true">↯</span><div><span className="eyebrow">{t("Long chapter")}</span><h2 id="chapter-split-title">{t("Split this into shorter chapters?")}</h2></div></div>
@@ -137,16 +152,16 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
         <p className="chapter-split-note">{t("The original item will be replaced. Review, cast and voices stay unchanged.")}</p>
         <div className="chapter-split-actions"><button className="ghost" type="button" disabled={busy} onClick={() => setSplitChapterId(undefined)}>{t("Cancel")}</button><button className="primary" type="button" disabled={busy} onClick={() => void splitLongChapter(splitChapter.id)}>{busy ? t("Splitting…") : t("Split into ≈ {{count}} chapters", { count: proposedPartCount })}</button></div>
       </DialogSurface>
-    </div>}
+    </DialogBackdrop>}
 
-    {listeningChapter && listeningAudio && <div className="chapter-player-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) setListeningChapterId(undefined); }}>
+    {listeningChapter && listeningAudio && <DialogBackdrop className="chapter-player-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setListeningChapterId(undefined); }}>
       <DialogSurface className="chapter-player-modal" aria-labelledby="chapter-player-title" onDismiss={() => setListeningChapterId(undefined)}>
         <button type="button" className="chapter-player-close" aria-label={t("Close player")} onClick={() => setListeningChapterId(undefined)}>×</button>
         <div className="chapter-player-book" aria-hidden="true"><span>{t("Chapter")}</span><b>{String(chapters.findIndex((chapter) => chapter.id === listeningChapter.id) + 1).padStart(2, "0")}</b><i>♪</i></div>
         <div className="chapter-player-copy"><span className="eyebrow">{t(listeningAudio.current ? "Chapter audio" : "Older recording")}</span><h2 id="chapter-player-title">{listeningChapter.title || t("Untitled chapter")}</h2></div>
         <ChapterAudioPlayer src={listeningAudio.audioUrl} />
       </DialogSurface>
-    </div>}
+    </DialogBackdrop>}
   </>;
 
 }
