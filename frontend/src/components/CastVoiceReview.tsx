@@ -7,7 +7,7 @@ import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog } from "./Ui";
 import { suggestedMemberIds } from "../voiceRoutes";
-import { ActionRequiredError } from '../api/actionRequired';
+import { isActionRequiredError } from '../api/actionRequired';
 
 interface Props {
   bookId: string;
@@ -369,7 +369,7 @@ export function CastVoiceReview({
       setSampleTranscription("ready");
     } catch (reason) {
       if (transcriptionRequest.current !== request) return;
-      setSampleTranscription(reason instanceof ActionRequiredError && reason.handled ? 'paused' : 'failed');
+      setSampleTranscription(isActionRequiredError(reason) && reason.handled ? 'paused' : 'failed');
     }
   }
 

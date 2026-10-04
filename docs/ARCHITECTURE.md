@@ -66,6 +66,11 @@ the action can throw `new ActionRequiredError(action, { handled: true })`. No ac
 permission, contains credentials, selects a provider or automatically replays a command. A browser
 voice file stays local and requires an explicit transcript retry or reselection after navigation.
 
+The error carries a provider-neutral brand. Use exported `isActionRequiredError` rather than
+constructor identity when inspecting it: development dependency optimization or independently
+bundled package entry points may create separate class instances. The guard also validates the
+descriptor and handled flag, so ordinary or malformed errors still remain visible.
+
 Storybook exercises the same source with deterministic synthetic gateways. It is a development
 surface and is excluded from the consumer package.
 

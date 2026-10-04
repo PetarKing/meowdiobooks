@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ActionRequiredError, readActionRequired, withActionRequired } from './actionRequired';
+import { ActionRequiredError, isActionRequiredError, readActionRequired, withActionRequired } from './actionRequired';
 import type { WorkflowGateway } from './contracts';
 import { HttpWizardApi } from './client';
 import { message } from '../workflow/presentation';
@@ -43,6 +43,32 @@ describe('provider-neutral required actions', () => {
     expect(message(new Error('Try this step again.'))).toBe('Try this step again.');
     for (const value of [null, [], {}, { ...action, code: '' }, { ...action, context: [] }, { ...action, message: 3 }]) {
       expect(readActionRequired(value)).toBeUndefined();
+    }
+  });
+
+  it('handles a branded error from another bundled entry point without constructor identity', async () => {
+    class ForeignActionError extends Error {
+      readonly actionRequiredError = true;
+      readonly actionRequired = action;
+      handled = false;
+      constructor() { super(action.message); this.name = 'ActionRequiredError'; }
+    }
+    const foreign = new ForeignActionError();
+    expect(foreign).not.toBeInstanceOf(ActionRequiredError);
+    expect(isActionRequiredError(foreign)).toBe(true);
+    const gateway = { processStage: vi.fn().mockRejectedValue(foreign) } as unknown as WorkflowGateway;
+    await withActionRequired(gateway, () => true).processStage('book', 'generate', { chapterIds: ['one'] }).catch(() => undefined);
+    expect(foreign.handled).toBe(true);
+    expect(message(foreign)).toBe('');
+  });
+
+  it('rejects forged or malformed cross-module action errors', () => {
+    const valid = { name: 'ActionRequiredError', message: action.message, actionRequiredError: true,
+      actionRequired: action, handled: true };
+    for (const value of [{ ...valid, actionRequiredError: false }, { ...valid, name: 'Error' },
+      { ...valid, handled: 'true' }, { ...valid, actionRequired: { ...action, context: [] } }, new Error(action.message)]) {
+      expect(isActionRequiredError(value)).toBe(false);
+      expect(message(value)).not.toBe('');
     }
   });
 });

@@ -38,3 +38,28 @@ boundary. This is not evidence of local inference compatibility, real Stripe aut
 redirects, webhook timing, funding eligibility or deployed hosted UI; those require consumer-side
 and staging evidence. The public planning aliases preserve existing cast algorithms; source
 availability and exact model/recipe validation remain required by compositions.
+
+## Packed entry-point regression
+
+The actual hosted rendering found that development dependency optimization can create separate
+`ActionRequiredError` constructors for App's internal module and the public `/api` entry point.
+Constructor identity then produced a generic workflow alert even after the host displayed the
+required action. The error now carries an explicit brand, and exported `isActionRequiredError`
+checks that brand, descriptor and handled flag across all handling/preservation paths. Ordinary,
+malformed and host-declined errors remain visible.
+
+- `WORKFLOW_CONSUMER_REF=6278fef npm --prefix frontend run test:consumer` reproduces the old
+  real App/public API failure: `development: handled expected-action visibility`.
+- The expanded packed-consumer script passes against the fix in both Vite development and a
+  built production preview. Already-handled and host-delegated actions show no workflow alert;
+  a host-declined action retains its message and Retry. Both use the actual App and public API
+  export, with no duplicate workflow implementation. Strict host types and both CSS consumer
+  cases also pass; there are no browser page errors.
+- Full frontend suite: 341 passed across 31 files. Focused App/API/transcription suite: 209 passed.
+- Strict TypeScript/Vite production build and lint pass, with the existing chunk-size and
+  LanguagePicker Fast Refresh warnings.
+
+The consumer script's former conditional dynamic-import expression was changed to literal import
+branches so its production build tests built JavaScript rather than requesting source TSX files.
+These isolated package checks do not establish the full companion application's production build
+or deployed UI behavior; companion validation remains separate.

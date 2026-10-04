@@ -25,7 +25,7 @@ import type {
 } from "./contracts";
 import { dialogueReaderAssignments } from "../workflow/dialogue";
 import { ActionRequiredError, readActionRequired } from './actionRequired';
-export { ActionRequiredError } from './actionRequired';
+export { ActionRequiredError, isActionRequiredError } from './actionRequired';
 
 class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly jobId?: string) {
