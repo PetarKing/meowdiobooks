@@ -1,5 +1,5 @@
 const zhCN: Record<string, string> = {
-  "Restoring your book…": "正在恢复你的书籍…",
+  "Opening your book": "正在打开你的书籍",
   "Retry": "重试",
   "Extraction ready": "提取结果已就绪",
   "Full extraction is ready": "完整提取结果已就绪",
