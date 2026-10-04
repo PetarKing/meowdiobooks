@@ -63,3 +63,15 @@ The consumer script's former conditional dynamic-import expression was changed t
 branches so its production build tests built JavaScript rather than requesting source TSX files.
 These isolated package checks do not establish the full companion application's production build
 or deployed UI behavior; companion validation remains separate.
+
+## Initial casting language confirmation
+
+Staging exposed an existing Cast launch block: selecting the initial English language after its
+quote had already loaded reset readiness, although the actual casting settings and quote key
+did not change. No readiness effect ran again, leaving Continue disabled indefinitely. The
+language confirmation now invalidates the quote only when the selected language actually changes.
+An actual-App regression first failed on the prior candidate, then passed while retaining the
+original quote fingerprint and dispatching only on explicit Continue. Existing language-change
+coverage still blocks Continue until the replacement quote resolves. App, casting-choice and
+language-picker checks pass: 181 tests; full frontend suite passes 342 tests across 31 files.
+Strict TypeScript/Vite build and lint also pass with the existing warnings.
