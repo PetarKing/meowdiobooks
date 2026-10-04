@@ -3,6 +3,7 @@ import "./preview.css";
 import type { Preview } from "@storybook/react-vite";
 import i18n, { localePreferenceKey } from "../src/i18n";
 import { sidebarPreferenceKey } from "../src/workflow/navigation";
+import { workflowStorageKey } from "../src/workflow/workflowLocation";
 const previewPath = window.location.pathname;
 const preview: Preview = {
   parameters: {
@@ -19,7 +20,8 @@ const preview: Preview = {
     const keys = [
       localePreferenceKey,
       sidebarPreferenceKey,
-      "meowdiobooks.activeJob",
+      workflowStorageKey("activeJob"),
+      workflowStorageKey("location"),
     ];
     const stored = new Map(keys.map((key) => [key, localStorage.getItem(key)]));
     const locale = i18n.language;
