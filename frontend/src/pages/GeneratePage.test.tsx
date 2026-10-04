@@ -44,6 +44,33 @@ function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentatio
 }
 
 describe("Generate chapter targets", () => {
+  it("defers resize-observer writes and cancels queued dock layout work on unmount", () => {
+    let resize = () => {};
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { resize = callback; }
+      observe() {}
+      disconnect() {}
+    });
+    const requestFrame = vi.spyOn(window, "requestAnimationFrame").mockReturnValue(7);
+    const cancelFrame = vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
+    try {
+      const { unmount } = render(<Tracklist />);
+      const anchor = document.querySelector<HTMLElement>(".generation-selection-anchor")!;
+      const height = anchor.style.height;
+      resize();
+      resize();
+      expect(requestFrame).toHaveBeenCalledTimes(1);
+      expect(anchor.style.height).toBe(height);
+      unmount();
+      expect(cancelFrame).toHaveBeenCalledWith(7);
+      expect(anchor.style.height).toBe("");
+    } finally {
+      requestFrame.mockRestore();
+      cancelFrame.mockRestore();
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("normalizes the former All filter to To make, keeps empty rows visible, and uses disjoint audio-ready tabs", () => {
     render(<Tracklist initialFilter="all" />);
     expect(screen.getAllByRole("tab")).toHaveLength(2);
@@ -147,11 +174,38 @@ describe("Generate chapter targets", () => {
     const exportChapters = vi.fn();
     render(<Tracklist snapshot={snapshot} initialFilter={initialFilter} generate={generate} exportChapters={exportChapters} />);
     fireEvent.click(screen.getByRole("checkbox", { name: `Select ${title}` }));
+    const options = screen.getByText("More options").closest("details")!;
+    const regenerate = screen.getByRole("button", { name: "Regenerate 1 selected" });
+    expect(options).not.toHaveAttribute("open");
+    expect(regenerate).not.toBeVisible();
+    expect(generate).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Export →" }));
     expect(exportChapters).toHaveBeenCalledWith([readyId]);
     expect(generate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "Regenerate 1 selected" }));
+    fireEvent.click(screen.getByText("More options"));
+    expect(regenerate).toBeVisible();
+    expect(generate).not.toHaveBeenCalled();
+    fireEvent.keyDown(options, { key: "Escape" });
+    expect(options).not.toHaveAttribute("open");
+    expect(screen.getByText("More options")).toHaveFocus();
+    fireEvent.click(screen.getByText("More options"));
+    fireEvent.click(regenerate);
     expect(generate).toHaveBeenCalledWith([readyId]);
+    expect(options).not.toHaveAttribute("open");
+  });
+
+  it("closes regeneration options when selection changes, without dispatching work", () => {
+    const snapshot = snapshotFor("generate-stale");
+    const generate = vi.fn();
+    render(<Tracklist snapshot={snapshot} initialFilter="generated" generate={generate} />);
+    const [first, second] = screen.getAllByRole("checkbox");
+    fireEvent.click(first);
+    fireEvent.click(screen.getByText("More options"));
+    expect(screen.getByRole("button", { name: "Regenerate 1 selected" })).toBeVisible();
+    fireEvent.click(second);
+    expect(screen.getByText("More options").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Regenerate 2 selected" })).not.toBeVisible();
+    expect(generate).not.toHaveBeenCalled();
   });
 
   it("keeps existing current audio out of mixed generation and its duration estimate", () => {
