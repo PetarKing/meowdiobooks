@@ -36,7 +36,7 @@ export const Configured: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: 'Choose speaker-check route' }))
-    const dialog = within(canvas.getByRole('dialog'))
+    const dialog = within(within(canvasElement.ownerDocument.body).getByRole('dialog'))
     await expect(dialog.queryByRole('button', { name: /^Use / })).not.toBeInTheDocument()
     await userEvent.click(dialog.getByRole('button', { name: /^Luna/ }))
     await expect(dialog.getByRole('button', { name: /^Luna/ })).toHaveAttribute('aria-pressed', 'true')
@@ -51,7 +51,7 @@ export const CredentialUnavailable: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement)
     await userEvent.click(canvas.getByRole('button', { name: 'Choose speaker-check route' }))
-    const dialog = within(canvas.getByRole('dialog'))
+    const dialog = within(within(canvasElement.ownerDocument.body).getByRole('dialog'))
     await expect(dialog.getByRole('button', { name: /^Luna/ })).toBeDisabled()
     await waitFor(() => expect(dialog.getByText('Remote model unavailable: API credentials are not configured.')).toBeVisible())
     await userEvent.click(dialog.getByRole('button', { name: /^Qwen/ }))
