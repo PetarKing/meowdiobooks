@@ -25,6 +25,17 @@ The frontend page views in `frontend/src/pages` receive typed selections from
 `app/useWorkflowModel`; the model owns workflow state and commands. Page extraction preserves
 the accepted application's existing mount boundaries. Render functions invoked directly by the
 shell remain hook-free; reusable stateful components mount normally inside those views.
+Browser return hints retain the selected book and stable journey step independently of the active-job
+marker. Reloads hydrate authoritative snapshots and pending candidates before reattaching a job, and
+again when it settles; they never rerun a provider command. Review candidates reopen for inspection,
+and completed extraction candidates offer explicit acceptance rather than publishing on reload.
+Explicit Home/Library navigation, including an initial Library URL, wins over
+a delayed restore. Missing or invalid books discard their hints; transient failures retain them with
+a Retry action. Extraction previews load only when the Extract view needs them. Browser storage is
+best-effort and contains identifiers, not artifacts or authority. Hosts must supply
+`workflowPersistenceNamespace` per identity (and remount on identity changes) to isolate browser hints;
+hosts that reload after deferred commands use `persistWorkflowReturn` from the public workflow entry.
+
 Storybook exercises the same source with deterministic synthetic gateways. It is a development
 surface and is excluded from the consumer package.
 
@@ -54,6 +65,14 @@ and known vulnerable parser versions; it does not provide a general CPU/memory s
 PDF extraction. Companion deployments must consume a new immutable release to adopt the repair.
 The dependency rationale also includes pdfminer's
 [removal of unsafe pickle-based CMap loading](https://github.com/pdfminer/pdfminer.six/releases/tag/20251230).
+
+### Book-list fault isolation
+
+Book discovery validates each record and workspace independently. A malformed book is omitted from
+the list without reinterpreting retired stages, changing its data, or hiding healthy books. Mutations
+of healthy records preserve unrelated raw records, including malformed ones. Non-book failures and
+store-wide failures remain explicit errors; isolation does not turn an inaccessible store into an
+empty shelf.
 
 ## Authority and publication
 

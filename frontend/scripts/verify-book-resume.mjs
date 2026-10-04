@@ -70,11 +70,9 @@ try {
       await page.keyboard.press('Enter');
       await page.locator('.wizard-steps, nav[aria-label="Wizard stages"], nav[aria-label="制作流程"]').first().waitFor();
       await page.reload();
-      await open.waitFor();
-      for (let tab = 0; tab < 20 && !(await open.evaluate(el => el === document.activeElement)); tab++) await page.keyboard.press('Tab');
-      assert(await open.evaluate(el => el === document.activeElement));
-      await page.keyboard.press('Enter');
       await page.locator('.step-eyebrow').filter({ hasText: locale === 'en' ? 'Step 3 · Review' : '第 3 步 · 审核' }).waitFor();
+      await page.locator('.brand').click();
+      await open.waitFor();
       fail = true;
       await page.reload();
       await page.getByRole('alert').waitFor();

@@ -4,7 +4,8 @@ import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
 import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, WorkflowGateway, WizardSnapshot, WizardStage } from './api/contracts'
 import { buildReviewWarningDecisions } from './reviewDecisions'
-import { publicJourney } from './workflow/navigation'
+import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
+import { workflowStorageKey } from './workflow/workflowLocation'
 
 vi.mock('./api/client', () => ({ wizardApi: {
   importBook: vi.fn(), getBookSnapshot: vi.fn(), previewExtraction: vi.fn(), previewDialogue: vi.fn(),
@@ -406,7 +407,7 @@ describe('v2 wizard', () => {
     )
     let finishPreview!: (value: Awaited<ReturnType<typeof wizardApi.previewExtraction>>) => void
     vi.mocked(wizardApi.previewExtraction).mockImplementationOnce(() => new Promise((resolve) => { finishPreview = resolve }))
-    const pageButton = screen.getByRole('button', { name: /p\. 12 dense dialogue/ })
+    const pageButton = await screen.findByRole('button', { name: /p\. 12 dense dialogue/ })
 
     pageButton.focus()
     fireEvent.click(pageButton)
@@ -2235,7 +2236,6 @@ describe('v2 wizard', () => {
     await screen.findByRole('navigation', { name: 'Wizard stages' })
     first.unmount()
     render(<App />)
-    fireEvent.click(await screen.findByRole('button', { name: /Alice.*Continue/ }))
     await screen.findByRole('navigation', { name: 'Wizard stages' })
     expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(2)
     expect(wizardApi.importBook).not.toHaveBeenCalled()
@@ -3633,4 +3633,233 @@ describe('v2 wizard', () => {
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
+  it('returns to the selected finished step after the active-job marker has been cleared', async () => {
+    await open()
+    fireEvent.click(screen.getByRole('button', { name: 'Dialogue Complete' }))
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('meowdiobooks.workflowLocation')!).stepId).toBe('dialogue'))
+    const { cleanup } = await import('@testing-library/react')
+    cleanup()
+    render(<App />)
+    expect(await screen.findByText('Transcript ready')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Dialogue Complete' })).toHaveAttribute('aria-current', 'step')
+    expect(wizardApi.getJob).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+  })
+
+  it('hydrates the running job book before completion and returns to its saved pending Dialogue result', async () => {
+    persistWorkflowReturn('book-1', 'dialogue', { activeJobId: 'dialogue-running' })
+    const pending: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract'] },
+      pendingCandidates: { dialogue: { revision: 'dialogue-saved', status: 'candidate' } } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValueOnce({ ...pending, pendingCandidates: undefined }).mockResolvedValue(pending)
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'dialogue-saved', spans: [], resultSummary: { explicitTurns: 1, aiAttributed: 0, unresolved: 0 } })
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'dialogue-running', kind: 'v2:dialogue', status: 'running', payload: { book_id: 'book-1' } })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<App />)
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Dialogue In progress' })).toHaveAttribute('aria-current', 'step')
+    finish({ id: 'dialogue-running', kind: 'v2:dialogue', status: 'succeeded', payload: { book_id: 'book-1' } })
+    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
+    view.unmount()
+    render(<App />)
+    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it.each(['home', 'library'])('honors explicit %s navigation over an old running-job marker on reload', async (destination) => {
+    await open()
+    if (destination === 'home') fireEvent.click(screen.getByRole('button', { name: 'Go to Home' }))
+    else fireEvent.click(screen.getByRole('button', { name: 'Library' }))
+    await waitFor(() => expect(JSON.parse(localStorage.getItem('meowdiobooks.workflowLocation')!).view).toBe(destination === 'home' ? 'create' : 'library'))
+    localStorage.setItem('meowdiobooks.activeJob', 'old-job')
+    const { cleanup } = await import('@testing-library/react')
+    cleanup()
+    vi.mocked(wizardApi.getBookSnapshot).mockClear()
+    render(<App />)
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument())
+    expect(wizardApi.getJob).not.toHaveBeenCalled()
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
+    if (destination === 'library') expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
+    else expect(await screen.findByRole('button', { name: /Alice.*Continue/ })).toBeInTheDocument()
+  })
+
+  it.each(['Go to Home', 'Library'])('does not override %s navigation when an old restore finishes late', async (destination) => {
+    persistWorkflowReturn('book-1', 'generate')
+    let finish!: (snapshot: WizardSnapshot) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    render(<App />)
+    fireEvent.click(screen.getByRole('button', { name: destination }))
+    finish(base)
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument())
+    expect(screen.queryByText('Record your chapters')).not.toBeInTheDocument()
+  })
+
+  it('scopes return hints to the host account and ignores unscoped legacy jobs', async () => {
+    persistWorkflowReturn('book-1', 'generate', { namespace: 'account-a', activeJobId: 'account-a-job' })
+    localStorage.setItem('meowdiobooks.activeJob', 'legacy-job')
+    render(<App workflowPersistenceNamespace="account-b" />)
+    await waitFor(() => expect(screen.queryByText('Loading books…')).not.toBeInTheDocument())
+    expect(wizardApi.getJob).not.toHaveBeenCalled()
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
+    expect(localStorage.getItem(workflowStorageKey('activeJob', 'account-a'))).toBe('account-a-job')
+  })
+
+  it('ignores the previous account snapshot when identity changes during restore', async () => {
+    persistWorkflowReturn('book-1', 'generate', { namespace: 'account-a' })
+    let finish!: (snapshot: WizardSnapshot) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<App workflowPersistenceNamespace="account-a" />)
+    view.rerender(<App workflowPersistenceNamespace="account-b" />)
+    finish(base)
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument())
+    expect(localStorage.getItem(workflowStorageKey('location', 'account-b')) ?? '').not.toContain('book-1')
+  })
+
+  it('retains a failed return hint and retries a temporary snapshot outage', async () => {
+    persistWorkflowReturn('book-1', 'generate')
+    vi.mocked(wizardApi.getBookSnapshot).mockRejectedValueOnce(Object.assign(new Error('Temporarily offline'), { status: 503 })).mockResolvedValue(base)
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Temporarily offline')
+    expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('clears a deleted book return and old job marker instead of trapping the user', async () => {
+    persistWorkflowReturn('book-removed', 'dialogue', { activeJobId: 'removed-job' })
+    vi.mocked(wizardApi.getBookSnapshot).mockRejectedValueOnce(Object.assign(new Error('Book not found'), { status: 404 }))
+    render(<App />)
+    await waitFor(() => expect(localStorage.getItem('meowdiobooks.workflowLocation')).not.toContain('book-removed'))
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(wizardApi.getJob).not.toHaveBeenCalled()
+  })
+
+  it('keeps the useful book available when its remembered job has disappeared', async () => {
+    persistWorkflowReturn('book-1', 'generate', { activeJobId: 'removed-job' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    vi.mocked(wizardApi.getJob).mockRejectedValueOnce(Object.assign(new Error('Job not found'), { status: 404 }))
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
+    expect(await screen.findByRole('alert')).toHaveTextContent('Job not found')
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+  })
+
+  it('restores a finished pending Review scan without running it again', async () => {
+    persistWorkflowReturn('book-1', 'review')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      pendingCandidates: { review: { revision: 'review-ready', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-ready', warnings: [], boundaryCandidates: [] })
+    render(<App />)
+    await screen.findByRole('navigation', { name: 'Wizard stages' })
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'review', 'review-ready')
+    expect(screen.queryByRole('button', { name: /Scan for issues/ })).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('ignores an old job marker for another book while restoring the saved current book', async () => {
+    persistWorkflowReturn('book-1', 'generate', { activeJobId: 'another-book-job' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'another-book-job', status: 'running', payload: { book_id: 'another-book' } })
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalledWith('another-book')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('returns to a completed Extraction candidate after reload and accepts it without rerunning the parser', async () => {
+    persistWorkflowReturn('book-1', 'extract', { activeJobId: 'extraction-finished' })
+    const pending: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'extract-ready', status: 'candidate' } },
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-ready', method: 'native' })
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'extraction-finished', kind: 'v2:extract', status: 'succeeded', payload: { book_id: 'book-1' }, result: { revision: 'extract-ready' } })
+    const first = render(<App />)
+    expect(await screen.findByRole('button', { name: 'Accept completed extraction →' })).toBeInTheDocument()
+    await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
+    first.unmount()
+    render(<App />)
+    const accept = await screen.findByRole('button', { name: 'Accept completed extraction →' })
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...pending,
+      book: { ...pending.book, completedStages: ['import', 'extract'] }, pendingCandidates: undefined,
+    })
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
+    fireEvent.click(accept)
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'extract', 'extract-ready', []))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('honors an explicit initial Library URL over a saved book destination', async () => {
+    persistWorkflowReturn('book-1', 'generate', { activeJobId: 'saved-job' })
+    window.history.replaceState({}, '', '/library')
+    render(<App />)
+    expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
+    expect(wizardApi.getJob).not.toHaveBeenCalled()
+    expect(window.location.pathname).toBe('/library')
+  })
+
+  it('retains the return destination when a candidate lookup fails with 404', async () => {
+    persistWorkflowReturn('book-1', 'cast')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      pendingCandidates: { cast: { revision: 'missing-candidate', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockRejectedValueOnce(Object.assign(new Error('Candidate not found'), { status: 404 }))
+    render(<App />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Candidate not found')
+    expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+  })
+
+  it('discards a late manual book open when the host account changes', async () => {
+    vi.mocked(wizardApi.listBooks).mockResolvedValueOnce([{ id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 }]).mockResolvedValue([])
+    let finish!: (snapshot: WizardSnapshot) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<App workflowPersistenceNamespace="account-a" />)
+    fireEvent.click(await screen.findByRole('button', { name: /Alice.*Continue/ }))
+    view.rerender(<App workflowPersistenceNamespace="account-b" />)
+    finish(base)
+    await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument())
+    expect(screen.queryByText('Record your chapters')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('Alice')).not.toBeInTheDocument())
+    expect(localStorage.getItem(workflowStorageKey('location', 'account-b')) ?? '').not.toContain('book-1')
+  })
+
+  it('reattaches a completed Review job and retains its ready scan after the job marker is cleared', async () => {
+    persistWorkflowReturn('book-1', 'review', { activeJobId: 'review-finished' })
+    const pending: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      pendingCandidates: { review: { revision: 'review-ready', status: 'candidate' } },
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValueOnce({ ...pending, pendingCandidates: undefined }).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-ready', warnings: [], boundaryCandidates: [] })
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'review-finished', kind: 'v2:review', status: 'succeeded', payload: { book_id: 'book-1' }, result: { revision: 'review-ready' } })
+    const first = render(<App />)
+    await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
+    await screen.findByRole('button', { name: 'Review Draft ready' })
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'review', 'review-ready')
+    expect(screen.queryByRole('button', { name: /Scan for issues/ })).not.toBeInTheDocument()
+    first.unmount()
+    render(<App />)
+    await screen.findByRole('navigation', { name: 'Wizard stages' })
+    expect(screen.getByRole('button', { name: 'Review Draft ready' })).toHaveAttribute('aria-current', 'step')
+    expect(screen.queryByRole('button', { name: /Scan for issues/ })).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
 })

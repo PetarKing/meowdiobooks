@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { wizardApi as defaultWorkflowGateway, normalizeDialogueArtifact } from "../api/client";
 import type {
   AcceptanceDecision,
+  ArtifactCandidate,
   AudioExportPreset,
   CastArtifact,
   DialogueArtifact,
@@ -76,6 +77,7 @@ import {
 } from "../workflow/presentation";
 import type { AppProps, WorkflowCapabilities } from "./contracts";
 import { dialogueCorrections } from "./dialogueCorrections";
+import { readWorkflowLocation, readWorkflowStorage, writeWorkflowStorage, workflowStorageKey, type WorkflowLocation } from "../workflow/workflowLocation";
 import { draftVoiceSelection } from "../workflow/voiceSelection";
 
 const emptyDialogue: DialogueArtifact = {
@@ -92,6 +94,14 @@ const emptyDialogue: DialogueArtifact = {
   attributionTargets: ["unlabelled-candidates"],
 };
 
+class BookSnapshotError extends Error {
+  readonly status?: number;
+  constructor(reason: unknown) {
+    super(message(reason));
+    this.status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : undefined;
+  }
+}
+
 const dialogueScanVersion = 6;
 
 const publicWorkflowCapabilities: WorkflowCapabilities = {
@@ -106,6 +116,7 @@ const publicWorkflowCapabilities: WorkflowCapabilities = {
 export function useWorkflowModel({
   gateway = defaultWorkflowGateway,
   journey = publicJourney,
+  workflowPersistenceNamespace,
   stepOverrides = {},
   renderHeader,
   renderLibraryActions,
@@ -133,7 +144,20 @@ export function useWorkflowModel({
 
   const [productView, setProductView] = useState<ProductView>(() => productViewFromPath(window.location.pathname));
 
-  const [home, setHome] = useState(true);
+  const [home, setHomeState] = useState(true);
+  const locationKey = workflowStorageKey("location", workflowPersistenceNamespace);
+  const jobKey = workflowStorageKey("activeJob", workflowPersistenceNamespace);
+  const navigationVersion = useRef(0);
+  const [restoringLocation, setRestoringLocation] = useState(true);
+  const [returnLocation, setReturnLocation] = useState<WorkflowLocation>();
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const readyLocationKey = useRef<string | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
+  const scopeRef = useRef(workflowPersistenceNamespace);
+  scopeRef.current = workflowPersistenceNamespace;
+  const gatewayRef = useRef(gateway);
+  gatewayRef.current = gateway;
 
   const [sidebarCollapsed, setSidebarCollapsed] = useState(persistedSidebarCollapsed);
 
@@ -189,7 +213,9 @@ export function useWorkflowModel({
 
   const [method, setMethod] = useState<ExtractionMethod>("liteparse");
 
+  const [extractionCandidate, setExtractionCandidate] = useState<ArtifactCandidate>();
   const [extractionPreview, setExtractionPreview] = useState<ExtractionPreview>();
+  const extractionPreviewRequest = useRef(0);
 
   const [dialogue, setDialogue] = useState<DialogueArtifact>(emptyDialogue);
 
@@ -309,9 +335,9 @@ export function useWorkflowModel({
 
   const [revisingStages, setRevisingStages] = useState<string[]>([]);
 
-  const booksRequest = useRef<{ gateway: typeof gateway; promise: Promise<void> } | undefined>(undefined);
+  const booksRequest = useRef<{ gateway: typeof gateway; namespace?: string; promise: Promise<void> } | undefined>(undefined);
   const loadBooks = useCallback(() => {
-    if (booksRequest.current?.gateway === gateway) return booksRequest.current.promise;
+    if (booksRequest.current?.gateway === gateway && booksRequest.current?.namespace === workflowPersistenceNamespace) return booksRequest.current.promise;
     setBooksError(false);
     setBooksLoading(true);
     const request = gateway.listBooks()
@@ -326,28 +352,29 @@ export function useWorkflowModel({
         booksRequest.current = undefined;
         setBooksLoading(false);
       });
-    booksRequest.current = { gateway, promise: request };
+    booksRequest.current = { gateway, namespace: workflowPersistenceNamespace, promise: request };
     return request;
-  }, [gateway]);
+  }, [gateway, workflowPersistenceNamespace]);
 
-  const libraryRequest = useRef<Promise<void> | undefined>(undefined);
+  const libraryRequest = useRef<{ gateway: typeof gateway; namespace?: string; promise: Promise<void> } | undefined>(undefined);
 
   const reviewStripRef = useRef<HTMLDivElement | null>(null);
   const loadLibrary = useCallback(() => {
-    if (libraryRequest.current) return libraryRequest.current;
+    if (libraryRequest.current?.gateway === gateway && libraryRequest.current?.namespace === workflowPersistenceNamespace) return libraryRequest.current.promise;
     setLibraryError(undefined);
     setLibraryLoading(true);
     const request = gateway.listLibrary()
-      .then(setLibraryExports)
-      .catch((reason) => setLibraryError(message(reason)))
+      .then((rows) => { if (libraryRequest.current?.promise === request) setLibraryExports(rows); })
+      .catch((reason) => { if (libraryRequest.current?.promise === request) setLibraryError(message(reason)); })
       .finally(() => {
-        if (libraryRequest.current === request) libraryRequest.current = undefined;
+        if (libraryRequest.current?.promise !== request) return;
+        libraryRequest.current = undefined;
         setLibraryReady(true);
         setLibraryLoading(false);
       });
-    libraryRequest.current = request;
+    libraryRequest.current = { gateway, namespace: workflowPersistenceNamespace, promise: request };
     return request;
-  }, [gateway]);
+  }, [gateway, workflowPersistenceNamespace]);
 
   const book = snapshot?.book;
 
@@ -368,6 +395,7 @@ export function useWorkflowModel({
     : snapshot ? Math.min(stageIndex("generate"), Math.max(0, nextStage(completed))) : 0;
 
   const hasDraft = (stageId?: WizardStep) => {
+    if (stageId === "extract") return Boolean(extractionCandidate);
     if (stageId === "dialogue") return Boolean(dialogueCandidate) && !editingAcceptedDialogue;
     if (stageId === "review") return Boolean(reviewCandidate);
     if (stageId === "cast") return Boolean(castCandidate && castCandidate.revision !== snapshot?.cast?.revision);
@@ -415,6 +443,9 @@ export function useWorkflowModel({
   }, [book, gateway, reviewCandidate?.revision, reviewDecisions, reviewFinalCheck, reviewPreviewPage]);
 
   useEffect(() => {
+    setBooks([]);
+    setLibraryExports([]);
+    setLibraryReady(false);
     void loadBooks();
     void loadLibrary();
   }, [loadBooks, loadLibrary]);
@@ -432,39 +463,128 @@ export function useWorkflowModel({
   useEffect(() => {
     const restoreProductView = () => {
       const next = productViewFromPath(window.location.pathname);
+      readyLocationKey.current = locationKey;
+      navigationVersion.current += 1;
+      setReturnLocation(undefined);
+      setRestoringLocation(false);
+      setBusy(false);
+      setActiveJob(undefined);
       setProductView(next);
       if (next === "library") void loadLibrary();
     };
     window.addEventListener("popstate", restoreProductView);
     return () => window.removeEventListener("popstate", restoreProductView);
-  }, [loadLibrary]);
+  }, [loadLibrary, locationKey]);
 
   useEffect(() => {
-    const id = localStorage.getItem("meowdiobooks.activeJob");
-    if (!id) return;
-    setBusy(true);
-    void runJob({ id, status: "running" }, async (job) => {
-      const bookId = typeof job.result?.bookId === "string"
-        ? job.result.bookId
-        : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
-      if (bookId) {
-        const next = await restoreBookView(bookId);
-        if (job.kind === "v2:generate" && job.status === "succeeded") {
-          const settings = job.payload?.settings as Record<string, unknown> | undefined;
-          const requested = Array.isArray(settings?.chapterIds)
-            ? settings.chapterIds.filter((id): id is string => typeof id === "string")
-            : Array.isArray(job.result?.chapters)
-              ? job.result.chapters.flatMap((row) => typeof row?.chapterId === "string" ? [row.chapterId] : [])
-              : [];
-          selectCompletedChapters(next, requested);
-        }
+    let disposed = false;
+    const version = navigationVersion.current;
+    const current = () => !disposed && navigationVersion.current === version
+      && scopeRef.current === workflowPersistenceNamespace;
+    const saved = readWorkflowLocation(locationKey);
+    const id = readWorkflowStorage(jobKey);
+    readyLocationKey.current = null;
+    setRestoringLocation(true);
+    setReturnLocation(undefined);
+    setError(undefined);
+    setBusy(Boolean(id || saved?.bookId));
+    setActiveJob(undefined);
+    setSnapshot(undefined);
+    setHomeState(true);
+    const restore = async () => {
+      // An explicit Home/Library visit takes precedence over an old active-job marker.
+      if (saved && (window.location.pathname === productPaths.library || saved.home || saved.view === "library")) {
+        setProductView(window.location.pathname === productPaths.library ? "library" : saved.view);
+        return;
       }
-    })
-      .catch((reason) => setError(message(reason)))
-      .finally(() => setBusy(false));
-    // Reattach once per gateway; hydrate and runJob intentionally consume the current app state.
+      let job: Job | undefined;
+      let restored: WizardSnapshot | undefined;
+      if (saved?.bookId) {
+        restored = await restoreBookView(saved.bookId, saved.stepId, current);
+      }
+      if (!current()) return;
+      if (id) {
+        try { job = await pollJobWithForegroundRefresh(gateway, id); }
+        catch (reason) {
+          if (!isRetryableJobPollError(reason)) writeWorkflowStorage(jobKey, null);
+          throw reason;
+        }
+        if (!current()) return;
+        const bookId = typeof job.result?.bookId === "string" ? job.result.bookId
+          : typeof job.payload?.book_id === "string" ? job.payload.book_id : undefined;
+        if (saved?.bookId && bookId && saved.bookId !== bookId) {
+          writeWorkflowStorage(jobKey, null);
+          return;
+        }
+        if (!restored && bookId) restored = await restoreBookView(bookId, saved?.stepId, current);
+        if (!current()) return;
+        await runJob(job, async (settled) => {
+          if (!current()) return;
+          const target = restored?.book.id ?? bookId;
+          if (!target) return;
+          const next = await restoreBookView(target, saved?.stepId, current);
+          if (!current()) return;
+          if (settled.kind === "v2:generate" && settled.status === "succeeded") {
+            const settings = settled.payload?.settings as Record<string, unknown> | undefined;
+            const requested = Array.isArray(settings?.chapterIds)
+              ? settings.chapterIds.filter((id): id is string => typeof id === "string")
+              : Array.isArray(settled.result?.chapters)
+                ? settled.result.chapters.flatMap((row) => typeof row?.chapterId === "string" ? [row.chapterId] : []) : [];
+            selectCompletedChapters(next, requested);
+          }
+        }, current);
+      }
+    };
+    void restore().catch((reason) => {
+      if (!current()) return;
+      const status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : undefined;
+      if (reason instanceof BookSnapshotError && (status === 404 || status === 422) && saved?.bookId) {
+        writeWorkflowStorage(jobKey, null);
+        writeWorkflowStorage(locationKey, null);
+        setHomeState(true);
+      } else {
+        setError(message(reason));
+        setReturnLocation(saved ?? { view: "create", home: false });
+      }
+    }).finally(() => {
+      if (!current()) return;
+      readyLocationKey.current = locationKey;
+      setBusy(false);
+      setRestoringLocation(false);
+    });
+    return () => { disposed = true; };
+    // Hydration consumes the current model; restoring is scoped to gateway and host identity.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [gateway]);
+  }, [gateway, workflowPersistenceNamespace, restoreAttempt]);
+
+  useEffect(() => {
+    if (restoringLocation || returnLocation || readyLocationKey.current !== locationKey) return;
+    writeWorkflowStorage(locationKey, JSON.stringify({
+      view: productView, home,
+      ...(book && !home ? { bookId: book.id, stepId: stages[stage]?.id } : {}),
+    } satisfies WorkflowLocation));
+  }, [book, home, locationKey, productView, restoringLocation, returnLocation, stage, stages]);
+
+  // Extraction preview is a separate, lazy UI concern. A later-stage return must not
+  // depend on PDF preview availability (including historical books without a filename).
+  useEffect(() => {
+    if (!book || home || productView !== "create" || stages[stage]?.builtin !== "extract"
+      || extractionCandidate
+      || (completed.includes("extract") && !revisingStages.includes("extract"))) return;
+    let disposed = false;
+    const request = ++extractionPreviewRequest.current;
+    setRepresentatives([]);
+    setExtractionPreview(undefined);
+    void gateway.getRepresentativePages(book.id).then(async (pages) => {
+      if (disposed || request !== extractionPreviewRequest.current) return;
+      setRepresentatives(pages);
+      const preview = await gateway.previewExtraction(book.id, pages[0]?.page ?? 1, method);
+      if (!disposed && request === extractionPreviewRequest.current) setExtractionPreview(preview);
+    }).catch((reason) => { if (!disposed && request === extractionPreviewRequest.current) setError(message(reason)); });
+    return () => { disposed = true; };
+  // Preview controls fetch their own chosen pages and methods.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book?.id, home, productView, stage, extractionCandidate, revisingStages, gateway]);
 
   useEffect(() => {
     if (!activeJob || !["queued", "running"].includes(activeJob.status)) return;
@@ -481,20 +601,31 @@ export function useWorkflowModel({
     return () => window.removeEventListener("keydown", closePlayer);
   }, [listeningChapterId]);
 
-  async function hydrate(bookId: string) {
-    let next = await gateway.getBookSnapshot(bookId);
+  async function hydrate(bookId: string, current = () => mounted.current
+    && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway) {
+    const readSnapshot = () => gateway.getBookSnapshot(bookId).catch((reason) => { throw new BookSnapshotError(reason); });
+    let next = await readSnapshot();
+    if (!current()) return next;
     if (
       next.book.completedStages.includes("cast")
       && !next.recordingScript
       && !next.dialogueRecovery
     ) {
       await gateway.prepareRecordingScript(bookId);
-      next = await gateway.getBookSnapshot(bookId);
+      next = await readSnapshot();
       if (!next.recordingScript) throw new Error("Generate could not be prepared. Your approved work is unchanged.");
     }
+    const pendingExtractionRevision = next.pendingCandidates?.extraction?.revision;
+    const pendingExtraction = pendingExtractionRevision
+      ? await gateway.getStageCandidate(bookId, "extract", pendingExtractionRevision)
+      : undefined;
     const pendingDialogueRevision = next.pendingCandidates?.dialogue?.revision;
     const pendingDialogue = pendingDialogueRevision
       ? await gateway.getStageCandidate(bookId, "dialogue", pendingDialogueRevision)
+      : undefined;
+    const pendingReviewRevision = next.pendingCandidates?.review?.revision;
+    const pendingReview = pendingReviewRevision
+      ? await gateway.getStageCandidate(bookId, "review", pendingReviewRevision)
       : undefined;
     const pendingCastRevision = next.pendingCandidates?.cast?.revision;
     const pendingCast = pendingCastRevision
@@ -509,12 +640,14 @@ export function useWorkflowModel({
       pendingDialoguePreview?.conflicts?.length || pendingDialoguePreview?.structuralIssues?.length,
     );
     const stalePreflightCandidate = pendingNeedsPreflight && pendingDialoguePreview?.scanVersion !== dialogueScanVersion;
+    if (!current()) return next;
     setSnapshot(next);
+    setExtractionCandidate(pendingExtraction);
     setDialogue(pendingNeedsPreflight && !stalePreflightCandidate ? pendingDialoguePreview! : hydratedDialogue);
     setDialogueCandidate(pendingNeedsPreflight ? undefined : pendingDialogue);
     setDialogueInitialDecisions([]);
     setEditingAcceptedDialogue(false);
-    setReviewCandidate(undefined);
+    setReviewCandidate(pendingReview);
     setReviewDecisions({});
     setBoundaryDecisions({});
     setReviewFinalCheck(false);
@@ -583,20 +716,22 @@ export function useWorkflowModel({
     return next;
   }
 
-  async function runJob(initial: Job, onSettled?: (job: Job) => Promise<void>): Promise<Job> {
+  async function runJob(initial: Job, onSettled?: (job: Job) => Promise<void>, isCurrent = () => mounted.current && scopeRef.current === workflowPersistenceNamespace): Promise<Job> {
     let current = initial;
     let consecutivePollFailures = 0;
     setActiveJob(current);
-    localStorage.setItem("meowdiobooks.activeJob", current.id);
+    writeWorkflowStorage(jobKey, current.id);
     while (["queued", "running"].includes(current.status)) {
       setProgress(current.progress ?? 0);
       setProcessMessage(current.message ?? "");
       try {
         current = await pollJobWithForegroundRefresh(gateway, current.id);
+        if (!isCurrent()) return current;
         consecutivePollFailures = 0;
       } catch (reason) {
+        if (!isCurrent()) return current;
         if (!isRetryableJobPollError(reason)) {
-          localStorage.removeItem("meowdiobooks.activeJob");
+          writeWorkflowStorage(jobKey, null);
           setActiveJob(undefined);
           throw reason;
         }
@@ -606,6 +741,7 @@ export function useWorkflowModel({
           jobPollIntervalMs * 2 ** (consecutivePollFailures - 1),
           maximumJobPollBackoffMs,
         ));
+        if (!isCurrent()) return current;
         continue;
       }
       setActiveJob(current);
@@ -613,9 +749,11 @@ export function useWorkflowModel({
       setProcessMessage(current.message ?? "");
       if (["queued", "running"].includes(current.status)) {
         await waitForNextJobPoll(jobPollIntervalMs);
+        if (!isCurrent()) return current;
       }
     }
-    localStorage.removeItem("meowdiobooks.activeJob");
+    if (!isCurrent()) return current;
+    writeWorkflowStorage(jobKey, null);
     setActiveJob(undefined);
     // Reattachment must restore saved book context even when the worker failed.
     if (onSettled) await onSettled(current);
@@ -690,7 +828,7 @@ export function useWorkflowModel({
     setProcessMessage("Preparing complete extraction");
     setProgress(0);
     try {
-      const candidate = await processCandidate("extract", { method });
+      const candidate = extractionCandidate ?? await processCandidate("extract", { method });
       if (!candidate.revision) throw new Error("extract did not return a candidate revision");
       setBusy(true);
       setProcessMessage("Publishing extraction");
@@ -718,8 +856,7 @@ export function useWorkflowModel({
       const result = await gateway.importBook(file);
       const next = await hydrate(result.book.id);
       setRepresentatives(result.representativePages);
-      const page = result.representativePages[0]?.page ?? 1;
-      setExtractionPreview(await gateway.previewExtraction(result.book.id, page, method));
+      setExtractionPreview(undefined);
       setBooks((current) => [result.book, ...current.filter((row) => row.id !== result.book.id)]);
       setFile(undefined);
       setStage(routeStage(nextStage(next.book.completedStages), next));
@@ -731,28 +868,53 @@ export function useWorkflowModel({
     }
   }
 
-  async function restoreBookView(bookId: string) {
-    const next = await hydrate(bookId);
-    const pages = await gateway.getRepresentativePages(bookId);
-    setRepresentatives(pages);
-    setExtractionPreview(await gateway.previewExtraction(bookId, pages[0]?.page ?? 1, method));
-    setStage(routeStage(nextStage(next.book.completedStages), next));
-    navigateProduct("create");
-    setHome(false);
+  async function restoreBookView(bookId: string, stepId?: string, current = () => true) {
+    const next = await hydrate(bookId, current);
+    if (!current()) return next;
+    const requested = stepId ? stages.findIndex((row) => row.id === stepId) : -1;
+    const unlocked = next.generatedChapters.some((row) => row.current)
+      ? stageIndex("export") : Math.min(stageIndex("generate"), nextStage(next.book.completedStages));
+    setStage(routeStage(requested >= 0 && requested <= unlocked ? requested : nextStage(next.book.completedStages), next));
+    if (window.location.pathname !== productPaths.create) window.history.replaceState({}, "", productPaths.create);
+    setProductView("create");
+    setHomeState(false);
+    writeWorkflowStorage(locationKey, JSON.stringify({ view: "create", home: false, bookId, stepId: stages[requested >= 0 && requested <= unlocked ? requested : nextStage(next.book.completedStages)]?.id } satisfies WorkflowLocation));
     return next;
   }
 
+  function setHome(next: boolean) {
+    readyLocationKey.current = locationKey;
+    navigationVersion.current += 1;
+    setReturnLocation(undefined);
+    setRestoringLocation(false);
+    setBusy(false);
+    setActiveJob(undefined);
+    setHomeState(next);
+  }
+
+  function retryWorkflowReturn() {
+    setRestoreAttempt((attempt) => attempt + 1);
+  }
+
   async function openBook(local: LocalBook) {
+    navigationVersion.current += 1;
+    const version = navigationVersion.current;
+    const current = () => navigationVersion.current === version && mounted.current
+      && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway;
+    setReturnLocation(undefined);
+    setRestoringLocation(false);
     setOpeningBookId(local.id);
     setBusy(true);
     setError(undefined);
     try {
-      await restoreBookView(local.id);
+      await restoreBookView(local.id, undefined, current);
     } catch (reason) {
-      setError(message(reason));
+      if (current()) setError(message(reason));
     } finally {
-      setBusy(false);
-      setOpeningBookId(undefined);
+      if (current()) {
+        setBusy(false);
+        setOpeningBookId(undefined);
+      }
     }
   }
 
@@ -773,9 +935,11 @@ export function useWorkflowModel({
 
   async function previewPage(page: number, selectedMethod = method) {
     if (!book) return;
+    const request = ++extractionPreviewRequest.current;
     setBusy(true);
     try {
-      setExtractionPreview(await gateway.previewExtraction(book.id, page, selectedMethod));
+      const preview = await gateway.previewExtraction(book.id, page, selectedMethod);
+      if (request === extractionPreviewRequest.current) setExtractionPreview(preview);
     } catch (reason) {
       setError(message(reason));
     } finally {
@@ -1072,6 +1236,12 @@ export function useWorkflowModel({
   }
 
   function navigateProduct(next: ProductView) {
+    readyLocationKey.current = locationKey;
+    navigationVersion.current += 1;
+    setReturnLocation(undefined);
+    setRestoringLocation(false);
+    setBusy(false);
+    setActiveJob(undefined);
     const path = productPaths[next];
     if (window.location.pathname !== path) window.history.pushState({}, "", path);
     setProductView(next);
@@ -1093,7 +1263,7 @@ export function useWorkflowModel({
       setError(message(reason));
     }
   }
-  return { castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
+  return { extractionCandidate, retryWorkflowReturn, returnLocation, restoringLocation, castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
 }
 
 export type WorkflowModel = ReturnType<typeof useWorkflowModel>;
