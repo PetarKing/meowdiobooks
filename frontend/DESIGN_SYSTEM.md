@@ -45,7 +45,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 
 ## Responsive behavior
 
-- Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone shows the current step above evenly spaced numbered progress markers. The standard six-step journey fits at 320px with 44px touch targets; longer host journeys can scroll. Accessible names retain every stage label and status.
+- Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone uses a slim connected row of evenly spaced numbered progress markers, with the current step in a cherry pill. Position remains available to assistive technology without repeating the page title. The standard six-step journey fits at 320px with 44px touch targets; longer host journeys can scroll. Accessible names retain every stage label and status.
 - On mobile, primary actions remain reachable without covering the final content. Horizontal choice rails must show more than one card edge so overflow is discoverable.
 - Desktop entrance artwork shares the screen with the import composition; phone stacks the illustration below the import action. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
 

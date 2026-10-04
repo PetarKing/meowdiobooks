@@ -7,7 +7,7 @@ Evidence uses the actual application and public synthetic-book gateway, without 
 
 | Before, 390px | After, 390px |
 | --- | --- |
-| ![Small scrolling stage labels](before-steps-detail-light.png) | ![Current stage and six reachable markers](after-steps-detail-light.png) |
+| ![Small scrolling stage labels](before-steps-detail-light.png) | ![Slim connected progress markers](after-steps-detail-light.png) |
 | ![Close control autofocus on keyboard opening](before-guide-390.png) | ![Neutral reading focus on modal opening](after-guide-390.png) |
 
 Full 390px/1440px light/dark captures are adjacent. The standard six-stage journey fits at 320px
@@ -16,7 +16,7 @@ retain horizontal scrolling and full stage names/statuses through their accessib
 
 ## Audit and result
 
-- Mobile navigation: current name and position above numbered/completed markers. Future steps
+- Mobile navigation: a 53px connected row of numbered/completed markers with a cherry current-step pill. The localized position is announced without a visible title or counter. Future steps
   remain disabled, previous unlocked stages remain navigable, and `aria-current="step"` is preserved.
 - Phase guide: default reading-surface focus replaces initial X focus. First Tab reaches X,
   focus remains trapped, Escape closes, and focus returns to the trigger.

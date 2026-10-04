@@ -304,12 +304,10 @@ describe('v2 wizard', () => {
     })
 
     const progress = screen.getByRole('status', { name: 'Workflow progress' })
-    expect(within(progress).getByLabelText('Step 6 of 7 · Generate')).toBeInTheDocument()
-    expect(progress).toHaveTextContent('6 / 7')
+    expect(progress).toHaveTextContent('Step 6 of 7 · Generate')
 
     fireEvent.click(screen.getByRole('button', { name: 'Soundscape Ready' }))
-    expect(within(progress).getByLabelText('Step 5 of 7 · Soundscape')).toBeInTheDocument()
-    expect(progress).toHaveTextContent('5 / 7')
+    expect(progress).toHaveTextContent('Step 5 of 7 · Soundscape')
   })
 
   it('collapses the wizard rail without changing the active stage', async () => {

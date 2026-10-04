@@ -28,7 +28,8 @@ for (const engine of [chromium, webkit]) {
         if (width <= 750) {
           assert.equal(await steps.count(), 6);
           for (const item of layout) { assert(item.width >= 44 && item.height >= 44, 'Touch target too small'); assert(item.x >= 0 && item.right <= width, 'Step outside viewport'); }
-          assert(await page.getByRole('status', { name: 'Workflow progress' }).isVisible());
+          assert(await page.getByRole('status', { name: 'Workflow progress' }).evaluate(e => e.getBoundingClientRect().width <= 1), 'Progress title stays visually hidden');
+          assert(await page.locator('.rail').evaluate(e => e.getBoundingClientRect().height <= 54), 'Mobile bar should stay slim');
           assert.equal(await nav.evaluate(e => e.scrollWidth > e.clientWidth), false, 'Six steps must fit');
         } else assert.equal(await page.getByRole('status', { name: 'Workflow progress' }).isVisible(), false);
       }
@@ -66,10 +67,10 @@ for (const engine of [chromium, webkit]) {
         assert.equal(await steps.nth(1).getAttribute('aria-current'), 'step');
       }
       assert.deepEqual(errors, []);
-      results.push({ engine:engine.name(), width, appearance, overflow, layout, entry, keyboardTrap:true, escapeAndReturn:true });
+      results.push({ engine:engine.name(), width, appearance, overflow, targets:{count:layout.length,minimumWidth:Math.min(...layout.map(r=>r.width)),minimumHeight:Math.min(...layout.map(r=>r.height)),allInsideViewport:layout.every(r=>r.x>=0&&r.right<=width)}, entry, keyboardTrap:true, escapeAndReturn:true });
       await page.close();
     }
   } finally { await browser.close(); }
 }
-await writeFile(`${out}/${phase}-report.json`, JSON.stringify(results,null,2));
+await writeFile(`${out}/${phase}-report.json`, `[\n${results.map(r => '  '+JSON.stringify(r)).join(',\n')}\n]\n`);
 console.log(`${phase}: ${results.length} browser/viewport/appearance cases passed`);
