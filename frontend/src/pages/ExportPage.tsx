@@ -54,7 +54,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
                     {exportCover && <button type="button" className="edition-use-pdf" onClick={() => setExportCover(undefined)}>{t("Use PDF page")}</button>}
                   </div>
                 </div>
-                {!exportCover && <div className="edition-cover-navigation">
+                {!exportCover && pageCount > 1 && <div className="edition-cover-navigation">
                   {pageCount > 1 && <button type="button" className="edition-cover-step" aria-label={t("Previous cover page")} disabled={exportCoverPage <= 1} onClick={() => setExportCoverPage(exportCoverPage - 1)}>‹</button>}
                   <label className="edition-page-picker">{t("Page")}<PdfCoverPageInput label={t("PDF cover page")} value={exportCoverPage} max={pageCount} onChange={setExportCoverPage} /><span aria-hidden="true">/ {pageCount}</span></label>
                   {pageCount > 1 && <button type="button" className="edition-cover-step" aria-label={t("Next cover page")} disabled={exportCoverPage >= pageCount} onClick={() => setExportCoverPage(exportCoverPage + 1)}>›</button>}
@@ -76,7 +76,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
       <div className="edition-output">
       <div className="edition-selections">
       <section className="edition-contents" aria-labelledby="edition-contents-title">
-        <header><div><h2 id="edition-contents-title">{t("Chapters to include")}</h2></div><div className="edition-bulk"><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div></header>
+        <header><div><h2 id="edition-contents-title">{t("Chapters to include")}</h2></div>{playableChapters.length > 1 && <div className="edition-bulk"><button type="button" onClick={() => setExportChapterIds(playableChapters.map((row) => row.id))}>{t("Select all")}</button><button type="button" onClick={() => setExportChapterIds([])}>{t("Clear")}</button></div>}</header>
         <div className="edition-chapters">{playableChapters.map((row) => {
           const index = (snapshot?.chapters ?? []).findIndex((chapter) => chapter.id === row.id);
           const audio = generatedByChapter.get(row.id)!;
@@ -111,7 +111,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
 
       <ExportRelease
         ariaLabel={t("Export summary")}
-        title={selectedPlayable.length ? t("{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}
+        title={selectedPlayable.length ? t(selectedPlayable.length === 1 ? "1 chapter · {{duration}}" : "{{count}} chapters · {{duration}}", { count: selectedPlayable.length, duration: chapterDuration(selectedSeconds, false) }) : t("Choose at least one chapter")}
         action={exportAction}
         compactAction={compactExportAction}
         progress={exportProgress}
