@@ -153,3 +153,22 @@ html, body { background: var(--canvas, #f4f1eb); }
 }
 
 .rail nav button strong { white-space: normal; overflow: visible; text-overflow: clip; }
+
+/* Existing projects take priority over the introductory illustration. */
+.studio-hero--compact { min-height: 0; margin-bottom: 32px; }
+.studio-hero--compact .sanctuary-art { border-radius: 76px 2px 2px 2px; }
+.studio-hero--compact .sanctuary-art > img { aspect-ratio: 3/1; object-position: 50% 40%; }
+@media (min-width: 751px) {
+ .studio-hero--compact { position: relative; isolation: isolate; display: block; }
+ .studio-hero--compact .studio-hero-copy { position: relative; z-index: 1; width: 44%; padding: 20px 0; }
+ .studio-hero--compact h1 { margin: 12px 0 14px; font-size: clamp(36px,3.1vw,44px); }
+ .studio-hero--compact .studio-hero-copy > p { max-width: 420px; font-size: 14px; margin-bottom: 16px; }
+ .studio-hero--compact .quick-upload { min-height: 62px; padding-block: 10px; }
+ .studio-hero--compact .sanctuary-art { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: 0 4px 4px 0; background: transparent; pointer-events: none; }
+ .studio-hero--compact .sanctuary-art > img { position: absolute; right: 0; width: 78%; height: 100%; aspect-ratio: auto; object-position: 50% 34%; }
+ .studio-hero--compact .sanctuary-art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, var(--canvas) 25%, color-mix(in srgb, var(--canvas) 98%, transparent) 34%, color-mix(in srgb, var(--canvas) 86%, transparent) 42%, transparent 62%); }
+}
+@media (max-width: 750px) {
+ .studio-hero--compact { gap: 20px; margin-bottom: 24px; }
+ .studio-hero--compact .sanctuary-art { border-radius: 44px 2px 2px 2px; }
+}
