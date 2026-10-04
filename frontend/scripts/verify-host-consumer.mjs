@@ -40,11 +40,10 @@ try {
   await writeFile(path.join(host, 'index.html'), '<div id="root"></div><script type="module">if (new URLSearchParams(location.search).has("primitive")) import("/primitive.tsx"); else if (new URLSearchParams(location.search).has("handoff")) import("/handoff.tsx"); else if (new URLSearchParams(location.search).has("modal")) import("/modal.tsx"); else import("/main.tsx");</script>');
   await writeFile(path.join(host, 'host.css'), '.primary { background: rgb(1, 23, 45); border-radius: 3px; } .primary:hover:not(:disabled) { background: rgb(2, 34, 56); }');
   await writeFile(path.join(host, 'primitive.tsx'), `import React from 'react'; import { createRoot } from 'react-dom/client'; import { Button, PresentationRoot } from 'meowdiobooks-workflow-ui/ui'; import 'meowdiobooks-workflow-ui/product.css'; import './host.css'; createRoot(document.getElementById('root')!).render(<PresentationRoot><Button data-testid="consumer">Standalone consumer</Button></PresentationRoot>);`);
-  await writeFile(path.join(host, 'classic-scrollbar.css'), 'html::-webkit-scrollbar { width: 15px; height: 15px; }');
   await writeFile(path.join(host, 'modal.tsx'), `
 import React, { useState } from 'react'; import { createRoot } from 'react-dom/client';
 import { DialogBackdrop, DialogSurface, PresentationRoot, Button } from 'meowdiobooks-workflow-ui/ui';
-import 'meowdiobooks-workflow-ui/product.css'; import './classic-scrollbar.css';
+import 'meowdiobooks-workflow-ui/product.css';
 function ModalHost() {
   const [open, setOpen] = useState(false); const [nested, setNested] = useState(false);
   return <PresentationRoot appearance={new URLSearchParams(location.search).get('appearance') === 'dark' ? 'dark' : 'light'} palette={{ paper: '#fdfdf4' }}>
@@ -194,7 +193,7 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
         return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, height: box.height,
           maxHeight: getComputedStyle(element).maxHeight, scrollHeight: element.scrollHeight,
           appearance: backdrop.dataset.appearance, paper: getComputedStyle(element).backgroundColor,
-          bodyTop: document.body.style.top, rootOverflow: document.documentElement.style.overflow,
+          bodyTop: document.body.style.top, rootOverflow: document.documentElement.style.overflow, rootScrollbarGutter: getComputedStyle(document.documentElement).scrollbarGutter,
           cornersCovered: corners.every(corner => corner.covered),
           coverageDiagnostic: { backdrop: inspect(backdrop), body: inspect(document.body), root: inspect(document.documentElement), corners, viewport: { innerWidth, innerHeight, clientWidth: document.documentElement.clientWidth, clientHeight: document.documentElement.clientHeight, scrollX, scrollY, devicePixelRatio } } };
       });
@@ -203,6 +202,7 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       if (!geometry.cornersCovered) console.error(JSON.stringify({ failure: 'modal viewport coverage', viewport, appearance, before, geometry, errors }, null, 2));
       assert(geometry.cornersCovered, 'Shell header/footer must never peek through backdrop');
       assert.equal(geometry.rootOverflow, 'hidden');
+      assert.equal(geometry.rootScrollbarGutter, 'auto', 'Modal must release the stable scrollbar gutter on every platform');
       assert.equal(geometry.bodyTop, `${-before}px`);
       assert.equal(geometry.appearance, appearance);
       assert.equal(geometry.paper, 'rgb(253, 253, 244)', 'Portal must retain semantic host palette');
