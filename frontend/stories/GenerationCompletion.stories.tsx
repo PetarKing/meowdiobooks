@@ -26,7 +26,8 @@ export const OneChapterReady: StoryObj<typeof meta> = {
     await userEvent.click(await canvas.findByRole("button", { name: /Alice.*Continue/ }));
     const navigation = await canvas.findByRole("navigation", { name: "Wizard stages" });
     await userEvent.click(within(navigation).getByText("Generate"));
-    await expect(await canvas.findByText("None remaining")).toBeVisible();
+    await expect(canvas.queryByText("Audio to make")).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("tablist", { name: "Filter chapters" })).not.toBeInTheDocument();
     await expect(canvas.getByText("1 chapter is ready")).toBeVisible();
     await expect(canvas.queryByText("Estimate pending")).not.toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: "Continue to Export →" })).toBeEnabled();

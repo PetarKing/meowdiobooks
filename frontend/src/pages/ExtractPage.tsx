@@ -2,7 +2,7 @@ import type {
   ExtractionMethod
 } from "../api/contracts";
 import type { WorkflowModel } from "../app/useWorkflowModel";
-import { Choice, Panel, Tag } from "../components/Ui";
+import { Choice, Panel } from "../components/Ui";
 import { AcceptedSummary, PageComparison, StepEyebrow } from "../pages/shared";
 import { methodLabel } from "./helpers";
 
@@ -11,13 +11,13 @@ export type ExtractPageModel = Pick<WorkflowModel, "book" | "busy" | "completed"
 export function ExtractPage({ model }: { model: ExtractPageModel; }) {
   const { book, busy, completed, extractionCandidate, extractionPreview, method, previewPage, processAndPublishExtraction, representatives, revisingStages, setMethod, setRevisingStages, snapshot, t } = model;
   const page = extractionPreview?.page ?? 1;
-  if (extractionCandidate) return <><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><Panel eyebrow={t("Extraction ready")} title={t("Full extraction is ready")}><p>{t("Use the saved result to continue without extracting again.")}</p><button className="primary" disabled={busy} onClick={() => void processAndPublishExtraction()}>{t("Accept completed extraction")} →</button></Panel></>;
-  if (completed.includes("extract") && !revisingStages.includes("extract")) return <AcceptedSummary stage="extract" step={t("Step 1")} title={t("Extraction complete")} revision={snapshot?.activeArtifacts.extraction} onRevise={() => setRevisingStages([...new Set([...revisingStages, "extract"])])}><span><b>{book?.pageCount ?? "—"}</b><small>{t("Pages extracted")}</small></span><span><b>{t(methodLabel(method))}</b><small>{t("Selected parser")}</small></span><span><b>{t("Accepted")}</b><small>{t("Current result")}</small></span></AcceptedSummary>;
+  if (extractionCandidate) return <><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><Panel title={t("Full extraction is ready")}><p>{t("Use the saved result to continue without extracting again.")}</p><button className="primary" disabled={busy} onClick={() => void processAndPublishExtraction()}>{t("Accept completed extraction")} →</button></Panel></>;
+  if (completed.includes("extract") && !revisingStages.includes("extract")) return <AcceptedSummary stage="extract" step={t("Step 1")} title={t("Extraction complete")} revision={snapshot?.activeArtifacts.extraction} onRevise={() => setRevisingStages([...new Set([...revisingStages, "extract"])])}><span><b>{book?.pageCount ?? "—"}</b><small>{t("Pages extracted")}</small></span><span><b>{t(methodLabel(method))}</b><small>{t("Selected parser")}</small></span></AcceptedSummary>;
   return <><section className="extract-hero">
     <div className="extract-hero-copy"><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><h1>{t("Check the extracted text")}</h1><p>{t("Compare the sample pages, choose a parser, then extract the full book.")}</p></div>
 
   </section>
-    {completed.includes("extract") && <Panel eyebrow={t("Accepted extraction")} title={t("Current extraction")} actions={<Tag tone="good">{t("Accepted")}</Tag>}><p className="panel-copy">{t("Your accepted text stays in use until a new extraction succeeds.")}</p></Panel>}
+    {completed.includes("extract") && <p className="panel-copy">{t("Your accepted text stays in use until a new extraction succeeds.")}</p>}
     <div className="choice-row extraction-choices">{(["liteparse", "native", "layout"] as ExtractionMethod[]).map((id) => {
       const title = t(id === "liteparse" ? "LiteParse" : id === "native" ? "Native PDF text" : "Layout-aware");
       return <Choice key={id} selected={method === id} onClick={() => { setMethod(id); void previewPage(page, id); }} title={title} badge={id === "liteparse" ? t("Recommended") : undefined} text={t(id === "liteparse" ? "Fast spatial parser" : id === "native" ? "Embedded text fallback" : "Slower layout-preserving fallback")} detailLabel={t("About {{title}}", { title })} detail={t(id === "liteparse" ? "Fast and reliable for most books. Preserves paragraphs and reading order." : id === "native" ? "Reads embedded PDF text. Try it if LiteParse misses or changes words in a digital PDF." : "Handles complex columns and spacing. Try it if text appears out of order; it takes longer.")} />;

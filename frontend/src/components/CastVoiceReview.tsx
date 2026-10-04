@@ -500,8 +500,8 @@ export function CastVoiceReview({
   return <div ref={workbenchRef} className="cast-workbench voice-cast-workbench">
     <div className="cast-toolbar voice-cast-toolbar">
       <p className="voice-cast-progress" aria-label={t("Voice review progress")}>
-        <span className="approved">{t("{{count}} approved", { count: selectedCount })}</span>
-        <span className={defaultReadyCount ? "pending" : ""}><b>{t("{{count}} not yet approved", { count: defaultReadyCount })}</b><small>{t("Can continue")}</small></span>
+        {selectedCount > 0 && <span className="approved">{t("{{count}} approved", { count: selectedCount })}</span>}
+        {defaultReadyCount > 0 && <span className="pending"><b>{t("{{count}} not yet approved", { count: defaultReadyCount })}</b></span>}
         {requiredCount > 0 && <span className="required"><b>{t("{{count}} required", { count: requiredCount })}</b><small>{t("Blocks continue")}</small></span>}
       </p>
       {requiredCount > 0 && <button type="button" className="primary compact" onClick={() => { const next = voices.find(requiresReview); if(next) openInspector(next.characterId); }}>{t("Review required voices")} →</button>}
@@ -531,7 +531,7 @@ export function CastVoiceReview({
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span> : undefined}
           portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true">▶</span> : undefined}
-          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b><small>{t(required ? "Blocks continue" : "Can continue")}</small></span>}
+          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Stop" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
           inspectRef={(element) => { tileRefs.current[voice.characterId] = element; }}
@@ -544,7 +544,6 @@ export function CastVoiceReview({
     {inspected && <InspectorDialog surfaceRef={inspectorRef} label={t("{{name}} voice", { name: inspected.name })} className={`voice-inspector ${auditionMode === "create" ? "voice-inspector-creating" : ""}`} closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
         <header className="cast-inspector-head">
           {auditionMode === "create" ? <div className="voice-create-header-copy">
-            <small>{t("New voice")}</small>
             <h2>{t("Create a new audition")}</h2>
             <p>{inspected.name}</p>
           </div> : <div>
