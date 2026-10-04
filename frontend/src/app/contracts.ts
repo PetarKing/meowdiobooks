@@ -34,6 +34,18 @@ export interface AppProps {
   renderLibraryActions?: (item: LibraryExport) => ReactNode;
   capabilities?: Partial<WorkflowCapabilities>;
   generationEstimatePolicy?: Partial<GenerationEstimatePolicy>;
+  /** Host-confirmed purchase presentation for the current accepted scope; grants no workflow authority. */
+  generationPurchase?: GenerationPurchasePresentation;
+}
+
+export interface GenerationPurchasePresentation {
+  bookId: string;
+  extractionRevision: string;
+  dialogueRevision: string;
+  reviewRevision: string;
+  castRevision: string;
+  scriptRevision: string | null;
+  chapterIds: readonly string[];
 }
 
 export interface WorkflowCapabilities {

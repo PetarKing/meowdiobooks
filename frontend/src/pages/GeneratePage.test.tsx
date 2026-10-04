@@ -4,12 +4,14 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createFixtureGateway, snapshotFor } from "../../design-kit/fixtures";
 import type { WizardSnapshot } from "../api/contracts";
+import type { GenerationPurchasePresentation } from "../app/contracts";
 import { publicGenerationEstimatePolicy } from "../workflow/generation";
 import { GeneratePage, type GeneratePageModel } from "./GeneratePage";
 
-function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale") }: {
+function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale"), purchase }: {
   generate?: GeneratePageModel["generateChapters"];
   snapshot?: WizardSnapshot;
+  purchase?: GenerationPurchasePresentation;
 }) {
   const { t } = useTranslation();
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
@@ -22,10 +24,62 @@ function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale"
     setChapterFilter, setSelectedChapters, setListeningChapterId, setSplitChapterId,
     generateChapters: generate, splitLongChapter: vi.fn(), continueToExport: vi.fn(),
     generationSamples: [], generationEstimatePolicy: publicGenerationEstimatePolicy, t,
-  }} />;
+  }} purchase={purchase} />;
+}
+
+function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentation {
+  return {
+    bookId: snapshot.book.id,
+    extractionRevision: snapshot.activeArtifacts.extraction!,
+    dialogueRevision: snapshot.activeArtifacts.dialogue!,
+    reviewRevision: snapshot.activeArtifacts.review!,
+    castRevision: snapshot.activeArtifacts.cast!,
+    scriptRevision: snapshot.recordingScript?.revision ?? null,
+    chapterIds: snapshot.chapters.map((chapter) => chapter.id),
+  };
 }
 
 describe("Generate chapter targets", () => {
+  it("does not infer purchase from playable or older audio", () => {
+    render(<Tracklist />);
+    expect(screen.getAllByText("Playable").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Older recording").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
+  });
+
+  it("marks only host-confirmed available chapters without changing audio state or selection", () => {
+    const snapshot = snapshotFor("generate-stale");
+    const purchase = purchasedScope(snapshot);
+    purchase.chapterIds = [snapshot.chapters[0].id, snapshot.chapters[5].id];
+    const generate = vi.fn();
+    render(<Tracklist snapshot={snapshot} purchase={purchase} generate={generate} />);
+    const chapter = screen.getByRole("heading", { name: "Down the Rabbit-Hole" }).closest("article")!;
+    expect(within(chapter).getByText("Purchased")).toBeInTheDocument();
+    expect(chapter).toHaveClass("purchased", "stale");
+    expect(within(chapter).getByText("Older recording")).toBeInTheDocument();
+    expect(screen.getAllByText("Purchased")).toHaveLength(1);
+    const checkbox = within(chapter).getByRole("checkbox");
+    expect(checkbox).not.toBeChecked();
+    fireEvent.click(checkbox);
+    fireEvent.click(screen.getByRole("button", { name: "Generate 1 selected →" }));
+    expect(generate).toHaveBeenCalledWith([snapshot.chapters[0].id]);
+  });
+
+  it.each(["bookId", "extractionRevision", "dialogueRevision", "reviewRevision", "castRevision", "scriptRevision"] as const)("hides purchase when the host's %s is stale", (key) => {
+    const snapshot = snapshotFor("generate-stale");
+    render(<Tracklist snapshot={snapshot} purchase={{ ...purchasedScope(snapshot), [key]: "older-scope" }} />);
+    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
+  });
+
+  it.each(["missing", "draft"] as const)("hides purchase with a %s cast", (state) => {
+    const snapshot = snapshotFor("generate-stale");
+    const purchase = purchasedScope(snapshot);
+    if (state === "missing") delete snapshot.cast;
+    else snapshot.cast!.phase = "audition-review";
+    render(<Tracklist snapshot={snapshot} purchase={purchase} />);
+    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
+  });
+
   it("shows completion rather than a pending estimate after the only chapter is ready", () => {
     const snapshot = snapshotFor("generate-stale");
     snapshot.chapters = snapshot.chapters.slice(0, 1);

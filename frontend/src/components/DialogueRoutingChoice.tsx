@@ -1,3 +1,4 @@
+import { DialogBackdrop } from "./DialogBackdrop";
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { DialogueAttributionRoute, DialogueRoutingPreview } from "../api/contracts";
@@ -31,7 +32,7 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
   const remote = routing.remote;
   const money = (value: number) => value <= 0 ? t("$0 API cost") : t("≈ ${{cost}} API cost", { cost: value.toFixed(2) });
 
-  return <div className="dialogue-routing-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <DialogBackdrop className="dialogue-routing-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <DialogSurface className="dialogue-routing-modal" aria-labelledby="dialogue-routing-title" onDismiss={onClose}>
       <button className="dialogue-routing-close" type="button" aria-label={t("Close speaker-check choice")} onClick={onClose}>×</button>
       <header className="dialogue-routing-heading">
@@ -88,5 +89,5 @@ export function DialogueRoutingChoice({ routing, onChoose, onClose }: DialogueRo
 
       <p className="dialogue-routing-privacy">{t("dialogue.routingPrivacyNote", { ns: "edition" })}</p>
     </DialogSurface>
-  </div>;
+  </DialogBackdrop>;
 }

@@ -42,6 +42,14 @@ dispatched jobs recover when browser storage is unavailable. It hydrates and pol
 repeats work. Hosts must remount App on identity or explicit return-context changes, and keep
 `onActionRequired` stable so changing unrelated host UI does not restart restoration.
 
+Hosts may supply `generationPurchase` for purchase presentation on Generate. Its book ID,
+accepted extraction/dialogue/review/cast revisions, recording-script revision, and explicit chapter IDs
+must describe the host-confirmed current purchase scope. Generate shows a text label and gold wash only
+when these revisions match the current snapshot and its cast is accepted. Omission, a different book,
+or a changed accepted parent removes the presentation. Existing audio never implies purchase.
+This prop grants no permission and does not change generation commands or host funding checks;
+account and payment records remain outside the workflow model and artifacts.
+
 The public `cast_runtime` planning helpers `rebase_accepted_cast`, `reuse_unchanged_cast_voices`
 and `has_complete_audition_pack` let compositions determine existing reuse before admitting new
 provider work. They do not call providers, write files or publish artifacts. The reuse helper updates

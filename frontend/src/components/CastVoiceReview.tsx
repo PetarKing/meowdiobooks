@@ -275,12 +275,13 @@ export function CastVoiceReview({
   const transcriptionRequest = useRef(0);
   const focusAfterClose = useRef<string | undefined>(undefined);
   const workbenchRef = useRef<HTMLDivElement>(null);
+  const inspectorRef = useRef<HTMLElement>(null);
   const tileRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const previousInspectedId = useRef<string | undefined>(undefined);
   const previousPreviewRevision = useRef<string | undefined>(undefined);
 
   useLayoutEffect(() => {
-    const inspector = workbenchRef.current?.querySelector<HTMLElement>(".voice-inspector");
+    const inspector = inspectorRef.current;
     if (inspector) inspector.scrollTop = 0;
   }, [auditionMode]);
 
@@ -455,12 +456,16 @@ export function CastVoiceReview({
     closeTimer.current = undefined;
     setInspectedId(undefined);
     setInspectorClosing(false);
+  }
+
+  useEffect(() => {
+    if (inspectedId || !focusAfterClose.current) return;
     if (focusAfterClose.current) {
       const target = tileRefs.current[focusAfterClose.current] ?? workbenchRef.current?.querySelector<HTMLInputElement>(".collection-search input");
       target?.focus();
     }
     focusAfterClose.current = undefined;
-  }
+  }, [inspectedId]);
 
   function closeInspector() {
     if (!inspected || inspectorClosing) return;
@@ -536,7 +541,7 @@ export function CastVoiceReview({
     </section>
     <audio ref={tileAudioRef} className="voice-tile-audio" preload="metadata" onEnded={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} onError={() => { tilePlaybackRequest.current += 1; setPlayingTileId(undefined); }} />
 
-    {inspected && <InspectorDialog label={t("{{name}} voice", { name: inspected.name })} className={`voice-inspector ${auditionMode === "create" ? "voice-inspector-creating" : ""}`} closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
+    {inspected && <InspectorDialog surfaceRef={inspectorRef} label={t("{{name}} voice", { name: inspected.name })} className={`voice-inspector ${auditionMode === "create" ? "voice-inspector-creating" : ""}`} closing={inspectorClosing} onClose={closeInspector} onClosed={finishInspectorClose}>
         <header className="cast-inspector-head">
           {auditionMode === "create" ? <div className="voice-create-header-copy">
             <small>{t("New voice")}</small>

@@ -1,14 +1,10 @@
 import {
-  useEffect,
   type HTMLAttributes,
   type RefObject,
 } from "react";
 import { useDialogFocus } from "./useDialogFocus";
+import { useModalScrollLock } from "./useModalScrollLock";
 import "./dialog-surface.css";
-
-// Reference counting also handles sibling dialogs unmounting out of order.
-let scrollLocks = 0;
-let previousOverflow = "";
 
 export type DialogSurfaceProps = Omit<
   HTMLAttributes<HTMLElement>,
@@ -19,6 +15,7 @@ export type DialogSurfaceProps = Omit<
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLElement | null>;
   lockScroll?: boolean;
+  surfaceRef?: RefObject<HTMLElement | null>;
 };
 
 /** Shared modal keyboard lifecycle; progress dialogs deliberately omit onDismiss. */
@@ -28,26 +25,16 @@ export function DialogSurface({
   initialFocusRef,
   returnFocusRef,
   lockScroll = true,
+  surfaceRef,
   className,
   ...props
 }: DialogSurfaceProps) {
   const ref = useDialogFocus(onDismiss, initialFocusRef, returnFocusRef);
-  useEffect(() => {
-    if (!lockScroll) return;
-    if (scrollLocks === 0) {
-      previousOverflow = document.body.style.overflow;
-      document.body.style.overflow = "hidden";
-    }
-    scrollLocks += 1;
-    return () => {
-      scrollLocks -= 1;
-      if (scrollLocks === 0) document.body.style.overflow = previousOverflow;
-    };
-  }, [lockScroll]);
+  useModalScrollLock(lockScroll);
   return (
     <Surface
       {...props}
-      ref={ref as RefObject<HTMLDivElement | null>}
+      ref={(element) => { ref.current = element; if (surfaceRef) surfaceRef.current = element; }}
       className={["dialog-surface", className].filter(Boolean).join(" ")}
       role="dialog"
       aria-modal="true"
