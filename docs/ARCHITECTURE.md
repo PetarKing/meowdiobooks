@@ -55,6 +55,12 @@ as disabled No audio rows and are excluded from its actionable count. A complete
 Generated. Tab changes clear selection. Current audio selection goes to Export by default; a named
 secondary Regenerate action deliberately creates replacement audio. A normal Generate action excludes
 already-current recordings from its requested IDs and duration estimate.
+Reattaching an active Generate job holds the return notice until authenticated job scope is known,
+then restores its valid requested chapters and the same locked progress presentation as a fresh run.
+Missing legacy scope uses neutral progress rather than inventing an all-chapter request. Settlement
+retains the initial job scope even when later polls omit payload. Partial failures select only requested
+pending tracks when any remain, including tracks already published before reattachment; an unchanged
+current recording remains an explicit Regenerate selection when no pending requested tracks remain.
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 
