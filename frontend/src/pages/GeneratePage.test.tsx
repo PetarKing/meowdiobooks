@@ -3,12 +3,15 @@ import { useTranslation } from "react-i18next";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { createFixtureGateway, snapshotFor } from "../../design-kit/fixtures";
+import type { WizardSnapshot } from "../api/contracts";
 import { publicGenerationEstimatePolicy } from "../workflow/generation";
 import { GeneratePage, type GeneratePageModel } from "./GeneratePage";
 
-function Tracklist({ generate = vi.fn() }: { generate?: GeneratePageModel["generateChapters"] }) {
+function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale") }: {
+  generate?: GeneratePageModel["generateChapters"];
+  snapshot?: WizardSnapshot;
+}) {
   const { t } = useTranslation();
-  const snapshot = snapshotFor("generate-stale");
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
   const [chapterFilter, setChapterFilter] = useState<GeneratePageModel["chapterFilter"]>("all");
   const [listeningChapterId, setListeningChapterId] = useState<string>();
@@ -23,6 +26,29 @@ function Tracklist({ generate = vi.fn() }: { generate?: GeneratePageModel["gener
 }
 
 describe("Generate chapter targets", () => {
+  it("shows completion rather than a pending estimate after the only chapter is ready", () => {
+    const snapshot = snapshotFor("generate-stale");
+    snapshot.chapters = snapshot.chapters.slice(0, 1);
+    snapshot.generatedChapters = [{ ...snapshot.generatedChapters![0], current: true }];
+    render(<Tracklist snapshot={snapshot} />);
+    expect(within(screen.getByText("Audio to make").parentElement!).getByText("None remaining")).toBeInTheDocument();
+    expect(screen.queryByText("Estimate pending")).not.toBeInTheDocument();
+    expect(screen.getByText("1 chapter is ready")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue to Export →" })).toBeEnabled();
+  });
+
+  it("keeps a missing duration estimate distinct from no remaining chapters", () => {
+    const snapshot = snapshotFor("generate-stale");
+    snapshot.chapters = [{ ...snapshot.chapters[0], estimatedCharacters: 0 }];
+    snapshot.generatedChapters = [];
+    snapshot.recordingScript!.summary.chapters[0].estimatedSeconds = 0;
+    render(<Tracklist snapshot={snapshot} />);
+    expect(within(screen.getByText("Audio to make").parentElement!).getByText("Estimate pending")).toBeInTheDocument();
+    expect(screen.getByText("Still to make").parentElement).toHaveTextContent("1 chapter");
+    expect(screen.queryByText("None remaining")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Select chapters above" })).toBeDisabled();
+  });
+
   it("uses a native label to select and deselect a chapter without a custom row keyboard handler", () => {
     render(<Tracklist />);
     const checkbox = screen.getByRole("checkbox", { name: "Select Down the Rabbit-Hole" });
