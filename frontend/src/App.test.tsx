@@ -425,7 +425,7 @@ describe('v2 wizard', () => {
     const chapter = screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!
     expect(chapter).toHaveClass('has-audio')
     expect(chapter).toHaveClass('generated')
-    expect(within(chapter).queryByText(/Generated/)).not.toBeInTheDocument()
+    expect(within(chapter).getByText('Generated')).toBeInTheDocument()
     expect(within(chapter).getByText('Pages 1–12')).toBeInTheDocument()
     expect(within(chapter).getByText('11 sec')).toBeInTheDocument()
     expect(within(chapter).queryByText('Generation')).not.toBeInTheDocument()
@@ -443,7 +443,7 @@ describe('v2 wizard', () => {
     expect(chapter.querySelector('.chapter-track-number')).toHaveTextContent('01')
     expect(chapter.querySelector('img')).not.toBeInTheDocument()
     expect(document.querySelector('.generate-cover-stack')).not.toBeInTheDocument()
-    expect(within(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!).getByText('Playable')).toBeInTheDocument()
+    expect(within(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!).getByText('Generated')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Continue to Export/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /M4B/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Technical details')).not.toBeInTheDocument()
@@ -2348,7 +2348,7 @@ describe('v2 wizard', () => {
   it('keeps playable audio clear without exposing provenance receipts', async () => {
     await open()
     const chapter = screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!
-    expect(within(chapter).queryByText(/Generated/)).not.toBeInTheDocument()
+    expect(within(chapter).getByText('Generated')).toBeInTheDocument()
     expect(within(chapter).getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Open WAV/ })).not.toBeInTheDocument()
     expect(screen.queryByText('Revision audio-1 · current')).not.toBeInTheDocument()

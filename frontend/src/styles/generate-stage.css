@@ -1,4 +1,7 @@
 /* Recording is an open score: one chapter, one generous selection target. */
+.app-shell:has(.chapter-library) { padding-bottom: 0; }
+.workspace main:has(> .chapter-library) { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
+.chapter-library { margin-bottom: 0; }
 .generate-hero { grid-template-columns: 1fr; gap: 28px; padding: 6px 0 24px; margin-bottom: 16px; border: 0; }
 .generate-hero-copy h1 { font: 500 clamp(36px, 4vw, 56px)/1.08 var(--font-display); letter-spacing: -.035em; }
 .generate-hero-copy p { max-width: 540px; margin-top: 14px; font-size: 15px; line-height: 1.65; }
@@ -20,11 +23,10 @@
 .chapter-card { position: relative; isolation: isolate; grid-template-columns: 22px 40px minmax(0, 1fr) minmax(170px, 220px) 48px; gap: 22px; min-height: 104px; padding: 20px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; }
 .chapter-card:hover:not(.unavailable) { background: color-mix(in srgb, var(--matcha-soft) 65%, transparent); }
 .chapter-card.selected, .chapter-card.has-audio.selected, .chapter-card.selected.generated, .chapter-card.selected.stale { background: color-mix(in srgb, var(--blush) 72%, transparent); box-shadow: none; }
-.chapter-card.purchased { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 11%, var(--paper)), var(--paper) 75%); }
-.chapter-card-grid.has-selection .chapter-card.purchased:not(.selected) { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 11%, var(--paper)), var(--paper) 75%); filter: none; opacity: 1; }
-.chapter-card.purchased:hover:not(.selected) { background: color-mix(in srgb, var(--gilt) 15%, var(--paper)); }
-.chapter-card.purchased.selected { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 13%, var(--blush)), var(--blush) 75%); }
-.chapter-purchased-label { display: inline-flex; align-items: center; gap: 4px; color: var(--gilt-ink); font: 600 11px/1.4 var(--font-sans); }
+.chapter-card.generated, .chapter-card.purchased { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); }
+.chapter-card-grid.has-selection .chapter-card.generated:not(.selected), .chapter-card-grid.has-selection .chapter-card.purchased:not(.selected) { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); filter: none; opacity: 1; }
+.chapter-card.generated:hover:not(.selected), .chapter-card.purchased:hover:not(.selected) { background: color-mix(in srgb, var(--gilt) 23%, var(--paper)); }
+.chapter-card.generated.selected, .chapter-card.has-audio.generated.selected, .chapter-card.purchased.selected { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 30%, var(--paper)), color-mix(in srgb, var(--gilt) 14%, var(--paper))); box-shadow: inset 3px 0 var(--gilt); }
 .chapter-card .chapter-row-target { position: absolute; z-index: 1; inset: 0; grid-column: auto; grid-row: auto; width: auto; height: auto; display: block; padding: 0; border: 0; border-radius: 0; cursor: pointer; }
 .chapter-row-target input { position: absolute; top: 50%; left: 20px; width: 20px; height: 20px; margin: 0; transform: translateY(-50%); cursor: pointer; }
 .chapter-card.unavailable .chapter-row-target, .chapter-card.unavailable .chapter-row-target input { cursor: default; }
@@ -43,8 +45,8 @@
 .chapter-card .chapter-listen, .chapter-card.stale .chapter-listen { position: relative; z-index: 2; grid-column: 5; width: 46px; height: 46px; padding: 0 0 0 2px; border: 0; background: var(--green-soft); color: var(--green); font-size: 13px; box-shadow: none; }
 .chapter-card .chapter-listen:hover { transform: none; background: var(--green); color: var(--paper); }
 .chapter-card.stale .chapter-listen { background: var(--warning-soft); color: var(--warning-ink); }
-.generation-selection-anchor { display: block; height: 0; overflow: hidden; }
-.generation-selection { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 5; align-items: center; margin-top: 32px; padding: 22px 20px; gap: 26px; border: 0; border-top: 1px solid var(--line-strong); border-radius: 0; background: var(--paper); box-shadow: none; backdrop-filter: none; }
+.generation-selection-anchor { display: block; height: 32px; overflow: hidden; }
+.generation-selection { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 5; align-items: center; margin-top: 0; padding: 18px 20px; gap: 22px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); box-shadow: 0 8px 26px rgb(var(--shadow-color) / .10); backdrop-filter: none; }
 .generation-selection.is-floating { gap: 16px; padding: 12px 20px; border: 1px solid var(--line-strong); border-left: 4px solid var(--poppy); border-radius: 12px; background: color-mix(in srgb, var(--paper) 94%, transparent); box-shadow: 0 13px 40px rgb(var(--shadow-color) / .18); backdrop-filter: blur(14px); }
 .generation-selection.is-floating .generation-selection-copy b { font-size: 19px; }
 .generation-selection.is-floating dl { display: flex; }
@@ -76,15 +78,20 @@
   .chapter-filter-tabs { gap: 20px; }
   .chapter-filter-tabs button { flex: 1; min-width: 0; padding-inline: 0; font-size: 13px; }
   .chapter-library-controls { gap: 10px; flex-wrap: wrap; }
-  .chapter-card { grid-template-columns: 20px 26px minmax(0, 1fr) 42px; grid-template-rows: auto auto; min-height: 148px; padding: 24px 0; gap: 14px 12px; }
-  .chapter-row-target input { left: 0; top: 30px; transform: none; }
-  .chapter-track-number { font-size: 20px; align-self: start; padding-top: 5px; }
-  .chapter-card-body { align-self: start; }
-  .chapter-card h3 { font-size: 23px; }
+  .chapter-card { grid-template-columns: 20px minmax(0, 1fr) 44px; grid-template-rows: auto auto; min-height: 0; padding: 18px 14px; gap: 12px; border: 1px solid var(--line); border-radius: 12px; }
+  .chapter-card-grid { gap: 12px; }
+  .chapter-row-target input { left: 14px; top: 20px; transform: none; }
+  .chapter-card .chapter-row-target { border-radius: 12px; }
+  .chapter-track-number { grid-column: 1; grid-row: 2; font: 500 12px/1.4 var(--font-sans); align-self: center; padding: 0; }
+  .chapter-card-body { grid-column: 2; grid-row: 1; align-self: start; }
+  .chapter-card h3 { font-size: 21px; line-height: 1.3; }
   .chapter-card-meta { margin-top: 8px; gap: 8px; }
-  .chapter-card .chapter-estimates, .chapter-card.generated .chapter-estimates, .chapter-card.stale .chapter-estimates { grid-column: 3 / 5; grid-row: 2; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-  .chapter-card .chapter-listen, .chapter-card.stale .chapter-listen { grid-column: 4; grid-row: 1; width: 42px; height: 42px; align-self: start; }
-  .generation-selection { padding: 20px max(14px, env(safe-area-inset-right)) 20px max(14px, env(safe-area-inset-left)); display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .chapter-card .chapter-estimates, .chapter-card.generated .chapter-estimates, .chapter-card.stale .chapter-estimates { grid-column: 2 / 4; grid-row: 2; display: flex; gap: 12px; }
+  .chapter-card .chapter-estimates div { display: flex; align-items: baseline; gap: 8px; }
+  .chapter-card .chapter-estimates dt { font-size: 11px; }
+  .chapter-card .chapter-estimates dd { font-size: 12px; }
+  .chapter-card .chapter-listen, .chapter-card.stale .chapter-listen { grid-column: 3; grid-row: 1; width: 44px; height: 44px; align-self: start; }
+  .generation-selection { padding: 16px max(14px, env(safe-area-inset-right)) 16px max(14px, env(safe-area-inset-left)); display: grid; grid-template-columns: 1fr; gap: 20px; }
   .generation-selection-actions { flex-direction: column-reverse; margin: 0; gap: 12px; }
   .generation-selection-actions .primary { width: 100%; }
   .chapter-split-button { align-self: flex-start; }

@@ -1,0 +1,1190 @@
+[
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 86
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 86
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "chromium",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 86
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 86
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 1440,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 272,
+        "width": 1112,
+        "height": 74
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 390,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 358,
+        "height": 127.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.910196 0.875294 0.771373), color(srgb 0.956 0.941804 0.878667))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "light",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.938824 0.916863 0.838431), color(srgb 0.976039 0.970902 0.925608))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 40
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-and-complete",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 1,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 129.296875
+      },
+      "goldCount": 1
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "purchased-chapters",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 6,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card selected purchased  has-audio stale ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card  purchased generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card selected purchased    ",
+          "background": "linear-gradient(110deg, color(srgb 0.380392 0.401176 0.323922), color(srgb 0.254902 0.312706 0.278745))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 5
+    }
+  },
+  {
+    "engine": "webkit",
+    "ready": "generate-long-book",
+    "appearance": "dark",
+    "width": 320,
+    "passed": true,
+    "geometry": {
+      "bottomGap": 16,
+      "overflow": 0,
+      "count": 120,
+      "purchasedLabel": false,
+      "gold": [
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        },
+        {
+          "className": "chapter-card   generated has-audio  ",
+          "background": "linear-gradient(110deg, color(srgb 0.301961 0.345882 0.295686), color(srgb 0.2 0.274 0.25898))"
+        }
+      ],
+      "dock": {
+        "x": 16,
+        "width": 288,
+        "height": 179.796875
+      },
+      "goldCount": 40
+    }
+  }
+]
