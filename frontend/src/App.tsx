@@ -19,6 +19,7 @@ import { GeneratePage } from "./pages/GeneratePage";
 import { HomePage } from "./pages/HomePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { BookReturnNotice } from "./components/BookReturnNotice";
 import {
   reconnectingJobMessage
 } from "./workflow/jobPolling";
@@ -57,7 +58,7 @@ export default function App(props: AppProps) {
   const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
 
   const createView = model.restoringLocation && busy && !book
-    ? <p role="status">{t("Restoring your book…")}</p>
+    ? <BookReturnNotice appearance={resolvedAppearance} />
     : home
     ? <HomePage model={model} />
     : StepOverride && activeJourneyStep
