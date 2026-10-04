@@ -279,7 +279,6 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
       <div className="dialogue-result-intro">
         <span className="dialogue-hero-mark" aria-hidden="true">✦</span>
         <div><small>{t("Step 2 · Dialogue")}</small><h1>{t("Your transcript is ready")}</h1></div>
-        <span className="dialogue-result-status">{t("Ready to review")}</span>
       </div>
       <DialogueComposition dialogue={{ ...result, readerAssignments }} />
       <div className="dialogue-review-views" role="tablist" aria-label={t("Dialogue review views")}>
@@ -297,7 +296,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
     {view === "overview" && <section className="dialogue-overview" aria-label={t("Dialogue overview")}>
       <section className="dialogue-reader-overview" aria-label={t("By reader")}>
         <header>
-          <div><b>{t("By reader")}</b><span>{t("Top readers first, with Narrator always visible.")}</span></div>
+          <div><b>{t("By reader")}</b></div>
           <strong>{t("{{count}} readers", { count: readerAssignments.length })}</strong>
         </header>
         <div className="dialogue-reader-grid">
@@ -351,7 +350,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
               onClick={() => changeFilter(value)}
             >{t(label)}<small>{counts[value]}</small></button>)}
           </div>
-          <span>{filter === "all" ? t("Showing all {{count}}", { count: counts.all }) : t("Showing {{shown}} of {{count}}", { shown: filteredRows.length, count: counts.all })}</span>
+          {filter !== "all" && <span>{t("Showing {{shown}} of {{count}}", { shown: filteredRows.length, count: counts.all })}</span>}
         </div>
 
         <div className="dialogue-review-examples">{visibleRows.map((reviewRow) => renderOutcomeCard(reviewRow))}</div>

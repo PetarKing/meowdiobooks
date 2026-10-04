@@ -92,14 +92,13 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
         </article> : loading ? <div className="transcript-loading">{t("Opening the transcript…")}</div> : <div className="transcript-empty"><span aria-hidden="true">☾</span><b>{t("No spoken text on this page")}</b><small>{t("The source page may be blank or everything on it was excluded.")}</small></div>}
       </PageComparison>
     </section>
-    <div className="phase-action transcript-final-action"><button type="button" className="ghost" onClick={onBack}>← {t("Back to decisions")}</button><span>{t("This is the last check before Cast & voices.")}</span><button type="button" className="primary" disabled={!preview || preview.page !== page || loading || busy} onClick={onAccept}>{t("Accept review and continue")} →</button></div>
+    <div className="phase-action transcript-final-action"><button type="button" className="ghost" onClick={onBack}>← {t("Back to decisions")}</button><button type="button" className="primary" disabled={!preview || preview.page !== page || loading || busy} onClick={onAccept}>{t("Accept review and continue")} →</button></div>
   </>;
 }
 
 export function AcceptedSummary({ stage, step, title, receipt, note, onRevise, children }: { stage: Exclude<WizardStage, "import">; step: string; title: string; revision?: unknown; receipt?: string; note?: string; onRevise: () => void; children: ReactNode; }) {
   const { t } = useTranslation();
-  const actions = <div className="accepted-summary-badges"><Tag tone="good">{t("Complete")}</Tag>{receipt && <span className="accepted-cost-receipt" title={t("Estimated API cost from provider-reported usage")}>{receipt}</span>}</div>;
-  return <><PageTitle stage={stage} step={step} title={title} /><Panel variant="plain" actions={actions} title={t("Accepted settings")}><div className="accepted-summary">{children}</div><div className="summary-note">{note ?? t("Your accepted version stays in use until you approve a replacement.")}</div><div className="summary-actions"><span>{t("Accepted and ready for the next steps")}</span><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></Panel></>;
+  return <><PageTitle stage={stage} step={step} title={title} /><section className="panel panel-plain">{receipt && <div className="accepted-summary-badges"><span className="accepted-cost-receipt" title={t("Estimated API cost from provider-reported usage")}>{receipt}</span></div>}<div className="accepted-summary">{children}</div><div className="summary-note">{note ?? t("Your accepted version stays in use until you approve a replacement.")}</div><div className="summary-actions"><button className="primary" onClick={onRevise}>{t("Change settings")} →</button></div></section></>;
 }
 
 export function DialogueStructuralReview({ issues, choices, onChoose, onApply }: { issues: DialogueStructuralIssue[]; choices: Record<string, DialogueStructuralAction>; onChoose: (issueId: string, action: DialogueStructuralAction) => void; onApply: () => void; }) {

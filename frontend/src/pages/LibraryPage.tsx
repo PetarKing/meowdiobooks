@@ -27,7 +27,7 @@ export function LibraryPage({ model }: { model: LibraryPageModel; }) {
   const loadingFirstEditions = !libraryReady || (libraryLoading && !libraryExports.length);
   return <section className="library-page" aria-busy={libraryLoading}>
     <header className="library-head">
-      <div className="library-head-copy"><span className="eyebrow">{t("Finished editions")}</span><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
+      <div className="library-head-copy"><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
 
       {(loadingFirstEditions || libraryExports.length > 0) && <span className="library-count" aria-live="polite">{libraryLoading ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>}
     </header>

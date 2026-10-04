@@ -112,7 +112,6 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
 
       <div className="phase-help-body">
         <section className="phase-help-reading" aria-labelledby={`${titleId}-overview`}>
-          <span className="eyebrow">{t("What this phase does")}</span>
           <h3 id={`${titleId}-overview`}>{t("Overview")}</h3>
           <p>{t(guide.intro)}</p>
           <div className="phase-help-path">
