@@ -1,5 +1,4 @@
 import { useEffect, useRef } from "react";
-import { StaticBook } from "./StaticBook";
 import * as THREE from "three";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
@@ -114,7 +113,6 @@ export default function AnimatedBook({ appearance }: { appearance: "light" | "da
     let renderer: THREE.WebGLRenderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true }); }
     catch { host.dataset.renderer = "fallback"; return; }
-    host.dataset.renderer = "webgl";
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.setSize(300, 260);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -176,7 +174,7 @@ export default function AnimatedBook({ appearance }: { appearance: "light" | "da
     const movingPage = new THREE.Mesh(movingGeometry, movingMaterial);
     movingPage.castShadow = movingPage.receiveShadow = true; book.add(movingPage);
     let frame = 0, disposed = false, contextLost = false;
-    const started = performance.now();
+    let started = 0;
     const draw = (seconds: number) => {
       const phase = ((seconds % PERIOD) + PERIOD) % PERIOD / PERIOD;
       const raw = THREE.MathUtils.clamp((phase - .1) / .74, 0, 1);
@@ -189,7 +187,16 @@ export default function AnimatedBook({ appearance }: { appearance: "light" | "da
       if (disposed || contextLost || reduced.matches || document.hidden) return;
       draw((performance.now() - started) / 1000); frame = requestAnimationFrame(animate);
     };
-    const restart = () => { cancelAnimationFrame(frame); if (contextLost) return; draw(0); animate(); };
+    const restart = () => {
+      cancelAnimationFrame(frame);
+      if (contextLost || disposed) return;
+      // Keep the canvas hidden through shader compilation and the first render.
+      // Start motion from rest only after that frame is ready to reveal.
+      draw(0);
+      host.dataset.renderer = "webgl";
+      started = performance.now();
+      if (!reduced.matches && !document.hidden) frame = requestAnimationFrame(animate);
+    };
     const onContextLost = () => {
       contextLost = true; cancelAnimationFrame(frame); host.dataset.renderer = "fallback";
       renderer.domElement.hidden = true;
@@ -198,12 +205,12 @@ export default function AnimatedBook({ appearance }: { appearance: "light" | "da
     reduced.addEventListener("change", restart); document.addEventListener("visibilitychange", restart);
     restart();
     return () => {
-      disposed = true; cancelAnimationFrame(frame);
+      disposed = true; cancelAnimationFrame(frame); host.dataset.renderer = "fallback";
       reduced.removeEventListener("change", restart); document.removeEventListener("visibilitychange", restart);
       scene.traverse(object => { if (object instanceof THREE.Mesh) { object.geometry.dispose(); for (const material of Array.isArray(object.material) ? object.material : [object.material]) { for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.dispose(); material.dispose(); } } });
       renderer.domElement.removeEventListener("webglcontextlost", onContextLost);
       renderer.dispose(); renderer.forceContextLoss(); renderer.domElement.remove();
     };
   }, [appearance]);
-  return <div ref={mount} className="book-return-3d" aria-hidden="true"><StaticBook /></div>;
+  return <div ref={mount} className="book-return-3d" aria-hidden="true"></div>;
 }

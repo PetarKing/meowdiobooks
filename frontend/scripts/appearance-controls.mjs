@@ -19,5 +19,13 @@ export async function chooseAppearance(page, appearance) {
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 }
 export async function readAppearance(page) {
-  return page.evaluate(() => localStorage.getItem('meowdiobooks.appearance') ?? 'system');
+  return page.evaluate(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('meowdiobooks.appearance') ?? 'null');
+      const now = Date.now();
+      return saved && (saved.appearance === 'light' || saved.appearance === 'dark')
+        && Number.isFinite(saved.expiresAt) && saved.expiresAt > now
+        && saved.expiresAt <= now + 12 * 60 * 60 * 1000 ? saved.appearance : 'system';
+    } catch { return 'system'; }
+  });
 }

@@ -28,8 +28,8 @@ try {
     await page.locator('.quick-upload input').setInputFiles({ name: 'sanctuary-sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic control check') });
     await page.getByRole('button', { name: 'Import PDF' }).waitFor();
     assert.match(await page.locator('.file-receipt').innerText(), /sanctuary-sample.pdf/);
-    await page.getByRole('button', { name: 'Choose another', exact: true }).click();
-    assert(await page.locator('.quick-upload').isVisible());
+    await page.getByLabel('Choose another PDF', { exact: true }).setInputFiles({ name: 'replacement-sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic replacement check') });
+    assert.match(await page.locator('.file-receipt').innerText(), /replacement-sample.pdf/);
     await page.reload();
     await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();
     assert.equal(await readAppearance(page), appearance, 'Appearance persists after reload');
