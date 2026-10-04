@@ -41,7 +41,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
         <button className="ghost" disabled={booksLoading} onClick={() => void refreshBooks()}>{t("Try again")}</button>
       </div>}
       {books.length > 0 && <section className="wip-shelf">
-        <Panel eyebrow={t("Work in progress")} title={t("books.workingTitle", { ns: "edition" })} actions={<div className="local-assets-summary">
+        <Panel title={t("books.workingTitle", { ns: "edition" })} actions={<div className="local-assets-summary">
           <b>{books.length === 1 ? t("1 book") : t("{{count}} books", { count: books.length })}</b>
           <span>{t("{{size}} used", { size: formatFileSize(totalAssetBytes) })}</span>
         </div>}>

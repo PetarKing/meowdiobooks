@@ -46,21 +46,22 @@ describe("Dialogue AI scope targets", () => {
     fireEvent.click(unknown.closest("label")!);
     expect(unknown).toBeChecked();
     expect(screen.getByText("5 detected turns will use AI.")).toBeInTheDocument();
-    fireEvent.click(screen.getByText("Dialogue with a known speaker keeps its assigned voice."));
+    fireEvent.click(screen.getByRole("button", { name: /Use the narrator/ }));
     expect(unknown).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: /Suggest speakers with AI/ }));
     expect(unknown).toBeEnabled();
     expect(unknown).toBeChecked();
   });
 
-  it("shows zero eligible turns as facts, and permits a transcript without AI matching", () => {
+  it("skips empty scope choices and builds the transcript without AI matching", () => {
     const request = vi.fn();
     render(<Scopes unlabeled={0} unknown={0} request={request} />);
     expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
-    expect(screen.getAllByText("None found")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: /Suggest speakers with AI/ })).toBeDisabled();
-    expect(screen.getByRole("button", { name: /Suggest speakers with AI/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: /Use the narrator/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.queryByText("None found")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Suggest speakers with AI/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Use the narrator/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Who reads the unresolved dialogue?" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dialogue detection rules" })).toBeInTheDocument();
     expect(screen.getByText("No AI speaker matching will run.")).toBeInTheDocument();
     expect(screen.getByText("Known speakers keep their voices; the narrator reads the remaining text.")).toBeInTheDocument();
     const build = screen.getByRole("button", { name: "Build transcript →" });

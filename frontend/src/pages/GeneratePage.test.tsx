@@ -7,13 +7,14 @@ import type { WizardSnapshot } from "../api/contracts";
 import { publicGenerationEstimatePolicy } from "../workflow/generation";
 import { GeneratePage, type GeneratePageModel } from "./GeneratePage";
 
-function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale") }: {
+function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale"), initialFilter = "all" }: {
   generate?: GeneratePageModel["generateChapters"];
   snapshot?: WizardSnapshot;
+  initialFilter?: GeneratePageModel["chapterFilter"];
 }) {
   const { t } = useTranslation();
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
-  const [chapterFilter, setChapterFilter] = useState<GeneratePageModel["chapterFilter"]>("all");
+  const [chapterFilter, setChapterFilter] = useState<GeneratePageModel["chapterFilter"]>(initialFilter);
   const [listeningChapterId, setListeningChapterId] = useState<string>();
   const [splitChapterId, setSplitChapterId] = useState<string>();
   return <GeneratePage model={{
@@ -31,10 +32,23 @@ describe("Generate chapter targets", () => {
     snapshot.chapters = snapshot.chapters.slice(0, 1);
     snapshot.generatedChapters = [{ ...snapshot.generatedChapters![0], current: true }];
     render(<Tracklist snapshot={snapshot} />);
-    expect(within(screen.getByText("Audio to make").parentElement!).getByText("None remaining")).toBeInTheDocument();
+    expect(screen.queryByText("Audio to make")).not.toBeInTheDocument();
+    expect(screen.queryByText("Generation")).not.toBeInTheDocument();
     expect(screen.queryByText("Estimate pending")).not.toBeInTheDocument();
     expect(screen.getByText("1 chapter is ready")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue to Export →" })).toBeEnabled();
+  });
+
+  it.each(["all", "pending", "generated"] as const)("keeps a single finished chapter visible and exportable with the saved %s filter", (initialFilter) => {
+    const snapshot = snapshotFor("generate-stale");
+    snapshot.chapters = snapshot.chapters.slice(0, 1);
+    snapshot.generatedChapters = [{ ...snapshot.generatedChapters![0], current: true }];
+    render(<Tracklist snapshot={snapshot} initialFilter={initialFilter} />);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Select Down the Rabbit-Hole" }));
+    expect(screen.getByRole("button", { name: "Continue to Export →" })).toHaveClass("primary");
+    expect(screen.getByRole("button", { name: "Generate 1 selected" })).toHaveClass("ghost");
+    expect(within(screen.getByRole("region", { name: "Generation action" })).getByText("Regeneration")).toBeInTheDocument();
   });
 
   it("keeps a missing duration estimate distinct from no remaining chapters", () => {
@@ -43,8 +57,9 @@ describe("Generate chapter targets", () => {
     snapshot.generatedChapters = [];
     snapshot.recordingScript!.summary.chapters[0].estimatedSeconds = 0;
     render(<Tracklist snapshot={snapshot} />);
-    expect(within(screen.getByText("Audio to make").parentElement!).getByText("Estimate pending")).toBeInTheDocument();
-    expect(screen.getByText("Still to make").parentElement).toHaveTextContent("1 chapter");
+    expect(screen.getAllByText("Estimate pending").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Down the Rabbit-Hole" })).not.toBeChecked();
     expect(screen.queryByText("None remaining")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Select chapters above" })).toBeDisabled();
   });
