@@ -41,6 +41,7 @@ describe("shared modal surface", () => {
 
   it("locks both document scroll containers and restores scroll position and inline priorities", () => {
     document.documentElement.style.setProperty("overflow", "auto", "important");
+    document.documentElement.style.setProperty("scrollbar-gutter", "stable", "important");
     document.body.style.setProperty("position", "relative", "important");
     document.body.style.setProperty("top", "3px");
     let scrollY = 240;
@@ -50,17 +51,21 @@ describe("shared modal surface", () => {
     expect(document.documentElement.style.overflow).toBe("hidden");
     expect(document.body.style.position).toBe("fixed");
     expect(document.body.style.top).toBe("-240px");
+    expect(document.documentElement.style.getPropertyValue("scrollbar-gutter")).toBe("auto");
     scrollY = 0;
     unmount();
     expect(scrollTo).toHaveBeenLastCalledWith(0, 240);
     expect(document.documentElement.style.overflow).toBe("auto");
     expect(document.documentElement.style.getPropertyPriority("overflow")).toBe("important");
+    expect(document.documentElement.style.getPropertyValue("scrollbar-gutter")).toBe("stable");
+    expect(document.documentElement.style.getPropertyPriority("scrollbar-gutter")).toBe("important");
     expect(document.body.style.position).toBe("relative");
     expect(document.body.style.getPropertyPriority("position")).toBe("important");
     expect(document.body.style.top).toBe("3px");
     offset.mockRestore();
     scrollTo.mockRestore();
     document.documentElement.style.removeProperty("overflow");
+    document.documentElement.style.removeProperty("scrollbar-gutter");
     document.body.style.removeProperty("position");
     document.body.style.removeProperty("top");
   });

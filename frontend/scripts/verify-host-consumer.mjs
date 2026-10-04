@@ -40,10 +40,11 @@ try {
   await writeFile(path.join(host, 'index.html'), '<div id="root"></div><script type="module">if (new URLSearchParams(location.search).has("primitive")) import("/primitive.tsx"); else if (new URLSearchParams(location.search).has("handoff")) import("/handoff.tsx"); else if (new URLSearchParams(location.search).has("modal")) import("/modal.tsx"); else import("/main.tsx");</script>');
   await writeFile(path.join(host, 'host.css'), '.primary { background: rgb(1, 23, 45); border-radius: 3px; } .primary:hover:not(:disabled) { background: rgb(2, 34, 56); }');
   await writeFile(path.join(host, 'primitive.tsx'), `import React from 'react'; import { createRoot } from 'react-dom/client'; import { Button, PresentationRoot } from 'meowdiobooks-workflow-ui/ui'; import 'meowdiobooks-workflow-ui/product.css'; import './host.css'; createRoot(document.getElementById('root')!).render(<PresentationRoot><Button data-testid="consumer">Standalone consumer</Button></PresentationRoot>);`);
+  await writeFile(path.join(host, 'classic-scrollbar.css'), 'html::-webkit-scrollbar { width: 15px; height: 15px; }');
   await writeFile(path.join(host, 'modal.tsx'), `
 import React, { useState } from 'react'; import { createRoot } from 'react-dom/client';
 import { DialogBackdrop, DialogSurface, PresentationRoot, Button } from 'meowdiobooks-workflow-ui/ui';
-import 'meowdiobooks-workflow-ui/product.css';
+import 'meowdiobooks-workflow-ui/product.css'; import './classic-scrollbar.css';
 function ModalHost() {
   const [open, setOpen] = useState(false); const [nested, setNested] = useState(false);
   return <PresentationRoot appearance={new URLSearchParams(location.search).get('appearance') === 'dark' ? 'dark' : 'light'} palette={{ paper: '#fdfdf4' }}>
@@ -173,6 +174,7 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       await opener.waitFor();
       await page.evaluate(() => window.scrollTo(0, 500));
       const before = await page.evaluate(() => window.scrollY);
+      const gutterBefore = await page.evaluate(() => innerWidth - document.documentElement.clientWidth);
       await opener.click();
       const dialog = page.getByRole('dialog', { name: 'Critical decision', exact: true });
       await dialog.waitFor();
@@ -180,14 +182,25 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       const geometry = await dialog.evaluate(element => {
         const box = element.getBoundingClientRect();
         const backdrop = element.parentElement;
+        const inspect = node => node ? {
+          tag: node.tagName, id: node.id, classes: node.className, inert: node.hasAttribute('inert'),
+          box: node.getBoundingClientRect().toJSON(),
+          styles: Object.fromEntries(['position', 'inset', 'zIndex', 'display', 'visibility', 'pointerEvents', 'transform', 'overflow', 'scrollbarGutter', 'height', 'width'].map(key => [key, getComputedStyle(node)[key]])),
+        } : null;
+        const corners = [[0, 0], [innerWidth - 1, 0], [0, innerHeight - 1], [innerWidth - 1, innerHeight - 1]].map(([x, y]) => {
+          const hit = document.elementFromPoint(x, y);
+          return { x, y, covered: Boolean(hit?.closest('.dialog-portal')), hit: inspect(hit) };
+        });
         return { x: box.x, y: box.y, right: box.right, bottom: box.bottom, height: box.height,
           maxHeight: getComputedStyle(element).maxHeight, scrollHeight: element.scrollHeight,
           appearance: backdrop.dataset.appearance, paper: getComputedStyle(element).backgroundColor,
           bodyTop: document.body.style.top, rootOverflow: document.documentElement.style.overflow,
-          cornersCovered: [[0, 0], [innerWidth - 1, 0], [0, innerHeight - 1], [innerWidth - 1, innerHeight - 1]].every(([x, y]) => document.elementFromPoint(x, y)?.closest('.dialog-portal')) };
+          cornersCovered: corners.every(corner => corner.covered),
+          coverageDiagnostic: { backdrop: inspect(backdrop), body: inspect(document.body), root: inspect(document.documentElement), corners, viewport: { innerWidth, innerHeight, clientWidth: document.documentElement.clientWidth, clientHeight: document.documentElement.clientHeight, scrollX, scrollY, devicePixelRatio } } };
       });
       assert(geometry.x >= 0 && geometry.y >= 0 && geometry.right <= viewport.width && geometry.bottom <= viewport.height, 'Dialog must fit complete viewport');
       assert(geometry.scrollHeight > geometry.height, 'Tall decision must retain internal scrolling');
+      if (!geometry.cornersCovered) console.error(JSON.stringify({ failure: 'modal viewport coverage', viewport, appearance, before, geometry, errors }, null, 2));
       assert(geometry.cornersCovered, 'Shell header/footer must never peek through backdrop');
       assert.equal(geometry.rootOverflow, 'hidden');
       assert.equal(geometry.bodyTop, `${-before}px`);
@@ -216,7 +229,8 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       assert.equal(await page.evaluate(() => window.scrollY), before, 'Final dismissal must restore document position');
       assert.equal(await opener.evaluate(element => document.activeElement === element), true);
       assert.deepEqual(errors, []);
-      modalResults.push({ viewport, appearance, before, internalScroll, geometry, errors });
+      const { coverageDiagnostic, ...measuredGeometry } = geometry;
+      modalResults.push({ viewport, appearance, before, gutterBefore, internalScroll, geometry: measuredGeometry, errors });
       await page.close();
     }
   }

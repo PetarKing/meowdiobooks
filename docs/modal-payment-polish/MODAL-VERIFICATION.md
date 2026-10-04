@@ -84,3 +84,11 @@ The independent actual Cloud 402 fixture separately observed the repaired handof
 and WebKit at 390px and 1440px: focus inside Billing, fixed body, hidden root overflow, inert
 application and no document movement under outside wheel input. That fixture also covers host
 remount behavior; returning to a disconnected opener is a separate host focus contract.
+
+The Linux packed-consumer gate additionally exposed a classic-scrollbar gutter that overlay-scrollbar
+macOS runs did not reveal. Hidden overflow alone retained the shell's stable gutter. The first modal
+lock now temporarily sets root scrollbar-gutter to auto and preserves/restores its original inline
+value and priority. The existing full-viewport corner assertion remains unchanged; failure diagnostics
+include corner hit nodes and root/backdrop dimensions. A focused regression verifies stable!important
+restoration. Routing Storybook queries now use the document body for the portaled dialog; purchased
+completion expectations retain current main's ready/export copy. All64 Storybook browser cases passed.

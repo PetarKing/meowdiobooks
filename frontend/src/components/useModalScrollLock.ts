@@ -17,8 +17,11 @@ export function useModalScrollLock(enabled = true) {
       const scrollY = window.scrollY;
       const properties = ["overflow", "position", "top", "left", "width", "padding-right"];
       const saved = properties.map((name) => [name, body.style.getPropertyValue(name), body.style.getPropertyPriority(name)]);
-      const rootOverflow = [root.style.getPropertyValue("overflow"), root.style.getPropertyPriority("overflow")];
+      const rootStyles = ["overflow", "scrollbar-gutter"].map((name) => [name, root.style.getPropertyValue(name), root.style.getPropertyPriority(name)]);
       const scrollbar = root.clientWidth > 0 ? Math.max(0, window.innerWidth - root.clientWidth) : 0;
+      // Stable classic scrollbar gutters remain reserved even with hidden
+      // overflow, leaving a right-hand strip outside fixed modal backdrops.
+      root.style.setProperty("scrollbar-gutter", "auto", "important");
       root.style.setProperty("overflow", "hidden", "important");
       body.style.setProperty("overflow", "hidden", "important");
       // A fixed body also blocks touch scrolling on mobile Safari, where overflow
@@ -30,7 +33,7 @@ export function useModalScrollLock(enabled = true) {
       if (scrollbar) body.style.setProperty("padding-right", `${parseFloat(getComputedStyle(body).paddingRight) + scrollbar}px`, "important");
       lifecycle.restoreScroll = () => {
         for (const [name, value, priority] of saved) body.style.setProperty(name, value, priority);
-        root.style.setProperty("overflow", rootOverflow[0], rootOverflow[1]);
+        for (const [name, value, priority] of rootStyles) root.style.setProperty(name, value, priority);
         if (window.scrollX !== scrollX || window.scrollY !== scrollY) window.scrollTo(scrollX, scrollY);
       };
     }
