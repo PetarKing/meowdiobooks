@@ -37,7 +37,7 @@ try {
     .replace("from '../App'", "from 'meowdiobooks-workflow-ui'")
     .replace("from '../locales/edition'", "from 'meowdiobooks-workflow-ui/i18n'");
   await writeFile(path.join(host, 'hostCompatibility.tsx'), contract);
-  await writeFile(path.join(host, 'index.html'), '<div id="root"></div><script type="module">if (new URLSearchParams(location.search).has("primitive")) import("/primitive.tsx"); else if (new URLSearchParams(location.search).has("modal")) import("/modal.tsx"); else import("/main.tsx");</script>');
+  await writeFile(path.join(host, 'index.html'), '<div id="root"></div><script type="module">if (new URLSearchParams(location.search).has("primitive")) import("/primitive.tsx"); else if (new URLSearchParams(location.search).has("handoff")) import("/handoff.tsx"); else if (new URLSearchParams(location.search).has("modal")) import("/modal.tsx"); else import("/main.tsx");</script>');
   await writeFile(path.join(host, 'host.css'), '.primary { background: rgb(1, 23, 45); border-radius: 3px; } .primary:hover:not(:disabled) { background: rgb(2, 34, 56); }');
   await writeFile(path.join(host, 'primitive.tsx'), `import React from 'react'; import { createRoot } from 'react-dom/client'; import { Button, PresentationRoot } from 'meowdiobooks-workflow-ui/ui'; import 'meowdiobooks-workflow-ui/product.css'; import './host.css'; createRoot(document.getElementById('root')!).render(<PresentationRoot><Button data-testid="consumer">Standalone consumer</Button></PresentationRoot>);`);
   await writeFile(path.join(host, 'modal.tsx'), `
@@ -62,6 +62,38 @@ function ModalHost() {
 }
 createRoot(document.getElementById('root')!).render(<ModalHost />);
 `);
+  await writeFile(path.join(host, 'handoff.tsx'), `
+import React, { useCallback, useRef, useState } from 'react'; import { createRoot } from 'react-dom/client';
+import App from 'meowdiobooks-workflow-ui';
+import { HttpWizardApi } from 'meowdiobooks-workflow-ui/api';
+import type { Job, WizardSnapshot } from 'meowdiobooks-workflow-ui/contracts';
+import { DialogBackdrop, DialogSurface, PresentationRoot } from 'meowdiobooks-workflow-ui/ui';
+import 'meowdiobooks-workflow-ui/i18n'; import 'meowdiobooks-workflow-ui/product.css';
+let blocked = false;
+Object.assign(window, { finishFundingHandoff: () => { blocked = true; } });
+const snapshot: WizardSnapshot = {
+ book: { id: 'host-book', title: 'Host handoff', author: '', filename: 'synthetic.pdf', pageCount: 1, completedStages: ['import'] },
+ activeArtifacts: {}, warnings: [], boundaryCandidates: [], reviewInspection: { decisions: [], boundaryDecisions: [], consequences: {}, history: [] }, chapters: [], generatedChapters: [], history: {},
+ voiceModels: [], voiceSelection: { modelId: '', language: 'english' }
+};
+class HandoffGateway extends HttpWizardApi {
+ async listBooks() { return []; } async listLibrary() { return []; } async listBookJobs() { return []; }
+ async getBookSnapshot() { return snapshot; } async getRepresentativePages() { return []; }
+ async previewExtraction() { return { page: 1, pageCount: 1, method: 'liteparse' as const, text: 'Synthetic source', warnings: [], elapsedSeconds: 0, cached: true, imageUrl: '' }; }
+ async getJob(): Promise<Job> { return { id: 'host-job', kind: 'v2:extract', status: blocked ? 'failed' : 'running', payload: { book_id: 'host-book' }, progress: 30, message: 'Core processing', ...(blocked ? { error: 'Funding required', action_required: { code: 'HOST_FUNDING_REQUIRED', message: 'Funding required', context: {} } } : {}) }; }
+}
+const gateway = new HandoffGateway();
+const locationHint = { bookId: 'host-book', stepId: 'extract', activeJobId: 'host-job' };
+function FundingHost() {
+ const [funding, setFunding] = useState(false); const returnFocus = useRef<HTMLButtonElement>(null);
+ const onActionRequired = useCallback(() => { setFunding(true); return true; }, []);
+ return <><App gateway={gateway} initialWorkflowLocation={locationHint} onActionRequired={onActionRequired}
+   renderHeader={() => <button ref={returnFocus}>Host account</button>} />
+   {funding && <PresentationRoot appearance="dark"><DialogBackdrop><DialogSurface aria-label="Host funding handoff" className="dialog-card" returnFocusRef={returnFocus} onDismiss={() => setFunding(false)}><h2>Funding required</h2><button onClick={() => setFunding(false)}>Keep reviewing</button></DialogSurface></DialogBackdrop></PresentationRoot>}
+ </>;
+}
+createRoot(document.getElementById('root')!).render(<FundingHost />);
+`);
   await writeFile(path.join(host, 'main.tsx'), `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
@@ -84,9 +116,14 @@ class Gateway extends HttpWizardApi {
 const actionMode = new URLSearchParams(location.search).get('action');
 createRoot(document.getElementById('root')!).render(<App {...hostComposition} gateway={new Gateway()} initialWorkflowLocation={actionMode ? { bookId: 'book', stepId: 'dialogue' } : undefined} onActionRequired={() => { window.hostActionCalls = (window.hostActionCalls || 0) + 1; return actionMode === 'delegated'; }} renderHeader={() => <Button data-testid="consumer">Host header</Button>} />);
 `);
-  await writeFile(path.join(host, 'assets.d.ts'), '/// <reference types="vite/client" />\ninterface Window { actionAttempted?: boolean; actionSettled?: boolean; hostActionCalls?: number }\n');
+  await writeFile(path.join(host, 'assets.d.ts'), '/// <reference types="vite/client" />\ninterface Window { actionAttempted?: boolean; actionSettled?: boolean; hostActionCalls?: number; finishFundingHandoff?: () => void }\n');
   await writeFile(path.join(host, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2022', module: 'ESNext', moduleResolution: 'Bundler', jsx: 'react-jsx', strict: true, skipLibCheck: true, esModuleInterop: true, noEmit: true, lib: ['ES2022', 'DOM', 'DOM.Iterable'] }, include: ['*.tsx', '*.d.ts'] }));
-  execFileSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '-p', path.join(host, 'tsconfig.json')], { cwd: host, stdio: 'pipe' });
+  try {
+    execFileSync(process.execPath, [path.join(root, 'node_modules/typescript/bin/tsc'), '-p', path.join(host, 'tsconfig.json')], { cwd: host, stdio: 'pipe' });
+  } catch (error) {
+    console.error(error.stdout?.toString());
+    throw error;
+  }
   server = await createServer({ configFile: false, root: host, plugins: [react()], esbuild: { jsx: 'automatic' }, optimizeDeps: { include: ['react', 'react-dom/client', 'react-i18next', 'i18next'] }, server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
   await server.listen();
   const address = server.httpServer.address();
@@ -183,6 +220,34 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       await page.close();
     }
   }
+  const handoffResults = [];
+  async function checkModalHandoff(base, mode) {
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+      const page = await browser.newPage({ viewport });
+      const errors = [];
+      page.on('pageerror', error => errors.push(error.message));
+      await page.goto(`${base}/?handoff`);
+      await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Core processing' }) }).waitFor();
+      const before = await page.evaluate(() => ({ position: document.body.style.position, overflow: document.documentElement.style.overflow }));
+      assert.deepEqual(before, { position: 'fixed', overflow: 'hidden' });
+      await page.evaluate(() => window.finishFundingHandoff());
+      const funding = page.getByRole('dialog', { name: 'Host funding handoff' });
+      await funding.waitFor();
+      await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')].some(element => element.textContent.includes('Core processing')));
+      const after = await funding.evaluate(element => ({ position: document.body.style.position, overflow: document.documentElement.style.overflow, focused: element.contains(document.activeElement), inert: Boolean(element.closest('[inert]')) }));
+      assert.deepEqual(after, { position: 'fixed', overflow: 'hidden', focused: true, inert: false }, 'Core cleanup must retain hosted modal ownership across App and /ui bundles');
+      await page.keyboard.press('Tab');
+      assert.equal(await page.getByRole('button', { name: 'Keep reviewing' }).evaluate(element => document.activeElement === element), true);
+      await page.keyboard.press('Escape');
+      await funding.waitFor({ state: 'detached' });
+      const closed = await page.evaluate(() => ({ position: document.body.style.position, overflow: document.documentElement.style.overflow, focus: document.activeElement.textContent }));
+      assert.deepEqual(closed, { position: '', overflow: '', focus: 'Host account' });
+      assert.deepEqual(errors, []);
+      handoffResults.push({ mode, viewport, before, after, closed, errors });
+      await page.close();
+    }
+  }
+  await checkModalHandoff(`http://127.0.0.1:${address.port}`, 'development');
   const actionResults = [];
   async function checkRequiredActions(base, mode) {
     for (const action of ['handled', 'delegated', 'declined']) {
@@ -209,7 +274,8 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
   previewServer = await preview({ configFile: false, root: host, preview: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
   const previewAddress = previewServer.httpServer.address();
   await checkRequiredActions(`http://127.0.0.1:${previewAddress.port}`, 'production');
-  console.log(JSON.stringify({ packedFiles: packed.files.length, hostTypes: 'passed', equalSpecificityOverride: results, requiredActions: actionResults, modalIsolation: modalResults }, null, 2));
+  await checkModalHandoff(`http://127.0.0.1:${previewAddress.port}`, 'production');
+  console.log(JSON.stringify({ packedFiles: packed.files.length, hostTypes: 'passed', equalSpecificityOverride: results, requiredActions: actionResults, modalIsolation: modalResults, crossEntryModalHandoff: handoffResults }, null, 2));
 } finally {
   await browser?.close();
   await server?.close();
