@@ -314,7 +314,7 @@ export function useWorkflowModel({
 
   const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
 
-  const [chapterFilter, setChapterFilter] = useState<"all" | "pending" | "generated">("all");
+  const [chapterFilter, setChapterFilter] = useState<"all" | "pending" | "generated">("pending");
 
   const [listeningChapterId, setListeningChapterId] = useState<string>();
 
@@ -707,14 +707,20 @@ export function useWorkflowModel({
       : draftVoiceSelection(next.voiceModels, [savedModel, next.voiceSelection.modelId], [savedLanguage, detected]);
     setVoiceModel(selection.modelId);
     setLanguage(selection.language);
-    setSelectedChapters((current) => {
-      const unavailable = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
-      const available = next.chapters.map((row) => row.id).filter((id) => !unavailable.has(id));
-      const generated = new Set(next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
-      const pending = available.filter((id) => !generated.has(id));
-      return current.length ? current.filter((id) => pending.includes(id)) : pending;
-    });
     const newExportBook = exportBookId.current !== next.book.id;
+    const unavailableChapters = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
+    const availableChapterIds = next.chapters.map((row) => row.id).filter((id) => !unavailableChapters.has(id));
+    const generatedChapterIds = new Set(next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+    const pendingChapterIds = availableChapterIds.filter((id) => !generatedChapterIds.has(id));
+    const nextChapterFilter = newExportBook
+      ? !pendingChapterIds.length && generatedChapterIds.size > 0 ? "generated" : "pending"
+      : chapterFilter === "all" ? "pending" : chapterFilter;
+    if (newExportBook || chapterFilter === "all") setChapterFilter(nextChapterFilter);
+    setSelectedChapters((current) => {
+      if (newExportBook) return nextChapterFilter === "pending" ? pendingChapterIds : [];
+      const visible = nextChapterFilter === "generated" ? generatedChapterIds : new Set(pendingChapterIds);
+      return current.length ? current.filter((id) => visible.has(id)) : nextChapterFilter === "pending" ? pendingChapterIds : [];
+    });
     exportBookId.current = next.book.id;
     setExportChapterIds((current) => {
       const playable = next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId);
@@ -1169,7 +1175,7 @@ export function useWorkflowModel({
         .filter((chapter) => chapter.splitFrom === chapterId)
         .map((chapter) => chapter.id);
       setSplitChapterId(undefined);
-      setChapterFilter("all");
+      setChapterFilter("pending");
       await hydrate(book.id);
       setSelectedChapters(partIds);
     } catch (reason) {

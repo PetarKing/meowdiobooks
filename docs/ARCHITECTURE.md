@@ -49,6 +49,12 @@ when these revisions match the current snapshot and its cast is accepted. Curren
 uses this wash, while its visible status always describes audio readiness: Generated, Older recording
 or To make. Purchase never changes that status, and no redundant Purchased badge is shown. Omission, a different book,
 or a changed accepted parent removes the presentation. Existing audio never implies purchase.
+Generate separates To make (the entry default when work remains) from Generated (current audio only).
+Older recordings stay in To make with an independent Listen action; empty chapters remain visible
+as disabled No audio rows and are excluded from its actionable count. A completed-only book opens
+Generated. Tab changes clear selection. Current audio selection goes to Export by default; a named
+secondary Regenerate action deliberately creates replacement audio. A normal Generate action excludes
+already-current recordings from its requested IDs and duration estimate.
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 

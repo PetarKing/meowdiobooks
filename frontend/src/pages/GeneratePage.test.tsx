@@ -8,15 +8,17 @@ import type { GenerationPurchasePresentation } from "../app/contracts";
 import { publicGenerationEstimatePolicy } from "../workflow/generation";
 import { GeneratePage, type GeneratePageModel } from "./GeneratePage";
 
-function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale"), purchase, initialFilter = "all" }: {
+function Tracklist({ generate = vi.fn(), exportChapters = vi.fn(), snapshot = snapshotFor("generate-stale"), purchase, initialSelection = [], initialFilter = "pending" }: {
   generate?: GeneratePageModel["generateChapters"];
+  exportChapters?: GeneratePageModel["continueToExport"];
   snapshot?: WizardSnapshot;
   purchase?: GenerationPurchasePresentation;
   initialFilter?: GeneratePageModel["chapterFilter"];
+  initialSelection?: string[];
 
 }) {
   const { t } = useTranslation();
-  const [selectedChapters, setSelectedChapters] = useState<string[]>([]);
+  const [selectedChapters, setSelectedChapters] = useState<string[]>(initialSelection);
   const [chapterFilter, setChapterFilter] = useState<GeneratePageModel["chapterFilter"]>(initialFilter);
   const [listeningChapterId, setListeningChapterId] = useState<string>();
   const [splitChapterId, setSplitChapterId] = useState<string>();
@@ -24,7 +26,7 @@ function Tracklist({ generate = vi.fn(), snapshot = snapshotFor("generate-stale"
     gateway: createFixtureGateway("generate-stale"), book: snapshot.book, snapshot,
     busy: false, error: "", chapterFilter, selectedChapters, listeningChapterId, splitChapterId,
     setChapterFilter, setSelectedChapters, setListeningChapterId, setSplitChapterId,
-    generateChapters: generate, splitLongChapter: vi.fn(), continueToExport: vi.fn(),
+    generateChapters: generate, splitLongChapter: vi.fn(), continueToExport: exportChapters,
     generationSamples: [], generationEstimatePolicy: publicGenerationEstimatePolicy, t,
   }} purchase={purchase} />;
 }
@@ -42,9 +44,25 @@ function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentatio
 }
 
 describe("Generate chapter targets", () => {
+  it("normalizes the former All filter to To make, keeps empty rows visible, and uses disjoint audio-ready tabs", () => {
+    render(<Tracklist initialFilter="all" />);
+    expect(screen.getAllByRole("tab")).toHaveLength(2);
+    expect(screen.queryByRole("tab", { name: /^All/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "To make 3" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("checkbox", { name: "Select Pig and Pepper" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Listen to Down the Rabbit-Hole (older recording)" })).toBeEnabled();
+    expect(screen.queryByRole("checkbox", { name: "Select The Pool of Tears" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Generated 2" }));
+    expect(screen.getAllByRole("checkbox")).toHaveLength(2);
+    expect(screen.queryByText("Older recording")).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: "Select Pig and Pepper" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select The Pool of Tears" })).not.toBeChecked();
+  });
+
   it("does not infer purchase from playable or older audio", () => {
     render(<Tracklist />);
-    expect(screen.getAllByText("Generated").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Generated", { selector: ".track-status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /^All/ })).not.toBeInTheDocument();
     expect(screen.getAllByText("Older recording").length).toBeGreaterThan(0);
     expect(document.querySelector(".chapter-card.purchased")).toBeNull();
     expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
@@ -117,8 +135,37 @@ describe("Generate chapter targets", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: "Select Down the Rabbit-Hole" }));
     expect(screen.getByRole("button", { name: "Continue to Export →" })).toHaveClass("primary");
-    expect(screen.getByRole("button", { name: "Generate 1 selected" })).toHaveClass("ghost");
-    expect(within(screen.getByRole("region", { name: "Generation action" })).getByText("Regeneration")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Regenerate 1 selected" })).toHaveClass("ghost");
+    expect(within(screen.getByRole("region", { name: "Generation action" })).queryByText("Generation")).not.toBeInTheDocument();
+  });
+
+  it.each(["generated"] as const)("exports a selected current recording in a multi-chapter %s view unless regeneration is explicitly chosen", (initialFilter) => {
+    const snapshot = snapshotFor("generate-stale");
+    const readyId = snapshot.generatedChapters.find((row) => row.current)!.chapterId;
+    const title = snapshot.chapters.find((row) => row.id === readyId)!.title;
+    const generate = vi.fn();
+    const exportChapters = vi.fn();
+    render(<Tracklist snapshot={snapshot} initialFilter={initialFilter} generate={generate} exportChapters={exportChapters} />);
+    fireEvent.click(screen.getByRole("checkbox", { name: `Select ${title}` }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue to Export →" }));
+    expect(exportChapters).toHaveBeenCalledWith([readyId]);
+    expect(generate).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate 1 selected" }));
+    expect(generate).toHaveBeenCalledWith([readyId]);
+  });
+
+  it("keeps existing current audio out of mixed generation and its duration estimate", () => {
+    const snapshot = snapshotFor("generate-stale");
+    const readyId = snapshot.generatedChapters.find((row) => row.current)!.chapterId;
+    const pendingId = snapshot.chapters[0].id;
+    const generate = vi.fn();
+    render(<Tracklist snapshot={snapshot} generate={generate} initialSelection={[pendingId, readyId]} />);
+    expect(screen.getByText("1 selected chapter is already generated and will be kept.")).toBeInTheDocument();
+    const action = screen.getByRole("region", { name: "Generation action" });
+    expect(within(action).queryByText("Listening")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Regenerate/ })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate 1 selected →" }));
+    expect(generate).toHaveBeenCalledWith([pendingId]);
   });
 
   it("keeps a missing duration estimate distinct from no remaining chapters", () => {
@@ -169,9 +216,9 @@ describe("Generate chapter targets", () => {
     expect(unavailable).not.toBeChecked();
     fireEvent.click(screen.getByRole("button", { name: "Select all shown" }));
     expect(unavailable).not.toBeChecked();
-    expect(screen.getAllByRole("checkbox").filter((checkbox) => (checkbox as HTMLInputElement).checked)).toHaveLength(5);
+    expect(screen.getAllByRole("checkbox").filter((checkbox) => (checkbox as HTMLInputElement).checked)).toHaveLength(3);
     fireEvent.click(screen.getByRole("tab", { name: /^To make/ }));
     expect(screen.getAllByRole("checkbox").every((checkbox) => !(checkbox as HTMLInputElement).checked)).toBe(true);
-    expect(screen.queryByRole("checkbox", { name: "Select Pig and Pepper" })).not.toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Pig and Pepper" })).toBeDisabled();
   });
 });

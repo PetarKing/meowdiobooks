@@ -24,9 +24,9 @@
 .chapter-card:hover:not(.unavailable) { background: color-mix(in srgb, var(--matcha-soft) 65%, transparent); }
 .chapter-card.selected, .chapter-card.has-audio.selected, .chapter-card.selected.generated, .chapter-card.selected.stale { background: color-mix(in srgb, var(--blush) 72%, transparent); box-shadow: none; }
 .chapter-card.generated, .chapter-card.purchased { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); }
-.chapter-card-grid.has-selection .chapter-card.generated:not(.selected), .chapter-card-grid.has-selection .chapter-card.purchased:not(.selected) { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); filter: none; opacity: 1; }
+.chapter-card-grid.has-selection .chapter-card.generated:not(.selected), .chapter-card-grid.has-selection .chapter-card.purchased:not(.selected), .chapter-card-grid.has-selection .chapter-card.generated:not(.selected):focus-within, .chapter-card-grid.has-selection .chapter-card.purchased:not(.selected):focus-within { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); filter: none; opacity: 1; }
 .chapter-card.generated:hover:not(.selected), .chapter-card.purchased:hover:not(.selected) { background: color-mix(in srgb, var(--gilt) 23%, var(--paper)); }
-.chapter-card.generated.selected, .chapter-card.has-audio.generated.selected, .chapter-card.purchased.selected { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 30%, var(--paper)), color-mix(in srgb, var(--gilt) 14%, var(--paper))); box-shadow: inset 3px 0 var(--gilt); }
+.chapter-card.generated.selected, .chapter-card.has-audio.generated.selected, .chapter-card.purchased.selected { background: linear-gradient(110deg, color-mix(in srgb, var(--gilt) 20%, var(--paper)), color-mix(in srgb, var(--gilt) 7%, var(--paper))); box-shadow: inset 2px 0 color-mix(in srgb, var(--ink) 45%, transparent); }
 .chapter-card .chapter-row-target { position: absolute; z-index: 1; inset: 0; grid-column: auto; grid-row: auto; width: auto; height: auto; display: block; padding: 0; border: 0; border-radius: 0; cursor: pointer; }
 .chapter-row-target input { position: absolute; top: 50%; left: 20px; width: 20px; height: 20px; margin: 0; transform: translateY(-50%); cursor: pointer; }
 .chapter-card.unavailable .chapter-row-target, .chapter-card.unavailable .chapter-row-target input { cursor: default; }
@@ -47,6 +47,7 @@
 .chapter-card.stale .chapter-listen { background: var(--warning-soft); color: var(--warning-ink); }
 .generation-selection-anchor { display: block; height: 32px; overflow: hidden; }
 .generation-selection { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 5; align-items: center; margin-top: 0; padding: 18px 20px; gap: 22px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); box-shadow: 0 8px 26px rgb(var(--shadow-color) / .10); backdrop-filter: none; }
+.generation-selection:not(:has(> dl)) { grid-template-columns: minmax(0, 1fr) auto; }
 .generation-selection.is-floating { gap: 16px; padding: 12px 20px; border: 1px solid var(--line-strong); border-left: 4px solid var(--poppy); border-radius: 12px; background: color-mix(in srgb, var(--paper) 94%, transparent); box-shadow: 0 13px 40px rgb(var(--shadow-color) / .18); backdrop-filter: blur(14px); }
 .generation-selection.is-floating .generation-selection-copy b { font-size: 19px; }
 .generation-selection.is-floating dl { display: flex; }
@@ -59,6 +60,7 @@
 .generation-selection dl div { min-width: 0; padding: 0; border: 0; }
 .generation-selection dt { font-size: 10px; letter-spacing: 0; text-transform: none; font-weight: 500; }
 .generation-selection dd { font: 500 14px/1.4 var(--font-sans); }
+.generation-kept-audio { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .generation-selection-actions { gap: 12px; }
 .generation-selection-actions .primary { min-height: 48px; padding-inline: 24px; font-size: 14px; box-shadow: none; }
 .generation-selection-actions .ghost, .chapter-split-button { border: 0; background: transparent; }
@@ -92,6 +94,7 @@
   .chapter-card .chapter-estimates dd { font-size: 12px; }
   .chapter-card .chapter-listen, .chapter-card.stale .chapter-listen { grid-column: 3; grid-row: 1; width: 44px; height: 44px; align-self: start; }
   .generation-selection { padding: 16px max(14px, env(safe-area-inset-right)) 16px max(14px, env(safe-area-inset-left)); display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .generation-selection:not(:has(> dl)) { grid-template-columns: 1fr; }
   .generation-selection-actions { flex-direction: column-reverse; margin: 0; gap: 12px; }
   .generation-selection-actions .primary { width: 100%; }
   .chapter-split-button { align-self: flex-start; }
