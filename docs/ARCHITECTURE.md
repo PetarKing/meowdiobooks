@@ -86,6 +86,12 @@ implement the same function and HTTP/gateway response without changing Cast UI o
 
 ### Untrusted PDF parsing
 
+Hosts may supply `book_id_for_source` to `create_app_v2` when their store needs a different identity
+namespace. The resolver receives the verified full source SHA-256 and returns a stable ID containing
+only letters, digits, `_` and `-` (1–128 characters). Local content-derived IDs remain the default.
+The workflow validates the ID before writing and rejects a collision with a different source hash;
+the host retains responsibility for ownership and legacy-ID compatibility.
+
 The September 2026 parser repair pins pypdf 6.18.1, pdfplumber 0.11.10 (pdfminer.six 20260107),
 and lxml 6.1.3 in both application and workflow distributions. The shared parser dependency stack
 belongs here so every composition receives the same fixes. Keeping the old parsers behind upload-size

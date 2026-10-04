@@ -6,6 +6,7 @@ import json
 import hashlib
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -437,6 +438,7 @@ def create_app_v2(
     ) = None,
     voice_candidate_policy: Mapping[str, Any] | VoiceCandidatePolicy | None = None,
     store_factory: Callable[[str, type[Any]], ModelStore[Any]] | None = None,
+    book_id_for_source: Callable[[str], str] | None = None,
     on_book_imported: Callable[[Book, Path], None] | None = None,
     on_book_deleting: Callable[[Book], None] | None = None,
     on_library_exported: Callable[[LibraryExport, Path, Path], None] | None = None,
@@ -450,6 +452,8 @@ def create_app_v2(
 ) -> FastAPI:
     """Create the v2 API with explicit provider seams for local or hosted composition.
 
+    The optional import identity resolver receives the verified source SHA-256 and returns a stable,
+    path-safe book ID within the host's store. Local imports retain their content-derived ID.
     The post-import hook observes an already-persisted book. Raising from the hook removes the new
     book and source so the same bytes can be retried as a fresh import. The pre-delete hook runs
     after active-work checks and before local state is removed; raising aborts deletion so hosted
@@ -1394,8 +1398,14 @@ def create_app_v2(
             chunks.append(chunk)
         raw = b"".join(chunks)
         book_id, source_hash = imported_book_id(raw)
+        if book_id_for_source is not None:
+            book_id = book_id_for_source(source_hash)
+            if not isinstance(book_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,128}", book_id):
+                raise RuntimeError("Import identity resolver returned an invalid book ID")
         existing = books.get(book_id)
         if existing is not None:
+            if existing.source_hash != source_hash:
+                raise HTTPException(status_code=409, detail="The import identity belongs to another source")
             if not existing.source_name:
                 raise HTTPException(
                     status_code=409, detail="The existing import has no source receipt"

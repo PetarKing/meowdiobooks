@@ -79,8 +79,8 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
       </div>
       <div className="generate-hero-state"><dl className="generate-hero-stats">
         <div><dt>{t("Playable")}</dt><dd>{currentGenerated.length} <small>{t("of {{count}}", { count: availableChapters.length })}</small></dd></div>
-        <div><dt>{t("Audio to make")}</dt><dd>{chapterDuration(remainingAudioSeconds)}</dd></div>
-        <div><dt>{t("Still to make")}</dt><dd>{filterCounts.pending} <small>{t("chapters")}</small></dd></div>
+        <div><dt>{t("Audio to make")}</dt><dd>{filterCounts.pending ? chapterDuration(remainingAudioSeconds) : t("None remaining")}</dd></div>
+        <div><dt>{t("Still to make")}</dt><dd>{filterCounts.pending} <small>{t(filterCounts.pending === 1 ? "chapter" : "chapters")}</small></dd></div>
       </dl></div>
     </section>
 
@@ -126,7 +126,7 @@ export function GeneratePage({ model }: { model: GeneratePageModel; }) {
       {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
       {(availableChapters.length > 0 || currentGenerated.length > 0) && <GenerationActionDock ariaLabel={t("Generation action")}>
         {error && <p className="generation-error"><b>{t("Generation needs attention")}</b><span>{t(error, { defaultValue: error })}</span></p>}
-        <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
+        <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? currentGenerated.length === 1 ? t("1 chapter is ready") : t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
         {selectedChapters.length > 0 && <dl><div><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div>{!exportSelected && <div><dt>{t("Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div>}</dl>}
         <div className="generation-selection-actions">
           {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">↯</span><span>{t("Split this into shorter chapters?")}</span></button>}
