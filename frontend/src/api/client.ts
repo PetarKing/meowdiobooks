@@ -24,6 +24,8 @@ import type {
   WizardStage,
 } from "./contracts";
 import { dialogueReaderAssignments } from "../workflow/dialogue";
+import { ActionRequiredError, readActionRequired } from './actionRequired';
+export { ActionRequiredError } from './actionRequired';
 
 class ApiError extends Error {
   constructor(message: string, readonly status: number, readonly jobId?: string) {
@@ -50,6 +52,9 @@ export class HttpWizardApi implements WorkflowGateway {
     if (!response.ok) {
       const payload = await response.json().catch(() => null) as { detail?: unknown } | null;
       const detail = payload?.detail;
+      const action = detail && typeof detail === 'object' && 'actionRequired' in detail
+        ? readActionRequired(detail.actionRequired) : undefined;
+      if (action) throw new ActionRequiredError(action, { status: response.status });
       const detailMessage = apiErrorMessage(detail);
       throw new ApiError(
         detailMessage || `API ${response.status}: ${response.statusText}`,

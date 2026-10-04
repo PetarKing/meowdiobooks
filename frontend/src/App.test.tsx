@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
+import { ActionRequiredError } from './api/actionRequired'
 import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, WorkflowGateway, WizardSnapshot, WizardStage } from './api/contracts'
 import { buildReviewWarningDecisions } from './reviewDecisions'
 import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
@@ -3861,5 +3862,71 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: /Scan for issues/ })).not.toBeInTheDocument()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
+
+  it.each(['synchronous', 'queued'])('shows a host action without global or inline generation failure for %s work', async (mode) => {
+    const action = { code: 'HOST_REVIEW_REQUIRED', message: 'Review before continuing.', context: { bookId: 'book-1', stage: 'generate' } };
+    const onActionRequired = vi.fn().mockReturnValue(true);
+    if (mode === 'synchronous') vi.mocked(wizardApi.processStage).mockRejectedValue(new ActionRequiredError(action));
+    else vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'blocked-generation', kind: 'v2:generate', status: 'failed',
+      error: 'Review before continuing.', action_required: action, payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'], language: 'english' } } });
+    await open(base, undefined, undefined, undefined, { onActionRequired });
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }));
+    await waitFor(() => expect(onActionRequired).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument());
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('Review before continuing.')).not.toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked();
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1);
+    if (mode === 'queued') expect(onActionRequired).toHaveBeenCalledWith(action, expect.objectContaining({ jobId: 'blocked-generation', stage: 'generate', settings: { chapterIds: ['chapter-1'], language: 'english' } }));
+  });
+
+  it('keeps required action feedback visible when no host handles it', async () => {
+    const action = { code: 'HOST_REVIEW_REQUIRED', message: 'Review before continuing.', context: {} };
+    vi.mocked(wizardApi.processStage).mockRejectedValue(new ActionRequiredError(action));
+    await open();
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(action.message);
+  });
+
+  it('restores a failed job action and its exact selected step without re-running work', async () => {
+    const action = { code: 'HOST_REVIEW_REQUIRED', message: 'Review before continuing.', context: { bookId: 'book-1' } };
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base);
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'saved-job', kind: 'v2:generate', status: 'failed', error: action.message,
+      action_required: action, payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'] } } });
+    const handler = vi.fn().mockReturnValue(true);
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'saved-job' }} onActionRequired={handler} />);
+    await waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+    expect(screen.getByText('Record your chapters')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+    expect(wizardApi.processStage).not.toHaveBeenCalled();
+  });
+
+  it('uses an explicit host job return when browser storage is unavailable', async () => {
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base);
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'host-dispatched', kind: 'v2:generate', status: 'succeeded', payload: { book_id: 'book-1' } });
+    const read = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('Storage unavailable'); });
+    const write = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('Storage unavailable'); });
+    try {
+      render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'host-dispatched' }} />);
+      expect(await screen.findByText('Record your chapters')).toBeInTheDocument();
+      await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('host-dispatched'));
+      expect(wizardApi.processStage).not.toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    } finally { read.mockRestore(); write.mockRestore(); }
+  });
+
+  it('discards an initial host return hint when the identity changes without a remount', async () => {
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base);
+    const view = render(<App workflowPersistenceNamespace="account-a" initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />);
+    expect(await screen.findByText('Record your chapters')).toBeInTheDocument();
+    const previous = vi.mocked(wizardApi.getBookSnapshot).mock.calls.length;
+    view.rerender(<App workflowPersistenceNamespace="account-b" initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />);
+    await waitFor(() => expect(screen.queryByText('Record your chapters')).not.toBeInTheDocument());
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(previous);
+    expect(localStorage.getItem(workflowStorageKey('location', 'account-b')) ?? '').not.toContain('book-1');
+  });
 
 })

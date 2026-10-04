@@ -283,3 +283,11 @@ def _shared_audition_identity(
         }
     )
     return _audition_identity(shared, package, base=base)
+
+
+# Public composition planning helpers. No provider calls, disk writes or publication occur here.
+# reuse_unchanged_cast_voices updates IDs/mapping in the supplied disposable finalized draft.
+# has_complete_audition_pack checks declared revisions; callers still validate available files.
+rebase_accepted_cast = _rebase_accepted_cast
+reuse_unchanged_cast_voices = _reuse_unchanged_cast_voices
+has_complete_audition_pack = _has_complete_audition_pack

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { wizardApi as defaultWorkflowGateway, normalizeDialogueArtifact } from "../api/client";
+import { ActionRequiredError, handleRequiredAction, readActionRequired, withActionRequired } from '../api/actionRequired';
 import type {
   AcceptanceDecision,
   ArtifactCandidate,
@@ -114,15 +115,21 @@ const publicWorkflowCapabilities: WorkflowCapabilities = {
 // Own workflow state and commands in one place; pages receive typed subsets.
 // Presentation values never select commands or alter accepted workflow state.
 export function useWorkflowModel({
-  gateway = defaultWorkflowGateway,
+  gateway: suppliedGateway = defaultWorkflowGateway,
   journey = publicJourney,
   workflowPersistenceNamespace,
+  initialWorkflowLocation,
+  onActionRequired,
   stepOverrides = {},
   renderHeader,
   renderLibraryActions,
   capabilities: capabilityOverrides = {},
   generationEstimatePolicy: generationEstimateOverrides = {},
 }: AppProps) {
+  const gateway = useMemo(() => onActionRequired
+    ? withActionRequired(suppliedGateway, onActionRequired) : suppliedGateway,
+  [suppliedGateway, onActionRequired]);
+  const initialLocation = useRef({ namespace: workflowPersistenceNamespace, value: initialWorkflowLocation });
   const capabilities = { ...publicWorkflowCapabilities, ...capabilityOverrides };
 
   const generationEstimatePolicy = {
@@ -481,8 +488,11 @@ export function useWorkflowModel({
     const version = navigationVersion.current;
     const current = () => !disposed && navigationVersion.current === version
       && scopeRef.current === workflowPersistenceNamespace;
-    const saved = readWorkflowLocation(locationKey);
-    const id = readWorkflowStorage(jobKey);
+    const hint = initialLocation.current.namespace === workflowPersistenceNamespace ? initialLocation.current.value : undefined;
+    const saved: WorkflowLocation | undefined = hint
+      ? { view: 'create', home: false, bookId: hint.bookId, stepId: hint.stepId }
+      : readWorkflowLocation(locationKey);
+    const id = hint?.activeJobId ?? readWorkflowStorage(jobKey);
     readyLocationKey.current = null;
     setRestoringLocation(true);
     setReturnLocation(undefined);
@@ -537,6 +547,7 @@ export function useWorkflowModel({
     };
     void restore().catch((reason) => {
       if (!current()) return;
+      if (reason instanceof ActionRequiredError && reason.handled) return;
       const status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : undefined;
       if (reason instanceof BookSnapshotError && (status === 404 || status === 422) && saved?.bookId) {
         writeWorkflowStorage(jobKey, null);
@@ -603,7 +614,10 @@ export function useWorkflowModel({
 
   async function hydrate(bookId: string, current = () => mounted.current
     && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway) {
-    const readSnapshot = () => gateway.getBookSnapshot(bookId).catch((reason) => { throw new BookSnapshotError(reason); });
+    const readSnapshot = () => gateway.getBookSnapshot(bookId).catch((reason) => {
+      if (reason instanceof ActionRequiredError) throw reason;
+      throw new BookSnapshotError(reason);
+    });
     let next = await readSnapshot();
     if (!current()) return next;
     if (
@@ -755,9 +769,21 @@ export function useWorkflowModel({
     if (!isCurrent()) return current;
     writeWorkflowStorage(jobKey, null);
     setActiveJob(undefined);
+    const action = current.status === 'failed' ? readActionRequired(current.action_required) : undefined;
+    const actionError = action ? new ActionRequiredError(action) : undefined;
+    if (actionError) {
+      // Deliver host intervention even if the subsequent book refresh fails.
+      handleRequiredAction(actionError, onActionRequired, {
+        bookId: typeof current.payload?.book_id === 'string' ? current.payload.book_id : undefined,
+        stage: current.kind?.startsWith('v2:') ? current.kind.slice(3) : undefined,
+        jobId: current.id,
+        settings: current.payload?.settings as Record<string, unknown> | undefined,
+      });
+    }
     // Reattachment must restore saved book context even when the worker failed.
     if (onSettled) await onSettled(current);
-    if (current.status !== "succeeded") throw new Error(current.error ?? `Job ${current.status}`);
+    if (actionError) throw actionError;
+    if (current.status !== 'succeeded') throw new Error(current.error ?? `Job ${current.status}`);
     setProgress(100);
     return current;
   }
