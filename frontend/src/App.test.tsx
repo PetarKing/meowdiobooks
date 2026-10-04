@@ -956,6 +956,44 @@ describe('v2 wizard', () => {
     expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
   })
 
+  it('keeps single-page, single-chapter Export concise while retaining selection', async () => {
+    await open({ ...base, book: { ...base.book, pageCount: 1 } })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export'))
+
+    const summary = screen.getByRole('region', { name: 'Export summary' })
+    expect(within(summary).getByRole('heading', { name: '1 chapter · 11 sec' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('PDF cover page')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next cover page' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select all' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
+    expect(screen.getByAltText('Current audiobook cover')).toHaveAttribute('src', '/api/books/book-1/pages/1/image')
+    const chapter = screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })
+    fireEvent.click(chapter)
+    expect(within(summary).getByText('Choose at least one chapter')).toBeInTheDocument()
+    expect(within(summary).getByRole('button')).toBeDisabled()
+    fireEvent.click(chapter)
+    expect(within(summary).getByRole('button')).toBeEnabled()
+  })
+
+  it('retains bulk chapter selection and updates plural Export summaries', async () => {
+    await open({
+      ...base,
+      chapters: [...base.chapters, { ...base.chapters[0], id: 'chapter-2', title: 'The Pool of Tears' }],
+      generatedChapters: [...base.generatedChapters!, { ...base.generatedChapters![0], chapterId: 'chapter-2', revision: 'audio-2' }],
+    })
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Export'))
+    const summary = screen.getByRole('region', { name: 'Export summary' })
+    expect(within(summary).getByRole('heading', { name: '2 chapters · 22 sec' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(within(summary).getByRole('button')).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Select all' }))
+    expect(screen.getAllByRole('checkbox')).toHaveLength(2)
+    expect(screen.getAllByRole('checkbox').every((checkbox) => (checkbox as HTMLInputElement).checked)).toBe(true)
+    fireEvent.click(screen.getAllByRole('checkbox')[1])
+    expect(within(summary).getByRole('heading', { name: '1 chapter · 11 sec' })).toBeInTheDocument()
+    expect(screen.getByLabelText('PDF cover page')).toHaveValue(1)
+  })
+
   it('keeps Export available when current chapter audio survives backward navigation', async () => {
     await open({
       ...base,

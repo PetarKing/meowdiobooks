@@ -664,6 +664,7 @@ const zhCN: Record<string, string> = {
   "Approximately {{size}}": "约 {{size}}",
   "Export summary": "导出摘要",
   "Ready to create": "可以创建",
+  "1 chapter · {{duration}}": "1 章 · {{duration}}",
   "{{count}} chapters · {{duration}}": "{{count}} 章 · {{duration}}",
   "Choose at least one chapter": "请至少选择一个章节",
   "One chaptered M4B, in book order, with the title, author, and cover shown above.": "按书中顺序生成一个带章节的 M4B，并使用上方显示的书名、作者和封面。",
