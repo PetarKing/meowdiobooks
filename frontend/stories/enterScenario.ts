@@ -205,6 +205,7 @@ export async function enterScenario(
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
       case "open-player":
+        await userEvent.click(await page.findByRole("tab", { name: prefix("Generated") }));
         await click(t("Listen to {{title}}", { title: "Down the Rabbit-Hole" }));
         await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;
