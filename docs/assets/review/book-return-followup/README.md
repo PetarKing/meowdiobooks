@@ -18,4 +18,15 @@ npm --prefix frontend run build
 npm --prefix frontend run test:consumer
 ```
 
-Final frontend suite: 396 tests in 33 files passed. Lint: zero errors, existing LanguagePicker fast-refresh warning. Production build and packed host-consumer verification passed (existing bundle-size warnings). Backend processing is unchanged. These are local implementation checks, not release publication or hosted adoption.
+Final frontend suite: 404 tests in 34 files passed. Lint: zero errors, existing LanguagePicker fast-refresh warning. Production build and packed host-consumer verification passed (existing bundle-size warnings). Backend processing is unchanged. These are local implementation checks, not release publication or hosted adoption.
+
+## Review helper compatibility
+
+The shared browser helper now decodes the timestamped appearance record instead of comparing raw JSON against Light/Dark. Eight regression cases cover valid choices, absent/legacy/malformed storage, expiry, excessive deadlines and blocked storage. Independent review and the full frontend suite passed.
+
+The existing synthetic preview workflow passed Light/Dark at 1440, 390 and 320 px, including file selection/replacement and preference restoration after reload; [report](preview-report.json). The appearance recording workflow passed Light → Dark → reload → System with no API requests or uncaught errors; [report](recording-report.json). The scripts now use the current PDF replacement input and hover the hero rather than its noninteractive decorative image.
+
+```sh
+node frontend/scripts/review-preview.mjs http://127.0.0.1:5198/studio.html /tmp/preview-review
+node frontend/scripts/record-design.mjs http://127.0.0.1:5198/studio.html /tmp/recording-review appearance-and-sanctuary
+```
