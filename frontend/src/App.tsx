@@ -1,5 +1,5 @@
 import { DialogBackdrop } from "./components/DialogBackdrop";
-import { type CSSProperties, type ReactNode } from "react";
+import { useEffect, type CSSProperties, type ReactNode } from "react";
 import type { AppProps } from "./app/contracts";
 import { useAppearance } from "./app/useAppearance";
 import { ThemeToggle } from "./components/ThemeToggle";
@@ -19,6 +19,7 @@ import { GeneratePage } from "./pages/GeneratePage";
 import { HomePage } from "./pages/HomePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { warmBookReturnAnimation } from "./components/book-return/loadAnimatedBook";
 import { BookReturnNotice } from "./components/BookReturnNotice";
 import {
   reconnectingJobMessage
@@ -43,6 +44,7 @@ function ProductTabIcon({ view }: { view: ProductView; }) {
 
 export default function App(props: AppProps) {
   const model = useWorkflowModel(props);
+  useEffect(() => { warmBookReturnAnimation(); }, []);
   const { appearance, resolvedAppearance, setAppearance } = useAppearance(props.appearance, props.onAppearanceChange);
   const { activeJob, activeJourneyStep, book, bookPendingDeletion, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, completed, deleteBook, deletingBookId, dialogue, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, error, extractionTransition, gateway, generateComplete, generationInProgress, generationReady, generationRemaining, generationRun, hasDraft, home, hydrate, libraryExports, navigateProduct, processMessage, processingOverlaySuppressed, productView, progress, recoveringDownstreamDialogue, renderHeader, reviewTransition, routeStage, runDialogueTranscript, setBookPendingDeletion, setDialogueRouteChoiceOpen, setHome, setStage, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, stage, stageIndex, stages, stepOverrides, t, toggleSidebar, unlockedThrough, uploadingCharacterId } = model;
   // Render-only page functions retain their boundaries; hook-owning pages mount as components.

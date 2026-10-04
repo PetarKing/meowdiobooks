@@ -19,17 +19,11 @@
   .sakura-wind { animation: none; opacity: .08; }
   .sakura-wind svg { animation: none; }
 }
-.book-return-cover { fill: none; stroke: var(--green); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
-.book-return-pages { fill: var(--paper); stroke: var(--line-strong); stroke-width: 1.25; stroke-linejoin: round; }
-.book-return-spine { fill: none; stroke: var(--line); stroke-width: 1; }
-.book-return-lines { fill: none; stroke: var(--line-strong); stroke-width: 1.2; stroke-linecap: round; }
-.book-return-bookmark { fill: var(--poppy); }
 .book-return h1 { margin: 0; color: var(--ink); font: 500 clamp(27px, 2.5vw, 34px)/1.15 var(--font-display); letter-spacing: -.035em; white-space: nowrap; }
 .book-return-quiet h1 { color: var(--muted); font: 500 14px/1.5 var(--font-sans); letter-spacing: 0; }
 .book-return-art { width: 300px; max-width: 100%; height: 260px; margin: 0 0 15px; position: relative; }
 .book-return-3d { width: 100%; height: 100%; position: relative; }
-.book-return-3d canvas { width: 100% !important; height: 100% !important; display: block; }
+.book-return-3d canvas { width: 100% !important; height: 100% !important; display: block; opacity: 0; }
+.book-return-3d[data-renderer="webgl"] canvas { opacity: 1; }
 .book-return-3d canvas[hidden] { display: none !important; }
-.book-return-static { position: absolute; inset: 0; display: grid; place-items: center; }
-.book-return-3d[data-renderer="webgl"] .book-return-static { display: none; }
 @media (max-width: 750px) { .book-return { min-height: clamp(300px, 64dvh, 490px); padding-bottom: 56px; } }
