@@ -23,6 +23,8 @@ export interface AppProps {
   onAppearanceChange?: (appearance: import('./useAppearance').Appearance) => void;
   presentationPalette?: PresentationPalette;
   gateway?: WorkflowGateway;
+  /** Scope browser return hints to the host identity; omit for the local application. */
+  workflowPersistenceNamespace?: string;
   journey?: JourneyDefinition;
   stepOverrides?: Readonly<Record<JourneyStepId, ComponentType<WorkflowStepOverrideProps>>>;
   renderHeader?: (context: WorkflowHeaderContext) => ReactNode;

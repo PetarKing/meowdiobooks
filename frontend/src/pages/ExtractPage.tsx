@@ -6,11 +6,12 @@ import { Choice, Panel, Tag } from "../components/Ui";
 import { AcceptedSummary, PageComparison, StepEyebrow } from "../pages/shared";
 import { methodLabel } from "./helpers";
 
-export type ExtractPageModel = Pick<WorkflowModel, "book" | "busy" | "completed" | "extractionPreview" | "method" | "previewPage" | "processAndPublishExtraction" | "representatives" | "revisingStages" | "setMethod" | "setRevisingStages" | "snapshot" | "t">;
+export type ExtractPageModel = Pick<WorkflowModel, "book" | "busy" | "completed" | "extractionCandidate" | "extractionPreview" | "method" | "previewPage" | "processAndPublishExtraction" | "representatives" | "revisingStages" | "setMethod" | "setRevisingStages" | "snapshot" | "t">;
 
 export function ExtractPage({ model }: { model: ExtractPageModel; }) {
-  const { book, busy, completed, extractionPreview, method, previewPage, processAndPublishExtraction, representatives, revisingStages, setMethod, setRevisingStages, snapshot, t } = model;
+  const { book, busy, completed, extractionCandidate, extractionPreview, method, previewPage, processAndPublishExtraction, representatives, revisingStages, setMethod, setRevisingStages, snapshot, t } = model;
   const page = extractionPreview?.page ?? 1;
+  if (extractionCandidate) return <><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><Panel eyebrow={t("Extraction ready")} title={t("Full extraction is ready")}><p>{t("Use the saved result to continue without extracting again.")}</p><button className="primary" disabled={busy} onClick={() => void processAndPublishExtraction()}>{t("Accept completed extraction")} →</button></Panel></>;
   if (completed.includes("extract") && !revisingStages.includes("extract")) return <AcceptedSummary stage="extract" step={t("Step 1")} title={t("Extraction complete")} revision={snapshot?.activeArtifacts.extraction} onRevise={() => setRevisingStages([...new Set([...revisingStages, "extract"])])}><span><b>{book?.pageCount ?? "—"}</b><small>{t("Pages extracted")}</small></span><span><b>{t(methodLabel(method))}</b><small>{t("Selected parser")}</small></span><span><b>{t("Accepted")}</b><small>{t("Current result")}</small></span></AcceptedSummary>;
   return <><section className="extract-hero">
     <div className="extract-hero-copy"><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><h1>{t("Check the extracted text")}</h1><p>{t("Compare the sample pages, choose a parser, then extract the full book.")}</p></div>

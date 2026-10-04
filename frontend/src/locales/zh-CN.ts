@@ -1,4 +1,10 @@
 const zhCN: Record<string, string> = {
+  "Restoring your book…": "正在恢复你的书籍…",
+  "Retry": "重试",
+  "Extraction ready": "提取结果已就绪",
+  "Full extraction is ready": "完整提取结果已就绪",
+  "Use the saved result to continue without extracting again.": "使用已保存的结果继续，无需再次提取。",
+  "Accept completed extraction": "接受已完成的提取结果",
   "Languages unavailable": "语言暂不可用",
   "Unavailable": "不可用",
   "No narration languages available.": "暂无可用的朗读语言。",

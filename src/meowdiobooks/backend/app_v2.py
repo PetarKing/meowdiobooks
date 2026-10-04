@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 from contextlib import AbstractContextManager, ExitStack, asynccontextmanager, nullcontext
 from copy import deepcopy
+from datetime import UTC
 from pathlib import Path
 from typing import Any, Callable, Mapping, cast
 from uuid import uuid4
@@ -219,15 +220,19 @@ def _commit_library_export(
 def _directory_size(path: Path) -> int:
     """Return the on-disk bytes owned by one working-book package."""
     total = 0
-    try:
-        for directory, _subdirectories, filenames in os.walk(path):
-            for filename in filenames:
-                try:
-                    total += os.stat(Path(directory) / filename, follow_symlinks=False).st_size
-                except OSError:
-                    continue
-    except OSError:
-        return total
+
+    def walk_error(error: OSError) -> None:
+        # A hosted book can have durable files without a hydrated local workspace.
+        if not isinstance(error, FileNotFoundError):
+            raise error
+
+    for directory, _subdirectories, filenames in os.walk(path, onerror=walk_error):
+        for filename in filenames:
+            try:
+                total += os.stat(Path(directory) / filename, follow_symlinks=False).st_size
+            except FileNotFoundError:
+                # Concurrent cleanup can remove a file after directory enumeration.
+                continue
     return total
 
 
@@ -608,6 +613,7 @@ def create_app_v2(
                 "revision": revision,
                 "method": method,
                 "methodVersion": EXTRACTION_METHOD_VERSION,
+                "sourceHash": book.source_hash,
                 "pageCount": len(pages),
                 "pages": pages,
                 "blocks": blocks,
@@ -1460,13 +1466,23 @@ def create_app_v2(
 
     @app.get("/api/books")
     def list_books() -> list[dict[str, Any]]:
-        return [
-            {
-                **book.model_dump(mode="json"),
-                "asset_size_bytes": _directory_size(package_for(book.id)),
-            }
-            for book in sorted(books.all(), key=lambda row: row.updated_at, reverse=True)
-        ]
+        result = []
+        for book in sorted(
+            books.all(),
+            key=lambda row: row.updated_at.replace(tzinfo=UTC)
+            if row.updated_at.tzinfo is None
+            else row.updated_at,
+            reverse=True,
+        ):
+            try:
+                size = _directory_size(package_for(book.id))
+            except (OSError, ValueError):
+                # Workspace failures belong to this book; store-wide failures above
+                # still propagate so an unavailable store is never an empty shelf.
+                logger.warning("Skipping book with inaccessible workspace")
+                continue
+            result.append({**book.model_dump(mode="json"), "asset_size_bytes": size})
+        return result
 
     @app.delete("/api/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
     def delete_book(book_id: str) -> Response:
@@ -1543,6 +1559,26 @@ def create_app_v2(
         }
         review_warnings = review.get("warningSnapshot", review.get("warnings", []))
         active_extraction_revision = str(current.get("extraction", {}).get("revision") or "")
+        extraction_history = artifact_history(package, "extraction")
+        active_extraction_index = next(
+            (
+                index
+                for index in range(len(extraction_history) - 1, -1, -1)
+                if str(extraction_history[index].get("revision") or "")
+                == active_extraction_revision
+            ),
+            -1,
+        )
+        pending_extraction = next(
+            (
+                row
+                for row in reversed(extraction_history[active_extraction_index + 1 :])
+                if str(row.get("revision") or "") not in accepted_revisions["extraction"]
+                and book.source_hash
+                and row.get("sourceHash") == book.source_hash
+            ),
+            None,
+        )
         dialogue_history = artifact_history(package, "dialogue")
         active_dialogue_revision = str(dialogue.get("revision") or "")
         active_dialogue_index = next(
@@ -1563,6 +1599,27 @@ def create_app_v2(
             None,
         )
         active_review_revision = str(review.get("revision") or "")
+        review_history = artifact_history(package, "review")
+        active_review_index = next(
+            (
+                index
+                for index in range(len(review_history) - 1, -1, -1)
+                if str(review_history[index].get("revision") or "") == active_review_revision
+            ),
+            -1,
+        )
+        pending_review = next(
+            (
+                row
+                for row in reversed(review_history[active_review_index + 1 :])
+                if str(row.get("revision") or "") not in accepted_revisions["review"]
+                and active_extraction_revision
+                and active_dialogue_revision
+                and str(row.get("extractionRevision") or "") == active_extraction_revision
+                and str(row.get("dialogueRevision") or "") == active_dialogue_revision
+            ),
+            None,
+        )
         cast_history = artifact_history(package, "cast")
         active_cast_revision = str(current.get("cast", {}).get("revision") or "")
         active_cast_index = next(
@@ -1593,6 +1650,16 @@ def create_app_v2(
             "book": book.model_dump(mode="json"),
             "activeArtifacts": {kind: row.get("revision") for kind, row in current.items()},
             "pendingCandidates": {
+                **(
+                    {"extraction": _history_summary(pending_extraction)}
+                    if pending_extraction is not None
+                    else {}
+                ),
+                **(
+                    {"review": _history_summary(pending_review)}
+                    if pending_review is not None
+                    else {}
+                ),
                 **(
                     {"dialogue": _history_summary(pending_dialogue)}
                     if pending_dialogue is not None

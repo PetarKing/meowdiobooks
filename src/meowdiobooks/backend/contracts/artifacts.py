@@ -19,6 +19,7 @@ class ExtractionArtifact(ArtifactHeader):
     kind: Literal["extraction"]
     method: NotRequired[str]
     methodVersion: NotRequired[str]
+    sourceHash: NotRequired[str]
     pageCount: NotRequired[int]
     pages: NotRequired[list[dict[str, object]]]
     blocks: NotRequired[list[dict[str, object]]]

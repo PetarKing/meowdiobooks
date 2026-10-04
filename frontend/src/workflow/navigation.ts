@@ -130,3 +130,5 @@ export function persistedSidebarCollapsed() {
 export function nextStage(completed: readonly WizardStage[], journey = publicJourney) {
   return journey.next(completed);
 }
+
+export { persistWorkflowReturn } from './workflowLocation';

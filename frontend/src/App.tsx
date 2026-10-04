@@ -55,7 +55,9 @@ export default function App(props: AppProps) {
 
   const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
 
-  const createView = home
+  const createView = model.restoringLocation && busy && !book
+    ? <p role="status">{t("Restoring your book…")}</p>
+    : home
     ? <HomePage model={model} />
     : StepOverride && activeJourneyStep
       ? <StepOverride
@@ -113,7 +115,7 @@ export default function App(props: AppProps) {
           <strong aria-hidden="true">{stage + 1} / {stages.length}</strong>
           <div aria-hidden="true"><i style={{ width: `${((stage + 1) / stages.length) * 100}%` }} /></div>
         </div>}
-        {error && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}</div>}
+        {error && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}{model.returnLocation && <button className="ghost" disabled={busy} onClick={model.retryWorkflowReturn}>{t("Retry")}</button>}</div>}
         {view}
       </main>
     </div>

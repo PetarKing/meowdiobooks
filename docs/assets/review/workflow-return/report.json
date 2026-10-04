@@ -1,0 +1,34 @@
+{
+  "browser": "153.0.8010.12",
+  "command": "/opt/homebrew/Cellar/node/24.1.0/bin/node /private/tmp/meow-book-recovery-20261004/Meowdiobooks/frontend/scripts/verify-workflow-return.mjs /private/tmp/meow-book-recovery-20261004/browser-return http://127.0.0.1:5188",
+  "scenarios": [
+    {
+      "width": 390,
+      "result": "passed",
+      "cases": [
+        "running-book-visible",
+        "CDP-frozen-worker-completes",
+        "pending-dialogue-after-marker-cleared-reload",
+        "snapshot-outage-retry",
+        "explicit-home-reload",
+        "explicit-library-reload",
+        "no-provider-rerun",
+        "no-extraction-preview"
+      ]
+    },
+    {
+      "width": 1440,
+      "result": "passed",
+      "cases": [
+        "running-book-visible",
+        "CDP-frozen-worker-completes",
+        "pending-dialogue-after-marker-cleared-reload",
+        "snapshot-outage-retry",
+        "explicit-home-reload",
+        "explicit-library-reload",
+        "no-provider-rerun",
+        "no-extraction-preview"
+      ]
+    }
+  ]
+}

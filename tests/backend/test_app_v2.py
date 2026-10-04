@@ -345,7 +345,12 @@ def test_v2_import_extract_dialogue_review_are_distinct_transactional_stages(tmp
 
         extraction = _process(client, book_id, "extract", {"method": "native"})
         # Processing creates a candidate. It is not active until the user accepts it.
-        assert client.get(f"/api/books/{book_id}/snapshot").json()["activeArtifacts"] == {}
+        extraction_snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+        assert extraction_snapshot["activeArtifacts"] == {}
+        assert (
+            extraction_snapshot["pendingCandidates"]["extraction"]["revision"]
+            == extraction["revision"]
+        )
         _accept(client, book_id, "extract", extraction["revision"])
 
         preview = client.post(
@@ -401,6 +406,16 @@ def test_v2_import_extract_dialogue_review_are_distinct_transactional_stages(tmp
         }
         _accept(client, book_id, "dialogue", dialogue["revision"])
         review = _process(client, book_id, "review", {})
+        review_snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+        assert review_snapshot["pendingCandidates"]["review"]["revision"] == review["revision"]
+        assert (
+            review_snapshot["pendingCandidates"]["review"]["extractionRevision"]
+            == extraction["revision"]
+        )
+        assert (
+            review_snapshot["pendingCandidates"]["review"]["dialogueRevision"]
+            == dialogue["revision"]
+        )
         _accept(client, book_id, "review", review["revision"])
 
         snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
@@ -1233,3 +1248,46 @@ def test_removed_enrichment_api_is_rejected_and_snapshot_omits_it(tmp_path):
         snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
         assert "enrichment" not in snapshot
         assert "enrichment" not in snapshot["history"]
+
+
+def test_snapshot_excludes_candidates_bound_to_other_inputs(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        "meowdiobooks.backend.app_v2.extract_full_document",
+        lambda *_args: [{"page": 1, "text": "Alice: [Wait.]", "warnings": []}],
+    )
+    with TestClient(create_app_v2(tmp_path)) as client:
+        book_id = client.post(
+            "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
+        ).json()["book"]["id"]
+        extraction = _process(client, book_id, "extract", {"method": "native"})
+        package = tmp_path / "packages" / book_id
+        write_artifact(
+            package,
+            "extraction",
+            {"revision": "wrong-source", "sourceHash": "other"},
+            publish=False,
+        )
+        pending = client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"]
+        assert pending["extraction"]["revision"] == extraction["revision"]
+        _accept(client, book_id, "extract", extraction["revision"])
+        dialogue = _process(client, book_id, "dialogue", {"strategy": "narrate"})
+        _accept(client, book_id, "dialogue", dialogue["revision"])
+        review = _process(client, book_id, "review", {})
+        for revision, extraction_revision, dialogue_revision in (
+            ("wrong-extraction", "other", dialogue["revision"]),
+            ("wrong-dialogue", extraction["revision"], "other"),
+        ):
+            write_artifact(
+                package,
+                "review",
+                {
+                    "revision": revision,
+                    "extractionRevision": extraction_revision,
+                    "dialogueRevision": dialogue_revision,
+                },
+                publish=False,
+            )
+        pending = client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"]
+        assert pending["review"]["revision"] == review["revision"]
+        _accept(client, book_id, "review", review["revision"])
+        assert client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"] == {}
