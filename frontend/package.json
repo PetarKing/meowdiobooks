@@ -1,7 +1,7 @@
 {
   "name": "meowdiobooks-workflow-ui",
   "private": true,
-  "version": "0.1.43",
+  "version": "0.1.44",
   "type": "module",
   "files": [
     "src",
@@ -35,11 +35,13 @@
     "studio": "vite --mode studio --host 127.0.0.1 --port 5179 --open /studio.html"
   },
   "dependencies": {
+    "@types/three": "0.186.0",
     "@vitejs/plugin-react": "4.4.1",
     "i18next": "^26.3.6",
     "react": "19.1.4",
     "react-dom": "19.1.4",
     "react-i18next": "^17.0.9",
+    "three": "0.186.1",
     "typescript": "5.8.3",
     "vite": "6.4.3"
   },
