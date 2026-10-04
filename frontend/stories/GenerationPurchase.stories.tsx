@@ -51,7 +51,7 @@ export const PurchasedAndComplete: StoryObj<typeof meta> = {
     await userEvent.click(await canvas.findByRole("button", { name: /Alice.*Continue/ }));
     await userEvent.click(within(await canvas.findByRole("navigation", { name: "Wizard stages" })).getByText("Generate"));
     await expect(await canvas.findByText("Purchased")).toBeVisible();
-    await expect(canvas.getByText("None remaining")).toBeVisible();
+    await expect(canvas.getByText("1 chapter is ready")).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Continue to Export →" })).toBeEnabled();
     canvasElement.dataset.scenarioReady = "purchased-and-complete";
   },
