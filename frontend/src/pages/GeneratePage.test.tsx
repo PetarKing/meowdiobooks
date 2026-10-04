@@ -44,8 +44,9 @@ function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentatio
 describe("Generate chapter targets", () => {
   it("does not infer purchase from playable or older audio", () => {
     render(<Tracklist />);
-    expect(screen.getAllByText("Playable").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Generated").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Older recording").length).toBeGreaterThan(0);
+    expect(document.querySelector(".chapter-card.purchased")).toBeNull();
     expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
   });
 
@@ -56,10 +57,10 @@ describe("Generate chapter targets", () => {
     const generate = vi.fn();
     render(<Tracklist snapshot={snapshot} purchase={purchase} generate={generate} />);
     const chapter = screen.getByRole("heading", { name: "Down the Rabbit-Hole" }).closest("article")!;
-    expect(within(chapter).getByText("Purchased")).toBeInTheDocument();
+    expect(within(chapter).queryByText("Purchased")).not.toBeInTheDocument();
     expect(chapter).toHaveClass("purchased", "stale");
     expect(within(chapter).getByText("Older recording")).toBeInTheDocument();
-    expect(screen.getAllByText("Purchased")).toHaveLength(1);
+    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
     const checkbox = within(chapter).getByRole("checkbox");
     expect(checkbox).not.toBeChecked();
     fireEvent.click(checkbox);
@@ -67,10 +68,24 @@ describe("Generate chapter targets", () => {
     expect(generate).toHaveBeenCalledWith([snapshot.chapters[0].id]);
   });
 
+  it("keeps a paid chapter without audio pending and never generates merely from purchase presentation", () => {
+    const snapshot = snapshotFor("generate-stale");
+    snapshot.generatedChapters = [];
+    const generate = vi.fn();
+    render(<Tracklist snapshot={snapshot} purchase={purchasedScope(snapshot)} generate={generate} />);
+    const chapter = screen.getByRole("heading", { name: "Down the Rabbit-Hole" }).closest("article")!;
+    expect(chapter).toHaveClass("purchased");
+    expect(chapter).not.toHaveClass("generated");
+    expect(within(chapter).getByText("To make")).toBeInTheDocument();
+    expect(within(chapter).queryByText("Generated")).not.toBeInTheDocument();
+    expect(within(chapter).queryByRole("button", { name: /Listen/ })).not.toBeInTheDocument();
+    expect(generate).not.toHaveBeenCalled();
+  });
+
   it.each(["bookId", "extractionRevision", "dialogueRevision", "reviewRevision", "castRevision", "scriptRevision"] as const)("hides purchase when the host's %s is stale", (key) => {
     const snapshot = snapshotFor("generate-stale");
     render(<Tracklist snapshot={snapshot} purchase={{ ...purchasedScope(snapshot), [key]: "older-scope" }} />);
-    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
+    expect(document.querySelector(".chapter-card.purchased")).toBeNull();
   });
 
   it.each(["missing", "draft"] as const)("hides purchase with a %s cast", (state) => {
@@ -79,7 +94,7 @@ describe("Generate chapter targets", () => {
     if (state === "missing") delete snapshot.cast;
     else snapshot.cast!.phase = "audition-review";
     render(<Tracklist snapshot={snapshot} purchase={purchase} />);
-    expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
+    expect(document.querySelector(".chapter-card.purchased")).toBeNull();
   });
 
   it("shows completion rather than a pending estimate after the only chapter is ready", () => {

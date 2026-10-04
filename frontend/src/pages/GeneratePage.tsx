@@ -5,8 +5,7 @@ import { DialogBackdrop } from "../components/DialogBackdrop";
 import { TabList } from "../components/TabList";
 import { WorkflowEmpty } from "../components/WorkflowPage";
 import { ChapterAudioPlayer } from "../components/ChapterAudioPlayer";
-import { useFloatingActionDock } from "../components/useFloatingActionDock";
-import type { ReactNode } from "react";
+import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { StepEyebrow } from "../pages/shared";
 import {
   averageGenerationMultiplier,
@@ -124,14 +123,14 @@ export function GeneratePage({ model, purchase }: { model: GeneratePageModel; pu
           {playable && <button type="button" className="chapter-listen" aria-label={t(playable.current ? "Listen to {{title}}" : "Listen to {{title}} (older recording)", { title: row.title || t("Chapter {{number}}", { number: chapterNumber }) })} onClick={() => setListeningChapterId(row.id)}>▶</button>}
           <div className="chapter-card-body">
             <h3 aria-level={2}>{row.title || t("Chapter {{number}}", { number: chapterNumber })}</h3>
-            <div className="chapter-card-meta"><span className={`track-status ${playable?.current ? "ready" : unavailable ? "unavailable" : ""}`}>{t(unavailable ? "No audio" : playable?.current ? "Playable" : playable ? "Older recording" : "To make")}</span>{purchased && <span className="chapter-purchased-label"><span aria-hidden="true">✦</span>{t("Purchased")}</span>}{pageRange && <small>{pageRange}</small>}</div>
+            <div className="chapter-card-meta"><span className={`track-status ${playable?.current ? "ready" : unavailable ? "unavailable" : ""}`}>{t(unavailable ? "No audio" : playable?.current ? "Generated" : playable ? "Older recording" : "To make")}</span>{pageRange && <small>{pageRange}</small>}</div>
 
           </div>
           {!unavailable && <dl className="chapter-estimates"><div><dt>{t("Listening")}</dt><dd>{chapterDuration(audioSeconds, !playable?.audioSeconds)}</dd></div></dl>}
         </article>;
       })}</div>
       {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
-      {(availableChapters.length > 0 || currentGenerated.length > 0) && <GenerationActionDock ariaLabel={t("Generation action")}>
+      {(availableChapters.length > 0 || currentGenerated.length > 0) && <GenerationActionDock ariaLabel={t("Generation action")} compact={visibleChapters.length > 3}>
         {error && <p className="generation-error"><b>{t("Generation needs attention")}</b><span>{t(error, { defaultValue: error })}</span></p>}
         <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? currentGenerated.length === 1 ? t("1 chapter is ready") : t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b></div>
         {selectedChapters.length > 0 && <dl>{selectedChapters.length > 1 && <div className="generation-listening-estimate"><dt>{t("Listening")}</dt><dd>{chapterDuration(selectedAudioSeconds)}</dd></div>}<div><dt>{t(exportSelected ? "Regeneration" : "Generation")}</dt><dd>{generationDuration(selectedAudioSeconds, historicalMultiplier, generationEstimatePolicy)}</dd></div></dl>}
@@ -166,10 +165,38 @@ export function GeneratePage({ model, purchase }: { model: GeneratePageModel; pu
 
 }
 
-function GenerationActionDock({ ariaLabel, children }: { ariaLabel: string; children: ReactNode }) {
-  const { anchorRef, floating } = useFloatingActionDock();
+function GenerationActionDock({ ariaLabel, compact, children }: { ariaLabel: string; compact: boolean; children: ReactNode }) {
+  const anchorRef = useRef<HTMLSpanElement>(null);
+  const dockRef = useRef<HTMLElement>(null);
+  useLayoutEffect(() => {
+    const anchor = anchorRef.current;
+    const dock = dockRef.current;
+    if (!anchor || !dock) return;
+    // A short list should leave its actions at the viewport foot, rather than directly
+    // below its only row. Long lists retain the existing bottom-sticky behavior.
+    const update = () => {
+      // Shared dialogs freeze the body at the saved negative scroll offset.
+      // ResizeObserver can still run while they are open (for example on rotation).
+      const scrollOffset = document.body.style.position === "fixed"
+        ? -(Number.parseFloat(document.body.style.top) || 0)
+        : window.scrollY;
+      const naturalTop = anchor.getBoundingClientRect().top + scrollOffset;
+      const bottomInset = Number.parseFloat(getComputedStyle(dock).bottom) || 16;
+      anchor.style.height = `${Math.max(32, window.innerHeight - naturalTop - dock.getBoundingClientRect().height - bottomInset)}px`;
+    };
+    update();
+    const observer = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(update);
+    observer?.observe(dock);
+    if (anchor.parentElement) observer?.observe(anchor.parentElement);
+    window.addEventListener("resize", update);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", update);
+      anchor.style.removeProperty("height");
+    };
+  }, [anchorRef]);
   return <>
     <span ref={anchorRef} className="generation-selection-anchor" aria-hidden="true" />
-    <section className={`generation-selection${floating ? " is-floating" : ""}`} aria-label={ariaLabel}>{children}</section>
+    <section ref={dockRef} className={`generation-selection${compact ? " is-floating" : ""}`} aria-label={ariaLabel}>{children}</section>
   </>;
 }

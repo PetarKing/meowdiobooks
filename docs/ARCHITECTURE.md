@@ -44,8 +44,10 @@ repeats work. Hosts must remount App on identity or explicit return-context chan
 
 Hosts may supply `generationPurchase` for purchase presentation on Generate. Its book ID,
 accepted extraction/dialogue/review/cast revisions, recording-script revision, and explicit chapter IDs
-must describe the host-confirmed current purchase scope. Generate shows a text label and gold wash only
-when these revisions match the current snapshot and its cast is accepted. Omission, a different book,
+must describe the host-confirmed current purchase scope. Generate applies a gold wash to the host-confirmed scope only
+when these revisions match the current snapshot and its cast is accepted. Current generated audio also
+uses this wash, while its visible status always describes audio readiness: Generated, Older recording
+or To make. Purchase never changes that status, and no redundant Purchased badge is shown. Omission, a different book,
 or a changed accepted parent removes the presentation. Existing audio never implies purchase.
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
