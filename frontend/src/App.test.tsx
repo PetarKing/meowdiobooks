@@ -3716,6 +3716,49 @@ describe('v2 wizard', () => {
     expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
   })
 
+  it('starts independent pending candidate and Dialogue preview reads together after the authoritative snapshot', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract'] },
+      pendingCandidates: {
+        extraction: { revision: 'e-pending' }, dialogue: { revision: 'd-pending' },
+        review: { revision: 'r-pending' }, cast: { revision: 'c-pending' },
+      },
+    }
+    let release!: () => void
+    const waiting = new Promise<void>(resolve => { release = resolve })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getStageCandidate).mockImplementation(async (_bookId, stage, revision) => {
+      await waiting
+      return stage === 'cast' ? base.cast! : { revision, spans: [], resultSummary: {}, warnings: [] }
+    })
+    vi.mocked(wizardApi.previewDialogue).mockImplementation(async () => { await waiting; return base.dialogue! })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'dialogue' }} />)
+    // None of the five reads resolves yet: a waterfall cannot reach this point.
+    await waitFor(() => expect(wizardApi.getStageCandidate).toHaveBeenCalledTimes(4))
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(1)
+    expect(wizardApi.previewDialogue).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument()
+    release()
+    expect(await screen.findByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('keeps a candidate read failure retryable without publishing an incomplete hydrated view', async () => {
+    const snapshot: WizardSnapshot = { ...base, pendingCandidates: {
+      extraction: { revision: 'e-pending' }, review: { revision: 'r-pending' },
+    } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getStageCandidate).mockRejectedValue(new Error('Saved candidate unavailable'))
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Saved candidate unavailable')
+    expect(wizardApi.getStageCandidate).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('heading', { name: 'Record your chapters' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(localStorage.getItem('meowdiobooks.workflowLocation')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
   it('restores one authenticated generation request before showing its pending selection or progress', async () => {
     const snapshot: WizardSnapshot = { ...base, generatedChapters: [],
       chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }],

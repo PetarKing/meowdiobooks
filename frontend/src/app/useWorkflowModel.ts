@@ -667,25 +667,21 @@ export function useWorkflowModel({
       if (!next.recordingScript) throw new Error("Generate could not be prepared. Your approved work is unchanged.");
     }
     const pendingExtractionRevision = next.pendingCandidates?.extraction?.revision;
-    const pendingExtraction = pendingExtractionRevision
-      ? await gateway.getStageCandidate(bookId, "extract", pendingExtractionRevision)
-      : undefined;
     const pendingDialogueRevision = next.pendingCandidates?.dialogue?.revision;
-    const pendingDialogue = pendingDialogueRevision
-      ? await gateway.getStageCandidate(bookId, "dialogue", pendingDialogueRevision)
-      : undefined;
     const pendingReviewRevision = next.pendingCandidates?.review?.revision;
-    const pendingReview = pendingReviewRevision
-      ? await gateway.getStageCandidate(bookId, "review", pendingReviewRevision)
-      : undefined;
     const pendingCastRevision = next.pendingCandidates?.cast?.revision;
-    const pendingCast = pendingCastRevision
-      ? await gateway.getStageCandidate(bookId, "cast", pendingCastRevision)
-      : undefined;
-    const hydratedDialogue = next.book.completedStages.includes("extract")
-      && !next.book.completedStages.includes("dialogue")
-      ? await gateway.previewDialogue(bookId, dialogueSettings(emptyDialogue, "fill-gaps"))
-      : next.dialogue ?? emptyDialogue;
+    // These immutable reads share the authoritative snapshot's revision IDs.
+    // None depends on another result, so a return pays one read interval rather
+    // than a round trip for every pending stage. Commit state only when all settle.
+    const [pendingExtraction, pendingDialogue, pendingReview, pendingCast, hydratedDialogue] = await Promise.all([
+      pendingExtractionRevision ? gateway.getStageCandidate(bookId, "extract", pendingExtractionRevision) : undefined,
+      pendingDialogueRevision ? gateway.getStageCandidate(bookId, "dialogue", pendingDialogueRevision) : undefined,
+      pendingReviewRevision ? gateway.getStageCandidate(bookId, "review", pendingReviewRevision) : undefined,
+      pendingCastRevision ? gateway.getStageCandidate(bookId, "cast", pendingCastRevision) : undefined,
+      next.book.completedStages.includes("extract") && !next.book.completedStages.includes("dialogue")
+        ? gateway.previewDialogue(bookId, dialogueSettings(emptyDialogue, "fill-gaps"))
+        : next.dialogue ?? emptyDialogue,
+    ]);
     const pendingDialoguePreview = normalizeDialogueArtifact(pendingDialogue);
     const pendingNeedsPreflight = Boolean(
       pendingDialoguePreview?.conflicts?.length || pendingDialoguePreview?.structuralIssues?.length,
