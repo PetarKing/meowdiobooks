@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { wizardApi as defaultWorkflowGateway, normalizeDialogueArtifact } from "../api/client";
-import { ActionRequiredError, handleRequiredAction, readActionRequired, withActionRequired } from '../api/actionRequired';
+import { ActionRequiredError, handleRequiredAction, isActionRequiredError, readActionRequired, withActionRequired } from '../api/actionRequired';
 import type {
   AcceptanceDecision,
   ArtifactCandidate,
@@ -547,7 +547,7 @@ export function useWorkflowModel({
     };
     void restore().catch((reason) => {
       if (!current()) return;
-      if (reason instanceof ActionRequiredError && reason.handled) return;
+      if (isActionRequiredError(reason) && reason.handled) return;
       const status = reason && typeof reason === "object" && "status" in reason ? Number(reason.status) : undefined;
       if (reason instanceof BookSnapshotError && (status === 404 || status === 422) && saved?.bookId) {
         writeWorkflowStorage(jobKey, null);
@@ -615,7 +615,7 @@ export function useWorkflowModel({
   async function hydrate(bookId: string, current = () => mounted.current
     && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway) {
     const readSnapshot = () => gateway.getBookSnapshot(bookId).catch((reason) => {
-      if (reason instanceof ActionRequiredError) throw reason;
+      if (isActionRequiredError(reason)) throw reason;
       throw new BookSnapshotError(reason);
     });
     let next = await readSnapshot();

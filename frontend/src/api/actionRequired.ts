@@ -2,6 +2,7 @@ import type { ActionRequired, ActionRequiredContext, WorkflowGateway } from './c
 
 /** Expected host intervention. Only a host that has shown the action may suppress it. */
 export class ActionRequiredError extends Error {
+  readonly actionRequiredError = true;
   readonly actionRequired: ActionRequired;
   readonly status?: number;
   handled: boolean;
@@ -13,6 +14,15 @@ export class ActionRequiredError extends Error {
     this.status = options.status;
     this.handled = options.handled ?? false;
   }
+}
+
+/** Entry points may be optimized into separate modules, so constructor identity is not portable. */
+export function isActionRequiredError(value: unknown): value is ActionRequiredError {
+  if (!value || typeof value !== 'object') return false;
+  const error = value as Partial<ActionRequiredError>;
+  return error.actionRequiredError === true && error.name === 'ActionRequiredError'
+    && typeof error.handled === 'boolean' && typeof error.message === 'string'
+    && readActionRequired(error.actionRequired) !== undefined;
 }
 
 export function readActionRequired(value: unknown): ActionRequired | undefined {
@@ -37,7 +47,7 @@ export function handleRequiredAction(error: ActionRequiredError, handler?: Actio
 export function withActionRequired(gateway: WorkflowGateway, handler: ActionRequiredHandler): WorkflowGateway {
   const methods = new Map<PropertyKey, { source: unknown; wrapped: (...args: unknown[]) => unknown }>();
   function report(reason: unknown, property: PropertyKey, args: unknown[]) {
-    if (reason instanceof ActionRequiredError) {
+    if (isActionRequiredError(reason)) {
       const context: ActionRequiredContext = {};
       if (typeof args[0] === 'string' && property !== 'getJob' && property !== 'cancelJob') context.bookId = args[0];
       if (property === 'processStage') {

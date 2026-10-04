@@ -174,7 +174,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Design the voices")} />
         <div className="voice-design-language">
           <div><label>{t("Narration language")}</label><p>{t("The language your audiobook will be spoken in.")}</p></div>
-          <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { updateCastingPreview(false); setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
+          <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => { if (id !== language) updateCastingPreview(false); setCastGenerationPaused(false); setLanguage(id); setNarrationLanguageConfirmed(Boolean(id)); }} />
         </div>
         <CastingChoice models={snapshot?.voiceModels} gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onSourcesChange={(ids) => { setCastGenerationPaused(false); setCastingSources({ bookId: book.id, ids }); }} onModelChange={changeCastingModel} action={<button className="primary" disabled={!castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Regenerate audition pack" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
         {confirmationDialog}

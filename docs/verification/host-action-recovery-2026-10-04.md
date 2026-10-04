@@ -38,3 +38,40 @@ boundary. This is not evidence of local inference compatibility, real Stripe aut
 redirects, webhook timing, funding eligibility or deployed hosted UI; those require consumer-side
 and staging evidence. The public planning aliases preserve existing cast algorithms; source
 availability and exact model/recipe validation remain required by compositions.
+
+## Packed entry-point regression
+
+The actual hosted rendering found that development dependency optimization can create separate
+`ActionRequiredError` constructors for App's internal module and the public `/api` entry point.
+Constructor identity then produced a generic workflow alert even after the host displayed the
+required action. The error now carries an explicit brand, and exported `isActionRequiredError`
+checks that brand, descriptor and handled flag across all handling/preservation paths. Ordinary,
+malformed and host-declined errors remain visible.
+
+- `WORKFLOW_CONSUMER_REF=6278fef npm --prefix frontend run test:consumer` reproduces the old
+  real App/public API failure: `development: handled expected-action visibility`.
+- The expanded packed-consumer script passes against the fix in both Vite development and a
+  built production preview. Already-handled and host-delegated actions show no workflow alert;
+  a host-declined action retains its message and Retry. Both use the actual App and public API
+  export, with no duplicate workflow implementation. Strict host types and both CSS consumer
+  cases also pass; there are no browser page errors.
+- Full frontend suite: 341 passed across 31 files. Focused App/API/transcription suite: 209 passed.
+- Strict TypeScript/Vite production build and lint pass, with the existing chunk-size and
+  LanguagePicker Fast Refresh warnings.
+
+The consumer script's former conditional dynamic-import expression was changed to literal import
+branches so its production build tests built JavaScript rather than requesting source TSX files.
+These isolated package checks do not establish the full companion application's production build
+or deployed UI behavior; companion validation remains separate.
+
+## Initial casting language confirmation
+
+Staging exposed an existing Cast launch block: selecting the initial English language after its
+quote had already loaded reset readiness, although the actual casting settings and quote key
+did not change. No readiness effect ran again, leaving Continue disabled indefinitely. The
+language confirmation now invalidates the quote only when the selected language actually changes.
+An actual-App regression first failed on the prior candidate, then passed while retaining the
+original quote fingerprint and dispatching only on explicit Continue. Existing language-change
+coverage still blocks Continue until the replacement quote resolves. App, casting-choice and
+language-picker checks pass: 181 tests; full frontend suite passes 342 tests across 31 files.
+Strict TypeScript/Vite build and lint also pass with the existing warnings.

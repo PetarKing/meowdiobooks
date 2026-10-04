@@ -2424,6 +2424,35 @@ describe('v2 wizard', () => {
     expect(window.scrollTo).not.toHaveBeenCalled()
   })
 
+  it('enables casting after confirming the unchanged initial language once its quote is ready', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
+      castingPreviewAvailable: true,
+      cast: { revision: 'cp', phase: 'identity-review', dossiers: [], proposals: [] },
+    }
+    vi.mocked(wizardApi.previewCasting!).mockResolvedValue({
+      sources: [], fingerprint: 'initial-english-quote', exactMatchCount: 0, totalVoiceCount: 1,
+      remainingVoiceCount: 1, currency: 'EUR',
+      options: [{ modelId: 'qwen', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 150 }],
+    })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'failed', error: 'test stop' })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    await screen.findByText('≈ €1.50')
+    expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ language: 'english' }))
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'english' } })
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled()
+    expect(wizardApi.previewCasting).toHaveBeenCalledTimes(1)
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast',
+      expect.objectContaining({ language: 'english', castingPreviewFingerprint: 'initial-english-quote' })))
+  })
+
   it('uses host casting choices and submits selected sources only on Continue', async () => {
     const snapshot: WizardSnapshot = { ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
