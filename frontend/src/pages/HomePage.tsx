@@ -10,7 +10,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
   const totalAssetBytes = books.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
 
   return <>
-    <StudioHero eyebrow={t("Your audiobook studio")} title={<>{t("From page")}<br /><em>{t("to performance.")}</em></>} description={t("Turn a PDF into an audiobook, with control at every step.")}>
+    <StudioHero compact={books.length > 0} eyebrow={t("Your audiobook studio")} title={<>{t("From page")}<br /><em>{t("to performance.")}</em></>} description={t("Turn a PDF into an audiobook, with control at every step.")}>
       <section className={`quick-import ${file ? "has-file" : ""}`} aria-labelledby="quick-import-title">
         <h2 id="quick-import-title" className="visually-hidden">{t(file ? "Ready to begin" : "Start another book")}</h2>
         {file ? <div className="quick-import-ready">
