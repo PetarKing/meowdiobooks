@@ -36,6 +36,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 ## Interaction and state
 
 - Every interactive element needs visible hover, keyboard focus, selected, and disabled treatment. Use one focus indicator per target. Whole-row Generate and Export selections own their indicator; their inner checkbox does not add another ring. Selection retains native checkmarks/radios alongside color.
+- Dialogs initially focus their reading surface without an outline. Controls retain a visible keyboard indicator when reached with Tab; autofocus remains appropriate for an explicit editing or playback action.
 - Small confirmations can compose `DialogSurface` with `dialog-backdrop`, `dialog-card` and `dialog-actions` from the public primitive sheet. The card provides padding, bounded width/height and scrolling; full workbench inspectors keep their own geometry. `DialogSurface` itself owns the shared keyboard and scroll-lock lifecycle.
 - Loading preserves context: keep the initiating label, add progress when measurable, and prevent duplicate actions.
 - Empty states explain what unlocks the surface. Library load failures have their own Retry state and never claim the library is empty; failed refresh retains the last successful editions. Errors are announced, visually anchored in red, and retain user work. Warnings use amber; success uses sage.
@@ -44,7 +45,7 @@ Artwork never substitutes for names, acceptance state, source evidence or actual
 
 ## Responsive behavior
 
-- Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone uses one scrollable named stage rail in the header.
+- Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone uses a slim connected row of evenly spaced numbered progress markers, with the current step in a cherry pill. Position remains available to assistive technology without repeating the page title. The standard six-step journey fits at 320px with 44px touch targets; longer host journeys can scroll. Accessible names retain every stage label and status.
 - On mobile, primary actions remain reachable without covering the final content. Horizontal choice rails must show more than one card edge so overflow is discoverable.
 - Desktop entrance artwork shares the screen with the import composition; phone stacks the illustration below the import action. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
 
