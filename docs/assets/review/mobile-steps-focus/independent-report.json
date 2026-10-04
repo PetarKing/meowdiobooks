@@ -1,0 +1,810 @@
+[
+  {
+    "scenario": "cast-identities",
+    "language": "en",
+    "width": 320,
+    "pageOverflow": 0,
+    "navWidth": 288,
+    "navScrollWidth": 288,
+    "progress": "Cast & voices4 / 6",
+    "buttons": [
+      {
+        "name": "Extract Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 64,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "Dialogue Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 64,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 112,
+          "bottom": 239.640625,
+          "left": 64
+        }
+      },
+      {
+        "name": "Review Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 112,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 160,
+          "bottom": 239.640625,
+          "left": 112
+        }
+      },
+      {
+        "name": "Cast & voices In progress",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 160,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 208,
+          "bottom": 239.640625,
+          "left": 160
+        }
+      },
+      {
+        "name": "Generate Complete Cast & voices first",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 208,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 256,
+          "bottom": 239.640625,
+          "left": 208
+        }
+      },
+      {
+        "name": "Export Generate audio first",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 256,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 304,
+          "bottom": 239.640625,
+          "left": 256
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "cast-identities",
+    "language": "zh",
+    "width": 320,
+    "pageOverflow": 0,
+    "navWidth": 288,
+    "navScrollWidth": 288,
+    "progress": "角色与声音4 / 6",
+    "buttons": [
+      {
+        "name": "提取 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 64,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "对话 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 64,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 112,
+          "bottom": 239.640625,
+          "left": 64
+        }
+      },
+      {
+        "name": "审核 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 112,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 160,
+          "bottom": 239.640625,
+          "left": 112
+        }
+      },
+      {
+        "name": "角色与声音 进行中",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 160,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 208,
+          "bottom": 239.640625,
+          "left": 160
+        }
+      },
+      {
+        "name": "生成 请先完成角色与声音",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 208,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 256,
+          "bottom": 239.640625,
+          "left": 208
+        }
+      },
+      {
+        "name": "导出 请先生成音频",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 256,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 304,
+          "bottom": 239.640625,
+          "left": 256
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "export",
+    "language": "en",
+    "width": 320,
+    "pageOverflow": 0,
+    "navWidth": 288,
+    "navScrollWidth": 288,
+    "progress": "Export6 / 6",
+    "buttons": [
+      {
+        "name": "Extract Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 64,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "Dialogue Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 64,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 112,
+          "bottom": 239.640625,
+          "left": 64
+        }
+      },
+      {
+        "name": "Review Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 112,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 160,
+          "bottom": 239.640625,
+          "left": 112
+        }
+      },
+      {
+        "name": "Cast & voices Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 160,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 208,
+          "bottom": 239.640625,
+          "left": 160
+        }
+      },
+      {
+        "name": "Generate Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 208,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 256,
+          "bottom": 239.640625,
+          "left": 208
+        }
+      },
+      {
+        "name": "Export In progress",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 256,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 304,
+          "bottom": 239.640625,
+          "left": 256
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "export",
+    "language": "zh",
+    "width": 320,
+    "pageOverflow": 0,
+    "navWidth": 288,
+    "navScrollWidth": 288,
+    "progress": "导出6 / 6",
+    "buttons": [
+      {
+        "name": "提取 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 64,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "对话 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 64,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 112,
+          "bottom": 239.640625,
+          "left": 64
+        }
+      },
+      {
+        "name": "审核 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 112,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 160,
+          "bottom": 239.640625,
+          "left": 112
+        }
+      },
+      {
+        "name": "角色与声音 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 160,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 208,
+          "bottom": 239.640625,
+          "left": 160
+        }
+      },
+      {
+        "name": "生成 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 208,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 256,
+          "bottom": 239.640625,
+          "left": 208
+        }
+      },
+      {
+        "name": "导出 进行中",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 256,
+          "y": 195.640625,
+          "width": 48,
+          "height": 44,
+          "top": 195.640625,
+          "right": 304,
+          "bottom": 239.640625,
+          "left": 256
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "cast-identities",
+    "language": "en",
+    "width": 390,
+    "pageOverflow": 0,
+    "navWidth": 358,
+    "navScrollWidth": 358,
+    "progress": "Cast & voices4 / 6",
+    "buttons": [
+      {
+        "name": "Extract Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 75.65625,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "Dialogue Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 75.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 135.328125,
+          "bottom": 239.640625,
+          "left": 75.65625
+        }
+      },
+      {
+        "name": "Review Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 135.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 195,
+          "bottom": 239.640625,
+          "left": 135.328125
+        }
+      },
+      {
+        "name": "Cast & voices In progress",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 195,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 254.65625,
+          "bottom": 239.640625,
+          "left": 195
+        }
+      },
+      {
+        "name": "Generate Complete Cast & voices first",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 254.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 314.328125,
+          "bottom": 239.640625,
+          "left": 254.65625
+        }
+      },
+      {
+        "name": "Export Generate audio first",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 314.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 374,
+          "bottom": 239.640625,
+          "left": 314.328125
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "cast-identities",
+    "language": "zh",
+    "width": 390,
+    "pageOverflow": 0,
+    "navWidth": 358,
+    "navScrollWidth": 358,
+    "progress": "角色与声音4 / 6",
+    "buttons": [
+      {
+        "name": "提取 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 75.65625,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "对话 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 75.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 135.328125,
+          "bottom": 239.640625,
+          "left": 75.65625
+        }
+      },
+      {
+        "name": "审核 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 135.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 195,
+          "bottom": 239.640625,
+          "left": 135.328125
+        }
+      },
+      {
+        "name": "角色与声音 进行中",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 195,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 254.65625,
+          "bottom": 239.640625,
+          "left": 195
+        }
+      },
+      {
+        "name": "生成 请先完成角色与声音",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 254.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 314.328125,
+          "bottom": 239.640625,
+          "left": 254.65625
+        }
+      },
+      {
+        "name": "导出 请先生成音频",
+        "current": null,
+        "disabled": true,
+        "rect": {
+          "x": 314.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 374,
+          "bottom": 239.640625,
+          "left": 314.328125
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "export",
+    "language": "en",
+    "width": 390,
+    "pageOverflow": 0,
+    "navWidth": 358,
+    "navScrollWidth": 358,
+    "progress": "Export6 / 6",
+    "buttons": [
+      {
+        "name": "Extract Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 75.65625,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "Dialogue Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 75.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 135.328125,
+          "bottom": 239.640625,
+          "left": 75.65625
+        }
+      },
+      {
+        "name": "Review Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 135.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 195,
+          "bottom": 239.640625,
+          "left": 135.328125
+        }
+      },
+      {
+        "name": "Cast & voices Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 195,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 254.65625,
+          "bottom": 239.640625,
+          "left": 195
+        }
+      },
+      {
+        "name": "Generate Complete",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 254.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 314.328125,
+          "bottom": 239.640625,
+          "left": 254.65625
+        }
+      },
+      {
+        "name": "Export In progress",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 314.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 374,
+          "bottom": 239.640625,
+          "left": 314.328125
+        }
+      }
+    ]
+  },
+  {
+    "scenario": "export",
+    "language": "zh",
+    "width": 390,
+    "pageOverflow": 0,
+    "navWidth": 358,
+    "navScrollWidth": 358,
+    "progress": "导出6 / 6",
+    "buttons": [
+      {
+        "name": "提取 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 16,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 75.65625,
+          "bottom": 239.640625,
+          "left": 16
+        }
+      },
+      {
+        "name": "对话 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 75.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 135.328125,
+          "bottom": 239.640625,
+          "left": 75.65625
+        }
+      },
+      {
+        "name": "审核 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 135.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 195,
+          "bottom": 239.640625,
+          "left": 135.328125
+        }
+      },
+      {
+        "name": "角色与声音 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 195,
+          "y": 195.640625,
+          "width": 59.65625,
+          "height": 44,
+          "top": 195.640625,
+          "right": 254.65625,
+          "bottom": 239.640625,
+          "left": 195
+        }
+      },
+      {
+        "name": "生成 已完成",
+        "current": null,
+        "disabled": false,
+        "rect": {
+          "x": 254.65625,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 314.328125,
+          "bottom": 239.640625,
+          "left": 254.65625
+        }
+      },
+      {
+        "name": "导出 进行中",
+        "current": "step",
+        "disabled": false,
+        "rect": {
+          "x": 314.328125,
+          "y": 195.640625,
+          "width": 59.671875,
+          "height": 44,
+          "top": 195.640625,
+          "right": 374,
+          "bottom": 239.640625,
+          "left": 314.328125
+        }
+      }
+    ]
+  }
+]

@@ -65,7 +65,7 @@ main { max-width:1360px; }
   .voice-select-control select { position:absolute; inset:0; z-index:1; height:100%; opacity:0; cursor:pointer; }
   .voice-select-control > span { display:flex; width:100%; height:100%; align-items:center; padding:0 32px 0 11px; border:1px solid var(--color-border, var(--line)); border-radius:7px; background:var(--paper); color:var(--color-ink, var(--ink)); font:400 14px/1 var(--font-sans); text-transform:none; }
   .voice-select-control::after { content:""; position:absolute; top:50%; right:13px; width:7px; height:7px; border-right:1.5px solid var(--color-ink, var(--ink)); border-bottom:1.5px solid var(--color-ink, var(--ink)); pointer-events:none; transform:translateY(-70%) rotate(45deg); }
-  .voice-select-control:has(select:focus-visible) > span { box-shadow:var(--focus); }
+  .voice-select-control:has(select:focus-visible) > span { outline:2px solid var(--color-action, var(--poppy)); outline-offset:3px; }
   .sample-reasons { flex-wrap: nowrap; overflow: auto; }
   .voice-fields { grid-template-columns: 1fr; }
   .voice-fields .wide { grid-column: auto; }

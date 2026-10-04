@@ -44,7 +44,7 @@
 .edition-page-picker input { width: 48px; min-height: 40px; padding: 5px 6px; border: 1px solid rgb(255 255 255 / .54); border-radius: 5px; background: rgb(255 255 255 / .15); color: #fff; }
 .edition-upload, .edition-use-pdf { position: relative; display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 5px 11px; border: 1px solid rgb(255 255 255 / .54); border-radius: 6px; background: rgb(255 255 255 / .13); cursor: pointer; color: #fff; font-size: 12px; font-weight: 600; }
 .edition-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-.edition-upload:focus-within { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 3px; }
+.edition-upload:has(input:focus-visible) { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 3px; }
 .edition-upload:hover, .edition-use-pdf:hover { background: rgb(255 255 255 / .25); }
 .edition-contents h2, .edition-format h2 { margin: 5px 0 0; font: 500 clamp(23px, 2.2vw, 29px)/1.15 var(--font-display); letter-spacing: -.025em; text-wrap: balance; }
 .edition-output { display: flow-root; margin-top: clamp(28px, 3.5vw, 46px); }
