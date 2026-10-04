@@ -156,6 +156,7 @@ export function useWorkflowModel({
   const jobKey = workflowStorageKey("activeJob", workflowPersistenceNamespace);
   const navigationVersion = useRef(0);
   const [restoringLocation, setRestoringLocation] = useState(true);
+  const [restoringJobScope, setRestoringJobScope] = useState(false);
   const [returnLocation, setReturnLocation] = useState<WorkflowLocation>();
   const [restoreAttempt, setRestoreAttempt] = useState(0);
   const readyLocationKey = useRef<string | null>(null);
@@ -474,8 +475,10 @@ export function useWorkflowModel({
       navigationVersion.current += 1;
       setReturnLocation(undefined);
       setRestoringLocation(false);
+      setRestoringJobScope(false);
       setBusy(false);
       setActiveJob(undefined);
+      clearGenerationTracking();
       setProductView(next);
       if (next === "library") void loadLibrary();
     };
@@ -495,10 +498,12 @@ export function useWorkflowModel({
     const id = hint?.activeJobId ?? readWorkflowStorage(jobKey);
     readyLocationKey.current = null;
     setRestoringLocation(true);
+    setRestoringJobScope(Boolean(id));
     setReturnLocation(undefined);
     setError(undefined);
     setBusy(Boolean(id || saved?.bookId));
     setActiveJob(undefined);
+    clearGenerationTracking();
     setSnapshot(undefined);
     setHomeState(true);
     const restore = async () => {
@@ -516,6 +521,7 @@ export function useWorkflowModel({
       if (id) {
         try { job = await pollJobWithForegroundRefresh(gateway, id); }
         catch (reason) {
+          if (!current()) return;
           if (!isRetryableJobPollError(reason)) writeWorkflowStorage(jobKey, null);
           throw reason;
         }
@@ -528,19 +534,48 @@ export function useWorkflowModel({
         }
         if (!restored && bookId) restored = await restoreBookView(bookId, saved?.stepId, current);
         if (!current()) return;
+        const settings = job.payload?.settings as Record<string, unknown> | undefined;
+        const unavailable = new Set(restored?.recordingScript?.summary.emptyChapterIds ?? []);
+        const available = new Set(restored?.chapters
+          .filter((row) => !unavailable.has(row.id))
+          .map((row) => row.id));
+        const requested = Array.isArray(settings?.chapterIds)
+          ? [...new Set(settings.chapterIds.filter((id): id is string => typeof id === "string" && available.has(id)))]
+          : [];
+        const generationJob = job.kind === "v2:generate";
+        const generation = generationJob && restored && requested.length > 0;
+        if (generationJob && !generation) setSelectedChapters([]);
+        const previousRevisions = new Map(restored?.generatedChapters.map((row) => [row.chapterId, row.revision]));
+        if (generation && restored) {
+          const ready = new Set(restored.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+          setChapterFilter(requested.every((id) => ready.has(id)) ? "generated" : "pending");
+          setSelectedChapters(requested);
+          if (["queued", "running"].includes(job.status)) {
+            startGenerationTracking(restored, requested, job.started_at);
+          }
+        }
+        setRestoringJobScope(false);
         await runJob(job, async (settled) => {
           if (!current()) return;
           const target = restored?.book.id ?? bookId;
           if (!target) return;
           const next = await restoreBookView(target, saved?.stepId, current);
           if (!current()) return;
-          if (settled.kind === "v2:generate" && settled.status === "succeeded") {
-            const settings = settled.payload?.settings as Record<string, unknown> | undefined;
-            const requested = Array.isArray(settings?.chapterIds)
-              ? settings.chapterIds.filter((id): id is string => typeof id === "string")
+          if ((generationJob || settled.kind === "v2:generate") && settled.status === "succeeded") {
+            const completedRequest = requested.length ? requested
               : Array.isArray(settled.result?.chapters)
                 ? settled.result.chapters.flatMap((row) => typeof row?.chapterId === "string" ? [row.chapterId] : []) : [];
-            selectCompletedChapters(next, requested);
+            selectCompletedChapters(next, completedRequest);
+          } else if (generation) {
+            const ready = new Set(next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+            const pending = requested.filter((id) => !ready.has(id));
+            if (pending.length) {
+              // A worker may have published tracks before this tab reattached.
+              setChapterFilter("pending");
+              setSelectedChapters(pending);
+            } else {
+              selectUnfinishedChapters(next, requested, previousRevisions);
+            }
           }
         }, current);
       }
@@ -561,7 +596,9 @@ export function useWorkflowModel({
       if (!current()) return;
       readyLocationKey.current = locationKey;
       setBusy(false);
+      clearGenerationTracking();
       setRestoringLocation(false);
+      setRestoringJobScope(false);
     });
     return () => { disposed = true; };
     // Hydration consumes the current model; restoring is scoped to gateway and host identity.
@@ -919,8 +956,10 @@ export function useWorkflowModel({
     navigationVersion.current += 1;
     setReturnLocation(undefined);
     setRestoringLocation(false);
+    setRestoringJobScope(false);
     setBusy(false);
     setActiveJob(undefined);
+    clearGenerationTracking();
     setHomeState(next);
   }
 
@@ -935,6 +974,7 @@ export function useWorkflowModel({
       && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway;
     setReturnLocation(undefined);
     setRestoringLocation(false);
+    setRestoringJobScope(false);
     setOpeningBookId(local.id);
     setBusy(true);
     setError(undefined);
@@ -1187,21 +1227,9 @@ export function useWorkflowModel({
 
   async function generateChapters(chapterIds: string[]) {
     if (!book) return;
-    const unavailable = new Set(snapshot?.recordingScript?.summary.emptyChapterIds ?? []);
-    const availableChapters = (snapshot?.chapters ?? []).filter((chapter) => !unavailable.has(chapter.id));
-    const estimates = new Map((snapshot?.recordingScript?.summary.chapters ?? []).map((chapter) => [chapter.chapterId, chapter.estimatedSeconds]));
-    const selected = new Set(chapterIds);
     const previousRevisions = new Map(snapshot?.generatedChapters.map((row) => [row.chapterId, row.revision]));
-    setGenerationRun({
-      chapterIds,
-      estimatedAudioSeconds: availableChapters
-        .filter((chapter) => selected.has(chapter.id))
-        .reduce((total, chapter) => total + (estimates.get(chapter.id) ?? (chapter.estimatedCharacters ?? 0) / 15), 0),
-      historicalMultiplier: averageGenerationMultiplier(generationSamples),
-      startedAtMs: Date.now(),
-    });
+    if (snapshot) startGenerationTracking(snapshot, chapterIds);
     setBusy(true);
-    setGenerationInProgress(true);
     setProgress(0);
     setError(undefined);
     try {
@@ -1214,20 +1242,45 @@ export function useWorkflowModel({
       setError(message(reason));
       try {
         const next = await hydrate(book.id);
-        // Each chapter is published atomically. A later failure can leave completed
-        // chapters saved; keep only unfinished requested tracks selected for retry.
-        const completed = new Set(next.generatedChapters
-          .filter((row) => row.current && row.revision !== previousRevisions.get(row.chapterId))
-          .map((row) => row.chapterId));
-        setSelectedChapters(chapterIds.filter((id) => !completed.has(id)));
+        selectUnfinishedChapters(next, chapterIds, previousRevisions);
       } catch {
         // Keep the original failure and local selection when refresh is unavailable.
       }
     } finally {
-      setGenerationInProgress(false);
-      setGenerationRun(undefined);
+      clearGenerationTracking();
       setBusy(false);
     }
+  }
+
+  function startGenerationTracking(next: WizardSnapshot, chapterIds: string[], startedAt?: string | null) {
+    const unavailable = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
+    const availableChapters = next.chapters.filter((chapter) => !unavailable.has(chapter.id));
+    const estimates = new Map((next.recordingScript?.summary.chapters ?? []).map((chapter) => [chapter.chapterId, chapter.estimatedSeconds]));
+    const selected = new Set(chapterIds);
+    const parsedStartedAt = startedAt ? Date.parse(startedAt) : Number.NaN;
+    setGenerationRun({
+      chapterIds,
+      estimatedAudioSeconds: availableChapters
+        .filter((chapter) => selected.has(chapter.id))
+        .reduce((total, chapter) => total + (estimates.get(chapter.id) ?? (chapter.estimatedCharacters ?? 0) / 15), 0),
+      historicalMultiplier: averageGenerationMultiplier(generationSamples),
+      startedAtMs: Number.isFinite(parsedStartedAt) ? parsedStartedAt : Date.now(),
+    });
+    setGenerationInProgress(true);
+  }
+
+  function clearGenerationTracking() {
+    setGenerationInProgress(false);
+    setGenerationRun(undefined);
+  }
+
+  function selectUnfinishedChapters(next: WizardSnapshot, chapterIds: string[], previousRevisions: Map<string, string>) {
+    // Each chapter publishes atomically. Retry only unfinished requested tracks,
+    // retaining an unchanged current recording after deliberate regeneration fails.
+    const completed = new Set(next.generatedChapters
+      .filter((row) => row.current && row.revision !== previousRevisions.get(row.chapterId))
+      .map((row) => row.chapterId));
+    setSelectedChapters(chapterIds.filter((id) => !completed.has(id)));
   }
 
   function selectCompletedChapters(next: WizardSnapshot, chapterIds: string[]) {
@@ -1272,8 +1325,10 @@ export function useWorkflowModel({
     navigationVersion.current += 1;
     setReturnLocation(undefined);
     setRestoringLocation(false);
+    setRestoringJobScope(false);
     setBusy(false);
     setActiveJob(undefined);
+    clearGenerationTracking();
     const path = productPaths[next];
     if (window.location.pathname !== path) window.history.pushState({}, "", path);
     setProductView(next);
@@ -1295,7 +1350,7 @@ export function useWorkflowModel({
       setError(message(reason));
     }
   }
-  return { extractionCandidate, retryWorkflowReturn, returnLocation, restoringLocation, castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
+  return { extractionCandidate, retryWorkflowReturn, returnLocation, restoringLocation, restoringJobScope, castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, castingSources, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setCastingSources, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
 }
 
 export type WorkflowModel = ReturnType<typeof useWorkflowModel>;

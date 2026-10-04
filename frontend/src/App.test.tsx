@@ -3716,6 +3716,156 @@ describe('v2 wizard', () => {
     expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
   })
 
+  it('restores one authenticated generation request before showing its pending selection or progress', async () => {
+    const snapshot: WizardSnapshot = { ...base, generatedChapters: [],
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }],
+    }
+    let revealJob!: (job: Job) => void
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob)
+      .mockImplementationOnce(() => new Promise(resolve => { revealJob = resolve }))
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'resumed-one' }} />)
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(1))
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledWith('book-1')
+    expect(screen.queryByRole('heading', { name: 'Record your chapters' })).not.toBeInTheDocument()
+    revealJob({ id: 'resumed-one', kind: 'v2:generate', status: 'running', progress: 20,
+      started_at: new Date().toISOString(),
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1', 'chapter-1', 'unknown', 1] } },
+    })
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
+    expect(screen.getByLabelText('Select Down the Rabbit-Hole')).toBeChecked()
+    expect(screen.getByLabelText('Select The Pool of Tears')).not.toBeChecked()
+    expect(document.querySelector('.workspace')).toHaveAttribute('inert')
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: base.generatedChapters })
+    // Terminal snapshots can omit payload. The first authenticated scope still wins.
+    finish({ id: 'resumed-one', status: 'succeeded' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeInTheDocument()
+    expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
+    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it.each(['failed', 'canceled'] as const)('cleans resumed progress and selects only unfinished requested chapters after partial %s work', async (status) => {
+    const snapshot: WizardSnapshot = { ...base, generatedChapters: [],
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }, { id: 'chapter-3', title: 'A Caucus-Race' }],
+    }
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'resumed-partial', kind: 'v2:generate', status: 'running',
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1', 'chapter-2'] } },
+    }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    vi.mocked(wizardApi.cancelJob).mockResolvedValue({ id: 'resumed-partial', kind: 'v2:generate', status: 'running', cancel_requested_at: new Date().toISOString() })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'resumed-partial' }} />)
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(within(dialog).getByText('0 of 2 ready')).toBeInTheDocument()
+    expect(screen.getByLabelText('Select A Caucus-Race')).not.toBeChecked()
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    if (status === 'canceled') {
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel audio generation' }))
+      await waitFor(() => expect(wizardApi.cancelJob).toHaveBeenCalledWith('resumed-partial'))
+      expect(within(dialog).getByRole('button', { name: 'Canceling…' })).toBeDisabled()
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: base.generatedChapters })
+    finish({ id: 'resumed-partial', kind: 'v2:generate', status, error: 'Stopped after saving Chapter 1.' })
+    await screen.findByRole('alert')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('keeps a track published before reattachment out of a resumed partial-failure retry', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }, { id: 'chapter-3', title: 'A Caucus-Race' }],
+    }
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'already-partial', kind: 'v2:generate', status: 'running',
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1', 'chapter-2'] } },
+    }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'already-partial' }} />)
+    await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    finish({ id: 'already-partial', kind: 'v2:generate', status: 'failed', error: 'Chapter 2 failed.' })
+    await screen.findByRole('alert')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+  })
+
+  it('clears resumed generation tracking after a permanent polling failure', async () => {
+    let fail!: (reason: Error) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, generatedChapters: [] })
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'expired-generation', kind: 'v2:generate', status: 'running',
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'] } },
+    }).mockImplementationOnce(() => new Promise((_resolve, reject) => { fail = reject }))
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'expired-generation' }} />)
+    await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    fail(Object.assign(new Error('Job no longer exists'), { status: 404 }))
+    await screen.findByRole('alert')
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('uses neutral resumed progress for a legacy generation job with unknown chapter scope', async () => {
+    const snapshot: WizardSnapshot = { ...base, generatedChapters: [],
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }],
+    }
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'legacy-generation', kind: 'v2:generate', status: 'running', payload: { book_id: 'book-1' } })
+      .mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const view = render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'legacy-generation' }} />)
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(document.querySelector('.generation-overlay')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Select Down the Rabbit-Hole')).not.toBeChecked()
+    expect(screen.getByLabelText('Select The Pool of Tears')).not.toBeChecked()
+    view.unmount()
+    finish({ id: 'legacy-generation', kind: 'v2:generate', status: 'succeeded' })
+    await waitFor(() => expect(document.body).not.toHaveStyle({ overflow: 'hidden' }))
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(1)
+  })
+
+  it('clears resumed generation UI on account change and ignores its late completion', async () => {
+    const snapshot: WizardSnapshot = { ...base, generatedChapters: [] }
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'account-a-generation', kind: 'v2:generate', status: 'running',
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'] } },
+    }).mockImplementationOnce(() => new Promise(resolve => { finish = resolve }))
+    const initial = { bookId: 'book-1', stepId: 'generate', activeJobId: 'account-a-generation' }
+    const view = render(<App workflowPersistenceNamespace="account-a" initialWorkflowLocation={initial} />)
+    await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    view.rerender(<App workflowPersistenceNamespace="account-b" />)
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    finish({ id: 'account-a-generation', kind: 'v2:generate', status: 'succeeded' })
+    await waitFor(() => expect(screen.queryByRole('heading', { name: 'Record your chapters' })).not.toBeInTheDocument())
+    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    expect(wizardApi.getBookSnapshot).toHaveBeenCalledTimes(1)
+    expect(localStorage.getItem(workflowStorageKey('activeJob', 'account-b'))).toBeNull()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
   it('hydrates the running job book before completion and returns to its saved pending Dialogue result', async () => {
     persistWorkflowReturn('book-1', 'dialogue', { activeJobId: 'dialogue-running' })
     const pending: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract'] },
