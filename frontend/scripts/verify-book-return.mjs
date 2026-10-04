@@ -5,7 +5,7 @@ const { chromium, webkit } = createRequire(process.cwd() + '/frontend/package.js
 const origin=process.argv[2] || 'http://127.0.0.1:5192';
 const out=process.env.BOOK_RETURN_EVIDENCE_DIR || '/private/tmp/meowdiobooks-book-return-check';
 await mkdir(out,{recursive:true});
-const report=['resume','context-only'].includes(process.argv[3])?JSON.parse(await (await import('node:fs/promises')).readFile(out+'/report.json','utf8')):[];
+const report=['resume','context-only','preload-only'].includes(process.argv[3])?JSON.parse(await (await import('node:fs/promises')).readFile(out+'/report.json','utf8')):[];
 const html=`<!doctype html><html><body><div id="root"></div>
 <script type="module">
 import RefreshRuntime from '/@react-refresh';
@@ -24,10 +24,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(
 for(const engine of [chromium,webkit]){
  const browser=await engine.launch();
  try{
-  for(const scenario of (process.argv[3]==='context-only'?['context-loss']:process.argv[3]==='resume'&&engine===chromium?['library']:['normal','reduced','no-webgl','delayed-module','failed-module','context-loss','home','library'])){
+  for(const scenario of (process.argv[3]==='preload-only'?['preload-failure']:process.argv[3]==='context-only'?['context-loss']:process.argv[3]==='resume'&&engine===chromium?['library']:['normal','reduced','no-webgl','delayed-module','failed-module','context-loss','home','library','preload-failure'])){
    const context=await browser.newContext({viewport:{width:390,height:844},reducedMotion:scenario==='reduced'?'reduce':'no-preference'});
    const page=await context.newPage();const errors=[];page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR: '+e.message)});page.on('requestfailed',r=>console.error('FAILED '+r.url()+' '+r.failure()?.errorText));
-   await page.route(url=>url.pathname==='/independent-book-return.html',r=>r.fulfill({contentType:'text/html',body:html}));
+   await page.route(url=>url.pathname==='/independent-book-return.html',r=>r.fulfill({contentType:'text/html',body:scenario==='preload-failure'?html.replace("persistWorkflowReturn('kit-book','dialogue',{namespace:'independent-book-return'});",''):html}));
    await page.route('**/api/**',r=>new URL(r.request().url()).pathname.startsWith('/api/')?r.abort():r.continue());
    await page.addInitScript(()=>{
     const realRAF=window.requestAnimationFrame.bind(window),realCancel=window.cancelAnimationFrame.bind(window),pending=new Set();
@@ -39,21 +39,34 @@ for(const engine of [chromium,webkit]){
    });
    if(scenario==='no-webgl')await page.addInitScript(()=>{const real=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=function(type,...args){return type==='webgl'||type==='webgl2'||type==='experimental-webgl'?null:real.call(this,type,...args)}});
    let releaseModule;const moduleWait=new Promise(r=>releaseModule=r);let held=0;
-   if(scenario==='delayed-module'||scenario==='failed-module')await page.route(url=>/\/book-return\//.test(url.pathname)&&/\.(tsx?|jsx?)$/.test(url.pathname)&&!/Loading|Atmosphere|Static/i.test(url.pathname),async r=>{held++;if(scenario==='failed-module')await r.abort();else{await moduleWait;await r.continue()}});
+   if(scenario==='delayed-module'||scenario==='failed-module'||scenario==='preload-failure')await page.route(url=>/\/AnimatedBook\.tsx$/.test(url.pathname),async r=>{held++;if(scenario==='failed-module'||scenario==='preload-failure')await r.abort();else{await moduleWait;await r.continue()}});
    await page.goto(origin+'/independent-book-return.html?appearance='+(['context-loss','reduced'].includes(scenario)?'dark':'light'));
+   if(scenario==='preload-failure'){
+    await page.getByRole('heading',{name:'Start another book'}).waitFor();await page.waitForTimeout(500);
+    assert(held>0,'Background module preload was attempted');assert.equal(await page.locator('.book-return').count(),0);assert.deepEqual(errors,[],'Preload rejection is handled while Home stays usable');
+    report.push({engine:engine.name(),scenario,result:'passed'});console.log(engine.name()+': '+scenario+' passed');await context.close();continue;
+   }
    const status=page.locator('.book-return');await status.waitFor({timeout:12000}).catch(async e=>{console.error(await page.locator('body').innerText());await page.screenshot({path:out+'/debug-'+engine.name()+'-'+scenario+'.png'});throw e});
    assert(await page.getByRole('heading',{name:'Opening your book',exact:true}).isVisible());
    if(scenario==='delayed-module'){
-    await page.waitForTimeout(400);assert(held>0,'Lazy module intercepted');assert(await status.locator('.book-return-static').isVisible(),'Static book available before lazy module resolves');assert.equal(await status.locator('canvas').count(),0);releaseModule();
+    await page.waitForTimeout(400);assert(held>0,'Lazy module intercepted');assert.equal(await status.locator('.book-return-static').count(),0,'No alternate book is shown while warming');assert.equal(await status.locator('canvas').count(),0);
+    assert.equal(await status.locator('.book-return-static svg').count(),0,'Old SVG book is removed');
+
+    const before={art:await status.locator('.book-return-art').boundingBox(),heading:await status.locator('h1').boundingBox()};
+    await page.screenshot({path:out+'/'+engine.name()+'-warming.png'});
+    releaseModule();await status.locator('[data-renderer="webgl"]').waitFor();
+    assert.deepEqual(await status.locator('.book-return-art').boundingBox(),before.art,'Art frame does not move on renderer readiness');
+    assert.deepEqual(await status.locator('h1').boundingBox(),before.heading,'Heading does not move on renderer readiness');
+    assert.deepEqual(await status.locator('canvas').boundingBox(),before.art,'Canvas uses the reserved art frame');
    }
    if(scenario==='failed-module'||scenario==='no-webgl'){
-    await page.waitForTimeout(700);assert(await status.locator('.book-return-static').isVisible(),'Static book survives renderer/module failure');assert(await status.isVisible());
+    await page.waitForTimeout(700);assert.equal(await status.locator('.book-return-static').count(),0,'Failure keeps the text-only status');assert(await status.isVisible());
    }else{
     await status.locator('canvas').waitFor();await page.waitForTimeout(400);
     if(scenario==='reduced')assert.equal(await page.evaluate(()=>window.__pendingAnimationFrames.size),0,'Reduced motion schedules no animation frames');
     if(scenario==='context-loss'){
       await status.locator('canvas').evaluate(canvas=>canvas.dispatchEvent(new Event('webglcontextlost',{cancelable:true})));
-      await page.waitForTimeout(100);assert(await status.locator('.book-return-static').isVisible(),'Fallback remains after context loss');assert.equal(await status.locator('canvas').evaluate(e=>getComputedStyle(e).display),'none','Lost-context canvas is actually hidden, leaving one book');
+      await page.waitForTimeout(100);assert.equal(await status.locator('.book-return-static').count(),0,'Context loss keeps the text-only status');assert.equal(await status.locator('canvas').evaluate(e=>getComputedStyle(e).display),'none','Lost-context canvas is hidden, retaining the heading');
     }
    }
    assert.equal(await page.locator('.book-return-atmosphere').getAttribute('aria-hidden'),'true');assert.equal(await page.locator('.book-return-atmosphere').evaluate(e=>getComputedStyle(e).pointerEvents),'none');
