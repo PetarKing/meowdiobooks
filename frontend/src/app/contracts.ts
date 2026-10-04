@@ -25,6 +25,9 @@ export interface AppProps {
   gateway?: WorkflowGateway;
   /** Scope browser return hints to the host identity; omit for the local application. */
   workflowPersistenceNamespace?: string;
+  /** Explicit host return destination, including a job already dispatched by the host. */
+  initialWorkflowLocation?: { bookId: string; stepId: string; activeJobId?: string };
+  onActionRequired?: import('../api/actionRequired').ActionRequiredHandler;
   journey?: JourneyDefinition;
   stepOverrides?: Readonly<Record<JourneyStepId, ComponentType<WorkflowStepOverrideProps>>>;
   renderHeader?: (context: WorkflowHeaderContext) => ReactNode;

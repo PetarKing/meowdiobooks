@@ -441,12 +441,27 @@ export interface WizardSnapshot {
   history: Partial<Record<ArtifactKind, ArtifactHistoryEntry[]>>;
 }
 
+export interface ActionRequired {
+  code: string;
+  message: string;
+  /** Opaque host metadata; carries no authority and must not contain credentials. */
+  context: Record<string, unknown>;
+}
+
+export interface ActionRequiredContext {
+  bookId?: string;
+  stage?: string;
+  jobId?: string;
+  settings?: Record<string, unknown>;
+}
+
 export interface Job {
   id: string;
   kind?: string;
   status: "queued" | "running" | "canceled" | "succeeded" | "failed";
   payload?: Record<string, unknown>;
   error?: string | null;
+  action_required?: ActionRequired | null;
   progress?: number;
   message?: string | null;
   cancel_requested_at?: string | null;

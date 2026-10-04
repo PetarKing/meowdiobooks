@@ -39,6 +39,7 @@ from .api.schemas import (
     StageProcessRequest,
 )
 from .api.jobs import create_jobs_router
+from .action_required import action_required_http_exception
 from .api.library import create_library_router
 from .api.media import create_media_router
 from .api.static import mount_local_frontend
@@ -2252,12 +2253,23 @@ def create_app_v2(
                 sample.flush()
                 draft = voice_sample_transcriber(repo_root, book_id, Path(sample.name))
         except RuntimeError as error:
+            action_error = action_required_http_exception(error)
+            if action_error is not None:
+                raise action_error from error
             raise HTTPException(
                 status_code=503,
                 detail=getattr(error, "public_message", str(error)),
             ) from error
         except ValueError as error:
+            action_error = action_required_http_exception(error)
+            if action_error is not None:
+                raise action_error from error
             raise HTTPException(status_code=422, detail=str(error)) from error
+        except Exception as error:
+            action_error = action_required_http_exception(error)
+            if action_error is not None:
+                raise action_error from error
+            raise
         return {"text": draft.text, "language": draft.language}
 
     @app.post(
@@ -2373,6 +2385,9 @@ def create_app_v2(
         except Exception as error:
             output.unlink(missing_ok=True)
             reference_output.unlink(missing_ok=True)
+            action_error = action_required_http_exception(error)
+            if action_error is not None:
+                raise action_error from error
             raise HTTPException(
                 status_code=422,
                 detail=(

@@ -6,6 +6,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
 
 from .models import Job, JobStatus, utc_now
+from .action_required import extract_action_required
 from .storage import ModelStore
 
 JobHandler = Callable[..., dict[str, object] | None]
@@ -207,14 +208,15 @@ class JobQueue:
                 if isinstance(failure, JobCancellationRequested) or current.cancel_requested_at:
                     return self._finish_canceled(current)
                 current.status = JobStatus.FAILED
-                current.error = str(
+                current.action_required = extract_action_required(failure)
+                current.error = current.action_required.message if current.action_required else str(
                     getattr(
                         failure,
                         "public_message",
                         f"{type(failure).__name__}: {failure}",
                     )
                 )
-                current.message = "Failed"
+                current.message = "Action required" if current.action_required else "Failed"
                 current.finished_at = utc_now()
                 current.updated_at = current.finished_at
                 return current

@@ -36,6 +36,36 @@ best-effort and contains identifiers, not artifacts or authority. Hosts must sup
 `workflowPersistenceNamespace` per identity (and remount on identity changes) to isolate browser hints;
 hosts that reload after deferred commands use `persistWorkflowReturn` from the public workflow entry.
 
+Hosts can also supply `initialWorkflowLocation` (`bookId`, stable `stepId`, optional `activeJobId`)
+on a newly mounted App. This explicit destination wins browser hints, so return links and already
+dispatched jobs recover when browser storage is unavailable. It hydrates and polls only; it never
+repeats work. Hosts must remount App on identity or explicit return-context changes, and keep
+`onActionRequired` stable so changing unrelated host UI does not restart restoration.
+
+The public `cast_runtime` planning helpers `rebase_accepted_cast`, `reuse_unchanged_cast_voices`
+and `has_complete_audition_pack` let compositions determine existing reuse before admitting new
+provider work. They do not call providers, write files or publish artifacts. The reuse helper updates
+identity IDs and label mapping in the supplied disposable finalized draft; never pass an authoritative
+store record. The completeness helper checks declared planned revisions, so callers must separately
+validate source availability and the current model/recipe. Existing private names remain aliases.
+
+Host intervention is a provider-neutral boundary: a valid descriptor has `code`, public `message`,
+and opaque JSON `context`. A provider exception may attach it as `action_required`; failed jobs
+persist it in their existing JSON record without a new status or automatic retry. Voice transcription
+and clone-upload endpoints preserve it as HTTP `detail.actionRequired` (default 409 or a supplied 4xx
+status), while cleaning temporary files and retaining accepted artifacts. Malformed metadata remains
+an ordinary failure. Policy and funding gates remain owned by hosts, including preflight before
+retrying an existing failed job.
+
+`HttpWizardApi` exports `ActionRequiredError` and decodes valid synchronous descriptors. App's
+`onActionRequired(action, context)` receives synchronous and settled/restored job actions; job context
+includes book, stage, job ID and original settings when available. Return `true` only after showing
+an actionable host response. Only handled typed actions suppress global/inline error banners;
+uncomposed or declined actions retain their public message. A host transport that already displayed
+the action can throw `new ActionRequiredError(action, { handled: true })`. No action descriptor grants
+permission, contains credentials, selects a provider or automatically replays a command. A browser
+voice file stays local and requires an explicit transcript retry or reselection after navigation.
+
 Storybook exercises the same source with deterministic synthetic gateways. It is a development
 surface and is excluded from the consumer package.
 

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { CastArtifact, VoiceRoute } from "../api/contracts";
 import i18n from "../i18n";
 import { CastVoiceReview } from "./CastVoiceReview";
+import { ActionRequiredError } from "../api/actionRequired";
 
 const cast: CastArtifact = {
   revision: "cast-voice-1",
@@ -199,6 +200,24 @@ describe("CastVoiceReview", () => {
     fireEvent.change(select, { target: { value: JSON.stringify({ bookId: "earlier", characterId: "different", revision: "v1" }) } });
     fireEvent.click(screen.getByRole("button", { name: "Use voice" }));
     expect(reuse).toHaveBeenCalledWith("many", { bookId: "earlier", characterId: "different", revision: "v1" });
+  });
+
+  it("pauses an expected hosted transcript action and retries only after another explicit click", async () => {
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    const error = new ActionRequiredError({ code: 'HOST_REVIEW_REQUIRED', message: 'Review first.', context: {} }, { handled: true });
+    const onTranscribe = vi.fn().mockRejectedValueOnce(error).mockResolvedValue({ text: 'Recovered words.' });
+    render(<CastVoiceReview bookId="book-1" cast={cast} selections={{}} routes={{}} onRouteChange={() => undefined} onApprove={() => undefined} onRegenerate={() => undefined} onTranscribe={onTranscribe} onUpload={() => undefined} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Many voice' }));
+    const dialog = screen.getByRole('dialog', { name: 'Many voice' });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create a new audition' }));
+    fireEvent.click(within(dialog).getByRole('radio', { name: /Clone from a sample/ }));
+    fireEvent.change(within(dialog).getByLabelText('Choose voice sample'), { target: { files: [new File(['sample'], 'sample.wav')] } });
+    expect(await within(dialog).findByText('Complete the requested action, then retry the transcript draft.')).toBeInTheDocument();
+    expect(within(dialog).queryByText('A draft could not be made. Type the exact words manually.')).not.toBeInTheDocument();
+    expect(onTranscribe).toHaveBeenCalledTimes(1);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry transcript draft' }));
+    await waitFor(() => expect(within(dialog).getByLabelText('Voice sample transcript')).toHaveValue('Recovered words.'));
+    expect(onTranscribe).toHaveBeenCalledTimes(2);
   });
 
   it("drafts an editable transcript and uses a compact player before submission", async () => {

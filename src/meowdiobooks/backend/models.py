@@ -85,6 +85,14 @@ class JobStatus(StrEnum):
     FAILED = "failed"
 
 
+class ActionRequired(BaseModel):
+    """Opaque host action metadata, never permission to repeat provider work."""
+
+    code: str = Field(min_length=1, max_length=128)
+    message: str = Field(min_length=1, max_length=2048)
+    context: dict[str, object] = Field(default_factory=dict)
+
+
 class Job(BaseModel):
     id: str = Field(default_factory=lambda: uuid4().hex)
     kind: str = Field(min_length=1)
@@ -92,6 +100,7 @@ class Job(BaseModel):
     status: JobStatus = JobStatus.QUEUED
     result: dict[str, object] | None = None
     error: str | None = None
+    action_required: ActionRequired | None = None
     progress: float = Field(default=0, ge=0, le=100)
     message: str | None = None
     cancel_requested_at: datetime | None = None

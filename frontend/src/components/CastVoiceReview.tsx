@@ -7,6 +7,7 @@ import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog } from "./Ui";
 import { suggestedMemberIds } from "../voiceRoutes";
+import { ActionRequiredError } from '../api/actionRequired';
 
 interface Props {
   bookId: string;
@@ -253,7 +254,7 @@ export function CastVoiceReview({
   const [sampleTranscript, setSampleTranscript] = useState("");
   const [sampleFile, setSampleFile] = useState<File>();
   const [samplePreviewUrl, setSamplePreviewUrl] = useState("");
-  const [sampleTranscription, setSampleTranscription] = useState<"idle" | "transcribing" | "ready" | "failed">("idle");
+  const [sampleTranscription, setSampleTranscription] = useState<"idle" | "transcribing" | "ready" | "failed" | "paused">("idle");
   const [sampleLanguage, setSampleLanguage] = useState<string>();
   const [samplePlaying, setSamplePlaying] = useState(false);
   const [sampleElapsed, setSampleElapsed] = useState(0);
@@ -366,9 +367,9 @@ export function CastVoiceReview({
       setSampleTranscript(draft.text.slice(0, sampleTranscriptLimit));
       setSampleLanguage(draft.language?.trim() || undefined);
       setSampleTranscription("ready");
-    } catch {
+    } catch (reason) {
       if (transcriptionRequest.current !== request) return;
-      setSampleTranscription("failed");
+      setSampleTranscription(reason instanceof ActionRequiredError && reason.handled ? 'paused' : 'failed');
     }
   }
 
@@ -680,7 +681,8 @@ export function CastVoiceReview({
                 <audio ref={sampleAudioRef} aria-label={t("Selected voice sample preview")} preload="metadata" src={samplePreviewUrl} onLoadedMetadata={(event) => setSampleDuration(event.currentTarget.duration)} onTimeUpdate={(event) => setSampleElapsed(event.currentTarget.currentTime)} onPause={() => setSamplePlaying(false)} onEnded={() => { setSamplePlaying(false); setSampleElapsed(sampleDuration); }} />
               </div>}
               <label className="voice-sample-transcript"><span>{t("What is said in the sample?")}</span><textarea aria-label={t("Voice sample transcript")} disabled={!sampleFile || sampleTranscription === "transcribing"} maxLength={sampleTranscriptLimit} rows={4} placeholder={t(!sampleFile ? "Choose a sample to draft its words…" : sampleTranscription === "transcribing" ? "Listening and drafting…" : "Type the sample’s exact spoken words…")} value={sampleTranscript} onChange={(event) => setSampleTranscript(event.target.value)} /><small>{sampleTranscript.length}/{sampleTranscriptLimit}</small></label>
-              {sampleFile && <p className={`voice-transcript-status ${sampleTranscription}`} aria-live="polite">{sampleTranscription === "transcribing" ? t("voiceSample.draftingStatus", { ns: "edition" }) : sampleTranscription === "ready" ? t(sampleLanguage ? "Drafted in {{language}}. Check every word before continuing." : "Draft ready. Check every word before continuing.", { language: sampleLanguage }) : sampleTranscription === "failed" ? t("A draft could not be made. Type the exact words manually.") : t("Type the exact words spoken in the sample.")}</p>}
+              {sampleFile && <p className={`voice-transcript-status ${sampleTranscription}`} aria-live="polite">{sampleTranscription === "transcribing" ? t("voiceSample.draftingStatus", { ns: "edition" }) : sampleTranscription === "ready" ? t(sampleLanguage ? "Drafted in {{language}}. Check every word before continuing." : "Draft ready. Check every word before continuing.", { language: sampleLanguage }) : sampleTranscription === "paused" ? t("Complete the requested action, then retry the transcript draft.") : sampleTranscription === "failed" ? t("A draft could not be made. Type the exact words manually.") : t("Type the exact words spoken in the sample.")}</p>}
+              {sampleTranscription === "paused" && sampleFile && <button type="button" className="ghost compact" onClick={() => { void chooseSample(sampleFile); }}>{t("Retry transcript draft")}</button>}
               <button
                 type="button"
                 className="primary voice-sample-submit"
