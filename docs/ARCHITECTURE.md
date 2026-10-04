@@ -27,8 +27,9 @@ the accepted application's existing mount boundaries. Render functions invoked d
 shell remain hook-free; reusable stateful components mount normally inside those views.
 Browser return hints retain the selected book and stable journey step independently of the active-job
 marker. Return hydration fetches independent immutable candidates in parallel after the authoritative
-snapshot is read; state commits only after all required reads succeed. Brief restores show a quiet
-localized status immediately. Book decoration starts only after an 800 ms sustained wait, without
+snapshot is read; state commits only after all required reads succeed. Known scoped book/job returns
+show a quiet localized status on the first render, preserving explicit Home/Library precedence.
+Book decoration starts only after an 800 ms sustained wait, without
 delaying workflow readiness or imposing a minimum animation duration. Reloads hydrate authoritative snapshots and pending candidates before reattaching a job, and
 again when it settles; they never rerun a provider command. Review candidates reopen for inspection,
 and completed extraction candidates offer explicit acceptance rather than publishing on reload.

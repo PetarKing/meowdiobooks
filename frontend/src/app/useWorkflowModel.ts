@@ -193,7 +193,16 @@ export function useWorkflowModel({
 
   const [stage, setStage] = useState(0);
 
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState(() => {
+    // A known return must not paint Home before the restoration effect starts.
+    // These scoped hints select the loading view only; hydration still verifies
+    // the book/job on the gateway. Explicit Home and Library retain precedence.
+    const saved = initialWorkflowLocation
+      ? { view: "create", home: false, bookId: initialWorkflowLocation.bookId }
+      : readWorkflowLocation(locationKey);
+    if (window.location.pathname === productPaths.library || saved?.home || saved?.view === "library") return false;
+    return Boolean(initialWorkflowLocation?.activeJobId || readWorkflowStorage(jobKey) || saved?.bookId);
+  });
 
   const [processingOverlaySuppressed, setProcessingOverlaySuppressed] = useState(false);
 

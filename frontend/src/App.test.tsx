@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { type AppProps } from './App'
 import { normalizeDialogueArtifact, wizardApi } from './api/client'
@@ -7,6 +8,29 @@ import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, Work
 import { buildReviewWarningDecisions } from './reviewDecisions'
 import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
 import { workflowStorageKey } from './workflow/workflowLocation'
+
+describe('first return paint', () => {
+  it('shows quiet restoration before effects run for an explicit book return', () => {
+    const html = renderToString(<App workflowPersistenceNamespace="first-paint" initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
+    expect(html).toContain('book-return-quiet')
+    expect(html).toContain('Opening your book')
+    expect(html).not.toContain('book-return-art')
+    expect(html).not.toContain('From page')
+    expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
+  })
+
+  it('uses only the current account saved location on the first paint', () => {
+    persistWorkflowReturn('book-1', 'generate', { namespace: 'account-a' })
+    expect(renderToString(<App workflowPersistenceNamespace="account-a" />)).toContain('book-return-quiet')
+    expect(renderToString(<App workflowPersistenceNamespace="account-b" />)).not.toContain('book-return-quiet')
+  })
+
+  it.each(['home', 'library'] as const)('keeps an explicit %s visit ahead of an old job marker', view => {
+    localStorage.setItem(workflowStorageKey('location', 'first-paint'), JSON.stringify({ view: view === 'home' ? 'create' : 'library', home: true }))
+    localStorage.setItem(workflowStorageKey('activeJob', 'first-paint'), 'old-job')
+    expect(renderToString(<App workflowPersistenceNamespace="first-paint" />)).not.toContain('book-return-quiet')
+  })
+})
 
 vi.mock('./api/client', () => ({ wizardApi: {
   importBook: vi.fn(), getBookSnapshot: vi.fn(), previewExtraction: vi.fn(), previewDialogue: vi.fn(),
