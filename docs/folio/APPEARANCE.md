@@ -11,8 +11,10 @@ Appearance changes presentation only.
 The default `App` header exposes one icon button named **Toggle dark mode**, with `aria-pressed`
 reflecting the resolved appearance. With no saved preference, System follows `prefers-color-scheme`
 and updates when the operating-system preference changes. Clicking the button chooses the opposite
-explicit Light or Dark appearance and persists it under `meowdiobooks.appearance` in browser local
-storage. The default header does not expose a separate System option. Malformed or unavailable
+explicit Light or Dark appearance for 12 hours and persists `{ appearance, expiresAt }` under
+`meowdiobooks.appearance` in browser local storage. Expiry returns to the current device setting
+while open, after reload, or on wake; changes synchronize across tabs. Unknown-age legacy strings
+and deadlines outside the remaining 12-hour window return to System. The default header does not expose a separate System option. Malformed or unavailable
 storage falls back to System; blocked writes still allow changing the current UI. This preference
 is not part of book, workflow, accepted artifacts or backend state.
 
@@ -47,7 +49,7 @@ HTML's default black `<mark>` foreground must not leak into Dark.
 ## Evidence and reproduction
 
 - `src/app/useAppearance.test.tsx` verifies restored and invalid preferences, blocked storage,
-  controlled host settings, system updates and listener cleanup.
+  controlled host settings, live and reloaded expiry, tab synchronization, wake, system updates and listener cleanup.
 - `src/components/ThemeToggle.test.tsx` verifies the accessible single icon, pressed state and
   explicit Light/Dark toggle behavior.
 - `src/components/PresentationRoot.test.tsx` verifies sibling isolation, supplied palette preservation

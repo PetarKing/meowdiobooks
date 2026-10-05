@@ -1,0 +1,110 @@
+[
+  {
+    "engine": "chromium",
+    "scenario": "normal",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "chromium",
+    "scenario": "reduced",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "chromium",
+    "scenario": "no-webgl",
+    "result": "passed",
+    "lostContexts": 0
+  },
+  {
+    "engine": "chromium",
+    "scenario": "delayed-module",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "chromium",
+    "scenario": "failed-module",
+    "result": "passed",
+    "lostContexts": 0
+  },
+  {
+    "engine": "chromium",
+    "scenario": "context-loss",
+    "result": "passed",
+    "lostContexts": 2,
+    "lostCanvasComputedDisplay": "none"
+  },
+  {
+    "engine": "chromium",
+    "scenario": "home",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "chromium",
+    "scenario": "library",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "chromium",
+    "scenario": "preload-failure",
+    "result": "passed"
+  },
+  {
+    "engine": "webkit",
+    "scenario": "normal",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "webkit",
+    "scenario": "reduced",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "webkit",
+    "scenario": "no-webgl",
+    "result": "passed",
+    "lostContexts": 0
+  },
+  {
+    "engine": "webkit",
+    "scenario": "delayed-module",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "webkit",
+    "scenario": "failed-module",
+    "result": "passed",
+    "lostContexts": 0
+  },
+  {
+    "engine": "webkit",
+    "scenario": "context-loss",
+    "result": "passed",
+    "lostContexts": 2,
+    "lostCanvasComputedDisplay": "none"
+  },
+  {
+    "engine": "webkit",
+    "scenario": "home",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "webkit",
+    "scenario": "library",
+    "result": "passed",
+    "lostContexts": 2
+  },
+  {
+    "engine": "webkit",
+    "scenario": "preload-failure",
+    "result": "passed"
+  }
+]

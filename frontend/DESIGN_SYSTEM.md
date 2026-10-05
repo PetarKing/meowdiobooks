@@ -13,7 +13,7 @@ The user selected Matcha & Cherry, with a Japanese-inspired maximalist sanctuary
 | Primary action | `#a42f4d` | `#f49bb6` |
 | Success | `#436627` | `#b6dcac` |
 
-The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance and persists locally. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
+The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance for 12 hours and persists its deadline locally. Expiry resumes the current device appearance, including after reload or wake. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/folio/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
 Working headings, home titles and bibliographic titles use the offline-safe editorial serif stack; supporting copy and controls use the humanist sans stack. Source excerpts preserve readable manuscript typography. A 4px spacing rhythm, restrained borders and modest corner radii support the content. Do not enlarge headings or decorative surfaces at the expense of the first decision.
 
@@ -102,6 +102,12 @@ standalone primitives and App host controls receive the baseline stylesheet and 
 an ordinary equal-specificity `.primary` rule imported afterward. It requires installed
 frontend dependencies and Playwright Chromium; it removes its temporary project on exit.
 
+
+Book returns show a quiet localized status immediately. Book art and its atmosphere appear only
+after 800 ms of unresolved restoration; this is a decoration threshold, never a minimum wait or
+a reason to delay content. The return cover stays until an active job's authenticated scope is known,
+so ordinary default selections cannot appear as the resumed request. Graphics are optional: failed
+loading or WebGL keeps the readable status, and completion or navigation removes the scene.
 
 ## Iteration ownership
 

@@ -26,7 +26,11 @@ The frontend page views in `frontend/src/pages` receive typed selections from
 the accepted application's existing mount boundaries. Render functions invoked directly by the
 shell remain hook-free; reusable stateful components mount normally inside those views.
 Browser return hints retain the selected book and stable journey step independently of the active-job
-marker. Reloads hydrate authoritative snapshots and pending candidates before reattaching a job, and
+marker. Return hydration fetches independent immutable candidates in parallel after the authoritative
+snapshot is read; state commits only after all required reads succeed. Known scoped book/job returns
+show a quiet localized status on the first render, preserving explicit Home/Library precedence.
+Book decoration starts only after an 800 ms sustained wait, without
+delaying workflow readiness or imposing a minimum animation duration. Reloads hydrate authoritative snapshots and pending candidates before reattaching a job, and
 again when it settles; they never rerun a provider command. Review candidates reopen for inspection,
 and completed extraction candidates offer explicit acceptance rather than publishing on reload.
 Explicit Home/Library navigation, including an initial Library URL, wins over
@@ -52,8 +56,8 @@ or a changed accepted parent removes the presentation. Existing audio never impl
 Generate separates To make (the entry default when work remains) from Generated (current audio only).
 Older recordings stay in To make with an independent Listen action; empty chapters remain visible
 as disabled No audio rows and are excluded from its actionable count. A completed-only book opens
-Generated. Tab changes clear selection. Current audio selection goes to Export by default; a named
-secondary Regenerate action deliberately creates replacement audio. A normal Generate action excludes
+Generated. Tab changes clear selection. Current audio selection goes to Export by default; Regenerate lives under More options
+and deliberately creates replacement audio only after that explicit choice. A normal Generate action excludes
 already-current recordings from its requested IDs and duration estimate.
 Reattaching an active Generate job holds the return notice until authenticated job scope is known,
 then restores its valid requested chapters and the same locked progress presentation as a fresh run.

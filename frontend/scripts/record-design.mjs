@@ -34,7 +34,7 @@ try {
       await chooseAppearance(page, 'light');
       await page.locator('.sanctuary-art img').waitFor();
       await page.locator('.sanctuary-art img').evaluate(image => image.decode());
-      await page.locator('.sanctuary-art').hover();
+      await page.locator('.studio-hero').hover();
       await page.waitForTimeout(2200);
       await chooseAppearance(page, 'dark');
       assert.equal(await page.locator('[data-presentation-root]').getAttribute('data-appearance'), 'dark');
