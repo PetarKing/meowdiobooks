@@ -3832,8 +3832,11 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
     expect(screen.queryByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeInTheDocument()
-    expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
-    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    // Portal removal can precede the passive scroll-lock cleanup in React.
+    await waitFor(() => {
+      expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
+      expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    })
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
