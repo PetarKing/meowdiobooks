@@ -103,6 +103,24 @@ async function open(
 describe('v2 wizard', () => {
   beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); window.history.replaceState({}, "", "/"); vi.mocked(normalizeDialogueArtifact).mockReturnValue(undefined); vi.mocked(wizardApi.listBooks).mockResolvedValue([]); vi.mocked(wizardApi.listBookJobs).mockResolvedValue([]); vi.mocked(wizardApi.listLibrary).mockResolvedValue([]); vi.mocked(wizardApi.transcribeVoiceSample).mockResolvedValue({ text: 'Automatic draft.', language: 'English' }); vi.mocked(wizardApi.previewReviewTranscript).mockImplementation(async (_bookId, _revision, page) => ({ page, pageCount: 120, imageUrl: `/page-${page}.png`, published: false, summary: { spoken: 2, dialogue: 1, excluded: 0 }, spans: [{ id: `n-${page}`, kind: 'narration', reader: 'Narrator', text: 'Alice was beginning to get very tired.', blockId: `p${page}`, sourceStart: 0, sourceEnd: 39 }, { id: `d-${page}`, kind: 'dialogue', reader: 'Alice', text: 'What is the use of a book?', blockId: `p${page}`, sourceStart: 40, sourceEnd: 70 }] })) })
 
+  it('resolves export cover media only while Export is visible', async () => {
+    const sourcePageImageUrl = vi.fn(() => '/host-cover.png')
+    const gateway: WorkflowGateway = Object.assign(Object.create(wizardApi), { sourcePageImageUrl })
+    await open(base, undefined, undefined, undefined, { gateway })
+    expect(sourcePageImageUrl).not.toHaveBeenCalled()
+
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: 'Library' }))
+    await screen.findByRole('heading', { name: 'Your audiobooks' })
+    fireEvent.click(screen.getByRole('button', { name: 'Toggle dark mode' }))
+    expect(sourcePageImageUrl).not.toHaveBeenCalled()
+
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Product areas' })).getByRole('button', { name: 'Create' }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByRole('button', { name: /^Export/ }))
+    await screen.findByRole('heading', { name: 'Prepare your audiobook' })
+    expect(sourcePageImageUrl).toHaveBeenCalledWith('book-1', 1)
+    expect(screen.getByRole('img', { name: 'Current audiobook cover' })).toHaveAttribute('src', '/host-cover.png')
+  })
+
   it('partitions a warning group into server-signed identical-evidence decisions', async () => {
     const preview = vi.fn()
       .mockResolvedValueOnce({ targetOccurrenceIds: ['o1', 'o2'], previewToken: 'same-header' })
@@ -3814,8 +3832,11 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
     expect(screen.queryByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeInTheDocument()
-    expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
-    expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    // Portal removal can precede the passive scroll-lock cleanup in React.
+    await waitFor(() => {
+      expect(document.querySelector('.workspace')).not.toHaveAttribute('inert')
+      expect(document.body).not.toHaveStyle({ overflow: 'hidden' })
+    })
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })

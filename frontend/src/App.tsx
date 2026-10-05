@@ -5,7 +5,7 @@ import { useAppearance } from "./app/useAppearance";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useWorkflowModel } from "./app/useWorkflowModel";
 import { usePageNavigation } from "./app/usePageNavigation";
-import brandMark from "./assets/brand/meowdiobooks-mark.png";
+import brandMark from "./assets/brand/meowdiobooks-mark.webp";
 import { DialogSurface } from "./components/DialogSurface";
 import { DialogueRoutingChoice } from "./components/DialogueRoutingChoice";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -47,19 +47,19 @@ export default function App(props: AppProps) {
   useEffect(() => { warmBookReturnAnimation(); }, []);
   const { appearance, resolvedAppearance, setAppearance } = useAppearance(props.appearance, props.onAppearanceChange);
   const { activeJob, activeJourneyStep, book, bookPendingDeletion, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, completed, deleteBook, deletingBookId, dialogue, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, error, extractionTransition, gateway, generateComplete, generationInProgress, generationReady, generationRemaining, generationRun, hasDraft, home, hydrate, libraryExports, navigateProduct, processMessage, processingOverlaySuppressed, productView, progress, recoveringDownstreamDialogue, renderHeader, reviewTransition, routeStage, runDialogueTranscript, setBookPendingDeletion, setDialogueRouteChoiceOpen, setHome, setStage, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, stage, stageIndex, stages, stepOverrides, t, toggleSidebar, unlockedThrough, uploadingCharacterId } = model;
-  // Render-only page functions retain their boundaries; hook-owning pages mount as components.
-  const builtinViews: Partial<Record<WizardStep, ReactNode>> = {
-    extract: ExtractPage({ model }),
-    dialogue: DialoguePage({ model }),
-    review: ReviewPage({ model }),
-    cast: <CastPage key="cast" model={model} />,
-    generate: <GeneratePage key="generate" model={model} purchase={props.generationPurchase} />,
-    export: ExportPage({ model }),
+  // Only evaluate the visible page; render-only functions retain their boundaries and hook-owning pages mount as components.
+  const builtinViews: Partial<Record<WizardStep, () => ReactNode>> = {
+    extract: () => ExtractPage({ model }),
+    dialogue: () => DialoguePage({ model }),
+    review: () => ReviewPage({ model }),
+    cast: () => <CastPage key="cast" model={model} />,
+    generate: () => <GeneratePage key="generate" model={model} purchase={props.generationPurchase} />,
+    export: () => ExportPage({ model }),
   };
 
   const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
 
-  const createView = model.restoringLocation && busy && (!book || model.restoringJobScope)
+  const createView = () => model.restoringLocation && busy && (!book || model.restoringJobScope)
     ? <BookReturnNotice appearance={resolvedAppearance} />
     : home
     ? <HomePage model={model} />
@@ -80,10 +80,10 @@ export default function App(props: AppProps) {
       : recoveringDownstreamDialogue
         ? DialogueRecoveryPage({ model })
         : activeJourneyStep?.builtin
-          ? builtinViews[activeJourneyStep.builtin]
+          ? builtinViews[activeJourneyStep.builtin]?.()
           : null;
 
-  const view = productView === "create" ? createView : LibraryPage({ model });
+  const view = productView === "create" ? createView() : LibraryPage({ model });
   const main = usePageNavigation(JSON.stringify([
     productView, home, book?.id, stage,
     model.designingVoices, model.editingCast, model.castCandidate?.phase,
