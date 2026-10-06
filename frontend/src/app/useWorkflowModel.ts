@@ -554,7 +554,6 @@ export function useWorkflowModel({
         const generationJob = job.kind === "v2:generate";
         const generation = generationJob && restored && requested.length > 0;
         if (generationJob && !generation) setSelectedChapters([]);
-        const previousRevisions = new Map(restored?.generatedChapters.map((row) => [row.chapterId, row.revision]));
         if (generation && restored) {
           const ready = new Set(restored.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
           setChapterFilter(requested.every((id) => ready.has(id)) ? "generated" : "pending");
@@ -583,7 +582,7 @@ export function useWorkflowModel({
               setChapterFilter("pending");
               setSelectedChapters(pending);
             } else {
-              selectUnfinishedChapters(next, requested, previousRevisions);
+              selectUnfinishedChapters(next, requested);
             }
           }
         }, current);
@@ -756,8 +755,8 @@ export function useWorkflowModel({
     const pendingChapterIds = availableChapterIds.filter((id) => !generatedChapterIds.has(id));
     const nextChapterFilter = newExportBook
       ? !pendingChapterIds.length && generatedChapterIds.size > 0 ? "generated" : "pending"
-      : chapterFilter === "all" ? "pending" : chapterFilter;
-    if (newExportBook || chapterFilter === "all") setChapterFilter(nextChapterFilter);
+      : chapterFilter === "all" || (chapterFilter === "generated" && !generatedChapterIds.size && pendingChapterIds.length > 0) ? "pending" : chapterFilter;
+    if (newExportBook || chapterFilter !== nextChapterFilter) setChapterFilter(nextChapterFilter);
     setSelectedChapters((current) => {
       if (newExportBook) return nextChapterFilter === "pending" ? pendingChapterIds : [];
       const visible = nextChapterFilter === "generated" ? generatedChapterIds : new Set(pendingChapterIds);
@@ -1231,23 +1230,27 @@ export function useWorkflowModel({
   }
 
   async function generateChapters(chapterIds: string[]) {
-    if (!book) return;
-    const previousRevisions = new Map(snapshot?.generatedChapters.map((row) => [row.chapterId, row.revision]));
-    if (snapshot) startGenerationTracking(snapshot, chapterIds);
+    if (!book || !snapshot || snapshot.book.id !== book.id || busy) return;
+    const unavailable = new Set(snapshot.recordingScript?.summary.emptyChapterIds ?? []);
+    const available = new Set(snapshot.chapters.filter((row) => !unavailable.has(row.id)).map((row) => row.id));
+    const current = new Set(snapshot.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+    const requestedChapterIds = [...new Set(chapterIds)].filter((id) => available.has(id) && !current.has(id));
+    if (!requestedChapterIds.length) return;
+    startGenerationTracking(snapshot, requestedChapterIds);
     setBusy(true);
     setProgress(0);
     setError(undefined);
     try {
-      const completedJob = await runJob(await gateway.processStage(book.id, "generate", { chapterIds, language }));
+      const completedJob = await runJob(await gateway.processStage(book.id, "generate", { chapterIds: requestedChapterIds, language }));
       const sample = generationSample(completedJob);
       if (sample) setGenerationSamples((current) => [sample, ...current].sort((left, right) => right.finishedAt - left.finishedAt).slice(0, 3));
       const next = await hydrate(book.id);
-      selectCompletedChapters(next, chapterIds);
+      selectCompletedChapters(next, requestedChapterIds);
     } catch (reason) {
       setError(message(reason));
       try {
         const next = await hydrate(book.id);
-        selectUnfinishedChapters(next, chapterIds, previousRevisions);
+        selectUnfinishedChapters(next, requestedChapterIds);
       } catch {
         // Keep the original failure and local selection when refresh is unavailable.
       }
@@ -1279,13 +1282,20 @@ export function useWorkflowModel({
     setGenerationRun(undefined);
   }
 
-  function selectUnfinishedChapters(next: WizardSnapshot, chapterIds: string[], previousRevisions: Map<string, string>) {
-    // Each chapter publishes atomically. Retry only unfinished requested tracks,
-    // retaining an unchanged current recording after deliberate regeneration fails.
-    const completed = new Set(next.generatedChapters
-      .filter((row) => row.current && row.revision !== previousRevisions.get(row.chapterId))
-      .map((row) => row.chapterId));
-    setSelectedChapters(chapterIds.filter((id) => !completed.has(id)));
+  function selectUnfinishedChapters(next: WizardSnapshot, chapterIds: string[]) {
+    // Published current tracks are ready for Export, even if the overall job failed.
+    // Retry only requested tracks that still lack current audio.
+    const unavailable = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
+    const available = new Set(next.chapters.filter((row) => !unavailable.has(row.id)).map((row) => row.id));
+    const ready = new Set(next.generatedChapters.filter((row) => row.current).map((row) => row.chapterId));
+    const pending = chapterIds.filter((id) => available.has(id) && !ready.has(id));
+    if (pending.length) {
+      setChapterFilter("pending");
+      setSelectedChapters(pending);
+    } else {
+      setSelectedChapters([]);
+      selectCompletedChapters(next, chapterIds);
+    }
   }
 
   function selectCompletedChapters(next: WizardSnapshot, chapterIds: string[]) {

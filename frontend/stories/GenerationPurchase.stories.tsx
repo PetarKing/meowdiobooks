@@ -40,7 +40,7 @@ export const PurchasedChapters: StoryObj<typeof meta> = {
     await userEvent.click(within(await canvas.findByRole("navigation", { name: "Wizard stages" })).getByText("Generate"));
     await expect(canvasElement.querySelectorAll(".chapter-card.purchased")).toHaveLength(3);
     await expect(canvas.queryByText("Purchased")).not.toBeInTheDocument();
-    await expect(canvas.getAllByText("Older recording").length).toBeGreaterThan(0);
+    await expect(canvas.getAllByText("Needs update").length).toBeGreaterThan(0);
     canvasElement.dataset.scenarioReady = "purchased-chapters";
   },
 };

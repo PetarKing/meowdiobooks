@@ -1613,16 +1613,34 @@ def test_semantically_identical_reaccepted_inputs_keep_generated_audio_current(t
     old_script = {
         "revision": "script-1",
         "status": "ready",
-        "entries": [{"id": "entry-1", "kind": "source", "text": "Hello."}],
+        "entries": [{
+            "id": "entry-1", "kind": "source", "text": "Hello.",
+            "chapterId": "chapter-1", "sourceSpanIds": ["span-1"],
+        }],
         "sourceCoverage": {"status": "exact", "sourceSpanIds": ["span-1"]},
-        "inputRevisions": {"cast": "cast-1"},
+        "inputRevisions": {
+            "dialogue": "dialogue-1", "review": "review-1", "cast": "cast-1",
+        },
     }
     new_script = {
         **old_script,
         "revision": "script-2",
-        "inputRevisions": {"cast": "cast-2"},
+        "inputRevisions": {**old_script["inputRevisions"], "cast": "cast-2"},
+    }
+    dialogue = {
+        "revision": "dialogue-1",
+        "spans": [{
+            "id": "span-1", "blockId": "block-1", "sourceStart": 0,
+            "sourceEnd": 6, "source": "Hello.", "text": "Hello.",
+            "renderRole": "narration",
+        }],
+    }
+    review = {
+        "revision": "review-1", "spanChapterIds": {"span-1": "chapter-1"},
     }
     for kind, artifact in (
+        ("dialogue", dialogue),
+        ("review", review),
         ("cast", old_cast),
         ("cast", new_cast),
         ("script", old_script),

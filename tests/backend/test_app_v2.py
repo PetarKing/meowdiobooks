@@ -918,7 +918,11 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             "dialogue",
             {
                 "revision": "dialogue-1",
-                "spans": [{"id": "s1", "chapterId": "legacy-chapter", "chapterTitle": "Legacy"}],
+                "spans": [{
+                    "id": "s1", "chapterId": "legacy-chapter", "chapterTitle": "Legacy",
+                    "blockId": "block-1", "sourceStart": 0, "sourceEnd": 6,
+                    "source": "Hello.", "text": "Hello.", "renderRole": "narration",
+                }],
             },
         )
         write_artifact(
@@ -926,14 +930,29 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             "review",
             {
                 "revision": "review-1",
+                "dialogueRevision": "dialogue-1",
+                "spanChapterIds": {"s1": "opening-matter"},
                 "chapters": [{"id": "opening-matter", "title": "Opening matter"}],
             },
         )
-        write_artifact(package, "cast", {"revision": "cast-1"}, publish=False)
-        write_artifact(package, "cast", {"revision": "cast-2"})
+        cast_payload = {
+            "language": "english", "voiceModel": "voice-model",
+            "dialogueRevision": "dialogue-1", "reviewRevision": "review-1",
+            "narrator": {
+                "characterId": "narrator", "name": "Narrator", "category": "narrator",
+                "voiceAccepted": True, "acceptedVoiceRevision": "narrator-voice-1",
+                "referenceAudio": "voices/narrator.wav", "referenceText": "A reference line.",
+            },
+            "identities": [], "labelToCharacterId": {},
+        }
+        write_artifact(package, "cast", {**cast_payload, "revision": "cast-1"}, publish=False)
+        write_artifact(package, "cast", {**cast_payload, "revision": "cast-2"})
         script_payload = {
             "status": "ready",
-            "entries": [{"id": "entry-1", "kind": "source", "text": "Hello."}],
+            "entries": [{
+                "id": "entry-1", "kind": "source", "text": "Hello.",
+                "chapterId": "opening-matter", "sourceSpanIds": ["s1"],
+            }],
             "sourceCoverage": {"status": "exact", "sourceSpanIds": ["s1"]},
             "inputRevisions": {
                 "dialogue": "dialogue-1",
@@ -941,7 +960,10 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
                 "cast": "cast-2",
             },
         }
-        write_artifact(package, "script", {**script_payload, "revision": "script-1"}, publish=False)
+        write_artifact(package, "script", {
+            **script_payload, "revision": "script-1",
+            "inputRevisions": {**script_payload["inputRevisions"], "cast": "cast-1"},
+        }, publish=False)
         write_artifact(package, "script", {**script_payload, "revision": "script-2"})
         render = package / "audio" / "opening-matter" / "render-1"
         render.mkdir(parents=True)

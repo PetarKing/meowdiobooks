@@ -48,32 +48,18 @@
 .chapter-card.stale .chapter-listen { background: var(--warning-soft); color: var(--warning-ink); }
 .generation-selection-anchor { display: block; height: 32px; overflow: hidden; }
 .generation-selection { position: sticky; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 5; align-items: center; margin-top: 0; padding: 18px 20px; gap: 22px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); box-shadow: 0 8px 26px rgb(var(--shadow-color) / .10); backdrop-filter: none; }
-.generation-selection:not(:has(> dl)) { grid-template-columns: minmax(0, 1fr) auto; }
+.generation-selection { grid-template-columns: minmax(0, 1fr) auto; }
 .generation-selection.is-floating { gap: 16px; padding: 12px 20px; border: 1px solid var(--line-strong); border-left: 4px solid var(--poppy); border-radius: 12px; background: color-mix(in srgb, var(--paper) 94%, transparent); box-shadow: 0 13px 40px rgb(var(--shadow-color) / .18); backdrop-filter: blur(14px); }
 .generation-selection.is-floating .generation-selection-copy b { font-size: 19px; }
-.generation-selection.is-floating dl { display: flex; }
-.generation-selection.is-floating dl div { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; }
-.generation-selection.is-floating dd { font-size: 12px; white-space: normal; }
-.generation-selection.is-floating .generation-listening-estimate { display: none; }
 .generation-selection-copy b { font: 500 21px/1.3 var(--font-display); }
 .generation-selection .selection-spark { width: auto; height: auto; background: transparent; color: var(--poppy); border: 0; box-shadow: none; }
-.generation-selection dl { gap: 20px; }
-.generation-selection dl div { min-width: 0; padding: 0; border: 0; }
-.generation-selection dt { font-size: 10px; letter-spacing: 0; text-transform: none; font-weight: 500; }
-.generation-selection dd { font: 500 14px/1.4 var(--font-sans); }
 .generation-kept-audio { margin: 6px 0 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .generation-selection-actions { gap: 12px; }
-.generation-selection-actions .primary { min-height: 48px; padding-inline: 24px; font-size: 14px; box-shadow: none; }
+.generation-selection-actions .primary, .generation-selection-actions .ghost { min-height: 48px; padding: 12px 20px; font-size: 14px; }
+.generation-selection-actions .primary { box-shadow: none; }
+.generation-selection-actions:has(> .ghost) { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: min(100%, 420px); }
+.generation-selection-actions:has(> .ghost) .chapter-split-button { grid-column: 1 / -1; }
 .generation-selection-actions .ghost, .chapter-split-button { border: 0; background: transparent; }
-.generation-more-options { position: relative; flex: 0 0 auto; }
-.generation-more-options summary { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 12px; border-radius: 8px; color: var(--muted); font-size: 12px; cursor: pointer; list-style: none; }
-.generation-more-options summary::-webkit-details-marker { display: none; }
-.generation-more-options summary:hover, .generation-more-options[open] summary { color: var(--ink); background: var(--surface-soft); }
-.generation-more-options summary:focus-visible { outline: 2px solid var(--poppy); outline-offset: 2px; }
-.generation-more-options summary[aria-disabled="true"] { cursor: wait; opacity: .6; }
-.generation-more-options-panel { position: absolute; bottom: calc(100% + 12px); right: 0; width: 260px; max-width: calc(100vw - 60px); padding: 16px; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--paper); box-shadow: 0 8px 26px rgb(var(--shadow-color) / .14); }
-.generation-more-options-panel p { margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.generation-more-options-panel .ghost { width: 100%; min-height: 44px; text-align: left; color: var(--ink); background: var(--surface-soft); white-space: normal; }
 @media (prefers-reduced-motion: reduce) { .chapter-card { transition: none; } }
 @media (max-width: 1180px) {
   .generate-hero { grid-template-columns: 1fr; gap: 28px; }
@@ -105,16 +91,16 @@
   .chapter-card .chapter-estimates dd { font-size: 12px; }
   .chapter-card .chapter-listen, .chapter-card.stale .chapter-listen { grid-column: 3; grid-row: 1; width: 44px; height: 44px; align-self: start; }
   .generation-selection { padding: 16px max(14px, env(safe-area-inset-right)) 16px max(14px, env(safe-area-inset-left)); display: grid; grid-template-columns: 1fr; gap: 20px; }
-  .generation-selection:not(:has(> dl)) { grid-template-columns: 1fr; }
+  .generation-selection { grid-template-columns: 1fr; }
   .generation-selection-actions { flex-direction: column-reverse; margin: 0; gap: 12px; }
-  .generation-selection-actions .primary { width: 100%; }
-  .generation-more-options { align-self: flex-end; }
+  .generation-selection-actions .primary, .generation-selection-actions .ghost { width: 100%; }
+  .generation-selection-actions:has(> .ghost) { width: 100%; grid-template-columns: 1fr; }
   .chapter-split-button { align-self: flex-start; }
   .generation-selection.is-floating { gap: 10px; padding: 10px max(14px, env(safe-area-inset-right)) 10px max(14px, env(safe-area-inset-left)); }
   .generation-selection.is-floating .generation-selection-copy { display: flex; gap: 8px; }
   .generation-selection.is-floating .generation-selection-copy b { font: 600 13px/1.25 var(--font-sans); }
   .generation-selection.is-floating .generation-selection-actions { flex-direction: row; align-items: center; gap: 8px; }
-  .generation-selection.is-floating .generation-selection-actions .primary { flex: 1 1 150px; min-height: 44px; padding: 10px 12px; font-size: 12px; width: auto; }
-  .generation-selection.is-floating .generation-selection-actions .ghost { flex: 1 1 100px; min-height: 44px; padding: 8px; font-size: 11px; }
+  .generation-selection.is-floating .generation-selection-actions:has(> .ghost) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .generation-selection.is-floating .generation-selection-actions .primary, .generation-selection.is-floating .generation-selection-actions .ghost { min-height: 44px; padding: 10px 12px; font-size: 12px; width: 100%; }
   .generation-selection.is-floating .chapter-split-button { min-height: 44px; padding-inline: 0; }
 }

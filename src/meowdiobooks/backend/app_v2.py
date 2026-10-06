@@ -1870,6 +1870,7 @@ def create_app_v2(
             raise HTTPException(status_code=422, detail={"invalidChapterIds": unknown})
 
         export_chapters: list[M4BChapter] = []
+        recipe_comparison_cache = {}
         for chapter_id, revision in requested:
             pointer = package / "audio" / chapter_id / "latest.json"
             metadata_path = package / "audio" / chapter_id / revision / "metadata.json"
@@ -1883,7 +1884,8 @@ def create_app_v2(
                     detail=f"{chapter_titles[chapter_id]} is missing or stale; regenerate it before export",
                 ) from error
             if str(latest.get("revision")) != revision or chapter_audio_stale_reasons(
-                package, metadata, current_revisions
+                package, {**metadata, "chapterId": chapter_id}, current_revisions,
+                comparison_cache=recipe_comparison_cache,
             ):
                 raise HTTPException(
                     status_code=409,

@@ -81,7 +81,7 @@ describe("Generate chapter targets", () => {
     expect(screen.queryByRole("checkbox", { name: "Select The Pool of Tears" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Generated 2" }));
     expect(screen.getAllByRole("checkbox")).toHaveLength(2);
-    expect(screen.queryByText("Older recording")).not.toBeInTheDocument();
+    expect(screen.queryByText("Needs update")).not.toBeInTheDocument();
     expect(screen.queryByRole("checkbox", { name: "Select Pig and Pepper" })).not.toBeInTheDocument();
     expect(screen.getByRole("checkbox", { name: "Select The Pool of Tears" })).not.toBeChecked();
   });
@@ -90,7 +90,7 @@ describe("Generate chapter targets", () => {
     render(<Tracklist />);
     expect(screen.queryByText("Generated", { selector: ".track-status" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: /^All/ })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Older recording").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Needs update").length).toBeGreaterThan(0);
     expect(document.querySelector(".chapter-card.purchased")).toBeNull();
     expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
   });
@@ -104,7 +104,7 @@ describe("Generate chapter targets", () => {
     const chapter = screen.getByRole("heading", { name: "Down the Rabbit-Hole" }).closest("article")!;
     expect(within(chapter).queryByText("Purchased")).not.toBeInTheDocument();
     expect(chapter).toHaveClass("purchased", "stale");
-    expect(within(chapter).getByText("Older recording")).toBeInTheDocument();
+    expect(within(chapter).getByText("Needs update")).toBeInTheDocument();
     expect(screen.queryByText("Purchased")).not.toBeInTheDocument();
     const checkbox = within(chapter).getByRole("checkbox");
     expect(checkbox).not.toBeChecked();
@@ -162,50 +162,39 @@ describe("Generate chapter targets", () => {
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("checkbox", { name: "Select Down the Rabbit-Hole" }));
     expect(screen.getByRole("button", { name: "Continue to Export →" })).toHaveClass("primary");
-    expect(screen.getByRole("button", { name: "Regenerate 1 selected" })).toHaveClass("ghost");
+    expect(screen.queryByRole("button", { name: /^(Generate|Regenerate)/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("More options")).not.toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Generation action" })).queryByText("Generation")).not.toBeInTheDocument();
   });
 
-  it.each(["generated"] as const)("exports a selected current recording in a multi-chapter %s view unless regeneration is explicitly chosen", (initialFilter) => {
+  it("exports selected current recordings without a Generate or More options action", () => {
     const snapshot = snapshotFor("generate-stale");
     const readyId = snapshot.generatedChapters.find((row) => row.current)!.chapterId;
     const title = snapshot.chapters.find((row) => row.id === readyId)!.title;
     const generate = vi.fn();
     const exportChapters = vi.fn();
-    render(<Tracklist snapshot={snapshot} initialFilter={initialFilter} generate={generate} exportChapters={exportChapters} />);
+    render(<Tracklist snapshot={snapshot} initialFilter="generated" generate={generate} exportChapters={exportChapters} />);
     fireEvent.click(screen.getByRole("checkbox", { name: `Select ${title}` }));
-    const options = screen.getByText("More options").closest("details")!;
-    const regenerate = screen.getByRole("button", { name: "Regenerate 1 selected" });
-    expect(options).not.toHaveAttribute("open");
-    expect(regenerate).not.toBeVisible();
-    expect(generate).not.toHaveBeenCalled();
+    expect(screen.queryByText("More options")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^(Generate|Regenerate)/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Continue to Export →" }));
     expect(exportChapters).toHaveBeenCalledWith([readyId]);
     expect(generate).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByText("More options"));
-    expect(regenerate).toBeVisible();
-    expect(generate).not.toHaveBeenCalled();
-    fireEvent.keyDown(options, { key: "Escape" });
-    expect(options).not.toHaveAttribute("open");
-    expect(screen.getByText("More options")).toHaveFocus();
-    fireEvent.click(screen.getByText("More options"));
-    fireEvent.click(regenerate);
-    expect(generate).toHaveBeenCalledWith([readyId]);
-    expect(options).not.toHaveAttribute("open");
   });
 
-  it("closes regeneration options when selection changes, without dispatching work", () => {
+  it("offers Generate again only when the selected chapter's authoritative recipe becomes outdated", () => {
     const snapshot = snapshotFor("generate-stale");
+    snapshot.chapters = snapshot.chapters.slice(0, 1);
+    snapshot.generatedChapters = [{ ...snapshot.generatedChapters[0], current: true, staleReasons: [] }];
     const generate = vi.fn();
-    render(<Tracklist snapshot={snapshot} initialFilter="generated" generate={generate} />);
-    const [first, second] = screen.getAllByRole("checkbox");
-    fireEvent.click(first);
-    fireEvent.click(screen.getByText("More options"));
-    expect(screen.getByRole("button", { name: "Regenerate 1 selected" })).toBeVisible();
-    fireEvent.click(second);
-    expect(screen.getByText("More options").closest("details")).not.toHaveAttribute("open");
-    expect(screen.getByRole("button", { name: "Regenerate 2 selected" })).not.toBeVisible();
-    expect(generate).not.toHaveBeenCalled();
+    const view = render(<Tracklist snapshot={snapshot} initialSelection={[snapshot.chapters[0].id]} generate={generate} />);
+    expect(screen.queryByRole("button", { name: /^Generate \d/ })).not.toBeInTheDocument();
+    const changed = { ...snapshot, generatedChapters: [{ ...snapshot.generatedChapters[0], current: false, staleReasons: ["cast:old->changed"] }] };
+    view.rerender(<Tracklist snapshot={changed} initialSelection={[snapshot.chapters[0].id]} generate={generate} />);
+    expect(screen.getByText("Needs update")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Listen to Down the Rabbit-Hole (older recording)" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Generate 1 selected →" }));
+    expect(generate).toHaveBeenCalledWith([snapshot.chapters[0].id]);
   });
 
   it("keeps existing current audio out of mixed generation and its duration estimate", () => {
