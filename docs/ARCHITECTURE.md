@@ -50,21 +50,26 @@ Hosts may supply `generationPurchase` for purchase presentation on Generate. Its
 accepted extraction/dialogue/review/cast revisions, recording-script revision, and explicit chapter IDs
 must describe the host-confirmed current purchase scope. Generate applies a gold wash to the host-confirmed scope only
 when these revisions match the current snapshot and its cast is accepted. Current generated audio also
-uses this wash, while its visible status always describes audio readiness: Generated, Older recording
+uses this wash, while its visible status always describes audio readiness: Generated, Needs update
 or To make. Purchase never changes that status, and no redundant Purchased badge is shown. Omission, a different book,
 or a changed accepted parent removes the presentation. Existing audio never implies purchase.
 Generate separates To make (the entry default when work remains) from Generated (current audio only).
 Older recordings stay in To make with an independent Listen action; empty chapters remain visible
 as disabled No audio rows and are excluded from its actionable count. A completed-only book opens
-Generated. Tab changes clear selection. Current audio selection goes to Export by default; Regenerate lives under More options
-and deliberately creates replacement audio only after that explicit choice. A normal Generate action excludes
-already-current recordings from its requested IDs and duration estimate.
+Generated. Tab changes clear selection. Current audio selection goes to Export. Generate is offered only for missing or outdated audio;
+there is no forced regeneration action. The workflow model filters requested IDs to valid, nonempty
+chapters without current audio before dispatch, tracking or estimation. Chapter readiness compares the
+effective per-chapter render recipe against immutable accepted inputs, so equivalent stage reacceptance
+and changes confined to other chapters preserve current recordings. Snapshot and Export use the same
+canonical render-plan comparison, with a request-local cache and conservative handling of missing
+history. Explicit Generate language overrides retain their existing command/receipt contract across
+equivalent reacceptance; this comparison does not infer new host settings or renderer versions.
 Reattaching an active Generate job holds the return notice until authenticated job scope is known,
 then restores its valid requested chapters and the same locked progress presentation as a fresh run.
 Missing legacy scope uses neutral progress rather than inventing an all-chapter request. Settlement
 retains the initial job scope even when later polls omit payload. Partial failures select only requested
-pending tracks when any remain, including tracks already published before reattachment; an unchanged
-current recording remains an explicit Regenerate selection when no pending requested tracks remain.
+pending tracks when any remain, including tracks already published before reattachment; when no
+requested pending tracks remain, current requested recordings are selected for Export.
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 

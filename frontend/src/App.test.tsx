@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App, { type AppProps } from './App'
@@ -8,6 +8,7 @@ import type { CastArtifact, DialogueConflict, DialogueStructuralIssue, Job, Work
 import { buildReviewWarningDecisions } from './reviewDecisions'
 import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
 import { workflowStorageKey } from './workflow/workflowLocation'
+import { useWorkflowModel } from './app/useWorkflowModel'
 
 describe('first return paint', () => {
   it('shows quiet restoration before effects run for an explicit book return', () => {
@@ -491,12 +492,14 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Technical details')).not.toBeInTheDocument()
     expect(document.querySelector('.chapter-card-grid')).not.toHaveClass('has-selection')
 
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'succeeded', result: {} })
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
     expect(document.querySelector('.chapter-card-grid')).toHaveClass('has-selection')
     expect(screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest('.chapter-card')).toHaveClass('selected')
-    fireEvent.click(screen.getByRole('button', { name: 'Regenerate 1 selected' }))
-    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'generate', { chapterIds: ['chapter-1'], language: 'english' }))
+    expect(screen.queryByText('More options')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    expect(screen.getByRole('heading', { name: 'Prepare your audiobook' })).toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
   it('routes malformed Dialogue to Review and opens a fresh prefilled preview', async () => {
@@ -642,12 +645,12 @@ describe('v2 wizard', () => {
       ] } },
     })
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-failed', status: 'failed', error: 'Synthesis interrupted; saved tracks are unchanged.' })
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const action = screen.getByRole('region', { name: 'Generation action' })
     expect(await within(action).findByText('Synthesis interrupted; saved tracks are unchanged.')).toBeVisible()
     expect(within(action).getByText('Generation needs attention')).toBeInTheDocument()
-    expect(within(action).getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ })).toBeEnabled()
+    expect(within(action).getByRole('button', { name: /^Generate 1 selected →$/ })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
@@ -673,7 +676,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.processStage).mockResolvedValue(completion === 'immediate' ? finished : { ...finished, status: 'running', progress: 20 })
     vi.mocked(wizardApi.getJob).mockResolvedValue(finished)
 
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     await waitFor(() => expect(screen.getByRole('tab', { name: 'Generated 2' })).toHaveAttribute('aria-selected', 'true'))
     expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
@@ -690,18 +693,64 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-2', revision: 'new-audio-2' }], expect.anything()))
   })
 
-  it('keeps a regenerated current track selected for Export with its new revision', async () => {
+  it('exports a selected current recording with its original revision without generation', async () => {
     await open()
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regenerate-current', kind: 'v2:generate', status: 'succeeded' })
-    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, generatedChapters: [{ ...base.generatedChapters[0], revision: 'audio-replacement' }] })
     fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
-
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked())
     expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    expect(screen.queryByText('More options')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Regenerate/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
     fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
-    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-1', revision: 'audio-replacement' }], expect.anything()))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-1', revision: 'audio-1' }], expect.anything()))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('filters direct generation requests to unique valid missing or stale chapters before host admission', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      chapters: [...base.chapters,
+        { id: 'chapter-2', title: 'The Pool of Tears' },
+        { id: 'chapter-3', title: 'A Caucus-Race' },
+        { id: 'empty', title: 'Blank page' },
+      ],
+      recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, emptyChapterIds: ['empty'] } },
+      generatedChapters: [...base.generatedChapters,
+        { chapterId: 'chapter-2', revision: 'old-audio-2', audioUrl: '/older.wav', current: false, staleReasons: ['recipe changed'] },
+      ],
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'pending-only', status: 'succeeded' })
+    const { result } = renderHook(() => useWorkflowModel({ gateway: wizardApi }))
+    await act(async () => { await result.current.hydrate('book-1') })
+
+    await act(async () => { await result.current.generateChapters(['chapter-1', 'empty', 'unknown']) })
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(result.current.generationRun).toBeUndefined()
+    await act(async () => { await result.current.generateChapters(['chapter-1', 'chapter-2', 'chapter-2', 'chapter-3', 'empty', 'unknown']) })
+    expect(wizardApi.processStage).toHaveBeenCalledExactlyOnceWith('book-1', 'generate', { chapterIds: ['chapter-2', 'chapter-3'], language: 'english' })
+  })
+
+  it('returns to To make when a changed recipe leaves the previous Generated view empty', async () => {
+    const ready: WizardSnapshot = { ...base,
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }],
+      generatedChapters: [...base.generatedChapters,
+        { chapterId: 'chapter-2', revision: 'audio-2', audioUrl: '/two.wav', current: true, staleReasons: [] },
+      ],
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(ready)
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
+    const { result } = renderHook(() => useWorkflowModel({ gateway: wizardApi }))
+    await act(async () => { await result.current.hydrate('book-1') })
+    expect(result.current.chapterFilter).toBe('generated')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...ready,
+      cast: { ...ready.cast!, revision: 'c2' },
+      activeArtifacts: { ...ready.activeArtifacts, cast: 'c2' },
+      generatedChapters: ready.generatedChapters.map(row => ({ ...row, current: false, staleReasons: ['cast recipe changed'] })),
+    })
+    await act(async () => { await result.current.hydrate('book-1') })
+    expect(result.current.chapterFilter).toBe('pending')
+    expect(result.current.selectedChapters).toEqual(['chapter-1', 'chapter-2'])
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
   it.each(['failed', 'canceled'] as const)('preserves saved tracks and selects only unfinished requests for retry after a partially %s job', async (status) => {
@@ -720,29 +769,35 @@ describe('v2 wizard', () => {
     ] })
     fireEvent.click(screen.getByRole('button', { name: 'Generate 2 selected →' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: /^Generate 1 selected →$/ })).toBeEnabled())
+    expect(wizardApi.processStage).toHaveBeenNthCalledWith(1, 'book-1', 'generate', { chapterIds: ['chapter-2', 'chapter-3'], language: 'english' })
     expect(screen.getByRole('tab', { name: 'To make 1' })).toHaveAttribute('aria-selected', 'true')
     expect(screen.queryByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenNthCalledWith(2, 'book-1', 'generate', { chapterIds: ['chapter-3'], language: 'english' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled())
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Listen to The Pool of Tears' })).toBeEnabled()
     expect(screen.getByRole('alert')).toHaveTextContent('Stopped after saving Chapter 2.')
   })
 
-  it('keeps an unchanged current recording selected for retry if regeneration fails', async () => {
-    await open()
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'regeneration-failed', status: 'failed', error: 'Previous recording is still available.' })
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+  it('selects audio saved by a failed generation job for Export when no requested work remains', async () => {
+    await open({ ...base, generatedChapters: [] })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'saved-before-failure', status: 'failed', error: 'All requested tracks were saved before the worker stopped.' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    fireEvent.click(screen.getByRole('button', { name: 'Generate 1 selected →' }))
     await screen.findByRole('alert')
     await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked())
-    expect(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Continue to Export →' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
+    expect(screen.queryByRole('button', { name: /Regenerate|Generate 1 selected/ })).not.toBeInTheDocument()
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
   })
 
   it('blocks navigation behind a full-screen chapter generation dialog', async () => {
-    await open()
+    await open({ ...base, generatedChapters: [] })
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', kind: 'v2:generate', status: 'running', message: 'Synthesizing segment 4/19' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
@@ -752,8 +807,7 @@ describe('v2 wizard', () => {
       cancel_requested_at: '2026-07-20T10:00:00Z',
     })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
     expect(dialog).toHaveAttribute('aria-modal', 'true')
@@ -821,7 +875,7 @@ describe('v2 wizard', () => {
   })
 
   it('retries a transient job poll failure when the browser returns to focus', async () => {
-    await open()
+    await open({ ...base, generatedChapters: [] })
     vi.mocked(wizardApi.processStage).mockResolvedValue({
       id: 'generate-job', status: 'running', progress: 59,
     })
@@ -829,8 +883,7 @@ describe('v2 wizard', () => {
       .mockRejectedValueOnce(new TypeError('Network connection was lost'))
       .mockResolvedValueOnce({ id: 'generate-job', status: 'succeeded', result: {} })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
     expect(await within(dialog).findByText('Reconnecting to processing status…')).toBeInTheDocument()
@@ -844,7 +897,7 @@ describe('v2 wizard', () => {
   })
 
   it('starts a fresh job poll on pageshow when the suspended request is still pending', async () => {
-    await open()
+    await open({ ...base, generatedChapters: [] })
     vi.mocked(wizardApi.processStage).mockResolvedValue({
       id: 'generate-job', status: 'running', progress: 59,
     })
@@ -852,8 +905,7 @@ describe('v2 wizard', () => {
       .mockImplementationOnce(() => new Promise<Job>(() => undefined))
       .mockResolvedValueOnce({ id: 'generate-job', status: 'succeeded', result: {} })
 
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(1))
@@ -864,7 +916,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
   })
 
-  it('uses a 0.5–2x generation range before successful job history exists', async () => {
+  it('keeps the generation action footer focused on selection without duration estimates', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       recordingScript: { ...base.recordingScript!, summary: {
@@ -877,10 +929,15 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
 
-    expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 5 min–20 min')
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    expect(action).toHaveTextContent('1 chapter selected')
+    expect(action.querySelector('dl')).not.toBeInTheDocument()
+    expect(within(action).queryByText('Generation')).not.toBeInTheDocument()
+    expect(action).not.toHaveTextContent('≈')
+    expect(within(action).getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
   })
 
-  it('accepts an edition-specific fallback range before successful history exists', async () => {
+  it('uses edition-specific estimates in generation progress while keeping them out of the action footer', async () => {
     const estimatedSeconds = 3917
     const snapshot: WizardSnapshot = {
       ...base,
@@ -902,18 +959,20 @@ describe('v2 wizard', () => {
       },
     })
 
-    expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 5 min–10 min')
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    expect(screen.getByRole('region', { name: 'Generation action' })).not.toHaveTextContent('≈')
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
     expect(within(dialog).getByText('≈ 5 min–10 min')).toBeInTheDocument()
 
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: base.generatedChapters })
     finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Continue to Export →' })).toHaveClass('primary')
   })
 
-  it('uses recent successful generation jobs as the lower bound with 2x headroom', async () => {
+  it('uses successful generation history in progress estimates while keeping the action footer clear', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       recordingScript: { ...base.recordingScript!, summary: {
@@ -934,15 +993,17 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledWith('book-1'))
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Generation action' })).toHaveTextContent('≈ 40 min–1 hr 20 min'))
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }))
+    expect(screen.getByRole('region', { name: 'Generation action' })).not.toHaveTextContent('≈')
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
     expect(within(dialog).getByText('≈ 40 min–1 hr 20 min')).toBeInTheDocument()
 
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot, generatedChapters: base.generatedChapters })
     finishJob({ id: 'generate-job', status: 'succeeded', result: {} })
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Continue to Export →' })).toHaveClass('primary')
   })
 
   it('keeps chapter selection, metadata, and a responsive format choice in Export', async () => {
@@ -3654,7 +3715,7 @@ describe('v2 wizard', () => {
     await open(snapshot)
     const staleChapter = screen.getByRole('heading', { name: 'Down the Rabbit-Hole' }).closest<HTMLElement>('.chapter-card')!
     expect(staleChapter).toHaveClass('stale')
-    expect(within(staleChapter).getByText('Older recording')).toBeInTheDocument()
+    expect(within(staleChapter).getByText('Needs update')).toBeInTheDocument()
     expect(screen.queryByText(/Regenerate/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Open WAV/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole (older recording)' }))
@@ -3662,7 +3723,7 @@ describe('v2 wizard', () => {
     expect(within(player).getByText('Older recording')).toBeInTheDocument()
     expect(player.querySelector('audio')).toHaveAttribute('src', '/chapter.wav')
     fireEvent.click(within(player).getByRole('button', { name: 'Close player' }))
-    expect(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Generate 1 selected →$/ })).toBeInTheDocument()
     expect(screen.queryByText(/cast:c1->c2/)).not.toBeInTheDocument()
     expect(screen.queryByText('Version history')).not.toBeInTheDocument()
     expect(document.querySelector('audio')).not.toBeInTheDocument()
@@ -3892,6 +3953,29 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeChecked()
     expect(screen.queryByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
+  })
+
+  it.each(['failed', 'canceled'] as const)('selects already-current requested recordings for Export after a resumed %s job without replaying it', async status => {
+    const snapshot: WizardSnapshot = { ...base,
+      chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears' }],
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'legacy-replacement', kind: 'v2:generate', status,
+      error: 'The previous recording is still available.',
+      payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'] } },
+    })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'legacy-replacement' }} />)
+    await screen.findByRole('alert')
+    expect(screen.getByRole('tab', { name: 'Generated 1' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: 'Select The Pool of Tears' })).not.toBeInTheDocument()
+    expect(screen.queryByText('More options')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Regenerate|^Generate \d/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to Export →' }))
+    expect(screen.getByRole('checkbox', { name: 'Chapter 01, 11 sec' })).toBeChecked()
+    fireEvent.click(screen.getByRole('button', { name: 'Create high-quality M4B →' }))
+    await waitFor(() => expect(wizardApi.createAudioExport).toHaveBeenCalledWith('book-1', [{ chapterId: 'chapter-1', revision: 'audio-1' }], expect.anything()))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
   it('clears resumed generation tracking after a permanent polling failure', async () => {
@@ -4175,9 +4259,8 @@ describe('v2 wizard', () => {
     if (mode === 'synchronous') vi.mocked(wizardApi.processStage).mockRejectedValue(new ActionRequiredError(action));
     else vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'blocked-generation', kind: 'v2:generate', status: 'failed',
       error: 'Review before continuing.', action_required: action, payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1'], language: 'english' } } });
-    await open(base, undefined, undefined, undefined, { onActionRequired });
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }));
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }));
+    await open({ ...base, generatedChapters: [] }, undefined, undefined, undefined, { onActionRequired });
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }));
     await waitFor(() => expect(onActionRequired).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Making your selected chapters…' })).not.toBeInTheDocument());
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -4190,9 +4273,8 @@ describe('v2 wizard', () => {
   it('keeps required action feedback visible when no host handles it', async () => {
     const action = { code: 'HOST_REVIEW_REQUIRED', message: 'Review before continuing.', context: {} };
     vi.mocked(wizardApi.processStage).mockRejectedValue(new ActionRequiredError(action));
-    await open();
-    fireEvent.click(screen.getByRole('checkbox', { name: 'Select Down the Rabbit-Hole' }));
-    fireEvent.click(screen.getByRole('button', { name: /^(?:Generate|Regenerate) 1 selected(?: →)?$/ }));
+    await open({ ...base, generatedChapters: [] });
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(action.message);
   });
 

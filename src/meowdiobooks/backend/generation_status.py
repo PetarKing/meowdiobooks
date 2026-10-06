@@ -7,6 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from .artifacts import artifact_history
+from .render_plan import compile_render_plan
+from .review import apply_review_render_policies
+
+RecipeCache = dict[tuple[str, ...], dict[str, dict[str, Any]] | None]
+_RECIPE_INPUTS = ("dialogue", "review", "cast", "script")
 
 
 def generated_chapters(
@@ -14,6 +19,7 @@ def generated_chapters(
 ) -> list[dict[str, Any]]:
     rows = []
     audio = package / "audio"
+    comparison_cache: RecipeCache = {}
     for pointer in sorted(audio.glob("*/latest.json")):
         try:
             value = json.loads(pointer.read_text(encoding="utf-8"))
@@ -25,7 +31,12 @@ def generated_chapters(
             continue
         pinned = metadata.get("inputRevisions", {})
         expected = current_inputs or {}
-        stale_reasons = chapter_audio_stale_reasons(package, metadata, expected)
+        stale_reasons = chapter_audio_stale_reasons(
+            package,
+            {**metadata, "chapterId": chapter_id},
+            expected,
+            comparison_cache=comparison_cache,
+        )
         revisions = []
         for candidate in sorted(pointer.parent.glob("*/metadata.json")):
             try:
@@ -61,59 +72,128 @@ def chapter_audio_stale_reasons(
     package: Path,
     metadata: dict[str, Any],
     current_inputs: dict[str, Any],
+    *,
+    comparison_cache: RecipeCache | None = None,
 ) -> list[str]:
-    """Report only render-affecting input changes for one generated chapter.
+    """Compare the effective chapter recipe, preserving immutable audit revisions.
 
-    Stage revisions remain immutable audit identities, but revisiting an accepted stage can
-    publish a new revision whose effective TTS inputs are unchanged. Snapshot and export must
-    use the same compatibility decision so playable audio never appears current in one surface
-    and stale in the other.
+    A request-local cache compiles each complete input tuple once, even when many chapters
+    share it. Missing or invalid history cannot establish equivalence. Snapshot and export
+    use this same decision; no recipe receipt or global cache is persisted.
     """
 
     pinned = dict(metadata.get("inputRevisions", {}))
-    reasons = []
-    for kind, current_revision in current_inputs.items():
-        if current_revision is None:
-            continue
-        pinned_revision = pinned.get(kind)
-        if str(pinned_revision or "") == str(current_revision):
-            continue
-        if kind in {"cast", "script"} and _render_artifacts_equivalent(
-            package,
-            kind,
-            str(pinned_revision or ""),
-            str(current_revision),
-            chapter_id=str(metadata.get("chapterId") or ""),
-        ):
-            continue
-        reasons.append(f"{kind}:{pinned_revision}->{current_revision}")
+    reasons = [
+        f"{kind}:{pinned.get(kind)}->{current_revision}"
+        for kind, current_revision in current_inputs.items()
+        if str(pinned.get(kind) or "") != str(current_revision or "")
+    ]
+    if not reasons:
+        return []
+    chapter_id = str(metadata.get("chapterId") or "")
+    if not chapter_id:
+        return reasons
+    cache = comparison_cache if comparison_cache is not None else {}
+    previous = _chapter_recipes(package, pinned, cache)
+    current = _chapter_recipes(package, current_inputs, cache)
+    if (
+        previous is not None
+        and current is not None
+        and chapter_id in previous
+        and chapter_id in current
+        and previous[chapter_id] == current[chapter_id]
+    ):
+        return []
     return reasons
 
 
-def _render_artifacts_equivalent(
-    package: Path,
-    kind: str,
-    pinned_revision: str,
-    current_revision: str,
-    *,
-    chapter_id: str = "",
-) -> bool:
-    pinned = _artifact_revision(package, kind, pinned_revision)
-    current = _artifact_revision(package, kind, current_revision)
-    if pinned is None or current is None:
-        return False
-    if kind == "cast":
-        return _cast_render_signature(pinned) == _cast_render_signature(current)
-    if kind == "script":
-        return _script_render_signature(pinned, chapter_id) == _script_render_signature(
-            current, chapter_id
+def _chapter_recipes(
+    package: Path, inputs: dict[str, Any], cache: RecipeCache
+) -> dict[str, dict[str, Any]] | None:
+    revisions = tuple(str(inputs.get(kind) or "") for kind in _RECIPE_INPUTS)
+    # Include the package so a caller cannot accidentally reuse one book's recipes for another.
+    key = (str(package), *revisions)
+    if key in cache:
+        return cache[key]
+    cache[key] = None
+    if not all(revisions):
+        return None
+    try:
+        artifacts = {
+            kind: _artifact_revision(package, kind, revision)
+            for kind, revision in zip(_RECIPE_INPUTS, revisions, strict=True)
+        }
+        if any(value is None for value in artifacts.values()):
+            return None
+        dialogue = artifacts["dialogue"]
+        review = artifacts["review"]
+        cast = artifacts["cast"]
+        script = artifacts["script"]
+        assert dialogue is not None and review is not None
+        assert cast is not None and script is not None
+        if any(
+            str(script.get("inputRevisions", {}).get(kind) or "") != revisions[index]
+            for index, kind in enumerate(_RECIPE_INPUTS[:-1])
+        ):
+            return None
+        mapping = {str(key): str(value) for key, value in review["spanChapterIds"].items()}
+        spans = list(dialogue["spans"])
+        if set(mapping) != {str(row["id"]) for row in spans}:
+            return None
+        chapter_dialogue = apply_review_render_policies(
+            {
+                **dialogue,
+                "spans": [{**row, "chapterId": mapping[str(row["id"])]} for row in spans],
+            },
+            review,
         )
-    return False
+        chapter_ids = list(
+            dict.fromkeys(str(row.get("chapterId") or "chapter-1") for row in script["entries"])
+        )
+        plan = compile_render_plan(chapter_dialogue, cast, script, chapter_ids)
+        recipes = {
+            str(chapter["chapterId"]): {
+                "voiceModel": cast.get("voiceModel"),
+                "language": cast.get("language"),
+                "segments": _segment_recipe(chapter["segments"]),
+            }
+            for chapter in plan["chapters"]
+        }
+    except (OSError, ValueError, TypeError, KeyError, AttributeError, IndexError):
+        return None
+    cache[key] = recipes
+    return recipes
+
+
+def _segment_recipe(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    # Display names, source/entry IDs and receipt IDs are audit metadata. Ordered text,
+    # voice inputs, passage boundaries and layered mixing determine the rendered chapter.
+    groups: dict[str, int] = {}
+    result = []
+    for segment in segments:
+        group_id = segment.get("mixGroupId")
+        group = groups.setdefault(str(group_id), len(groups)) if group_id is not None else None
+        result.append(
+            {
+                **{
+                    field: segment.get(field)
+                    for field in (
+                        "text",
+                        "effectiveCharacterId",
+                        "voiceRevision",
+                        "referenceAudio",
+                        "referenceText",
+                        "referenceMode",
+                        "voiceSettings",
+                    )
+                },
+                "mixGroup": group,
+            }
+        )
+    return result
 
 
 def _artifact_revision(package: Path, kind: str, revision: str) -> dict[str, Any] | None:
-    if not revision:
-        return None
     return next(
         (
             row
@@ -122,47 +202,3 @@ def _artifact_revision(package: Path, kind: str, revision: str) -> dict[str, Any
         ),
         None,
     )
-
-
-def _cast_render_signature(cast: dict[str, Any]) -> dict[str, Any]:
-    def voice(raw: Any) -> dict[str, Any]:
-        row = raw if isinstance(raw, dict) else {}
-        route = row.get("voiceRoute")
-        if isinstance(route, dict) and route.get("kind") == "layered":
-            normalized_route: dict[str, Any] = {
-                "kind": "layered",
-                "characterIds": [str(value) for value in route.get("characterIds", [])],
-            }
-        else:
-            normalized_route = {"kind": "dedicated"}
-        return {
-            "characterId": str(row.get("characterId") or ""),
-            "name": str(row.get("name") or row.get("characterId") or ""),
-            "category": str(row.get("category") or "character"),
-            "voiceAccepted": row.get("voiceAccepted") is True,
-            "voiceRevision": str(
-                row.get("acceptedVoiceRevision") or row.get("voiceRevision") or ""
-            ),
-            "referenceAudio": str(row.get("referenceAudio") or row.get("referenceAudioPath") or ""),
-            "referenceText": str(row.get("referenceText") or ""),
-            "voiceRoute": normalized_route,
-        }
-
-    return {
-        "voiceModel": cast.get("voiceModel"),
-        "language": cast.get("language"),
-        "labelToCharacterId": cast.get("labelToCharacterId", {}),
-        "narrator": voice(cast.get("narrator")),
-        "identities": [voice(row) for row in cast.get("identities", [])],
-    }
-
-
-def _script_render_signature(script: dict[str, Any], chapter_id: str = "") -> dict[str, Any]:
-    entries = script.get("entries", [])
-    if chapter_id and entries and all(row.get("chapterId") for row in entries):
-        entries = [row for row in entries if str(row.get("chapterId") or "") == chapter_id]
-    return {
-        "status": script.get("status"),
-        "entries": entries,
-        "sourceCoverage": script.get("sourceCoverage", {}),
-    }
