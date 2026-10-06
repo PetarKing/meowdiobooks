@@ -58,6 +58,7 @@ build once before starting the backend. It is the short form of
 ordinary `serve` never rebuilds the frontend.
 
 The base project dependencies are cross-platform. `mlx-runtime` selects the current Apple Silicon
-inference backend; it does not download llama.cpp or any model weights. The equivalent wheel install
-is `pip install "meowdiobooks[mlx-runtime]"`; installing the wheel without that extra provides only
-the cross-platform application core.
+inference backend; it does not download llama.cpp or any model weights. The supported application setup is the source-checkout installation above; no public package
+registry installation is documented. The separately published `meowdiobooks-workflow` wheel is an
+integration asset, not the complete local application or its Apple Silicon runtime. See
+[shared release assets](../release/README.md) for its scope.

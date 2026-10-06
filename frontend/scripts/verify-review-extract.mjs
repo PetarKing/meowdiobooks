@@ -8,11 +8,11 @@ import { chooseAppearance } from './appearance-controls.mjs';
 
 const frontend = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const url = process.argv[2] ?? 'http://127.0.0.1:5180/studio.html';
-const out = path.resolve(process.argv[3] ?? path.join(frontend, '../docs/matcha-next/evidence/review-extract'));
+const out = path.resolve(process.argv[3] ?? path.join(frontend, '../.review-evidence/review-extract'));
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const results = [];
-const alicePage = await readFile(path.join(out, 'alice-source-page-1.png'));
+const alicePage = await readFile(path.join(frontend, 'stories/fixtures/alice-source-page-1.png'));
 try {
   for (const width of [1440, 390]) for (const theme of ['light', 'dark']) for (const scenario of ['review-intro', 'extract']) {
     const page = await browser.newPage({ viewport: { width, height: width > 700 ? 1000 : 844 }, reducedMotion: 'reduce' });
@@ -44,7 +44,7 @@ try {
     assert(overflow <= 1, `${scenario}/${width}/${theme} overflow ${overflow}px`);
     const row = { scenario, width, theme, overflow, errors, apiRequests };
     if (scenario === 'review-intro') {
-      await page.getByRole('heading', { name: 'A closer look at the story' }).waitFor();
+      await page.getByRole('heading', { name: 'Check for issues' }).waitFor();
       assert(await page.getByRole('button', { name: 'Scan for issues →' }).isVisible());
       row.invitation = 'visible';
     } else {

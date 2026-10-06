@@ -84,6 +84,10 @@ not decorative receipts.
 
 ## Result review
 
+Initial entry exposes an explicit Scan action. Returning through **Change settings** on an
+accepted Review starts one nonpublishing candidate scan and shows in-page progress. A failed scan
+leaves Retry. The accepted revision remains active until the new candidate is explicitly accepted.
+
 Before acceptance, the user sees the full consequence delta: affected spans, narrator/character impact,
 source reconstruction and downstream invalidation. After acceptance, the same evidence, decisions and
 history remain available from the book.

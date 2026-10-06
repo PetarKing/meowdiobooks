@@ -39,11 +39,8 @@ At 390, Library uses an explicit URL because the local shell hides its desktop t
 The gateway, source content and worker state in these checks are synthetic. The CDP check exercises
 browser freezing and fresh-document reload; it is not a physical-phone or staging deployment check.
 
-## Inspectable evidence
+## Reproducing evidence
 
-- [Lifecycle report](assets/review/workflow-return/report.json)
-- [Mobile running step](assets/review/workflow-return/running-390.png)
-- [Mobile finished step after reload](assets/review/workflow-return/finished-after-reload-390.png)
-- [Mobile interaction recording](assets/review/workflow-return/workflow-return-390.webm)
-
-The scripts regenerate desktop and mobile screenshots and recordings without using account data.
+The scripts above regenerate synthetic desktop and mobile screenshots, reports and recordings.
+Store captures in the ignored `.review-evidence/` directory or a temporary directory.
+Historical capture bundles are not part of the maintained documentation.

@@ -56,10 +56,8 @@ outputs/
 tmp/
 fixtures/downloaded/
 
-# Generation troubleshooting note (2026-07-14): chapter WAV assembly changed from whole-chapter
-# NumPy concatenation to bounded-memory copying of staged segment WAVs. If output ordering, 240 ms
-# gaps, or WAV readability regress, inspect src/meowdiobooks/backend/tts_v2.py and its byte-exact
-# tests first.
+# Local review screenshots, recordings and generated reports
+.review-evidence/
 
 # Maintainer-only evaluation material. Only the documented public-domain set is publishable.
 internal-docs/

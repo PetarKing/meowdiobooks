@@ -33,6 +33,9 @@ jobs:
       - name: Lint
         run: uv run --no-sync ruff check src/meowdiobooks tests
 
+      - name: Check publication hygiene
+        run: python scripts/check_publication.py
+
       - name: Test
         run: >-
           uv run --no-sync pytest -q

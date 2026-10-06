@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 import { chooseAppearance } from './appearance-controls.mjs';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:5179/studio.html';
-const out = process.argv[3] ?? '../docs/matcha-next/evidence/cast-listen-portrait';
+const out = process.argv[3] ?? '../.review-evidence/cast-listen-portrait';
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch();
 const results = [];

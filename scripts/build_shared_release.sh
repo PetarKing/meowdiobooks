@@ -24,6 +24,13 @@ trap 'rm -rf -- "${staging_dir}"' EXIT
 wheel_name="meowdiobooks_workflow-${python_version}-py3-none-any.whl"
 ui_name="meowdiobooks-workflow-ui-${ui_version}.tgz"
 
+for package_license in "${repo_root}/frontend/LICENSE" "${repo_root}/release/python/LICENSE"; do
+  if ! cmp -s "${repo_root}/LICENSE" "${package_license}"; then
+    echo "Package license must match the canonical root LICENSE: ${package_license}" >&2
+    exit 1
+  fi
+done
+
 uv build --wheel --out-dir "${staging_dir}" "${repo_root}/release/python"
 npm pack "${repo_root}/frontend" --pack-destination "${staging_dir}" --cache "${repo_root}/.npm-cache"
 
