@@ -30,7 +30,9 @@ from .dialogue_attribution import (
     attribution_summary,
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
-from .remote_llm import RemoteRequestAdmission, _observe_remote_call, admit_remote_request
+from .remote_llm import (
+    RemoteRequestAdmission, _observe_remote_call, admit_remote_request, remote_usage_cost,
+)
 
 
 POLICY_ID = "dual-pass-with-tools-v1"
@@ -572,7 +574,7 @@ def run_dialogue_remote(
     config = load_model_registry(Path(repo_root)).remote_dialogue_model()
     if config is None or config.engine != "openai_responses":
         raise DialogueContractError("Dual pass with tools requires an OpenAI Responses profile")
-    if config.model != "gpt-5.6-luna":
+    if config.model not in {"gpt-5.6-luna", "gpt-6-luna"}:
         raise DialogueContractError("Dual pass with tools requires the configured Luna model")
     resolved_policy = DualPassPolicy(
         max_targets_per_batch=config.max_targets_per_batch,
@@ -692,6 +694,14 @@ def run_dialogue_remote(
     )
     requests = [request for run in all_runs for request in run["requests"]]
     usage = _sum_usage(requests)
+    try:
+        estimated_cost = round(sum(
+            remote_usage_cost(config, request["usage"], service_tier=request.get("serviceTier"))
+            for request in requests
+        ), 4)
+    except ValueError:
+        # Preserve successful attribution when a future provider tier has no known price.
+        estimated_cost = None
     result["attributionRoute"] = "remote"
     result["attributionChecks"] = checks
     result["remoteUsage"] = {
@@ -699,7 +709,7 @@ def run_dialogue_remote(
         "cachedInputTokens": usage["cached_input_tokens"],
         "cacheWriteInputTokens": usage["cache_write_input_tokens"],
         "outputTokens": usage["output_tokens"],
-        "estimatedCostUsd": round(_usage_cost(config, usage), 4),
+        **({"estimatedCostUsd": estimated_cost} if estimated_cost is not None else {}),
         "modelProfile": config.id,
         "modelDisplayName": config.display_name,
         "providerModels": sorted(
@@ -819,6 +829,7 @@ def _run_agent(
                 "usage": dict(response.get("usage") or {}),
                 "responseId": response.get("id"),
                 "model": response.get("model"),
+                "serviceTier": response.get("service_tier"),
             }
         )
         output = response.get("output")
@@ -924,6 +935,8 @@ def _responses_api_call(
                 "context": "all_turns",
             },
         }
+        if config.service_tier:
+            payload["service_tier"] = config.service_tier
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         last_error = ""
         for attempt, delay in enumerate((2, 5, 10, 0), 1):
@@ -985,6 +998,7 @@ def _responses_api_call(
                         outcome="response", attempt=attempt,
                         model=str(result.get("model") or config.model),
                         reported_model=result.get("model"),
+                        service_tier=result.get("service_tier"),
                         usage=usage if isinstance(usage, Mapping) else {},
                         ambiguous_billable=not bool(usage), http_status=200,
                     )
@@ -1212,25 +1226,6 @@ def _sum_usage(requests: Sequence[Mapping[str, Any]]) -> dict[str, int]:
                 details.get("cache_write_tokens", details.get("cache_creation_tokens", 0)) or 0
             )
     return totals
-
-
-def _usage_cost(config: RemoteTextModelConfig, usage: Mapping[str, int]) -> float:
-    cached = usage["cached_input_tokens"]
-    cache_write = usage["cache_write_input_tokens"]
-    uncached = max(0, usage["input_tokens"] - cached - cache_write)
-    cache_write_price = float(
-        getattr(
-            config,
-            "cache_write_input_usd_per_million_tokens",
-            config.input_usd_per_million_tokens,
-        )
-    )
-    return (
-        uncached * config.input_usd_per_million_tokens
-        + cached * config.cached_input_usd_per_million_tokens
-        + cache_write * cache_write_price
-        + usage["output_tokens"] * config.output_usd_per_million_tokens
-    ) / 1_000_000
 
 
 def _response_text(response: Mapping[str, Any]) -> str:

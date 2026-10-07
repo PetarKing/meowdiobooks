@@ -118,7 +118,7 @@ PDF 文本提取、对话归属判定、角色统一、声音设计与克隆、�
 | 步骤 / 用途 | 路由 | 默认模型 | 兼容配置 |
 |---|---|---|---|
 | 对话归属判定、角色身份分类和声音建议 | 本地 | 通过固定版本 `llama.cpp` 运行的 Qwen3.5 9B Q4_K_M | 使用受支持 `llama_cpp` 引擎并遵守相同已验证提示词/输出契约的注册项 |
-| 大型“对话”审核（仅在明确选择时） | 可选远程 | 通过已配置 OpenAI Responses 配置运行的 `gpt-5.6-luna` | 满足有限范围响应契约的 OpenAI 兼容 Chat Completions 或 Responses 配置；只有选中的“对话”片段会离开本机 |
+| 大型“对话”审核（仅在明确选择时） | 可选远程 | 通过已配置 OpenAI Responses 配置运行的 `gpt-6-luna` (`service_tier = "fast"`) | 满足有限范围响应契约的 OpenAI 兼容 Chat Completions 或 Responses 配置；只有选中的“对话”片段会离开本机 |
 | 设计声音试听 | 本地 | [`mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) | 与 Base 渲染器配对、并明确验证语言列表的兼容 MLX-Audio VoiceDesign 检查点 |
 | 声音样本文本草稿（STT） | 本地 | 支持自动语言检测的 [`mlx-community/Qwen3-ASR-0.6B-4bit`](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-4bit) | 实现相同可编辑文本/语言结果的兼容 MLX-Audio Qwen3-ASR 检查点；未来 Linux 适配器可保持此边界不变 |
 | 声音克隆试听 | 本地 | 使用上传参考 WAV 与修正文本的 [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit) | 支持 `ref_audio` + `ref_text` 文本条件克隆的兼容 Base 检查点 |
