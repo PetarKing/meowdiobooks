@@ -38,3 +38,12 @@ def test_python_distribution_uses_an_explicit_checkout_allowlist():
         "frontend/dist": "meowdiobooks/web",
         "models.toml": "meowdiobooks/resources/models.toml",
     }
+
+
+def test_workflow_distributions_preserve_the_root_license_and_required_notice():
+    terms = (ROOT / "LICENSE").read_bytes()
+    assert b"Required Notice: Copyright 2026 Petar Nedeljkovic and Meowdiobooks contributors." in terms
+    for relative in ("release/python/LICENSE", "frontend/LICENSE"):
+        assert (ROOT / relative).read_bytes() == terms
+    config = tomllib.loads((ROOT / "release/python/pyproject.toml").read_text(encoding="utf-8"))
+    assert config["project"]["license"] == {"file": "LICENSE"}
