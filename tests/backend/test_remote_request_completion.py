@@ -29,7 +29,7 @@ class Response:
 
 
 def success():
-    return json.dumps({"model": "gpt-5.6-luna", "usage": {
+    return json.dumps({"model": "gpt-6-luna", "usage": {
         "input_tokens": 100, "output_tokens": 10,
     }, "output": [{"type": "message", "content": [
         {"type": "output_text", "text": "valid"},
@@ -120,5 +120,26 @@ def test_receipt_preserves_absent_reported_model_without_changing_display_model(
     monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs:
                         Response(json.dumps(payload).encode()))
     run(kind, monkeypatch, lambda *_args: events.append)
-    assert events[0]["model"] == "gpt-5.6-luna"
+    assert events[0]["model"] == "gpt-6-luna"
     assert events[0]["reportedModel"] is None
+
+
+@pytest.mark.parametrize("kind", ["dialogue", "chat"])
+@pytest.mark.parametrize("reported_tier", ["fast", "default"])
+def test_fast_service_tier_is_sent_and_actual_tier_observed(kind, reported_tier, monkeypatch):
+    observed = []
+    captured = []
+
+    def transport(request, **_kwargs):
+        captured.append(json.loads(request.data))
+        payload = json.loads(success())
+        payload["model"] = "gpt-6-luna"
+        payload["service_tier"] = reported_tier
+        return Response(json.dumps(payload).encode())
+
+    monkeypatch.setattr("urllib.request.urlopen", transport)
+    run(kind, monkeypatch, None, lambda _config, event: observed.append(event))
+    assert captured[0]["model"] == "gpt-6-luna"
+    assert captured[0]["service_tier"] == "fast"
+    assert captured[0]["reasoning"]["effort"] == "low"
+    assert observed[0]["serviceTier"] == reported_tier

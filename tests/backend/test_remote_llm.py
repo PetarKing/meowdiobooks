@@ -2,6 +2,7 @@ import io
 import json
 import urllib.error
 from pathlib import Path
+from dataclasses import replace
 
 import pytest
 
@@ -36,7 +37,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
         captured["timeout"] = timeout
         return _Response(
             {
-                "model": "gpt-5.6-luna",
+                "model": "gpt-6-luna",
                 "output": [
                     {
                         "type": "message",
@@ -70,24 +71,26 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
 
     assert captured["url"] == "https://api.openai.com/v1/responses"
     assert captured["payload"] == {
-        "model": "gpt-5.6-luna",
+        "model": "gpt-6-luna",
         "instructions": "system rules",
         "input": "source passage",
         "max_output_tokens": 500,
         "store": False,
         "reasoning": {"effort": "low"},
+        "service_tier": "fast",
     }
     assert result["text"] == "T001|D|Alice"
     assert result["usage"]["input_tokens"] == 100
-    assert remote_usage_cost(config, result["usage"]) == pytest.approx(0.0000284)
+    assert remote_usage_cost(config, result["usage"]) == pytest.approx(0.0000264)
     assert observed == [
         (
             config,
             {
                 "outcome": "response",
                 "attempt": 1,
-                "model": "gpt-5.6-luna",
-                "reportedModel": "gpt-5.6-luna",
+                "model": "gpt-6-luna",
+                "reportedModel": "gpt-6-luna",
+                "serviceTier": None,
                 "usage": {
                     "input_tokens": 100,
                     "input_tokens_details": {"cached_tokens": 20},
@@ -98,7 +101,7 @@ def test_luna_uses_responses_without_remote_state_storage(monkeypatch):
             },
         )
     ]
-    assert config.pricing_version == "openai-gpt-5.6-luna-2026-07-30"
+    assert config.pricing_version == "openai-gpt-6-luna-fast-2026-10-07"
 
 
 def test_luna_uses_native_strict_structured_outputs_when_schema_is_supplied(monkeypatch):
@@ -168,7 +171,7 @@ def test_luna_prices_cache_write_tokens_separately():
         "output_tokens": 100,
     }
 
-    assert remote_usage_cost(config, usage) == pytest.approx(0.000299)
+    assert remote_usage_cost(config, usage) == pytest.approx(0.000279)
 
 
 def test_usage_observer_sees_provider_usage_before_invalid_output_retry(monkeypatch):
@@ -248,3 +251,53 @@ def test_remote_failure_keeps_provider_diagnostics_out_of_public_message(monkeyp
         "The hosted speaker check was interrupted. Try again; "
         "accepted work is unchanged."
     )
+
+
+@pytest.mark.parametrize("input_tokens,tier,expected", [
+    (272_000, "fast", 0.0554),
+    (272_001, "fast", 0.1103004),
+    (272_001, "priority", 0.1103004),
+    (272_000, "default", 0.0277),
+    (272_001, "default", 0.0551502),
+])
+def test_luna_request_pricing_obeys_actual_tier_and_long_context_boundary(input_tokens, tier, expected):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    usage = {"input_tokens": input_tokens, "output_tokens": 1_000}
+    assert remote_usage_cost(config, usage, service_tier=tier) == pytest.approx(expected)
+
+
+def test_luna_rejects_unknown_reported_tier_instead_of_silently_mispricing():
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    with pytest.raises(ValueError, match="Unsupported reported service tier"):
+        remote_usage_cost(config, {"input_tokens": 10}, service_tier="future-tier")
+
+
+def test_luna_prices_long_context_cache_classes_and_creation_alias():
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    usage = {
+        "input_tokens": 300_000,
+        "input_tokens_details": {"cached_tokens": 100_000, "cache_creation_tokens": 100_000},
+        "output_tokens": 10_000,
+    }
+    assert remote_usage_cost(config, usage, service_tier="fast") == pytest.approx(0.109)
+    assert remote_usage_cost(config, usage, service_tier="default") == pytest.approx(0.0545)
+
+
+@pytest.mark.parametrize("engine", ["openai_responses", "openai_compatible"])
+def test_existing_profiles_without_service_tier_do_not_send_one(engine, monkeypatch):
+    config = replace(load_model_registry(REPO_ROOT).remote_dialogue_model(),
+                     engine=engine, service_tier=None)
+    captured = []
+
+    def transport(request, **_kwargs):
+        captured.append(json.loads(request.data))
+        return _Response({
+            "model": config.model, "usage": {},
+            "output": [{"type": "message", "content": [{"type": "output_text", "text": "ok"}]}],
+            "choices": [{"message": {"content": "ok"}}],
+        })
+
+    monkeypatch.setenv(config.api_key_env, "test-key")
+    monkeypatch.setattr("urllib.request.urlopen", transport)
+    assert remote_chat_completion(REPO_ROOT, config, "system", "prompt")["text"] == "ok"
+    assert "service_tier" not in captured[0]

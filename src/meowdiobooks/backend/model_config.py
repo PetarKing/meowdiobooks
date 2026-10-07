@@ -60,6 +60,14 @@ class RemoteTextModelConfig:
     estimated_usd_per_target: float
     dialogue_benchmark: DialogueBenchmark | None
 
+    service_tier: str | None = None
+    default_service_tier_price_multiplier: float = 1.0
+    long_context_input_token_threshold: int | None = None
+    long_context_input_usd_per_million_tokens: float | None = None
+    long_context_cached_input_usd_per_million_tokens: float | None = None
+    long_context_cache_write_input_usd_per_million_tokens: float | None = None
+    long_context_output_usd_per_million_tokens: float | None = None
+
     @property
     def domain(self) -> str:
         return urlparse(self.base_url).hostname or self.base_url
@@ -139,10 +147,14 @@ class ModelRegistry:
             raise ModelConfigError(f"Unknown remote Dialogue model: {selected}") from error
 
 
-def load_model_registry(repo_root: Path) -> ModelRegistry:
-    """Load the local override or packaged model contract without touching model assets."""
+def load_model_registry(repo_root: Path, *, models_path: Path | None = None) -> ModelRegistry:
+    """Load an explicit registry file, local override, or packaged model contract.
 
-    path = model_registry_path(repo_root)
+    Compositions may pass a custom catalog filename without changing process environment
+    or copying files. An explicit missing file fails rather than falling back silently.
+    """
+
+    path = Path(models_path) if models_path is not None else model_registry_path(repo_root)
     try:
         raw = tomllib.loads(path.read_text(encoding="utf-8"))
     except OSError as error:
@@ -300,6 +312,19 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         raise ModelConfigError(
             f"Unsupported reasoning_effort for remote text model {model_id}: {reasoning_effort}"
         )
+    service_tier = _optional_string(row, "service_tier")
+    if service_tier not in {None, "default", "fast", "priority"}:
+        raise ModelConfigError(f"Unsupported service_tier for remote text model {model_id}")
+    long_price_keys = (
+        "long_context_input_usd_per_million_tokens",
+        "long_context_cached_input_usd_per_million_tokens",
+        "long_context_cache_write_input_usd_per_million_tokens",
+        "long_context_output_usd_per_million_tokens",
+    )
+    long_keys = ("long_context_input_token_threshold", *long_price_keys)
+    if any(key in row for key in long_keys) and not all(key in row for key in long_keys):
+        raise ModelConfigError("Long-context pricing requires a threshold and all four token rates")
+    long_prices = {key: _non_negative_number(row, key) for key in long_price_keys if key in row}
     input_price = _non_negative_number(row, "input_usd_per_million_tokens")
     cache_write_price = (
         _non_negative_number(row, "cache_write_input_usd_per_million_tokens")
@@ -315,6 +340,16 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         model=_string(row, "model"),
         pricing_version=_string(row, "pricing_version"),
         reasoning_effort=reasoning_effort,
+        service_tier=service_tier,
+        default_service_tier_price_multiplier=(
+            _non_negative_number(row, "default_service_tier_price_multiplier")
+            if "default_service_tier_price_multiplier" in row else 1.0
+        ),
+        long_context_input_token_threshold=(
+            _positive_int(row, "long_context_input_token_threshold")
+            if "long_context_input_token_threshold" in row else None
+        ),
+        **long_prices,
         policy=_string(row, "policy"),
         input_usd_per_million_tokens=input_price,
         cached_input_usd_per_million_tokens=_non_negative_number(
