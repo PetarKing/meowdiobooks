@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from scripts.check_publication import check_files, check_licenses
 
 
@@ -42,3 +44,14 @@ def test_publication_rejects_drifted_package_license(tmp_path: Path):
     assert check_licenses(tmp_path) == []
     (tmp_path / 'frontend/LICENSE').write_text('obsolete license')
     assert check_licenses(tmp_path) == ['frontend/LICENSE: must match the root LICENSE']
+
+
+@pytest.mark.parametrize('name', ['output.txt', 'page.html', 'theme.css', 'bundle.js', 'build.log', 'NOTICE'])
+def test_publication_scans_text_regardless_of_extension(tmp_path: Path, name: str):
+    (tmp_path / name).write_text('/'.join(['', 'Users', 'private-user', 'book', '']))
+    assert check_files(tmp_path, [name]) == [f'{name}: personal filesystem path']
+
+
+def test_publication_skips_binary_files(tmp_path: Path):
+    (tmp_path / 'image.png').write_bytes(b'\x89PNG\x00\xff')
+    assert check_files(tmp_path, ['image.png']) == []

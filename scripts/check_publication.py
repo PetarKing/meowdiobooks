@@ -28,9 +28,13 @@ def check_files(root: Path, names: list[str]) -> list[str]:
         )
         if forbidden:
             errors.append(f'{name}: private or generated material must not be tracked')
-        if path.suffix.lower() not in {'.md', '.json', '.toml', '.yml', '.yaml', '.py', '.mjs', '.cjs', '.ts', '.tsx', '.sh'}:
+        raw = path.read_bytes()
+        if b'\0' in raw:
             continue
-        text = path.read_text(encoding='utf-8', errors='replace')
+        try:
+            text = raw.decode('utf-8')
+        except UnicodeDecodeError:
+            continue
         if any(match.group(1) != 'test' for match in PRIVATE_PATH.finditer(text)):
             errors.append(f'{name}: personal filesystem path')
         if path.suffix.lower() != '.md':
