@@ -1261,6 +1261,12 @@ const zhCN: Record<string, string> = {
   "Generation needs attention": "生成需要处理",
   "1 required voice": "1 个必审声音",
   "{{count}} required voices": "{{count}} 个必审声音",
+  "Default audition": "默认试音",
+  "Continuing approves the default audition for {{name}} and accepts the full cast.": "继续将批准 {{name}} 的默认试音，并接受整个角色阵容。",
+  "Continuing approves the default audition for each of these voices and accepts the full cast: {{names}}.": "继续将批准以下声音的默认试音，并接受整个角色阵容：{{names}}。",
+  "Script direction": "剧本提示",
+  "Should these script directions be spoken?": "这些剧本提示需要朗读吗？",
+  "Delivery and sound cues usually stay unspoken. Choose the narrator for descriptive action, or keep text that is intended as dialogue.": "语气和音效提示通常不朗读。描述性动作可以交给旁白，属于对白的文字则可保留。",
 };
 
 export default zhCN;

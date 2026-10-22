@@ -70,7 +70,9 @@ def build_recording_script(
                 "text": text,
                 "sourceText": str(span.get("source", "")),
                 "provenance": (
-                    f"review:{span.get('reviewOccurrenceId')}:exclude"
+                    "source-delimiter"
+                    if span.get("origin") == "source-delimiter"
+                    else f"review:{span.get('reviewOccurrenceId')}:exclude"
                     if not keep
                     else "accepted-source"
                 ),

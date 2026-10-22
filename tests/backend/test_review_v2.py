@@ -738,3 +738,52 @@ def test_review_policy_splits_dialogue_without_losing_source_or_speaker(
     assert result["spans"][1]["reviewAction"] == action
     assert result["spans"][0]["resolvedSpeakerLabel"] == "Alice"
     assert result["spans"][2]["resolvedSpeakerLabel"] == "Alice"
+
+
+def test_script_directions_can_be_excluded_without_speaking_labels():
+    from meowdiobooks.backend.dialogue import scan_dialogue, malformed_playable_spans
+
+    text = 'PEUS: (creepily) Hello there. (whispers softly)'
+    blocks = [{'id': 'b1', 'page': 1, 'text': text}]
+    dialogue = scan_dialogue(blocks, enabled_profile_ids=['label-colon-line'])
+    dialogue.update(revision='d1', extractionRevision='e1', spans=dialogue['partition'])
+    extraction = {'revision': 'e1', 'blocks': blocks}
+    workspace = build_review_workspace(extraction, dialogue)
+    cues = [row for group in workspace['warnings'] if group['kind'] == 'stage-direction'
+            for row in group['occurrences']]
+    assert [row['source'] for row in cues] == ['(creepily)', '(whispers softly)']
+    review = {'warningSnapshot': workspace['warnings'], 'decisions': [
+        {'occurrenceId': row['id'], 'action': 'exclude'} for row in cues]}
+    rendered = apply_review_render_policies(dialogue, review)
+    assert ''.join(row['source'] for row in rendered['spans']) == text
+    assert ''.join(row['text'] for row in rendered['spans'] if row.get('reviewAction') != 'exclude').strip() == 'Hello there.'
+    assert not malformed_playable_spans(rendered)
+
+
+def test_parenthetical_prose_is_not_a_script_direction():
+    extraction, dialogue = _artifacts([{'id': 'b1', 'page': 1, 'text': 'He waited (as he always did).'}])
+    assert not any(row['kind'] == 'stage-direction' for row in build_review_workspace(extraction, dialogue)['warnings'])
+
+
+@pytest.mark.parametrize('action', ['keep', 'exclude', 'narrate'])
+def test_nested_script_cue_after_speaker_correction_is_whole_and_source_exact(action):
+    from meowdiobooks.backend.dialogue import scan_dialogue, malformed_playable_spans
+    text = 'PEUS: (whispers (very) softly) Stay here.'
+    blocks = [{'id': 'b1', 'page': 1, 'text': text}]
+    d = scan_dialogue(blocks, enabled_profile_ids=['label-colon-line'])
+    d.update(revision='d1', extractionRevision='e1', spans=d['partition'])
+    for span in d['spans']:
+        if span['renderRole'] == 'dialogue':
+            span['origin'] = 'user:dialogue-speaker'
+    w = build_review_workspace({'revision': 'e1', 'blocks': blocks}, d)
+    cues = [x for g in w['warnings'] if g['kind'] == 'stage-direction' for x in g['occurrences']]
+    assert [x['source'] for x in cues] == ['(whispers (very) softly)']
+    r = apply_review_render_policies(d, {'warningSnapshot': w['warnings'],
+        'decisions': [{'occurrenceId': cues[0]['id'], 'action': action}]})
+    assert ''.join(x['source'] for x in r['spans']) == text
+    assert not malformed_playable_spans(r)
+    spoken = ''.join(x['text'] for x in r['spans'] if x.get('reviewAction') != 'exclude')
+    assert 'PEUS:' not in spoken
+    assert ('whispers' in spoken) == (action != 'exclude')
+    if action != 'keep':
+        assert r['spans'][0]['origin'] == 'source-delimiter'

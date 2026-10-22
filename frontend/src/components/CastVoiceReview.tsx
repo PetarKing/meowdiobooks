@@ -6,6 +6,7 @@ import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog } from "./Ui";
+import { chosenVoiceRevision } from "../workflow/cast";
 import { suggestedMemberIds } from "../voiceRoutes";
 import { isActionRequiredError } from '../api/actionRequired';
 
@@ -52,10 +53,7 @@ function approvedRevisionFor(voice: CastVoice, selections: Record<string, string
 }
 
 function tilePreviewFor(voice: CastVoice, selections: Record<string, string>) {
-  const approvedRevision = approvedRevisionFor(voice, selections);
-  return candidateForRevision(voice, approvedRevision)
-    ?? candidateForRevision(voice, voice.voicePreviewRevision)
-    ?? candidatesFor(voice).at(-1);
+  return candidateForRevision(voice, chosenVoiceRevision(voice, selections));
 }
 
 function sharedGroupFor(voice: CastVoice, selections: Record<string, string>) {
@@ -239,11 +237,8 @@ export function CastVoiceReview({
   const [collectionQuery, setCollectionQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const largeCollection = voices.length > 12;
-  const byReviewPriority = (left: CastVoice, right: CastVoice) =>
-    Number(requiresReview(right)) - Number(requiresReview(left))
-      || Number(!routeReady(right)) - Number(!routeReady(left));
   const visibleVoices = largeCollection ? voices.filter((voice) => collectionMatches(collectionQuery, [voice.name, ...(voice.literalLabels ?? [])])
-    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))).slice().sort(byReviewPriority) : voices.slice().sort(byReviewPriority);
+    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))) : voices;
   const selectedCount = voices.filter(routeReady).length;
   const requiredCount = voices.filter(requiresReview).length;
   const defaultReadyCount = voices.length - selectedCount - requiredCount;
@@ -598,11 +593,13 @@ export function CastVoiceReview({
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => {
               const number = index + 1;
               const applied = candidate.revision === approvedRevision;
+              const selected = candidate.revision === chosenVoiceRevision(inspected, selections);
               const playingCandidate = playingCandidateRevision === candidate.revision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied selected" : ""}`}>
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${selected ? "applied selected" : ""}`}>
                 <div className="voice-candidate-actions">
-                  <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={applied} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
+                  <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={selected} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
                     <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
+                    {selected && !applied && <small>{t("Default audition")}</small>}
                     {applied && <strong className="candidate-applied-badge"><span aria-hidden="true">✓</span><span className="visually-hidden">{t("✓ Applied")}</span></strong>}
                   </button>
                 </div>

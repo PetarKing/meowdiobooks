@@ -3536,14 +3536,14 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
     const warning = screen.getByRole('dialog', { name: 'Approve 1 remaining voice?' })
-    expect(warning).toHaveTextContent('Continuing approves the latest audition for Alice and accepts the full cast.')
+    expect(warning).toHaveTextContent('Continuing approves the default audition for Alice and accepts the full cast.')
     expect(warning).toHaveTextContent('Your 1 approved choice stays exactly as selected.')
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
 
     fireEvent.click(within(warning).getByRole('button', { name: 'Approve remaining & accept →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'auditions-2', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
-      { characterId: 'alice', voiceRevision: 'av2' },
+      { characterId: 'alice', voiceRevision: 'av1' },
     ]))
   })
 
