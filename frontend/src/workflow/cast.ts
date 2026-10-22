@@ -54,7 +54,8 @@ export function voiceHasRevision(voice: CastVoice, revision?: string) {
 export function chosenVoiceRevision(voice: CastVoice, selections: Record<string, string>) {
   const approved = selections[voice.characterId];
   if (voiceHasRevision(voice, approved)) return approved;
-  return voiceHasRevision(voice, voice.voicePreviewRevision) ? voice.voicePreviewRevision : undefined;
+  return voice.voiceCandidates?.find((candidate) => candidate.previewUrl)?.revision
+    ?? (voiceHasRevision(voice, voice.voicePreviewRevision) ? voice.voicePreviewRevision : undefined);
 }
 
 export function acceptedVoiceSelections(cast?: CastArtifact) {

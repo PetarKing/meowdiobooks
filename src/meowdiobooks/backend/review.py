@@ -21,6 +21,10 @@ class ReviewContractError(ValueError):
 
 
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
+    "stage-direction": {
+        "severity": "warning",
+        "actions": ("keep", "exclude", "narrate"),
+    },
     "empty-page": {
         "severity": "blocking",
         "actions": ("keep", "rerun-extraction"),
@@ -103,6 +107,7 @@ def build_review_workspace(
     coverage_failures = _coverage_occurrences(blocks, spans)
     occurrences.extend(_empty_occurrences(blocks))
     occurrences.extend(_text_occurrences(blocks))
+    occurrences.extend(_stage_direction_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
     _add_adjacent_context(occurrences, blocks)
@@ -435,15 +440,28 @@ def _review_policy_span(
     original_start = int(span.get("sourceStart", 0))
     source = str(span.get("source", ""))[start - original_start : end - original_start]
     split = start != original_start or end != int(span.get("sourceEnd", 0))
+    structural_omission = False
+    spoken_start, spoken_end = start, end
+    spoken_text = source
+    if action == "keep":
+        spoken_start = max(start, int(span.get("spokenStart", original_start)))
+        spoken_end = min(end, int(span.get("spokenEnd", span.get("sourceEnd", end))))
+        if spoken_start >= spoken_end:
+            # Keep label/quote delimiters as source evidence, never new speech.
+            action = "exclude"
+            structural_omission = True
+            spoken_start, spoken_end = start, end
+        else:
+            spoken_text = source[spoken_start - start : spoken_end - start]
     row = {
         **dict(span),
         "id": f"{span['id']}:review:{start}-{end}" if split else str(span["id"]),
         "sourceStart": start,
         "sourceEnd": end,
-        "spokenStart": start,
-        "spokenEnd": end,
+        "spokenStart": spoken_start,
+        "spokenEnd": spoken_end,
         "source": source,
-        "text": "" if action == "exclude" else source,
+        "text": "" if action == "exclude" else spoken_text,
         "reviewAction": action,
         "reviewOccurrenceId": occurrence_id,
     }
@@ -458,6 +476,8 @@ def _review_policy_span(
                 "origin": f"review:{action}",
             }
         )
+    if structural_omission:
+        row["origin"] = "source-delimiter"
     return row
 
 
@@ -569,6 +589,47 @@ def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         for page, page_blocks in by_page.items()
         if not any(str(block["text"]).strip() for block in page_blocks)
     ]
+
+
+def _stage_direction_occurrences(blocks, spans):
+    """Offer explicit script parentheticals for review; never strip prose globally."""
+    by_id = {str(block["id"]): block for block in blocks}
+    result = []
+    for span in spans:
+        prefix = str(span.get("source", ""))[:int(span.get("spokenStart", 0)) - int(span.get("sourceStart", 0))]
+        if span.get("origin") != "regex:label-colon-line" and not (
+            span.get("renderRole") == "dialogue" and re.fullmatch(r"\s*[^:()]+:\s*", prefix)
+        ):
+            continue
+        block = by_id.get(str(span.get("blockId")))
+        if block is None:
+            continue
+        text = str(block["text"])
+        start = int(span["spokenStart"])
+        end = int(span["spokenEnd"])
+        if not 0 <= start < end <= len(text):
+            # Existing coverage diagnostics own malformed source boundaries.
+            continue
+        depth = 0
+        cue_start = None
+        ranges = []
+        for offset in range(start, end):
+            if text[offset] == "(":
+                if depth == 0:
+                    cue_start = offset
+                depth += 1
+            elif text[offset] == ")" and depth:
+                depth -= 1
+                if depth == 0:
+                    ranges.append((cue_start, offset + 1))
+        for cue_start, cue_end in ranges:
+            result.append(_occurrence(
+                "stage-direction", str(block["id"]), cue_start, cue_end,
+                text[cue_start:cue_end], int(block["page"]),
+                "Parenthetical script direction. Leave delivery and sound cues unspoken, "
+                "or choose the narrator for descriptive action.", block_text=text,
+            ))
+    return result
 
 
 def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
