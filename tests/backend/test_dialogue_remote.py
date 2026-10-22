@@ -307,3 +307,53 @@ def test_every_payload_disables_provider_storage_and_uses_strict_schema(monkeypa
         for _effort, payload in calls
     )
     assert all(not re.search(r"\balias(?:es)?\b", json.dumps(payload), re.I) for _, payload in calls)
+
+
+def test_dialogue_cost_prices_each_physical_request_before_aggregating(monkeypatch):
+    def factory(_config, effort, _observer, *, request_admission=None):
+        def call(payload):
+            response = _response(_target_ids(payload), "Alice")
+            response["usage"] = {"input_tokens": 200_000, "output_tokens": 10}
+            response["service_tier"] = "fast" if effort == "low" else "default"
+            return response
+        return call
+
+    monkeypatch.setattr(dialogue_remote, "_responses_api_call", factory)
+    scan = scan_dialogue([{'page': 1, 'text': '“Hello,” Alice said.'}])
+    result = dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps")
+    assert result["remoteUsage"]["inputTokens"] == 400_000
+    # Neither 200K request incurs long-context pricing; the second is billed at default tier.
+    assert result["remoteUsage"]["estimatedCostUsd"] == 0.06
+
+
+def test_unknown_provider_tier_preserves_attribution_without_fabricated_cost(monkeypatch):
+    def factory(_config, _effort, _observer, *, request_admission=None):
+        def call(payload):
+            response = _response(_target_ids(payload), "Alice")
+            response["service_tier"] = "future-tier"
+            return response
+        return call
+
+    monkeypatch.setattr(dialogue_remote, "_responses_api_call", factory)
+    scan = scan_dialogue([{'page': 1, 'text': '“Hello,” Alice said.'}])
+    result = dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps")
+    assert "estimatedCostUsd" not in result["remoteUsage"]
+    assert result["remoteUsage"]["physicalRequests"] == 2
+    assert _single_dialogue(result)["resolvedSpeakerLabel"] == "Alice"
+
+
+def test_explicit_legacy_luna_profile_remains_supported(monkeypatch):
+    from dataclasses import replace
+    from meowdiobooks.backend.model_config import load_model_registry
+
+    registry = load_model_registry(REPO_ROOT)
+    config = registry.remote_dialogue_model()
+    legacy = replace(config, model="gpt-5.6-luna", service_tier=None,
+                     output_usd_per_million_tokens=1.2)
+    registry = replace(registry, remote_text_models={**registry.remote_text_models, config.id: legacy})
+    monkeypatch.setattr(dialogue_remote, "load_model_registry", lambda _root: registry)
+    calls = _install_speakers(monkeypatch, {"low": "Alice", "medium": "Alice", "high": "unused"})
+    scan = scan_dialogue([{'page': 1, 'text': '“Hello,” Alice said.'}])
+    result = dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps")
+    assert _single_dialogue(result)["resolvedSpeakerLabel"] == "Alice"
+    assert [effort for effort, _payload in calls] == ["low", "medium"]

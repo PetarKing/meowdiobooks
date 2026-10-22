@@ -8,6 +8,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
+from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypedDict
 
@@ -142,6 +143,8 @@ def remote_chat_completion(
         if config.reasoning_effort:
             payload["reasoning_effort"] = config.reasoning_effort
         endpoint = f"{config.base_url}/chat/completions"
+    if config.service_tier:
+        payload["service_tier"] = config.service_tier
     encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
     last_error = ""
     for attempt, delay in enumerate((2, 5, 10, 0), 1):
@@ -221,6 +224,7 @@ def remote_chat_completion(
                 ambiguous_billable=not bool(usage),
                 model=model,
                 reported_model=response.get("model") if isinstance(response, Mapping) else None,
+                service_tier=response.get("service_tier") if isinstance(response, Mapping) else None,
                 usage=usage if isinstance(usage, Mapping) else {},
             )
             try:
@@ -241,6 +245,7 @@ def remote_chat_completion(
                     "usage": dict(usage),
                     "model": model,
                     "attempts": attempt,
+                    "serviceTier": response.get("service_tier"),
                 }
         time.sleep(delay)
     raise RemoteModelUnavailableError(
@@ -272,12 +277,14 @@ def _observe_remote_call(
     http_status: int | None = None,
     completion: RemoteRequestCompletion | None = None,
     reported_model: str | None = None,
+    service_tier: str | None = None,
 ) -> None:
     event = {
         "outcome": outcome,
         "attempt": attempt,
         "model": model or config.model,
         "reportedModel": reported_model,
+        "serviceTier": service_tier,
         "usage": dict(usage or {}),
         "ambiguousBillable": ambiguous_billable,
         "httpStatus": http_status,
@@ -307,26 +314,57 @@ def _responses_output_text(response: Mapping[str, Any]) -> str:
     return "".join(parts).strip()
 
 
-def remote_usage_cost(config: RemoteTextModelConfig, usage: Mapping[str, Any]) -> float:
-    """Estimate provider cost from the token classes present in the response usage."""
+def remote_token_prices(
+    config: RemoteTextModelConfig,
+    input_tokens: int,
+    *,
+    service_tier: str | None = None,
+) -> tuple[Decimal, Decimal, Decimal, Decimal]:
+    """Return per-million input, cache-read, cache-write and output prices for one request.
 
+    Missing response tiers use configured rates for estimates; settlement callers may instead
+    retain a reservation until the provider reports its actual tier. Fast and priority are aliases.
+    Long-context prices apply to the entire request, not just tokens above the threshold.
+    """
+    tier = service_tier or getattr(config, "service_tier", None)
+    if tier not in {None, "default", "fast", "priority"}:
+        raise ValueError(f"Unsupported reported service tier: {tier}")
+    prefix = (
+        "long_context_"
+        if getattr(config, "long_context_input_token_threshold", None) is not None
+        and input_tokens > config.long_context_input_token_threshold else ""
+    )
+    rates = tuple(
+        Decimal(str(getattr(config, f"{prefix}{kind}_usd_per_million_tokens")))
+        for kind in ("input", "cached_input", "cache_write_input", "output")
+    )
+    multiplier = (
+        Decimal(str(getattr(config, "default_service_tier_price_multiplier", 1.0)))
+        if tier == "default" else Decimal(1)
+    )
+    return tuple(rate * multiplier for rate in rates)
+
+
+def remote_usage_cost(
+    config: RemoteTextModelConfig,
+    usage: Mapping[str, Any],
+    *,
+    service_tier: str | None = None,
+) -> float:
+    """Estimate one request from its provider token classes and actual response tier."""
     prompt = int(usage.get("prompt_tokens", usage.get("input_tokens", 0)) or 0)
     completion = int(usage.get("completion_tokens", usage.get("output_tokens", 0)) or 0)
     prompt_details = usage.get("prompt_tokens_details", usage.get("input_tokens_details"))
     cached = (
         int(prompt_details.get("cached_tokens", 0) or 0)
-        if isinstance(prompt_details, Mapping)
-        else 0
+        if isinstance(prompt_details, Mapping) else 0
     )
     cache_write = (
-        int(prompt_details.get("cache_write_tokens", 0) or 0)
-        if isinstance(prompt_details, Mapping)
-        else 0
+        int(prompt_details.get("cache_write_tokens", prompt_details.get("cache_creation_tokens", 0)) or 0)
+        if isinstance(prompt_details, Mapping) else 0
     )
     uncached = max(0, prompt - cached - cache_write)
-    return (
-        uncached * config.input_usd_per_million_tokens
-        + cached * config.cached_input_usd_per_million_tokens
-        + cache_write * config.cache_write_input_usd_per_million_tokens
-        + completion * config.output_usd_per_million_tokens
-    ) / 1_000_000
+    rates = remote_token_prices(config, prompt, service_tier=service_tier)
+    return float(sum(count * rate for count, rate in zip(
+        (uncached, cached, cache_write, completion), rates, strict=True
+    )) / 1_000_000)

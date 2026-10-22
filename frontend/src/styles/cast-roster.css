@@ -78,8 +78,8 @@
 .voice-cast-board .voice-tile-portrait:hover:not(:disabled) { color: var(--poppy); background: transparent; }
 .voice-cast-board .voice-tile-portrait:disabled { cursor: not-allowed; }
 .voice-cast-board .voice-tile-play-cue {
-  position: absolute; right: 4px; bottom: 10px; display: grid; width: 17px; height: 17px;
-  place-items: center; border: 1px solid var(--paper); border-radius: 50%;
+  position: absolute; right: 4px; bottom: 10px; display: grid; width: 28px; height: 28px;
+  place-items: center; border: 2px solid var(--paper); border-radius: 50%;
   background: var(--ink); color: var(--paper); font: 600 8px/1 var(--font-sans);
 }
 .voice-cast-board .voice-tile-portrait:hover .voice-tile-play-cue,
@@ -144,3 +144,5 @@
 @media (prefers-reduced-motion: reduce) {
   .cast-board .cast-roster-card, .voice-cast-board .voice-tile-wave i { transition: none; animation: none; }
 }
+
+.voice-cast-board .voice-tile-play-cue .voice-playback-icon { width: 16px; height: 16px; }

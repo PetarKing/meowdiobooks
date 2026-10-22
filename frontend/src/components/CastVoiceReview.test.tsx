@@ -66,7 +66,7 @@ describe("CastVoiceReview", () => {
     const missing: CastArtifact = { ...cast, identities: [...cast.identities!, { characterId: "missing", name: "Missing", category: "character", referenceText: "A voice still to be made." }] };
     render(<CastVoiceReview bookId="book" cast={missing} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={regenerate} />);
     const board = screen.getByRole("region", { name: "Cast voice auditions" });
-    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Missing voice");
+    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Narrator voice");
     expect(within(board).getByRole("button", { name: "Open Missing voice" })).toHaveTextContent("Audition required");
     expect(screen.getByRole("button", { name: "Play Missing preview" })).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "Review required voices →" }));
@@ -121,7 +121,7 @@ describe("CastVoiceReview", () => {
     const approve = vi.fn();
     render(<CastVoiceReview bookId="book" cast={ensemble} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
     const board = screen.getByRole("region", { name: "Cast voice auditions" });
-    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Duet voice");
+    expect(within(board).getAllByRole("button", { name: /Open .* voice/ })[0]).toHaveAccessibleName("Open Narrator voice");
     const search = screen.getByRole("searchbox", { name: "Search cast" });
     search.focus();
     fireEvent.change(search, { target: { value: "moonLIGHT" } });
@@ -544,4 +544,26 @@ describe("CastVoiceReview", () => {
     }
   });
 
+});
+
+describe("stable cast choices", () => {
+  it("keeps the roster in place when a voice is approved", () => {
+    const props = { bookId: "book", cast, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} selections={{}} />);
+    const order = () => screen.getAllByRole("button", { name: /^Open .* voice$/ }).map(button => button.getAttribute("aria-label"));
+    const before = order();
+    view.rerender(<CastVoiceReview {...props} selections={{ narrator: "narrator-1", many: "many-2" }} />);
+    expect(order()).toEqual(before);
+  });
+
+  it("shows the first audition as the default and preserves an explicit later choice", () => {
+    const props = { bookId: "book", cast, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} selections={{}} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+    expect(screen.getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Default audition")).toBeInTheDocument();
+    view.rerender(<CastVoiceReview {...props} selections={{ many: "many-2" }} />);
+    expect(screen.getByRole("button", { name: "Apply Audition 2" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "false");
+  });
 });

@@ -6,6 +6,7 @@ import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog } from "./Ui";
+import { chosenVoiceRevision } from "../workflow/cast";
 import { suggestedMemberIds } from "../voiceRoutes";
 import { isActionRequiredError } from '../api/actionRequired';
 
@@ -52,10 +53,7 @@ function approvedRevisionFor(voice: CastVoice, selections: Record<string, string
 }
 
 function tilePreviewFor(voice: CastVoice, selections: Record<string, string>) {
-  const approvedRevision = approvedRevisionFor(voice, selections);
-  return candidateForRevision(voice, approvedRevision)
-    ?? candidateForRevision(voice, voice.voicePreviewRevision)
-    ?? candidatesFor(voice).at(-1);
+  return candidateForRevision(voice, chosenVoiceRevision(voice, selections));
 }
 
 function sharedGroupFor(voice: CastVoice, selections: Record<string, string>) {
@@ -239,11 +237,8 @@ export function CastVoiceReview({
   const [collectionQuery, setCollectionQuery] = useState("");
   const [collectionFilter, setCollectionFilter] = useState("all");
   const largeCollection = voices.length > 12;
-  const byReviewPriority = (left: CastVoice, right: CastVoice) =>
-    Number(requiresReview(right)) - Number(requiresReview(left))
-      || Number(!routeReady(right)) - Number(!routeReady(left));
   const visibleVoices = largeCollection ? voices.filter((voice) => collectionMatches(collectionQuery, [voice.name, ...(voice.literalLabels ?? [])])
-    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))).slice().sort(byReviewPriority) : voices.slice().sort(byReviewPriority);
+    && (collectionFilter === "all" || (collectionFilter === "required" ? requiresReview(voice) : collectionFilter === "approved" ? routeReady(voice) : !routeReady(voice) && !requiresReview(voice)))) : voices;
   const selectedCount = voices.filter(routeReady).length;
   const requiredCount = voices.filter(requiresReview).length;
   const defaultReadyCount = voices.length - selectedCount - requiredCount;
@@ -530,7 +525,7 @@ export function CastVoiceReview({
           dataSharedVoiceGroup={sharedGroupId}
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span> : undefined}
-          portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true">▶</span> : undefined}
+          portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true"><PlaybackIcon /></span> : undefined}
           badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Stop" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
@@ -598,17 +593,19 @@ export function CastVoiceReview({
             <div className="voice-candidate-grid">{inspectedCandidates.map((candidate, index) => {
               const number = index + 1;
               const applied = candidate.revision === approvedRevision;
+              const selected = candidate.revision === chosenVoiceRevision(inspected, selections);
               const playingCandidate = playingCandidateRevision === candidate.revision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${applied ? "applied selected" : ""}`}>
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${selected ? "applied selected" : ""}`}>
                 <div className="voice-candidate-actions">
-                  <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={applied} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
+                  <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={selected} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
                     <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "Sample-cloned candidate" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest candidate" : "Earlier candidate")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
+                    {selected && !applied && <small>{t("Default audition")}</small>}
                     {applied && <strong className="candidate-applied-badge"><span aria-hidden="true">✓</span><span className="visually-hidden">{t("✓ Applied")}</span></strong>}
                   </button>
                 </div>
                 {candidate.previewUrl
                   ? <button type="button" ref={candidate.revision === newAuditionRevision ? newAuditionPlayRef : undefined} className={`voice-candidate-play ${playingCandidate ? "playing" : ""}`} aria-label={t("{{action}} Audition {{number}}", { action: t(playingCandidate ? "Stop" : "Play"), number })} aria-pressed={playingCandidate} onClick={() => toggleCandidatePreview(candidate)}>
-                    <span className="voice-candidate-play-icon" aria-hidden="true">{playingCandidate ? "■" : "▶"}</span>
+                    <span className="voice-candidate-play-icon" aria-hidden="true"><PlaybackIcon state={playingCandidate ? "stop" : "play"} /></span>
                     <span>{t(playingCandidate ? "Stop audition" : "Play audition")}</span>
                     <span className="voice-candidate-play-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
                   </button>
@@ -678,7 +675,7 @@ export function CastVoiceReview({
                 <span>{t("Choose voice sample")}</span>
               </label>}
               {sampleFile && samplePreviewUrl && <div className="voice-sample-preview">
-                <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}>{samplePlaying ? "Ⅱ" : "▶"}</button>
+                <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}><PlaybackIcon state={samplePlaying ? "pause" : "play"} /></button>
                 <span className="voice-sample-preview-copy"><b title={sampleFile.name}>{sampleFile.name}</b><small>{sampleTranscription === "transcribing" ? t("voiceSample.draftingShort", { ns: "edition" }) : t("Play while checking the transcript below.")}</small></span>
                 <span className="voice-sample-time">{audioTime(sampleElapsed)} / {audioTime(sampleDuration)}</span>
                 <label className="voice-sample-replace"><input type="file" aria-label={t("Choose a different sample")} accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" disabled={uploadingCharacterId === inspected.characterId} onChange={(event) => { const sample = event.target.files?.[0]; event.target.value = ""; if (sample) void chooseSample(sample); }} /><span>{t("Replace")}</span></label>
@@ -737,4 +734,13 @@ function ExistingVoiceChoice({ load, busy, onChoose }: { load: () => Promise<Cas
       <button type="button" disabled={!selection || busy} onClick={() => onChoose(JSON.parse(selection) as SourceVoice)}>{t(busy ? "Copying…" : "Use voice")}</button>
     </div> : <small>{t("No compatible voices in other books.")}</small>)}
   </details>;
+}
+
+/** Fixed geometry keeps playback marks aligned across platforms and typefaces. */
+function PlaybackIcon({ state = "play" }: { state?: "play" | "stop" | "pause" }) {
+  return <svg className="voice-playback-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
+    {state === "play" ? <path d="M8 5.8a1 1 0 0 1 1.5-.86l10 6.2a1 1 0 0 1 0 1.72l-10 6.2A1 1 0 0 1 8 18.2Z" />
+      : state === "stop" ? <rect x="6" y="6" width="12" height="12" rx="2" />
+      : <><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>}
+  </svg>;
 }

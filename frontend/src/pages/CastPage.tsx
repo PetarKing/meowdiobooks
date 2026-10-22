@@ -300,8 +300,8 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       <DialogSurface as="div" className="process-modal cast-default-modal" aria-labelledby="default-voices-title" onDismiss={() => setConfirmDefaultVoices(false)}>
         <h2 id="default-voices-title">{unapprovedVoices.length === 1 ? t("Approve 1 remaining voice?") : t("Approve {{count}} remaining voices?", { count: unapprovedVoices.length })}</h2>
         <p>{unapprovedVoices.length === 1
-          ? t("Continuing approves the latest audition for {{name}} and accepts the full cast.", { name: summarizedVoiceNames(unapprovedVoices) })
-          : t("Continuing approves the latest audition for each of these voices and accepts the full cast: {{names}}.", { names: summarizedVoiceNames(unapprovedVoices) })}</p>
+          ? t("Continuing approves the default audition for {{name}} and accepts the full cast.", { name: summarizedVoiceNames(unapprovedVoices) })
+          : t("Continuing approves the default audition for each of these voices and accepts the full cast: {{names}}.", { names: summarizedVoiceNames(unapprovedVoices) })}</p>
         {approvedCount > 0 && <p>{approvedCount === 1 ? t("Your 1 approved choice stays exactly as selected.") : t("Your {{count}} approved choices stay exactly as selected.", { count: approvedCount })}</p>}
         <div className="cast-default-actions">
           <button className="ghost" onClick={() => setConfirmDefaultVoices(false)}>{t("Keep reviewing")}</button>

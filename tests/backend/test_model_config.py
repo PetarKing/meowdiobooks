@@ -27,11 +27,14 @@ def test_default_registry_preserves_current_models_and_all_supported_languages()
     assert remote.input_usd_per_million_tokens == 0.2
     assert remote.cached_input_usd_per_million_tokens == 0.02
     assert remote.cache_write_input_usd_per_million_tokens == 0.25
-    assert remote.output_usd_per_million_tokens == 1.2
+    assert remote.output_usd_per_million_tokens == 1.0
+    assert remote.model == "gpt-6-luna"
+    assert remote.service_tier == "fast"
+    assert remote.reasoning_effort == "low"
     assert remote.policy == "dual-pass-with-tools-v1"
     assert remote.max_targets_per_batch == 8
     assert remote.max_concurrent_batches == 8
-    assert remote.estimated_usd_per_target == 0.00092
+    assert remote.estimated_usd_per_target == 0.00085
     assert voice.audition_path == "models/qwen_1_7b_voice_design"
     assert voice.renderer_path == "models/qwen_1_7b_base_4bit"
     assert voice.recipe_version == "1"
@@ -90,7 +93,51 @@ def test_dialogue_routing_preview_uses_model_display_cost_and_benchmark_config(t
         "domain": "api.openai.com",
         "credentialConfigured": False,
         "apiKeyEnvironmentVariable": "OPENAI_API_KEY",
-        "estimatedCostUsd": 0.86,
-        "falseNamesReductionPercent": 91,
-        "speakerRecallImprovementPercent": 373,
+        "estimatedCostUsd": 0.80,
+        "falseNamesReductionPercent": None,
+        "speakerRecallImprovementPercent": None,
     }
+
+
+def test_legacy_remote_profile_remains_loadable_without_new_pricing_fields(tmp_path):
+    source = (REPO_ROOT / "models.toml").read_text()
+    source = "\n".join(line for line in source.splitlines() if not line.startswith((
+        "service_tier", "default_service_tier_price_multiplier", "long_context_"
+    )))
+    (tmp_path / "models.toml").write_text(source)
+    remote = load_model_registry(tmp_path).remote_dialogue_model()
+    assert remote.service_tier is None
+    assert remote.long_context_input_token_threshold is None
+    assert remote.default_service_tier_price_multiplier == 1
+
+
+def test_partial_long_context_pricing_is_rejected(tmp_path):
+    source = (REPO_ROOT / "models.toml").read_text()
+    (tmp_path / "models.toml").write_text(source.replace(
+        "long_context_output_usd_per_million_tokens = 1.5", ""
+    ))
+    with pytest.raises(ModelConfigError, match="Long-context pricing requires"):
+        load_model_registry(tmp_path)
+
+
+def test_unknown_requested_service_tier_is_rejected(tmp_path):
+    source = (REPO_ROOT / "models.toml").read_text()
+    (tmp_path / "models.toml").write_text(source.replace('service_tier = "fast"', 'service_tier = "typo"'))
+    with pytest.raises(ModelConfigError, match="Unsupported service_tier"):
+        load_model_registry(tmp_path)
+
+
+def test_explicit_catalog_path_honors_alternate_filename_without_changing_default(tmp_path):
+    source = (REPO_ROOT / "models.toml").read_text()
+    (tmp_path / "models.toml").write_text(source)
+    alternate = tmp_path / "custom-prices.toml"
+    alternate.write_text(source.replace(
+        "output_usd_per_million_tokens = 1.0", "output_usd_per_million_tokens = 10.0"
+    ))
+    assert load_model_registry(tmp_path).remote_dialogue_model().output_usd_per_million_tokens == 1.0
+    assert load_model_registry(tmp_path, models_path=alternate).remote_dialogue_model().output_usd_per_million_tokens == 10.0
+
+
+def test_explicit_missing_catalog_does_not_silently_use_default():
+    with pytest.raises(ModelConfigError, match="Cannot read"):
+        load_model_registry(REPO_ROOT, models_path=REPO_ROOT / "missing-registry.toml")

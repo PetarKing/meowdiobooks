@@ -41,27 +41,30 @@ display_name = "Luna"
 engine = "openai_responses"
 base_url = "https://api.openai.com/v1"
 api_key_env = "OPENAI_API_KEY"
-model = "gpt-5.6-luna"
-pricing_version = "openai-gpt-5.6-luna-2026-07-30"
+model = "gpt-6-luna"
+pricing_version = "openai-gpt-6-luna-fast-2026-10-07"
 reasoning_effort = "low"
+service_tier = "fast"
 policy = "dual-pass-with-tools-v1"
-# USD charged per 1,000,000 provider-reported tokens.
+# Fast USD per 1,000,000 provider-reported tokens; see docs/REMOTE-PRICING.md.
 input_usd_per_million_tokens = 0.2
 cached_input_usd_per_million_tokens = 0.02
 cache_write_input_usd_per_million_tokens = 0.25
-output_usd_per_million_tokens = 1.2
+output_usd_per_million_tokens = 1.0
+# Responses can fall back to default processing, which costs half the Fast rates.
+default_service_tier_price_multiplier = 0.5
+long_context_input_token_threshold = 272000
+long_context_input_usd_per_million_tokens = 0.4
+long_context_cached_input_usd_per_million_tokens = 0.04
+long_context_cache_write_input_usd_per_million_tokens = 0.5
+long_context_output_usd_per_million_tokens = 1.5
 # Ordered Dialogue targets sent together inside one bounded eight-page scene.
 max_targets_per_batch = 8
 # Independent scene passes and selective adjudication share this worker ceiling.
 max_concurrent_batches = 8
-# Conservative full-book planning estimate: $1.744 / 1,903 targets, rounded up.
-estimated_usd_per_target = 0.00092
-
-[remote_text_models."luna-dialogue".dialogue_benchmark]
-sample_size = 586
-false_character_rate = 0.0085
-speaker_recall = 0.9701
-policy = "dual-pass-with-tools-v1"
+# Historical workload repriced at Luna 6 Fast: $1.61256046 / 1,903 targets, rounded up.
+# This is a planning estimate, not a newly measured Luna 6 workload or quality result.
+estimated_usd_per_target = 0.00085
 
 [voice_pipelines."qwen-voice-design-1.7b"]
 label = "Qwen3-TTS 1.7B VoiceDesign"
