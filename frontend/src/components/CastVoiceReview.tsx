@@ -525,7 +525,7 @@ export function CastVoiceReview({
           dataSharedVoiceGroup={sharedGroupId}
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span> : undefined}
-          portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true">▶</span> : undefined}
+          portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true"><PlaybackIcon /></span> : undefined}
           badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Stop" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
@@ -605,7 +605,7 @@ export function CastVoiceReview({
                 </div>
                 {candidate.previewUrl
                   ? <button type="button" ref={candidate.revision === newAuditionRevision ? newAuditionPlayRef : undefined} className={`voice-candidate-play ${playingCandidate ? "playing" : ""}`} aria-label={t("{{action}} Audition {{number}}", { action: t(playingCandidate ? "Stop" : "Play"), number })} aria-pressed={playingCandidate} onClick={() => toggleCandidatePreview(candidate)}>
-                    <span className="voice-candidate-play-icon" aria-hidden="true">{playingCandidate ? "■" : "▶"}</span>
+                    <span className="voice-candidate-play-icon" aria-hidden="true"><PlaybackIcon state={playingCandidate ? "stop" : "play"} /></span>
                     <span>{t(playingCandidate ? "Stop audition" : "Play audition")}</span>
                     <span className="voice-candidate-play-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span>
                   </button>
@@ -675,7 +675,7 @@ export function CastVoiceReview({
                 <span>{t("Choose voice sample")}</span>
               </label>}
               {sampleFile && samplePreviewUrl && <div className="voice-sample-preview">
-                <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}>{samplePlaying ? "Ⅱ" : "▶"}</button>
+                <button type="button" className={`voice-sample-play ${samplePlaying ? "playing" : ""}`} aria-label={t(samplePlaying ? "Pause selected voice sample" : "Play selected voice sample")} onClick={toggleSamplePreview}><PlaybackIcon state={samplePlaying ? "pause" : "play"} /></button>
                 <span className="voice-sample-preview-copy"><b title={sampleFile.name}>{sampleFile.name}</b><small>{sampleTranscription === "transcribing" ? t("voiceSample.draftingShort", { ns: "edition" }) : t("Play while checking the transcript below.")}</small></span>
                 <span className="voice-sample-time">{audioTime(sampleElapsed)} / {audioTime(sampleDuration)}</span>
                 <label className="voice-sample-replace"><input type="file" aria-label={t("Choose a different sample")} accept=".wav,.mp3,.flac,audio/wav,audio/mpeg,audio/flac" disabled={uploadingCharacterId === inspected.characterId} onChange={(event) => { const sample = event.target.files?.[0]; event.target.value = ""; if (sample) void chooseSample(sample); }} /><span>{t("Replace")}</span></label>
@@ -734,4 +734,13 @@ function ExistingVoiceChoice({ load, busy, onChoose }: { load: () => Promise<Cas
       <button type="button" disabled={!selection || busy} onClick={() => onChoose(JSON.parse(selection) as SourceVoice)}>{t(busy ? "Copying…" : "Use voice")}</button>
     </div> : <small>{t("No compatible voices in other books.")}</small>)}
   </details>;
+}
+
+/** Fixed geometry keeps playback marks aligned across platforms and typefaces. */
+function PlaybackIcon({ state = "play" }: { state?: "play" | "stop" | "pause" }) {
+  return <svg className="voice-playback-icon" viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true" focusable="false">
+    {state === "play" ? <path d="M8 5.8a1 1 0 0 1 1.5-.86l10 6.2a1 1 0 0 1 0 1.72l-10 6.2A1 1 0 0 1 8 18.2Z" />
+      : state === "stop" ? <rect x="6" y="6" width="12" height="12" rx="2" />
+      : <><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></>}
+  </svg>;
 }

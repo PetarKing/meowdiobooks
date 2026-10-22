@@ -15,7 +15,7 @@
 .voice-cast-progress .required::before { background: var(--danger-ink); }
 .voice-inspector-body { display: block; background: var(--paper); }
 .cast-inspector-backdrop:has(> .voice-inspector) { justify-content: center; align-items: center; padding: 24px; }
-.voice-inspector.cast-inspector { width: min(1000px, calc(100vw - 48px)); height: auto; max-height: calc(100dvh - 48px); margin: 0; overflow: auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 32px 100px rgb(var(--shadow-color) / .24); animation: voice-dialog-in 220ms cubic-bezier(.2,.8,.2,1) both; }
+.voice-inspector.cast-inspector { width: min(1120px, calc(100vw - 48px)); height: auto; max-height: calc(100dvh - 48px); margin: 0; overflow: auto; border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 32px 100px rgb(var(--shadow-color) / .24); animation: voice-dialog-in 220ms cubic-bezier(.2,.8,.2,1) both; }
 .voice-inspector.cast-inspector.closing { animation: voice-dialog-out 220ms ease both; }
 @keyframes voice-dialog-in { from { transform: translateY(14px) scale(.985); opacity: .5; } to { transform: translateY(0) scale(1); opacity: 1; } }
 @keyframes voice-dialog-out { from { transform: translateY(0) scale(1); opacity: 1; } to { transform: translateY(9px) scale(.99); opacity: 0; } }
@@ -29,29 +29,31 @@
 .voice-candidates-section blockquote { max-width: 760px; margin: 20px 0 12px; padding: 0 0 0 18px; border-left: 2px solid var(--gilt); background: transparent; font-size: 19px; }
 .voice-candidates-help { margin: 0 0 22px; font-size: 13px; }
 .voice-no-script { margin: 14px 0 8px; font: 450 12px/1.5 var(--font-sans); }
-.voice-candidate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 218px), 1fr)); gap: 14px; }
+.voice-candidate-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; }
 .voice-candidate-grid:has(> .voice-new-audition:only-child) { grid-template-columns: minmax(0, 340px); }
 .voice-candidate-tile,
 .voice-candidate-tile.sample-derived,
-.voice-candidate-tile.shared-derived { position: relative; display: grid; grid-template-rows: 1fr auto; border: 0; border-top: 1px solid var(--line); border-bottom: 3px solid transparent; border-radius: 5px; background: color-mix(in srgb, var(--surface-soft) 42%, var(--paper)); box-shadow: none; }
+.voice-candidate-tile.shared-derived { position: relative; display: grid; grid-template-rows: 1fr auto; border: 1px solid var(--color-border, var(--line)); border-radius: 14px; background: var(--paper); box-shadow: none; }
 .voice-candidate-tile.applied,
-.voice-candidate-tile.sample-derived.applied { border-top-color: var(--success-border); border-bottom-color: var(--green); background: var(--green-soft); }
+.voice-candidate-tile.sample-derived.applied { border-color: var(--color-success, var(--green)); background: color-mix(in srgb, var(--green-soft) 45%, var(--paper)); }
 .voice-candidate-tile.selected,
-.voice-candidate-tile.applied.selected { border-width: 1px 0 3px; box-shadow: none; }
-.voice-candidate-choice { position: relative; display: flex; min-height: 122px; height: 100%; align-items: start; justify-content: space-between; gap: 8px; padding: 17px 17px 20px; border: 0; box-shadow: none; }
+.voice-candidate-tile.applied.selected { border-width: 1px; box-shadow: inset 0 3px var(--color-success, var(--green)); }
+.voice-candidate-choice { position: relative; display: flex; min-height: 136px; height: 100%; align-items: start; justify-content: space-between; gap: 8px; padding: 22px 20px 20px; border: 0; box-shadow: none; }
 .voice-candidate-choice:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
 .voice-candidate-choice:hover { background: color-mix(in srgb, var(--matcha) 9%, transparent); }
 .voice-candidate-choice b { font: 500 20px/1.15 var(--font-display); white-space: nowrap; }
-.voice-candidate-choice > span:first-child { display: grid; min-width: 0; gap: 4px; }
+.voice-candidate-choice > span:first-child { display: grid; min-width: 0; gap: 7px; }
 .voice-candidate-choice small { display: block; margin: 0; line-height: 1.3; }
 .voice-candidate-choice .voice-candidate-summary { overflow-wrap: anywhere; }
 .voice-candidate-choice .candidate-applied-badge { display: grid; place-items: center; flex: 0 0 20px; width: 20px; height: 20px; margin-top: 1px; padding: 0; border-radius: 50%; background: var(--green); color: var(--paper); white-space: nowrap; font-size: 11px; }
-.voice-candidate-play { display: flex; width: 100%; min-height: 62px; align-items: center; gap: 11px; margin: 0; padding: 9px 17px 12px; border: 0; border-radius: 0; background: color-mix(in srgb, var(--surface-soft) 55%, var(--paper)); color: var(--ink); box-shadow: none; font: 650 12px/1 var(--font-sans); text-align: left; cursor: pointer; }
+.voice-candidate-play { display: flex; width: 100%; min-height: 72px; align-items: center; gap: 11px; margin: 0; padding: 14px 20px; border: 0; border-top: 1px solid var(--color-border, var(--line)); border-radius: 0; background: transparent; color: var(--ink); box-shadow: none; font: 650 12px/1 var(--font-sans); text-align: left; cursor: pointer; }
 .voice-candidate-play:hover { background: color-mix(in srgb, var(--sakura) 23%, var(--paper)); color: var(--poppy); }
 .voice-candidate-play:focus-visible { outline: 3px solid var(--poppy); outline-offset: -3px; }
 .voice-candidate-play.playing { background: color-mix(in srgb, var(--sakura) 32%, var(--paper)); color: var(--poppy); }
-.voice-candidate-play-icon { display: grid; width: 31px; height: 31px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--poppy); color: var(--action-ink); font-size: 12px; }
-.voice-candidate-play.playing .voice-candidate-play-icon { font-size: 10px; }
+.voice-candidate-play-icon { display: grid; width: 42px; height: 42px; flex: 0 0 auto; place-items: center; border-radius: 50%; background: var(--color-action, var(--poppy)); color: var(--action-ink); }
+.voice-playback-icon { display: block; flex: 0 0 auto; }
+.voice-sample-play { width: 44px; height: 44px; padding: 0; box-shadow: none; }
+.voice-sample-preview { grid-template-columns: 44px minmax(0,1fr) auto auto; }
 .voice-candidate-play-wave { display: flex; height: 22px; align-items: center; gap: 3px; margin-left: auto; opacity: .42; }
 .voice-candidate-play-wave i { width: 2px; height: 13px; border-radius: 2px; background: currentColor; }
 .voice-candidate-play-wave i:nth-child(2), .voice-candidate-play-wave i:nth-child(4) { height: 19px; }
@@ -59,8 +61,8 @@
 .voice-candidate-play.playing .voice-candidate-play-wave i { animation: voice-tile-wave 950ms ease-in-out infinite; }
 .voice-candidate-play.playing .voice-candidate-play-wave i:nth-child(even) { animation-delay: -370ms; }
 .voice-candidate-audio { display: none; }
-.voice-new-audition { display: flex; min-height: 185px; align-items: center; justify-content: center; flex-direction: column; gap: 11px; padding: 18px; border: 0; border-top: 1px solid var(--line); border-bottom: 3px solid transparent; border-radius: 5px; background: color-mix(in srgb, var(--sakura) 13%, var(--paper)); color: var(--ink); text-align: center; cursor: pointer; transition: border-color 180ms ease, background 180ms ease; }
-.voice-new-audition:hover { transform: none; border-bottom-color: var(--poppy); background: color-mix(in srgb, var(--sakura) 25%, var(--paper)); }
+.voice-new-audition { display: flex; min-height: 210px; align-items: center; justify-content: center; flex-direction: column; gap: 11px; padding: 18px; border: 1px dashed var(--line-strong); border-radius: 14px; background: color-mix(in srgb, var(--sakura) 13%, var(--paper)); color: var(--ink); text-align: center; cursor: pointer; transition: border-color 180ms ease, background 180ms ease; }
+.voice-new-audition:hover { transform: none; border-color: var(--poppy); background: color-mix(in srgb, var(--sakura) 25%, var(--paper)); }
 .voice-new-audition-icon { display: grid; width: 52px; height: 52px; place-items: center; border: 1px solid var(--poppy); border-radius: 50%; color: var(--poppy); font: 300 32px/1 var(--font-sans); }
 .voice-new-audition b { display: block; font: 500 22px/1.1 var(--font-display); }
 .voice-new-audition small { display: block; margin-top: 5px; color: var(--muted); font-size: 12px; }
@@ -104,6 +106,7 @@
   .voice-inspector-body > section { padding: 24px 18px; }
   .voice-inspector .cast-inspector-head { padding: 18px; }
   .voice-candidate-grid { grid-template-columns: 1fr; }
+  .voice-sample-preview { grid-template-columns: 44px minmax(0,1fr) auto; }
   .voice-candidate-choice { min-height: 95px; }
   .voice-new-audition { min-height: 134px; }
   .voice-audition-settings .voice-trait-columns { grid-template-columns: 1fr; }
