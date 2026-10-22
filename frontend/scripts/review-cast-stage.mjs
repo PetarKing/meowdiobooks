@@ -3,7 +3,7 @@ import {mkdir,writeFile} from 'node:fs/promises';
 import {chromium} from 'playwright';
 import {chooseAppearance} from './appearance-controls.mjs';
 const base=process.argv[2]??'http://127.0.0.1:5179/studio.html';
-const out=process.argv[3]??'../docs/matcha-next/evidence/cast';
+const out=process.argv[3]??'../.review-evidence/cast';
 await mkdir(out,{recursive:true});
 const browser=await chromium.launch();const results=[];
 try {for(const width of [1440,390]) for(const appearance of ['light','dark']) {

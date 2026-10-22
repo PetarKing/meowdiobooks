@@ -221,9 +221,10 @@ Pull-request CI installs only the cross-platform core and skips tests marked
 `uses_audio_decoder` or `runs_models`. The complete local suite above remains the release-confidence
 check on Apple Silicon.
 
-Contributions should start with an issue describing user value, scope, affected contracts, test
-strategy, and dependencies. New services, databases, caches, cross-service coupling, or runtime
-dependencies require maintainer approval before implementation. AI-assisted contributions are
+Substantial contributions without existing maintainer approval should start with an issue describing
+user value, scope, affected contracts, test strategy, and dependencies. Existing approval covers its
+stated scope. New services, databases, caches, cross-service coupling, or runtime dependencies outside
+that scope require maintainer approval before adoption. AI-assisted contributions are
 welcome when the author remains accountable and supplies evidence proportional to the change. See
 the [contributor reference](docs/CONTRIBUTING.md), including the
 [AI-assisted contribution policy](docs/CONTRIBUTING.md#ai-assisted-contributions).

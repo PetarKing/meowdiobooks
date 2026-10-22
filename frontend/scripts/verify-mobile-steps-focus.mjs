@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium, webkit } from 'playwright';
-const [phase = 'after', url = 'http://127.0.0.1:5189/studio.html', out = '../docs/assets/review/mobile-steps-focus'] = process.argv.slice(2);
+const [phase = 'after', url = 'http://127.0.0.1:5189/studio.html', out = '../.review-evidence/mobile-steps-focus'] = process.argv.slice(2);
 await mkdir(out, { recursive: true });
 const results = [];
 for (const engine of [chromium, webkit]) {

@@ -1,8 +1,8 @@
 # Architecture and release boundary
 
-Status: current public-alpha architecture.
+Status: current alpha architecture.
 
-Meowdiobooks is a complete local application. Installing the public Python distribution provides the
+Meowdiobooks is a complete local application. The [source setup](SETUP.md) builds and installs the
 API, local workflow runtime, compiled browser application, model registry, and command-line entrypoint.
 No account, hosted service, private repository, database, or network provider is required to run it.
 

@@ -7,7 +7,7 @@ books and computers without losing its source-linked workflow.
 ## Easier to start
 
 - Provide a guided installation path for the application, llama.cpp and the supported model assets.
-- Ship a small public-domain example that proves the complete workflow from import through M4B.
+- Simplify running the included public-domain evaluation fixtures from import through M4B.
 - Make setup failures actionable without requiring users to understand the runtime architecture.
 
 ## Easier to review and refine
@@ -33,7 +33,7 @@ books and computers without losing its source-linked workflow.
 ## Hosted companion
 
 - A hosted companion is planned for people who prefer managed setup and compute. It will build on a
-  fixed public release rather than replacing the local open-source workflow. Scope and timing are not
+  fixed workflow release rather than replacing the local source-available workflow. Scope and timing are not
   yet committed.
 ## How quality changes are made
 

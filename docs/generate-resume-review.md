@@ -42,9 +42,8 @@ GENERATION_REVIEW_URL=http://127.0.0.1:6027 node frontend/scripts/verify-generat
   fast-refresh export warning.
 - 66 Storybook browser/accessibility tests and packaged host compatibility passed.
 - Eight Chromium/WebKit mobile/desktop and light/dark reattachment/cancellation browser
-  combinations passed. [Mobile progress](assets/review/generate-resume/running-mobile.png),
-  [desktop progress](assets/review/generate-resume/running-desktop.png) and
-  [browser report](assets/review/generate-resume/report.json) use deterministic synthetic public-domain fixtures.
+  combinations passed with deterministic synthetic public-domain fixtures. Regenerate captures
+  with the command above and keep them outside tracked documentation.
 - Local canonical review: 95 of 96 combinations passed; desktop dark Home repeatedly reported
   contrast against the underlying illustration despite a visibly dark masking gradient. No Home/CSS
   change is included in this fix. Required CI must pass the full canonical gate before merge.

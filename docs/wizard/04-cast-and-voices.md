@@ -132,7 +132,8 @@ Audition lines and voice direction stay out of identity classification.
 - narrator voice tuning appears with the other auditions in Voice, not during Cast identity review;
 - a separate Voice tile board with Narrator pinned first and the remaining cast ordered by descending
   line count;
-- line counts on Cast settings and Voice tiles;
+- occurrence details in the identity inspector; roster cards keep the name, playback and status
+  without repeating line counts;
 - Voice tiles open an inspector and never participate in identity drag-to-merge operations;
 - the inspector puts audition text and generation settings first, followed by newest-first selectable
   candidate tiles with preview audio, compact settings and explicit applied/selected/available states;
@@ -142,6 +143,14 @@ Audition lines and voice direction stay out of identity classification.
   transcript without forcing a language, the user corrects it to exactly what the speaker says, and
   Qwen Base creates another candidate. The normalized sample and matching transcript remain inside
   the working book.
+
+Selecting an audition applies its exact revision to the draft immediately; Play/Stop remains a
+separate action. In the voice roster, the initials field controls playback and the rest of the
+card opens the inspector. The first audition starts directly; replacing an existing set requires
+confirmation because generation replaces that candidate set. The accepted Cast stays usable until
+replacement acceptance. Returning to an accepted Cast confirms replacement, prepares an editable
+candidate and opens Voices; identity editing remains available there. A newer saved draft opens
+directly. See [interaction decisions](../INTERACTION_DECISIONS.md) for the rationale.
 
 ## AI contract B — voice-profile suggestion
 

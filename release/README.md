@@ -25,6 +25,11 @@ After a successful build, `dist/release` contains exactly:
 
 Do not hand-maintain generated archives in `dist/release`; rerun the builder instead.
 
+Both packages include a copy of the canonical [license](../LICENSE), including its required
+copyright notice. The package-local copies are checked against the root license before building.
+Use the [publication reference](../docs/PUBLICATION.md) for release discovery and retention;
+historical published assets remain unchanged.
+
 The workflow wheel intentionally excludes the Apple-only MLX dependency. It contains the public
 workflow contracts and reference implementation. Integrators targeting other platforms must provide
 compatible execution adapters for the local MLX and llama.cpp handlers.
