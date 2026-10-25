@@ -6,15 +6,17 @@ import { createFixtureGateway, snapshotFor } from "../../design-kit/fixtures";
 import type { WizardSnapshot } from "../api/contracts";
 import type { GenerationPurchasePresentation } from "../app/contracts";
 import { publicGenerationEstimatePolicy } from "../workflow/generation";
+import { changeAppLocale } from "../i18n";
 import { GeneratePage, type GeneratePageModel } from "./GeneratePage";
 
-function Tracklist({ generate = vi.fn(), exportChapters = vi.fn(), snapshot = snapshotFor("generate-stale"), purchase, initialSelection = [], initialFilter = "pending" }: {
+function Tracklist({ generate = vi.fn(), exportChapters = vi.fn(), snapshot = snapshotFor("generate-stale"), purchase, error, initialSelection = [], initialFilter = "pending" }: {
   generate?: GeneratePageModel["generateChapters"];
   exportChapters?: GeneratePageModel["continueToExport"];
   snapshot?: WizardSnapshot;
   purchase?: GenerationPurchasePresentation;
   initialFilter?: GeneratePageModel["chapterFilter"];
   initialSelection?: string[];
+  error?: string;
 
 }) {
   const { t } = useTranslation();
@@ -24,11 +26,11 @@ function Tracklist({ generate = vi.fn(), exportChapters = vi.fn(), snapshot = sn
   const [splitChapterId, setSplitChapterId] = useState<string>();
   return <GeneratePage model={{
     gateway: createFixtureGateway("generate-stale"), book: snapshot.book, snapshot,
-    busy: false, error: "", chapterFilter, selectedChapters, listeningChapterId, splitChapterId,
+    busy: false, chapterFilter, selectedChapters, listeningChapterId, splitChapterId,
     setChapterFilter, setSelectedChapters, setListeningChapterId, setSplitChapterId,
     generateChapters: generate, splitLongChapter: vi.fn(), continueToExport: exportChapters,
     generationSamples: [], generationEstimatePolicy: publicGenerationEstimatePolicy, t,
-  }} purchase={purchase} />;
+  }} purchase={purchase} error={error} />;
 }
 
 function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentation {
@@ -44,6 +46,20 @@ function purchasedScope(snapshot: WizardSnapshot): GenerationPurchasePresentatio
 }
 
 describe("Generate chapter targets", () => {
+  it("localizes the inline failure while preserving its support reference", async () => {
+    await changeAppLocale("zh-CN");
+    try {
+      render(<Tracklist error="We couldn’t create the audio. Please try again. Reference: 0123456789abcdef0123456789abcdef." />);
+      const alert = screen.getByRole("alert");
+      expect(alert.textContent).toMatch(/[\u4e00-\u9fff]/);
+      expect(alert).toHaveTextContent("0123456789abcdef0123456789abcdef");
+      expect(alert).not.toHaveTextContent("We couldn’t create the audio");
+      expect(alert).not.toHaveTextContent("Reference:");
+    } finally {
+      await changeAppLocale("en");
+    }
+  });
+
   it("defers resize-observer writes and cancels queued dock layout work on unmount", () => {
     let resize = () => {};
     vi.stubGlobal("ResizeObserver", class {

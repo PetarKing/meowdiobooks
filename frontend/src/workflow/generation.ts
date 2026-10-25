@@ -1,5 +1,12 @@
-import type { Job } from "../api/contracts";
+import type { Job, WizardSnapshot } from "../api/contracts";
 import appI18n from "../i18n";
+
+export function hasGenerationAction(snapshot?: WizardSnapshot): boolean {
+  if (!snapshot?.recordingScript) return false;
+  const unavailable = new Set(snapshot.recordingScript.summary.emptyChapterIds);
+  return snapshot.chapters.some((chapter) => !unavailable.has(chapter.id))
+    || snapshot.generatedChapters.some((chapter) => chapter.current);
+}
 
 export const longChapterSplitSeconds = 2 * 60 * 60;
 export const targetChapterPartSeconds = 30 * 60;

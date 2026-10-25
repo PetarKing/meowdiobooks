@@ -91,7 +91,7 @@ async function open(
   })
   vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue(representativePages)
   vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, pageCount: 120, method: 'liteparse', text: 'Alice', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: '/page.png' })
-  render(<App {...appProps} />)
+  const view = render(<App {...appProps} />)
   await screen.findByRole('button', { name: /Alice.*Continue/ })
   await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledWith('book-1'))
   fireEvent.click(screen.getByRole('button', { name: /Alice.*Continue/ }))
@@ -101,6 +101,7 @@ async function open(
     expect(wizardApi.getBookSnapshot).toHaveBeenCalledWith('book-1')
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
   })
+  return view
 }
 
 describe('v2 wizard', () => {
@@ -655,25 +656,85 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('tab', { name: /Generated/ })).toHaveAttribute('aria-selected', 'true')
   })
 
-  it('keeps a generation failure beside its retry action and preserves saved audio', async () => {
-    await open({ ...base,
+  it.each(['synchronous', 'immediate', 'polled'] as const)('shows a generation failure once beside its retry action after %s failure', async (completion) => {
+    const view = await open({ ...base,
       chapters: [...base.chapters, { id: 'chapter-2', title: 'The Pool of Tears', startPage: 13, endPage: 24 }],
       recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, chapters: [
         ...faithfulSummary.chapters,
         { chapterId: 'chapter-2', totalCharacters: 900, retainedCharacters: 900, dialogueSpans: 2, narratorFallbackSpans: 0, retainedPercent: 100, estimatedSeconds: 60, empty: false },
       ] } },
     })
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-failed', status: 'failed', error: 'Synthesis interrupted; saved tracks are unchanged.' })
+    const detail = 'We couldn’t create the audio. Please try again. Reference: 0123456789abcdef0123456789abcdef.'
+    const failed: Job = { id: 'generate-failed', status: 'failed', error: detail }
+    if (completion === 'synchronous') vi.mocked(wizardApi.processStage).mockRejectedValue(new Error(detail))
+    else vi.mocked(wizardApi.processStage).mockResolvedValue(completion === 'immediate' ? failed : { ...failed, status: 'running' })
+    vi.mocked(wizardApi.getJob).mockResolvedValue(failed)
     fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const action = screen.getByRole('region', { name: 'Generation action' })
-    expect(await within(action).findByText('Something went wrong while completing this step. Try again; your accepted work is unchanged.')).toBeVisible()
+    expect(await within(action).findByText(detail)).toBeVisible()
+    expect(screen.getAllByText(detail)).toHaveLength(1)
+    expect(screen.getAllByRole('alert')).toEqual([within(action).getByRole('alert')])
     expect(within(action).getByText('Generation needs attention')).toBeInTheDocument()
     expect(within(action).getByRole('button', { name: /^Generate 1 selected →$/ })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
+    expect(screen.getByRole('alert')).toHaveTextContent(detail)
+    view.rerender(<App stepOverrides={{ generate: () => <h1>Custom generation</h1> }} />)
+    expect(screen.getByRole('heading', { name: 'Custom generation' })).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('error-note')
+    expect(screen.getAllByText(detail)).toHaveLength(1)
+    view.rerender(<App />)
+    expect(within(screen.getByRole('region', { name: 'Generation action' })).getByRole('alert')).toHaveTextContent(detail)
+    fireEvent.click(screen.getByRole('tab', { name: /To make/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' }))
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'retry', status: 'succeeded', result: {} })
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledTimes(2))
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('keeps an unrelated chapter-split failure global after a generation failure', async () => {
+    const snapshot: WizardSnapshot = { ...base, generatedChapters: [],
+      recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary,
+        chapters: [{ ...faithfulSummary.chapters[0], estimatedSeconds: 9_000 }],
+      } },
+    }
+    await open(snapshot)
+    vi.mocked(wizardApi.processStage).mockRejectedValue(new Error('We couldn’t create the audio. Please try again.'))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
+    const action = screen.getByRole('region', { name: 'Generation action' })
+    await within(action).findByRole('alert')
+    vi.mocked(wizardApi.splitRecordingScriptChapter).mockRejectedValue(new Error('Private split diagnostic'))
+    fireEvent.click(screen.getByRole('button', { name: 'Split Down the Rabbit-Hole into shorter chapters' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Split into ≈ 5 chapters' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveClass('error-note'))
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(within(action).queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('Generation needs attention')).not.toBeInTheDocument()
+    expect(screen.getByRole('alert')).not.toHaveTextContent('Private split diagnostic')
+  })
+
+  it.each(['all-ready', 'no-action'] as const)('retains one failure when refreshed chapters are %s', async (state) => {
+    await open({ ...base, generatedChapters: [] })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(state === 'all-ready' ? base : {
+      ...base, generatedChapters: [], recordingScript: { ...base.recordingScript!,
+        summary: { ...faithfulSummary, emptyChapterIds: ['chapter-1'] } },
+    })
+    vi.mocked(wizardApi.processStage).mockRejectedValue(new Error('We couldn’t create the audio. Please try again.'))
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    if (state === 'all-ready') {
+      const action = screen.getByRole('region', { name: 'Generation action' })
+      expect(within(action).getByRole('alert')).toBeVisible()
+      expect(within(action).getByRole('button', { name: 'Continue to Export →' })).toBeEnabled()
+    } else {
+      expect(screen.queryByRole('region', { name: 'Generation action' })).not.toBeInTheDocument()
+      expect(screen.getByRole('alert')).toHaveClass('error-note')
+    }
   })
 
   it.each(['immediate', 'polled'] as const)('selects the newly generated tracks and carries that selection to Export after %s completion', async (completion) => {
@@ -4106,6 +4167,9 @@ describe('v2 wizard', () => {
     finish({ id: 'resumed-partial', kind: 'v2:generate', status, error: 'Stopped after saving Chapter 1.' })
     await screen.findByRole('alert')
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    expect(screen.getAllByRole('alert')).toHaveLength(1)
+    expect(within(screen.getByRole('alert')).getByRole('button', { name: 'Retry' })).toBeEnabled()
+    expect(within(screen.getByRole('region', { name: 'Generation action' })).queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
     expect(screen.getByRole('checkbox', { name: 'Select A Caucus-Race' })).not.toBeChecked()
     expect(screen.queryByRole('checkbox', { name: 'Select Down the Rabbit-Hole' })).not.toBeInTheDocument()
@@ -4456,6 +4520,8 @@ describe('v2 wizard', () => {
     await open({ ...base, generatedChapters: [] });
     fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(action.message);
+    expect(screen.getAllByText(action.message)).toHaveLength(1);
+    expect(within(screen.getByRole('region', { name: 'Generation action' })).getByRole('alert')).toHaveTextContent(action.message);
   });
 
   it('restores a failed job action and its exact selected step without re-running work', async () => {

@@ -5,6 +5,7 @@ import { useAppearance } from "./app/useAppearance";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { useWorkflowModel } from "./app/useWorkflowModel";
 import { usePageNavigation } from "./app/usePageNavigation";
+import { hasGenerationAction } from "./workflow/generation";
 import brandMark from "./assets/brand/meowdiobooks-mark.webp";
 import { DialogSurface } from "./components/DialogSurface";
 import { DialogueRoutingChoice } from "./components/DialogueRoutingChoice";
@@ -47,17 +48,22 @@ export default function App(props: AppProps) {
   useEffect(() => { warmBookReturnAnimation(); }, []);
   const { appearance, resolvedAppearance, setAppearance } = useAppearance(props.appearance, props.onAppearanceChange);
   const { activeJob, activeJourneyStep, book, bookPendingDeletion, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, completed, deleteBook, deletingBookId, dialogue, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, error, extractionTransition, gateway, generateComplete, generationInProgress, generationReady, generationRemaining, generationRun, hasDraft, home, hydrate, libraryExports, navigateProduct, processMessage, processingOverlaySuppressed, productView, progress, recoveringDownstreamDialogue, renderHeader, reviewTransition, routeStage, runDialogueTranscript, setBookPendingDeletion, setDialogueRouteChoiceOpen, setHome, setStage, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, stage, stageIndex, stages, stepOverrides, t, toggleSidebar, unlockedThrough, uploadingCharacterId } = model;
+  const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
+  // Only the visible built-in action dock owns generation failures. Return retries,
+  // custom steps and unrelated operations retain the shell's error presentation.
+  const inlineGenerationError = productView === "create" && !home && !StepOverride
+    && !recoveringDownstreamDialogue && !model.restoringLocation && !model.returnLocation
+    && activeJourneyStep?.builtin === "generate" && hasGenerationAction(snapshot)
+    ? model.generationError : undefined;
   // Only evaluate the visible page; render-only functions retain their boundaries and hook-owning pages mount as components.
   const builtinViews: Partial<Record<WizardStep, () => ReactNode>> = {
     extract: () => ExtractPage({ model }),
     dialogue: () => DialoguePage({ model }),
     review: () => ReviewPage({ model }),
     cast: () => <CastPage key="cast" model={model} />,
-    generate: () => <GeneratePage key="generate" model={model} purchase={props.generationPurchase} />,
+    generate: () => <GeneratePage key="generate" model={model} purchase={props.generationPurchase} error={inlineGenerationError} />,
     export: () => ExportPage({ model }),
   };
-
-  const StepOverride = activeJourneyStep ? stepOverrides[activeJourneyStep.id] : undefined;
 
   const createView = () => model.restoringLocation && busy && (!book || model.restoringJobScope)
     ? <BookReturnNotice appearance={resolvedAppearance} />
@@ -117,7 +123,7 @@ export default function App(props: AppProps) {
         <nav aria-label={t("Wizard stages")} style={{ "--journey-progress": `${stages.length > 1 ? stage / (stages.length - 1) * 100 : 0}%` } as CSSProperties}>{stages.map((row, index) => { const done = row.builtin === "generate" ? generateComplete : Boolean(row.completionStage && completed.includes(row.completionStage)); const draft = hasDraft(row.builtin); const skipped = row.builtin === "extract" && ["epub", "text"].includes(book?.sourceKind ?? ""); const locked = skipped || index > unlockedThrough; const status = draft ? "Draft ready" : done ? "Complete" : stage === index ? "In progress" : "Ready"; const label = t(row.label); const previousLabel = t(stages[Math.max(0, index - 1)]?.label ?? ""); const localizedStatus = skipped ? t("Not needed") : locked ? row.builtin === "export" ? t("Generate audio first") : t("Complete {{stage}} first", { stage: previousLabel }) : t(status); return <button key={row.id} aria-current={stage === index ? "step" : undefined} disabled={locked} aria-label={`${label} ${localizedStatus}`} title={`${label} · ${localizedStatus}`} className={`${stage === index ? "active" : ""} ${done && !skipped ? "done" : ""} ${draft ? "revising" : ""}`} onClick={() => setStage(routeStage(index))}><b aria-hidden="true">{skipped ? "–" : done ? "✓" : index + 1}</b><span><strong>{label}</strong><small>{localizedStatus}</small></span></button>; })}</nav>
       </aside>}
       <main ref={main} tabIndex={-1} className={!showWizard ? "home-main" : stage <= stageIndex("review") ? "review-wide" : ""}>
-        {error && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}{model.returnLocation && <button className="ghost" disabled={busy} onClick={model.retryWorkflowReturn}>{t("Retry")}</button>}</div>}
+        {error && !inlineGenerationError && <div className="error-note" role="alert">{localizeErrorMessage(error, t)}{model.returnLocation && <button className="ghost" disabled={busy} onClick={model.retryWorkflowReturn}>{t("Retry")}</button>}</div>}
         {view}
       </main>
     </div>
