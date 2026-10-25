@@ -25,6 +25,16 @@ Independent workflow tests cover source preservation, spine order, automatic acc
 restarts, host processor routing, failure rollback/retry, Dialogue→Review, and default/custom covers
 for all three formats. Export packaging is stubbed; these tests do not claim audio codec verification.
 
+Real-book compatibility: both EPUB editions of [Project Gutenberg’s Alice](https://www.gutenberg.org/ebooks/11)
+were downloaded into temporary storage and parsed successfully, including their image-only SVG cover
+wrappers. Those wrappers are skipped without rendering or loading resources; SVG reading text remains
+unsupported. Both editions preserve the title and author and produce 34 source sections.
+
+| Edition | Source SHA-256 | Extracted characters |
+|---|---|---:|
+| EPUB 3 | `4f81245d31380ac1d6eafb9a321e3691369bc70985736ae4bccf849a4f784036` | 164349 |
+| EPUB 2 | `e332bfce56f79897138d73e7b698dc59bd073d932acb87897606aa7b5df96dac` | 164441 |
+
 ## Browser evidence
 
 Using the production frontend and real local API, upload a synthetic `.txt`, `.md`, and `.epub`;

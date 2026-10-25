@@ -180,8 +180,8 @@ an active generation remains owned by the original backend process.
 
 ## Limitations
 
-- Encrypted PDFs and EPUBs are unsupported. EPUB reading sections must be XHTML; embedded
-  SVG, audio, video, objects, and XML entities are rejected. Image-only sections have no spoken
+- Encrypted PDFs and EPUBs are unsupported. EPUB reading sections must be XHTML; SVG reading
+  text, audio, video, objects, and XML entities are rejected. Image-only sections have no spoken
   text; image descriptions are kept when supplied. Markdown is read literally as text.
 - EPUB and text imports skip Extract (shown disabled) and open Dialogue. Long passages use
   stable reading sections rather than printed pages; Review keeps the source text visible.

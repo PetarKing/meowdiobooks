@@ -77,7 +77,17 @@ def _body_text(root) -> str:
 
     def visit(node):
         tag = _tag(node)
-        if tag in {"iframe", "object", "svg", "audio", "video"}:
+        if tag == "svg":
+            # Common EPUB covers wrap an image in SVG. Skip only image wrappers;
+            # never render/fetch them or silently drop SVG reading text.
+            for child in node.iter():
+                child_tag = _tag(child)
+                if (child_tag not in {"svg", "g", "image", "title", "desc"}
+                        or (child_tag not in {"title", "desc"} and (child.text or "").strip())
+                        or (child is not node and (child.tail or "").strip())):
+                    raise ValueError("EPUB contains unsupported embedded reading content")
+            return
+        if tag in {"iframe", "object", "audio", "video"}:
             raise ValueError("EPUB contains unsupported embedded reading content")
         if not tag or tag in {"script", "style"}:
             return

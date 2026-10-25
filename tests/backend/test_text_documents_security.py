@@ -188,12 +188,28 @@ def test_inline_text_tails_alt_text_and_notes_survive_in_document_order(tmp_path
     assert "Not body" not in output
 
 
-def test_unsupported_svg_text_is_not_silently_omitted(tmp_path):
+def test_svg_cover_image_wrapper_is_skipped_without_loading_resources(tmp_path):
     source = _epub(tmp_path, entries={"OPS/chapter.xhtml": (
-        b"<html><body><p>Visible paragraph.</p>"
-        b'<svg xmlns="http://www.w3.org/2000/svg"><text>Essential ending.</text></svg>'
-        b"</body></html>"
+        b'<html><body><svg xmlns="http://www.w3.org/2000/svg" '
+        b'xmlns:xlink="http://www.w3.org/1999/xlink">'
+        b'<title>Cover</title><desc>A cover image</desc><g>'
+        b'<image xlink:href="file:///nonexistent/cover.jpg"/></g></svg>'
+        b'<p>The complete story.</p></body></html>'
     )})
+    assert text_documents.read_text_document(source)[0] == ["The complete story."]
+
+
+@pytest.mark.parametrize("content", [
+    '<text>Essential ending.</text>', '<g>Essential ending.</g>',
+    '<foreignObject><p>Essential ending.</p></foreignObject>',
+    '<use href="other.svg#text"/>',
+])
+def test_unsupported_svg_text_is_not_silently_omitted(tmp_path, content):
+    source = _epub(tmp_path, entries={"OPS/chapter.xhtml": (
+        '<html><body><p>Visible paragraph.</p>'
+        f'<svg xmlns="http://www.w3.org/2000/svg">{content}</svg>'
+        '</body></html>'
+    ).encode()})
     with pytest.raises(ValueError):
         text_documents.read_text_document(source)
 
