@@ -221,6 +221,13 @@ sample rate, segment metadata and omissions. Audio is written into a staging dir
 current only after the complete chapter WAV and metadata validate. A failed regeneration leaves the
 previous playable chapter revision untouched.
 
+A segment receipt may include `synthesisRecoveries` for a bounded native short-word recovery.
+Each event records `segmentId`, `effectiveCharacterId`, one-based `unitIndex`,
+`originalReferenceMode`, `effectiveReferenceMode`, `reason`, `initialAttempts`, and
+`recoveryAttempts`. Mixed-track events identify the actual recovered member. These describe the
+mode used to produce that audio; they do not replace the accepted voice reference or mutate Cast.
+See [Generate](wizard/06-generate.md) for the eligibility and retry bounds.
+
 ## Jobs and transactional publication
 
 `jobs.json` records queued, running, canceled, succeeded and failed jobs with attempts, retry lineage,
