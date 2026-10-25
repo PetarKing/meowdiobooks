@@ -107,6 +107,27 @@ constructor identity when inspecting it: development dependency optimization or 
 bundled package entry points may create separate class instances. The guard also validates the
 descriptor and handled flag, so ordinary or malformed errors still remain visible.
 
+Background job failures use an optional `on_job_failed(job, error)` callback on `create_app_v2`
+and `JobQueue`. This additive, provider-neutral seam receives the settled failed job and original
+exception, including its traceback, after persistence. Without a callback, local operator logs
+retain the exception with job ID, kind and attempt. A composed callback owns private diagnostic
+storage and redaction; core does not duplicate its exception in logs. Callback failures produce
+only a job-correlated warning and cannot leave the job running or stop subsequent jobs.
+Cancellation, successful publication and valid action-required outcomes do not invoke the callback.
+Explicit `public_message` values remain public; otherwise jobs return plain retry guidance rather
+than exception names or diagnostics. Hosts must keep callback records outside public artifacts and
+job responses. Synchronous requests and process crashes do not pass through this queue callback.
+The additive `on_operation_failed(operation, book_id, error)` application hook covers caught
+transcription, cloned-audition, export-packaging and export-save failures with the same private-log
+ownership and reporter-failure isolation. Its operation labels are `transcribe`, `clone`, `export`
+and `export-save`; it does not claim universal HTTP error coverage. Explicit `WorkflowInputError`
+recovery guidance and valid host action descriptors remain public.
+Public operation errors may append ` Reference: <32 lowercase hexadecimal characters>.` to one of
+the reviewed audio, transcription, voice-sample, export, preview or document-read messages in
+`referencedOperationErrors`. The frontend preserves only this exact message/reference pairing,
+translates the base message and reference label separately, and rejects unknown or malformed pairs.
+The opaque reference conveys no provider details and grants no access to diagnostic records.
+
 Storybook exercises the same source with deterministic synthetic gateways. It is a development
 surface and is excluded from the consumer package.
 

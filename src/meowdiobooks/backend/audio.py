@@ -17,6 +17,7 @@ import numpy as np
 from scipy.io import wavfile
 from scipy.signal import resample_poly
 
+from .errors import WorkflowInputError
 from .model_config import asset_path, load_model_registry
 from .native_runtime import NativeModelLoader, load_native_model
 
@@ -41,9 +42,9 @@ def normalize_voice_sample(raw: bytes, filename: str) -> tuple[bytes, float]:
 
     suffix = Path(filename).suffix.casefold()
     if suffix not in VOICE_SAMPLE_SUFFIXES:
-        raise ValueError("Use a WAV, MP3, or FLAC voice sample")
+        raise WorkflowInputError("Use a WAV, MP3, or FLAC voice sample")
     if not raw:
-        raise ValueError("Voice sample is empty")
+        raise WorkflowInputError("Voice sample is empty")
 
     from mlx_audio.audio_io import read as read_audio
 
@@ -53,20 +54,20 @@ def normalize_voice_sample(raw: bytes, filename: str) -> tuple[bytes, float]:
             source.flush()
             samples, sample_rate = read_audio(source.name, dtype="float32")
     except (OSError, RuntimeError, ValueError) as error:
-        raise ValueError("Voice sample could not be decoded") from error
+        raise WorkflowInputError("Voice sample could not be decoded") from error
 
     audio = np.asarray(samples, dtype=np.float32)
     if audio.ndim == 2:
         audio = np.mean(audio, axis=1, dtype=np.float32)
     audio = audio.reshape(-1)
     if sample_rate <= 0 or not audio.size or not np.all(np.isfinite(audio)):
-        raise ValueError("Voice sample contains no usable audio")
+        raise WorkflowInputError("Voice sample contains no usable audio")
 
     duration = audio.size / float(sample_rate)
     if duration < VOICE_SAMPLE_MIN_SECONDS or duration > VOICE_SAMPLE_MAX_SECONDS:
-        raise ValueError("Voice sample must be between 3 and 30 seconds")
+        raise WorkflowInputError("Voice sample must be between 3 and 30 seconds")
     if float(np.sqrt(np.mean(np.square(audio, dtype=np.float64)))) < 1e-4:
-        raise ValueError("Voice sample is silent")
+        raise WorkflowInputError("Voice sample is silent")
 
     if sample_rate != VOICE_SAMPLE_RATE:
         divisor = math.gcd(int(sample_rate), VOICE_SAMPLE_RATE)

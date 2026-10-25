@@ -288,7 +288,9 @@ def test_composition_can_replace_the_default_job_resource_preflight(tmp_path):
         checks += 1
         raise HostedCapacityError("private capacity diagnostic")
 
-    app = create_app_v2(tmp_path, job_preflight=reject_job)
+    reported = []
+    app = create_app_v2(tmp_path, job_preflight=reject_job,
+                        on_job_failed=lambda job, error: reported.append((job, error)))
     with TestClient(app) as client:
         book_id = client.post(
             "/api/books/import", files={"file": ("alice.pdf", _pdf(), "application/pdf")}
@@ -304,6 +306,10 @@ def test_composition_can_replace_the_default_job_resource_preflight(tmp_path):
         assert finished["status"] == "failed"
         assert finished["error"] == HostedCapacityError.public_message
         assert "private capacity diagnostic" not in finished["error"]
+    assert len(reported) == 1
+    assert reported[0][0].id == finished["id"]
+    assert isinstance(reported[0][1], HostedCapacityError)
+    assert str(reported[0][1]) == "private capacity diagnostic"
 
 
 def test_cast_mapping_does_not_restore_a_model_alias_detached_during_review():
@@ -465,7 +471,7 @@ def test_v2_import_extract_dialogue_review_are_distinct_transactional_stages(tmp
         assert resumed["pendingCandidates"]["cast"]["revision"] == "cast-review-1"
 
 
-def test_dialogue_conflicts_block_processing_before_qwen_runs(tmp_path, monkeypatch):
+def test_dialogue_conflicts_block_processing_before_qwen_runs(tmp_path, monkeypatch, caplog):
     pages = [{"page": 1, "text": "<Alice>Hello</Alice>", "warnings": []}]
     monkeypatch.setattr(
         "meowdiobooks.backend.app_v2.extract_full_document",
@@ -506,7 +512,8 @@ def test_dialogue_conflicts_block_processing_before_qwen_runs(tmp_path, monkeypa
         finished = _wait(client, queued.json()["id"])
 
         assert finished["status"] == "failed"
-        assert "overlapping regex claim" in finished["error"]
+        assert "conflicting matches" in finished["error"]
+        assert "overlapping regex claim" in caplog.text
         assert qwen_calls == []
 
 
@@ -619,7 +626,7 @@ def test_accepting_new_extraction_invalidates_active_downstream_artifacts(tmp_pa
         assert "superseded Extraction" in stale.json()["detail"]
 
 
-def test_extraction_rejects_a_changed_imported_source_before_parsing(tmp_path, monkeypatch):
+def test_extraction_rejects_a_changed_imported_source_before_parsing(tmp_path, monkeypatch, caplog):
     called = False
 
     def fake_extract(*_args):
@@ -642,7 +649,8 @@ def test_extraction_rejects_a_changed_imported_source_before_parsing(tmp_path, m
         failed = _wait(client, queued.json()["id"])
 
         assert failed["status"] == "failed"
-        assert "integrity check failed" in failed["error"]
+        assert failed["error"] == "Import the source document again before continuing."
+        assert "integrity check failed" in caplog.text
         assert called is False
 
 
@@ -882,6 +890,7 @@ def test_generated_chapter_can_open_in_the_default_mac_audio_app(tmp_path, monke
 
 @pytest.mark.parametrize("processor_mode", [
     "default", "host", "cover-value-error", "cover-runtime-error", "package-value-error",
+    "encoder-unavailable", "encoder-failure", "save-failure", "save-preparation-failure",
 ])
 def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
     tmp_path, monkeypatch, processor_mode,
@@ -891,6 +900,11 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
     captured = {}
     rendered_pages = []
     materialized_paths = []
+    reported = []
+
+    def fail_save(*_args):
+        if processor_mode == "save-failure":
+            raise OSError("private save diagnostic")
 
     @contextmanager
     def materialize_audio(_book_id, chapter_id, revision, expected):
@@ -904,6 +918,11 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
             materialized.unlink(missing_ok=True)
 
     def fake_package(chapters, output, **metadata):
+        from meowdiobooks.backend.m4b import FFmpegUnavailableError, M4BExportError
+        if processor_mode == "encoder-unavailable":
+            raise FFmpegUnavailableError("private executable diagnostic")
+        if processor_mode == "encoder-failure":
+            raise M4BExportError("private encoding diagnostic")
         if processor_mode == "package-value-error":
             output.write_bytes(b"incomplete export")
             raise ValueError("Packaging rejected")
@@ -912,6 +931,15 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
         captured["metadata"] = metadata
         captured["cover_bytes"] = Path(metadata["cover"]).read_bytes()
         output.write_bytes(b"packaged-m4b")
+        if processor_mode == "save-preparation-failure":
+            original_mkdir = Path.mkdir
+
+            def fail_library_directory(path, *args, **kwargs):
+                if path == tmp_path / "library":
+                    raise OSError("private library directory diagnostic")
+                return original_mkdir(path, *args, **kwargs)
+
+            monkeypatch.setattr(Path, "mkdir", fail_library_directory)
         return output
 
     def fake_render_pdf_page(_source, _cache, page):
@@ -939,7 +967,8 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
         monkeypatch.setattr("meowdiobooks.backend.app_v2.render_pdf_page", forbidden)
         monkeypatch.setattr("meowdiobooks.backend.app_v2.package_audio_export", forbidden)
     with TestClient(create_app_v2(tmp_path, chapter_audio_source=materialize_audio,
-                                file_processor=processor)) as client:
+                                file_processor=processor, on_library_exported=fail_save,
+                                on_operation_failed=lambda *args: reported.append(args))) as client:
         imported = client.post(
             "/api/books/import",
             files={"file": ("fallback.pdf", _metadata_pdf(), "application/pdf")},
@@ -1028,7 +1057,12 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
         )
 
         if processor_mode not in {"default", "host"}:
-            assert response.status_code == (409 if processor_mode == "cover-runtime-error" else 422)
+            expected_status = {"cover-runtime-error": 409, "encoder-unavailable": 503, "save-failure": 500, "save-preparation-failure": 500}
+            assert response.status_code == expected_status.get(processor_mode, 422)
+            assert len(reported) == 1
+            assert reported[0][:2] == ("export-save" if processor_mode.startswith("save-") else "export", book_id)
+            assert isinstance(reported[0][2], Exception)
+            assert str(reported[0][2]) not in response.text
             assert not list((tmp_path / "tmp").glob("m4b-*"))
             assert all(not path.exists() for path in materialized_paths)
             assert (render / "chapter.wav").read_bytes() == b"wav"
