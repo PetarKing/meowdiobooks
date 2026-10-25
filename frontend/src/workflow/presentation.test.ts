@@ -8,6 +8,42 @@ import type { ReviewWarning } from "../api/contracts";
 afterEach(async () => { await changeAppLocale("en"); });
 
 describe("workflow service copy boundary", () => {
+  it.each(["en", "zh-CN"] as const)("translates reviewed operation failures and keeps a support reference in %s", async (locale) => {
+    await changeAppLocale(locale);
+    const reference = "0123456789abcdef0123456789abcdef";
+    for (const base of [
+      "We couldn’t create the audio. Please try again.",
+      "We couldn’t transcribe the voice sample. Please try again.",
+      "We couldn’t read this voice sample. Please try another recording.",
+      "We couldn’t create the audiobook download. Please try again.",
+      "We couldn’t create this page preview. Please try again.",
+      "We couldn’t read this document. Please try again or upload another file.",
+    ]) {
+      const raw = `${base} Reference: ${reference}.`;
+      expect(message(new Error(raw))).toBe(raw);
+      const rendered = localizeErrorMessage(message(new Error(raw)), i18n.t);
+      expect(rendered).toContain(reference);
+      if (locale === "en") expect(rendered).toBe(raw);
+      else {
+        expect(rendered).toContain("参考编号");
+        expect(rendered).not.toContain(base);
+      }
+    }
+  });
+
+  it("rejects unknown or malformed reference-bearing failures", () => {
+    const base = "We couldn’t create the audio. Please try again.";
+    for (const raw of [
+      `An unknown diagnostic. Reference: ${"a".repeat(32)}.`,
+      `${base} Reference: ${"A".repeat(32)}.`,
+      `${base} Reference: ${"a".repeat(31)}.`,
+      `${base} Reference: ${"a".repeat(33)}.`,
+      `${base} Reference: token-secret.`,
+      `${base} Reference: ${"a".repeat(32)}.\n`,
+      `${base} Reference: ${"a".repeat(32)}. extra`,
+    ]) expect(message(new Error(raw))).toBe("Something went wrong while completing this step. Try again; your accepted work is unchanged.");
+  });
+
   it.each(["en", "zh-CN"] as const)("keeps reviewed failure recovery copy in %s", async (locale) => {
     await changeAppLocale(locale);
     for (const raw of [

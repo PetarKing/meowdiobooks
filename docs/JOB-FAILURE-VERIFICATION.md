@@ -16,7 +16,8 @@ python -m ruff check src/meowdiobooks/backend/queue.py src/meowdiobooks/backend/
 
 On macOS / Python 3.12, the final backend run passed 758 tests with three decoder/model tests excluded.
 The targeted lint check and TypeScript check of the translation catalog passed. After integrating
-the concurrent copy change from main, 19 presentation/action-required frontend tests also passed.
+the concurrent copy change from main, 22 presentation/action-required frontend tests also passed.
+The frontend production build passed with its existing bundle-size advisory.
 The initial attempt using the companion frontend dependency tree could not resolve the Core test
 setup; rerunning with the existing Core dependency tree passed. The environment emitted
 one existing Starlette/httpx deprecation warning. An earlier run including the optional real audio
@@ -28,6 +29,7 @@ real-provider execution claim.
 | Synthetic trigger | Before | After / evidence |
 | --- | --- | --- |
 | Each registered workflow command raises a provider exception | Exception class and raw diagnostic appear in persisted job error; no queue log. | Safe retry guidance; callback receives the identical exception and traceback, with persisted failed job ID/kind/attempt. `test_job_diagnostics.py` parameterizes the real command registry. |
+| Reviewed operation error has an opaque reference | Unknown dynamic error becomes generic. | Six exact public messages with a 32-character lowercase hexadecimal reference remain readable in English/Chinese; malformed references and unknown diagnostics stay generic. |
 | Host failure reporter itself raises | No hook available. | Job is already settled, subsequent jobs succeed, and only job metadata enters fallback logs. |
 | Canceled work, required host action, exception after irrevocable publication | Existing cancellation/action/publication semantics. | Semantics preserved; no failure callback for these outcomes. |
 | Source changes or dialogue rules conflict | Raw exception details in job response. | Corrective guidance in response; original reason in operator logs. Existing API regressions verify processing stops before parsing/provider calls. |

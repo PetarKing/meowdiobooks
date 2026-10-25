@@ -1450,6 +1450,11 @@ const zhCN: Record<string, string> = {
   "We couldn’t create the voice audition. Please try again.": "无法创建声音试听。请重试。",
   "The voice draft changed. Refresh before adding or removing auditions.": "声音草稿已更改。请刷新后再添加或移除试听。",
   "Review the dialogue rules and resolve conflicting matches before continuing.": "请检查对白规则并解决匹配冲突后再继续。",
+  "We couldn’t create the audio. Please try again.": "无法生成音频。请重试。",
+  "We couldn’t read this voice sample. Please try another recording.": "无法读取声音样本。请尝试另一段录音。",
+  "We couldn’t create this page preview. Please try again.": "无法创建页面预览。请重试。",
+  "We couldn’t read this document. Please try again or upload another file.": "无法读取文档。请重试或上传其他文件。",
+  "{{message}} Reference: {{reference}}.": "{{message}} 参考编号：{{reference}}。",
 };
 
 export default zhCN;

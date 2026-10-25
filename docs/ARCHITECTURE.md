@@ -122,6 +122,11 @@ transcription, cloned-audition, export-packaging and export-save failures with t
 ownership and reporter-failure isolation. Its operation labels are `transcribe`, `clone`, `export`
 and `export-save`; it does not claim universal HTTP error coverage. Explicit `WorkflowInputError`
 recovery guidance and valid host action descriptors remain public.
+Public operation errors may append ` Reference: <32 lowercase hexadecimal characters>.` to one of
+the reviewed audio, transcription, voice-sample, export, preview or document-read messages in
+`referencedOperationErrors`. The frontend preserves only this exact message/reference pairing,
+translates the base message and reference label separately, and rejects unknown or malformed pairs.
+The opaque reference conveys no provider details and grants no access to diagnostic records.
 
 Storybook exercises the same source with deterministic synthetic gateways. It is a development
 surface and is excluded from the consumer package.
