@@ -8,6 +8,7 @@ import re
 import shutil
 import struct
 import unicodedata
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Mapping, Sequence
 from uuid import uuid4
@@ -28,6 +29,12 @@ class TTSContractError(ValueError):
 
 _CHAPTER_GAP_SECONDS = 0.24
 _WAV_COPY_SAMPLES = 256 * 1024
+# Application chunking policy, not a model/API limit: ordinary dialogue turns
+# retain their full context. Only longer passages need sentence-based splitting.
+_SYNTHESIS_CONTEXT_CHARACTERS = 500
+# A very short isolated fragment can make a reference-conditioned model emit EOS
+# immediately. Keep it with nearby words from the same accepted voice segment.
+_MIN_SYNTHESIS_ALNUM = 8
 
 
 def render_plan_audio(
@@ -107,8 +114,10 @@ def render_plan_audio(
                         2 + completed / total * 94,
                         f"{chapter_id}: segment {index} of {len(render_units)}",
                     )
+                    recoveries: list[dict[str, Any]] = []
                     rendered = [
-                        _synthesize(model, text, member, package, language) for member in unit
+                        _synthesize(model, text, member, package, language, recoveries=recoveries)
+                        for member in unit
                     ]
                     audio = mix_audio_tracks(rendered) if len(rendered) > 1 else rendered[0]
                     path = staging / "segments" / f"{index:05d}.wav"
@@ -119,6 +128,8 @@ def render_plan_audio(
                         "index": index,
                         "file": str(path.relative_to(staging)),
                     }
+                    if recoveries:
+                        metadata_row["synthesisRecoveries"] = recoveries
                     if len(unit) > 1:
                         metadata_row.update(
                             {
@@ -339,6 +350,8 @@ def _synthesize(
     segment: Mapping[str, Any],
     package: Path,
     language: str,
+    *,
+    recoveries: list[dict[str, Any]] | None = None,
 ) -> np.ndarray:
     reference = Path(str(segment.get("referenceAudio", "")))
     if not reference.is_absolute():
@@ -357,14 +370,16 @@ def _synthesize(
             f"Accepted voice reference is unavailable for {segment.get('effectiveCharacterId')}"
         )
     rendered: list[np.ndarray] = []
-    for unit_index, unit in enumerate(_synthesis_units(text), 1):
+    units = _synthesis_units(text)
+    for unit_index, unit in enumerate(units, 1):
         errors: list[str] = []
+        no_result_attempts = 0
         for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
             try:
                 reference_args = {"ref_audio": str(reference)}
                 if reference_mode == "transcript-conditioned":
                     reference_args["ref_text"] = reference_text
-                chunks = _valid_chunks(
+                chunks, summary = _valid_chunks(
                     model.generate(
                         unit,
                         lang_code=language,
@@ -376,13 +391,50 @@ def _synthesize(
                 if chunks:
                     rendered.append(np.concatenate(chunks))
                     break
-                errors.append(f"attempt {attempt}: no usable samples")
+                no_result_attempts += summary.results == 0
+                errors.append(f"attempt {attempt}: no usable samples ({summary})")
             except Exception as error:  # local model backends expose heterogeneous failures
                 errors.append(f"attempt {attempt}: {type(error).__name__}: {error}")
         else:
-            raise RuntimeError(
-                f"No audio for segment {segment.get('id')} unit {unit_index}: " + "; ".join(errors)
-            )
+            # Some transcript-conditioned references immediately end a one-word
+            # request. The already-supported speaker-embedding route retains the
+            # exact accepted WAV and source word, without transcript prefill. This
+            # is explicit per-unit recovery, never a change to accepted Cast state.
+            recovered = False
+            if (reference_mode == "transcript-conditioned" and len(units) == 1
+                    and len(unit) <= 32 and len(unit.split()) == 1
+                    and no_result_attempts == len(QWEN_GENERATION_ATTEMPTS)):
+                for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
+                    try:
+                        chunks, summary = _valid_chunks(model.generate(
+                            unit, lang_code=language, split_pattern="",
+                            ref_audio=str(reference), **settings,
+                        ))
+                        if chunks:
+                            rendered.append(np.concatenate(chunks))
+                            if recoveries is not None:
+                                recoveries.append({
+                                    "segmentId": str(segment.get("id") or ""),
+                                    "effectiveCharacterId": segment.get("effectiveCharacterId"),
+                                    "unitIndex": unit_index,
+                                    "originalReferenceMode": reference_mode,
+                                    "effectiveReferenceMode": "speaker-embedding",
+                                    "reason": "no-results-after-transcript-conditioning",
+                                    "initialAttempts": len(QWEN_GENERATION_ATTEMPTS),
+                                    "recoveryAttempts": attempt,
+                                })
+                            recovered = True
+                            break
+                        errors.append(f"speaker-embedding attempt {attempt}: "
+                                      f"no usable samples ({summary})")
+                    except Exception as error:
+                        errors.append(f"speaker-embedding attempt {attempt}: "
+                                      f"{type(error).__name__}: {error}")
+            if not recovered:
+                raise RuntimeError(
+                    f"No audio for segment {segment.get('id')} unit {unit_index}: "
+                    + "; ".join(errors)
+                )
     if not rendered:
         raise TTSContractError(f"Render segment {segment.get('id')} produced no audio")
     return np.concatenate(rendered)
@@ -394,23 +446,60 @@ def _clean_text(text: str) -> str:
 
 
 def _synthesis_units(text: str) -> list[str]:
-    return [
-        unit.strip()
-        for unit in re.split(
-            r"(?<=[.!?…。！？])\s+|(?<=[.!?…。！？][\"'”’»）】」』])\s+",
-            _clean_text(text),
-        )
-        if _clean_text(unit)
-    ]
+    cleaned = _clean_text(text)
+    if not cleaned:
+        return []
+    if len(cleaned) <= _SYNTHESIS_CONTEXT_CHARACTERS:
+        return [cleaned]
+    pieces = re.split(
+        r"(?<=[.!?…。！？])\s+|(?<=[.!?…。！？][\"'”’»）】」』])\s+",
+        cleaned,
+    )
+    units: list[str] = []
+    pending: list[str] = []
+    pending_alnum = 0
+    for piece in pieces:
+        if not piece:
+            continue
+        pending.append(piece)
+        pending_alnum += sum(character.isalnum() for character in piece)
+        if pending_alnum >= _MIN_SYNTHESIS_ALNUM:
+            units.append(" ".join(pending))
+            pending = []
+            pending_alnum = 0
+    if pending:
+        remainder = " ".join(pending)
+        if units:
+            units[-1] += " " + remainder
+        else:
+            # A standalone short segment must still be spoken, never discarded.
+            units.append(remainder)
+    return units
 
 
-def _valid_chunks(results: Any) -> list[np.ndarray]:
+@dataclass(frozen=True)
+class _SampleSummary:
+    results: int
+    empty: int
+    nonfinite: int
+
+    def __str__(self) -> str:
+        return f"results={self.results}, empty={self.empty}, nonfinite={self.nonfinite}"
+
+
+def _valid_chunks(results: Any) -> tuple[list[np.ndarray], _SampleSummary]:
     chunks = []
+    result_count = empty_count = nonfinite_count = 0
     for result in results:
+        result_count += 1
         audio = np.asarray(result.audio, dtype=np.float32).reshape(-1)
-        if audio.size and np.all(np.isfinite(audio)):
+        if not audio.size:
+            empty_count += 1
+        elif not np.all(np.isfinite(audio)):
+            nonfinite_count += 1
+        else:
             chunks.append(audio)
-    return chunks
+    return chunks, _SampleSummary(result_count, empty_count, nonfinite_count)
 
 
 def _render_units(segments: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:

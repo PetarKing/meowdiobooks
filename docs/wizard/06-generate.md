@@ -48,15 +48,32 @@ For each speakable render unit, Qwen Base receives the equivalent of:
 }
 ```
 
-Long render text is split deterministically at sentence punctuation before synthesis. Each unit tries
-the checkpoint-default `(temperature, top_k)` pair `(0.9, 50)`, then cooler recovery pairs `(0.75, 40)`
-and `(0.65, 30)` until it gets non-empty, finite audio samples. If all attempts fail, the chapter
+An ordinary render turn of up to 500 normalized characters is synthesized intact, including its
+pauses and short phrases. This is an application context policy, not a provider input limit. Longer
+text is split deterministically at sentence punctuation; fragments with fewer than eight Unicode
+letters or digits remain with an adjacent sentence from that same render turn. An indivisible
+sentence is never cut through a word to meet this soft threshold. These groups preserve the exact
+normalized source text, accepted speaker and reference; they never cross a render-segment boundary.
+A standalone one-word turn remains speakable input and is never replaced with silence or omitted.
+Each unit tries the checkpoint-default `(temperature, top_k)` pair `(0.9, 50)`, then cooler recovery pairs `(0.75, 40)`
+and `(0.65, 30)` until it gets non-empty, finite audio samples. Exhausted attempts distinguish no
+returned results, empty sample arrays and non-finite arrays without including source text. If all attempts fail, the chapter
 staging directory is discarded and the prior playable revision remains current. Adjacent joint-speaker
 tracks are synthesized separately and mixed onto one timeline slot; ordinary units are concatenated
 with 240 ms silence. A confirmed layered group route expands its group character ID to the route's
 character IDs during deterministic render-plan compilation. Each member uses the accepted reference
 revision already pinned by the same Cast artifact. Generate never reparses `&`, `/`, or “and” and never
 guesses members.
+
+If all three normal attempts produce no model results for a standalone, single-word
+passage of at most 32 normalized characters, synthesis retries that exact text with
+the same accepted reference WAV using speaker embedding, without transcript
+prefill. This recovery has at most three attempts and is recorded per member and
+unit in chapter metadata as `synthesisRecoveries`, including original/effective
+reference modes and attempt counts. It does not change accepted Cast state or
+conditioning for later passages. Exceptions, empty/nonfinite output, longer text,
+and existing speaker-embedding requests do not trigger this recovery. Failure
+still leaves the previous playable chapter intact; no silence or words are added.
 
 The model output is audio samples only. The application writes per-segment WAVs, `chapter.wav`, and a
 `meowdiobooks.chapter-audio.v2` metadata receipt containing source linkage, effective speaker, voice

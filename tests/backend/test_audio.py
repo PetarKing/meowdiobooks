@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -11,7 +12,7 @@ from meowdiobooks.backend.audio import (
     _generate_preview,
     normalize_voice_sample,
 )
-from meowdiobooks.backend.tts_v2 import _synthesize
+from meowdiobooks.backend.tts_v2 import _clean_text, _synthesis_units, _synthesize
 
 
 class RecordingModel:
@@ -21,6 +22,88 @@ class RecordingModel:
     def generate(self, text: str, **kwargs):
         self.calls.append({"text": text, **kwargs})
         return iter([SimpleNamespace(audio=np.array([0.1, -0.1], dtype=np.float32))])
+
+
+@pytest.mark.parametrize('text', [
+    'Erm.. Hello there.',
+    'A longer opening sentence. Oh. Another complete sentence.',
+    'Another complete sentence. Yes.',
+    'Oh. No. Um. Another complete sentence.',
+    'Oh. No. Uh.', 'Yes.', '“Oh.” Another complete sentence.',
+    '嗯。 花園裡的貓正在安靜地散步。',
+    '花園裡的貓正在安靜地散步。 嗯。',
+    '嗯。 啊。 好。 花園裡的貓正在安靜地散步。',
+    'An ordinary first sentence. Another ordinary sentence.',
+    'An ordinary first sentence. ... Another ordinary sentence.',
+])
+def test_ordinary_turns_keep_complete_context_without_changing_text(text):
+    units = _synthesis_units(text)
+    assert units == [_clean_text(text)]
+    assert ' '.join(units) == _clean_text(text)
+
+
+def test_punctuation_without_speech_produces_no_synthesis_units():
+    assert _synthesis_units(' ... !!! ') == []
+
+
+@pytest.mark.parametrize('fragment', ['Oh.', 'Oh. No.', '“Oh.”', '嗯。 啊。', '...'])
+@pytest.mark.parametrize('position', ['leading', 'middle', 'trailing'])
+def test_long_passages_preserve_fragments_and_every_cleaned_source_character(fragment, position):
+    sentence = 'This ordinary complete sentence supplies enough speech context for a long passage.'
+    sentences = [sentence] * 8
+    sentences.insert({'leading': 0, 'middle': 4, 'trailing': 8}[position], fragment)
+    text = ' '.join(sentences)
+    units = _synthesis_units(text)
+    assert len(text) > 500
+    assert len(units) == 8
+    assert fragment not in units
+    assert ' '.join(units) == text
+
+
+def test_long_passage_sentence_boundaries_and_unsplittable_words_remain_intact():
+    sentences = ['This is an ordinary sentence with enough context.'] * 12
+    assert _synthesis_units(' '.join(sentences)) == sentences
+    unsplittable = 'a' * 501
+    assert _synthesis_units(unsplittable) == [unsplittable]
+
+
+def test_short_fragment_context_is_spoken_once_with_unchanged_conditioning(tmp_path):
+    model = RecordingModel()
+    reference = tmp_path / 'reference.wav'
+    reference.write_bytes(b'reference')
+    segment = {'id': 'passage', 'referenceAudio': 'reference.wav',
+               'referenceText': 'The accepted voice reference.'}
+    _synthesize(model, 'Erm.. Hello there.', segment, tmp_path, 'english')
+    assert model.calls == [{
+        'text': 'Erm.. Hello there.', 'lang_code': 'english', 'split_pattern': '',
+        'ref_audio': str(reference), 'ref_text': segment['referenceText'],
+        **QWEN_GENERATION_ATTEMPTS[0],
+    }]
+
+
+@pytest.mark.parametrize('results,summary', [
+    ([], 'results=0, empty=0, nonfinite=0'),
+    ([[]], 'results=1, empty=1, nonfinite=0'),
+    ([[float('nan')]], 'results=1, empty=0, nonfinite=1'),
+    ([[], [float('inf')], [float('nan'), 0.1]], 'results=3, empty=1, nonfinite=2'),
+])
+def test_exhausted_audio_attempts_explain_rejected_samples_without_source_text(tmp_path, results, summary):
+    class FailingModel(RecordingModel):
+        def generate(self, text, **kwargs):
+            self.calls.append({'text': text, **kwargs})
+            return iter(SimpleNamespace(audio=np.asarray(row, dtype=np.float32)) for row in results)
+
+    reference = tmp_path / 'reference.wav'
+    reference.write_bytes(b'reference')
+    model = FailingModel()
+    with pytest.raises(RuntimeError) as caught:
+        _synthesize(model, 'Sensitive manuscript words.',
+                    {'id': 'passage', 'referenceAudio': 'reference.wav',
+                     'referenceText': 'Sensitive reference words.'}, tmp_path, 'english')
+    assert str(caught.value).count(summary) == len(QWEN_GENERATION_ATTEMPTS)
+    assert len(model.calls) == len(QWEN_GENERATION_ATTEMPTS)
+    assert 'Sensitive' not in str(caught.value)
+    assert str(reference) not in str(caught.value)
 
 
 def test_voice_design_primary_attempt_uses_qwen_checkpoint_defaults():
@@ -150,3 +233,141 @@ def test_uploaded_voice_sample_rejects_unsupported_format_and_silence():
     wavfile.write(source, 24_000, np.zeros(24_000 * 4, dtype=np.float32))
     with pytest.raises(ValueError, match="silent"):
         normalize_voice_sample(source.getvalue(), "sample.wav")
+
+
+class ShortWordRecoveryModel(RecordingModel):
+    sample_rate = 24_000
+
+    def generate(self, text, **kwargs):
+        self.calls.append({'text': text, **kwargs})
+        if text == 'Erm..' and kwargs.get('ref_text') == 'Accepted reference.':
+            return iter([])
+        return iter([SimpleNamespace(audio=np.array([0.1, -0.1], dtype=np.float32))])
+
+
+def recovery_segment(tmp_path, **overrides):
+    (tmp_path / 'reference.wav').write_bytes(b'reference')
+    return {'id': 'short', 'text': 'Erm..', 'effectiveCharacterId': 'speaker',
+            'referenceAudio': 'reference.wav', 'referenceText': 'Accepted reference.', **overrides}
+
+
+def test_short_word_recovery_keeps_source_and_reference_and_records_mode(tmp_path):
+    model = ShortWordRecoveryModel()
+    segment = recovery_segment(tmp_path)
+    before = dict(segment)
+    recoveries = []
+    result = _synthesize(model, segment['text'], segment, tmp_path, 'english', recoveries=recoveries)
+    np.testing.assert_array_equal(result, [np.float32(0.1), np.float32(-0.1)])
+    assert segment == before
+    assert len(model.calls) == 4
+    assert all(call['text'] == 'Erm..' for call in model.calls)
+    assert all(call['ref_audio'] == str(tmp_path / 'reference.wav') for call in model.calls)
+    assert all(call['ref_text'] == 'Accepted reference.' for call in model.calls[:3])
+    assert 'ref_text' not in model.calls[3]
+    assert recoveries == [{
+        'segmentId': 'short', 'effectiveCharacterId': 'speaker', 'unitIndex': 1,
+        'originalReferenceMode': 'transcript-conditioned',
+        'effectiveReferenceMode': 'speaker-embedding',
+        'reason': 'no-results-after-transcript-conditioning',
+        'initialAttempts': 3, 'recoveryAttempts': 1,
+    }]
+    _synthesize(model, 'Next complete passage.', segment, tmp_path, 'english')
+    assert model.calls[-1]['ref_text'] == 'Accepted reference.'
+
+
+@pytest.mark.parametrize('kind', ['empty', 'nonfinite', 'exception', 'mixed'])
+def test_recovery_requires_every_initial_attempt_to_yield_zero_results(tmp_path, kind):
+    class Model(RecordingModel):
+        def generate(self, text, **kwargs):
+            self.calls.append({'text': text, **kwargs})
+            selected = kind if len(self.calls) == 1 or kind != 'mixed' else 'zero'
+            if selected in {'exception', 'mixed'}:
+                raise ValueError('backend failed')
+            rows = {'zero': [], 'empty': [[]], 'nonfinite': [[float('nan')]]}[selected]
+            return iter(SimpleNamespace(audio=np.asarray(row)) for row in rows)
+    model = Model()
+    with pytest.raises(RuntimeError):
+        _synthesize(model, 'Erm..', recovery_segment(tmp_path), tmp_path, 'english')
+    assert len(model.calls) == 3
+    assert all('ref_text' in call for call in model.calls)
+
+
+@pytest.mark.parametrize('text,mode', [
+    ('Two words.', 'transcript-conditioned'), ('a' * 33, 'transcript-conditioned'),
+    ('Erm..', 'speaker-embedding'),
+])
+def test_recovery_is_limited_to_short_standalone_transcript_conditioned_units(tmp_path, text, mode):
+    class Model(RecordingModel):
+        def generate(self, text, **kwargs):
+            self.calls.append({'text': text, **kwargs})
+            return iter([])
+    model = Model()
+    with pytest.raises(RuntimeError):
+        _synthesize(model, text, recovery_segment(tmp_path, referenceMode=mode), tmp_path, 'english')
+    assert len(model.calls) == 3
+
+
+def test_recovery_is_bounded_and_never_returns_silence_on_failure(tmp_path):
+    class Model(RecordingModel):
+        def generate(self, text, **kwargs):
+            self.calls.append({'text': text, **kwargs})
+            return iter([])
+    model = Model()
+    recoveries = []
+    with pytest.raises(RuntimeError, match='speaker-embedding attempt 3: no usable samples'):
+        _synthesize(model, 'Erm..', recovery_segment(tmp_path), tmp_path, 'english', recoveries=recoveries)
+    assert len(model.calls) == 6
+    assert recoveries == []
+
+
+def test_recovery_does_not_swallow_cancellation(tmp_path):
+    class Model(RecordingModel):
+        def generate(self, text, **kwargs):
+            if 'ref_text' not in kwargs:
+                raise KeyboardInterrupt()
+            return iter([])
+    segment = recovery_segment(tmp_path)
+    with pytest.raises(KeyboardInterrupt):
+        _synthesize(Model(), 'Erm..', segment, tmp_path, 'english')
+    assert segment['referenceText'] == 'Accepted reference.'
+
+
+def test_mixed_render_records_recovery_for_correct_member(tmp_path, monkeypatch):
+    import json
+    from meowdiobooks.backend import tts_v2
+    first = recovery_segment(tmp_path, id='first', effectiveCharacterId='first-voice',
+                             referenceText='Other reference.', mixGroupId='duet')
+    second = {**first, 'id': 'second', 'effectiveCharacterId': 'second-voice',
+              'referenceText': 'Accepted reference.'}
+    model = ShortWordRecoveryModel()
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: (model, lambda: None))
+    result = tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', {
+        'contract': 'meowdiobooks.render-plan.v2',
+        'chapters': [{'chapterId': 'chapter', 'segments': [first, second]}],
+    }, 'english', lambda *args: None)
+    metadata = json.loads(Path(result[0]['metadataPath']).read_text())
+    event = metadata['segments'][0]['synthesisRecoveries'][0]
+    assert event['segmentId'] == 'second'
+    assert event['effectiveCharacterId'] == 'second-voice'
+    assert len(model.calls) == 5
+
+
+def test_failed_recovery_preserves_previous_published_chapter(tmp_path, monkeypatch):
+    from meowdiobooks.backend import tts_v2
+    class Model(RecordingModel):
+        sample_rate = 24_000
+        def generate(self, text, **kwargs):
+            return iter([])
+    segment = recovery_segment(tmp_path)
+    chapter = tmp_path / 'audio' / 'chapter'
+    chapter.mkdir(parents=True)
+    latest = chapter / 'latest.json'
+    latest.write_text('{"revision":"previous"}')
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: (Model(), lambda: None))
+    with pytest.raises(RuntimeError):
+        tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', {
+            'contract': 'meowdiobooks.render-plan.v2',
+            'chapters': [{'chapterId': 'chapter', 'segments': [segment]}],
+        }, 'english', lambda *args: None)
+    assert latest.read_text() == '{"revision":"previous"}'
+    assert not list(chapter.glob('.*.staging'))
