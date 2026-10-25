@@ -43,22 +43,22 @@
     "react-i18next": "^17.0.9",
     "three": "0.186.1",
     "typescript": "5.8.3",
-    "vite": "6.4.3"
+    "vite": "6.4.5"
   },
   "devDependencies": {
     "@eslint/js": "9.27.0",
-    "@storybook/addon-a11y": "10.6.0",
-    "@storybook/addon-docs": "10.6.0",
-    "@storybook/addon-vitest": "10.6.0",
-    "@storybook/react-vite": "10.6.0",
+    "@storybook/addon-a11y": "10.6.3",
+    "@storybook/addon-docs": "10.6.3",
+    "@storybook/addon-vitest": "10.6.3",
+    "@storybook/react-vite": "10.6.3",
     "@testing-library/dom": "10.4.0",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.3.0",
     "@types/node": "^22.20.4",
     "@types/react": "19.1.4",
     "@types/react-dom": "19.1.5",
-    "@vitest/browser": "4.1.11",
-    "@vitest/browser-playwright": "4.1.11",
+    "@vitest/browser": "4.1.12",
+    "@vitest/browser-playwright": "4.1.12",
     "eslint": "9.27.0",
     "eslint-plugin-react-hooks": "5.2.0",
     "eslint-plugin-react-refresh": "0.4.20",
@@ -68,9 +68,9 @@
     "pixelmatch": "^7.1.0",
     "playwright": "1.63.0",
     "pngjs": "^7.0.0",
-    "storybook": "10.6.0",
+    "storybook": "10.6.3",
     "typescript-eslint": "8.32.1",
-    "vitest": "4.1.11"
+    "vitest": "4.1.12"
   },
   "license": "PolyForm-Noncommercial-1.0.0"
 }
