@@ -7,6 +7,8 @@ from copy import deepcopy
 import re
 from typing import Any
 
+from .voice_routing import narrator_route, speaker_labels
+
 
 class RenderPlanError(ValueError):
     """Raised when accepted artifacts cannot produce a lossless playable plan."""
@@ -45,7 +47,6 @@ def compile_render_plan(
         raise RenderPlanError(f"Unknown selected chapters: {unknown_chapters}")
 
     voices = _accepted_voices(cast)
-    narrator = _narrator_voice(cast)
     label_mapping = {
         str(label): character_id
         for label, character_id in cast.get("labelToCharacterId", {}).items()
@@ -86,7 +87,7 @@ def compile_render_plan(
             raise RenderPlanError(
                 f"Recording-script entry {entry.get('id')} combines incompatible render roles"
             )
-        effective = _effective_voices(anchor, label_mapping, voices, narrator)
+        effective = _effective_voices(anchor, label_mapping, voices, cast)
         mix_group = f"mix:{entry.get('id')}" if len(effective) > 1 else None
         for voice, fallback in effective:
             segment_number += 1
@@ -308,26 +309,14 @@ def _effective_voices(
     span: Mapping[str, Any],
     label_mapping: Mapping[str, Any],
     voices: Mapping[str, dict[str, Any]],
-    narrator: dict[str, Any],
+    cast: Mapping[str, Any],
 ) -> list[tuple[dict[str, Any], str | None]]:
-    if str(span.get("renderRole", "narration")) != "dialogue":
-        return [(narrator, None)]
-    if str(span.get("speakerStatus", "")).casefold() in {"unresolved", "open-marker"}:
-        return [(narrator, "unresolved-speaker")]
-    labels = span.get("speakerLabels")
-    if labels is None:
-        label = span.get("resolvedSpeakerLabel") or span.get("sourceSpeakerLabel")
-        labels = [label] if label is not None else []
-    labels = [str(value) for value in labels if str(value)]
-    if not labels:
-        return [(narrator, "missing-speaker-label")]
+    needs_narrator, fallback = narrator_route(span, label_mapping)
+    if needs_narrator:
+        return [(_narrator_voice(cast), fallback)]
     result: list[tuple[dict[str, Any], str | None]] = []
-    for label in labels:
-        if label not in label_mapping:
-            return [(narrator, f"unmapped-label:{label}")]
+    for label in speaker_labels(span):
         character_id = label_mapping[label]
-        if character_id is None:
-            return [(narrator, None)]
         voice = voices.get(str(character_id))
         if voice is None:
             raise RenderPlanError(f"Cast mapping for {label} has no accepted identity voice")

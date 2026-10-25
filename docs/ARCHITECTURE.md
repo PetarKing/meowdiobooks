@@ -74,6 +74,10 @@ requested pending tracks remain, current requested recordings are selected for E
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 
+The public `cast_runtime.cast_voice_targets` helper plans required voices from finalized identities
+and accepted Dialogue/Review routing without mutating inputs. Hosts use it for cost and reuse checks;
+zero-line narrators are absent from these targets.
+
 The public `cast_runtime` planning helpers `rebase_accepted_cast`, `reuse_unchanged_cast_voices`
 and `has_complete_audition_pack` let compositions determine existing reuse before admitting new
 provider work. They do not call providers, write files or publish artifacts. The reuse helper updates

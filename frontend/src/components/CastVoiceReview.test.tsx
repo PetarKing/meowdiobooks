@@ -60,6 +60,17 @@ const cast: CastArtifact = {
 };
 
 describe("CastVoiceReview", () => {
+  it("reviews a dialogue-only cast without an unused narrator tile or approval", () => {
+    const approve = vi.fn();
+    render(<CastVoiceReview bookId="book" cast={{ ...cast, narrator: null }} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
+    expect(screen.queryByRole("button", { name: "Open Narrator voice" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Open .* voice$/ })).toHaveLength(2);
+    expect(screen.getByText("2 not yet approved")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply Audition 1" }));
+    expect(approve).toHaveBeenCalledWith("many", "many-1");
+  });
+
   it("routes a missing dedicated audition to generation without treating it as ready", () => {
     const approve = vi.fn();
     const regenerate = vi.fn();

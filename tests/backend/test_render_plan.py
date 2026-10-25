@@ -365,3 +365,17 @@ def test_generation_gates_invalid_or_incomplete_accepted_artifacts(mutate, error
 
     with pytest.raises(RenderPlanError, match=error):
         compile_render_plan(dialogue, cast, script, ["chapter-1"])
+
+
+def test_character_only_chapter_does_not_require_unused_narrator():
+    dialogue, cast, script = _artifacts()
+    cast["narrator"] = None
+    for span in dialogue["spans"]:
+        span["chapterId"] = "dialogue-only" if span["id"] == "s3" else "other"
+    for entry in script["entries"]:
+        entry["chapterId"] = "dialogue-only" if entry["sourceSpanIds"] == ["s3"] else "other"
+
+    plan = compile_render_plan(dialogue, cast, script, ["dialogue-only"])
+    assert [row["effectiveCharacterId"] for row in plan["chapters"][0]["segments"]] == ["alice"]
+    with pytest.raises(RenderPlanError, match="accepted narrator voice"):
+        compile_render_plan(dialogue, cast, script, ["other"])
