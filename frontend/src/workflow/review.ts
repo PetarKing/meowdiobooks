@@ -10,7 +10,7 @@ function reviewText(t: TFunction | undefined, key: string, values: Record<string
 export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): ReviewWarning[] {
   if (!Array.isArray(candidate.warnings)) return [];
   const aliases: Record<string, string> = { "missing-content": "empty-page", "extraction-artifact": "suspicious-extraction", "ocr-artifact": "suspicious-extraction", "layout-order": "reading-order", "peripheral-matter": "front-back-matter" };
-  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
+  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
   // Older candidates attached corrections to deterministic categories. Preserve
   // occurrence IDs and capabilities for preview and acceptance of saved revisions.
   const aiWarnings = warnings.filter((warning) => warning.kind === "ai-cleanup");
@@ -39,8 +39,8 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): R
 
 export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarning) {
   const { kind, readerState } = warning;
-  if (kind === "ai-cleanup" && action === "keep") return "Keep";
-  if (kind === "ai-cleanup" && action === "exclude") return "Leave";
+  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep";
+  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave";
   if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
   if (kind === "empty-page" && action === "keep") return "Confirm this page is intentionally empty";
   if (kind === "empty-page" && action === "rerun-extraction") return "Try extraction again";
@@ -90,6 +90,7 @@ export function reviewQuestion(kind: string) {
 }
 
 export function reviewGuidance(warning: ReviewWarning) {
+  if (reviewIsVerifiedScriptGroup(warning)) return "AI checked these delivery cues in context. Suggested choices leave them unspoken. Uncertain text stays spoken and needs no decision.";
   const guidance: Partial<Record<string, string>> = {
     "ai-cleanup": "Check each suggested correction against the source document before applying it.",
     "empty-page": "No text was extracted from this page. Confirm it only when the source page is intentionally blank or visual-only.",
@@ -106,17 +107,33 @@ export function reviewGuidance(warning: ReviewWarning) {
 }
 
 export function reviewWarningLabel(kind: string) {
-  return ({ "ai-cleanup": "AI suggestions", "stage-direction": "Script direction", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
+  return ({ "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
 }
 
 export function reviewUsesOccurrenceDecisions(warning: ReviewWarning) {
   return warning.decisionScope === "occurrence" || warning.kind === "ai-cleanup";
 }
 
+export function reviewIsVerifiedScriptGroup(warning: ReviewWarning) {
+  return warning.kind === "stage-direction" && warning.decisionScope === "occurrence" &&
+    warning.occurrences.length > 0 && warning.occurrences.every((row) =>
+      row.cueVerification === "verified" && row.recommendedAction === "exclude");
+}
+
+export function reviewScriptCueDecisions(warning: ReviewWarning, decisions: Record<string, ReviewCapability>) {
+  const next = { ...decisions };
+  if (!reviewIsVerifiedScriptGroup(warning)) return next;
+  for (const row of warning.occurrences) {
+    if (next[row.id] === undefined && reviewOccurrenceActions(warning, row).includes("exclude")) next[row.id] = "exclude";
+  }
+  return next;
+}
+
 // Candidate normalization gathers corrections into the AI suggestions category.
 export function reviewOccurrenceActions(warning: ReviewWarning, occurrence: WarningOccurrence): ReviewCapability[] {
   if (!reviewUsesOccurrenceDecisions(warning)) return reviewDecisionActions(warning);
   const available = occurrence.availableActions ?? warning.availableActions;
+  if (reviewIsVerifiedScriptGroup(warning)) return (["keep", "exclude"] as ReviewCapability[]).filter((action) => available.includes(action));
   return reviewDecisionActions({ ...warning, availableActions: available.filter((action) =>
     action !== "repair" || typeof occurrence.replacement === "string",
   ) });
