@@ -34,8 +34,23 @@ export const SourceCheckAfterBulkApply: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: "Apply all 2 proposals" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Apply remaining 2 proposals" }));
     await expect(canvas.getByText("No correction was proposed. Check the source before keeping this text or trying extraction again.")).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
+  },
+};
+
+export const KeepOneThenApplyRemaining: Story = {
+  play: async ({ canvasElement }) => {
+    await enterScenario(canvasElement, "review");
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /^Keep original text/ }));
+    const queue = within(canvas.getByRole("complementary", { name: "Decision queue" }));
+    await userEvent.click(queue.getByRole("button", { name: "Apply remaining 1 proposal" }));
+    await expect(canvas.queryByRole("button", { name: /^Apply remaining/ })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
+    await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
+    await expect(canvas.getByRole("button", { name: /^Keep original text/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getByRole("button", { name: /^Apply correction/ })).toHaveAttribute("aria-pressed", "false");
   },
 };

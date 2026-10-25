@@ -14,6 +14,8 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): R
 
 export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarning) {
   const { kind, readerState } = warning;
+  if (kind === "ai-cleanup" && action === "keep") return "Keep original text";
+  if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
   if (kind === "empty-page" && action === "keep") return "Confirm this page is intentionally empty";
   if (kind === "empty-page" && action === "rerun-extraction") return "Try extraction again";
   if (kind === "reading-order" && action === "keep") return "Accept this reading order";
@@ -22,7 +24,9 @@ export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarni
 }
 
 export function reviewDecisionActions(warning: ReviewWarning): ReviewCapability[] {
-  const order: ReviewCapability[] = ["keep", "repair", "exclude", "narrate", "rerun-extraction", "rerun-dialogue"];
+  const order: ReviewCapability[] = warning.kind === "ai-cleanup"
+    ? ["repair", "keep", "rerun-extraction"]
+    : ["keep", "repair", "exclude", "narrate", "rerun-extraction", "rerun-dialogue"];
   return [...warning.availableActions].sort((left, right) => order.indexOf(left) - order.indexOf(right));
 }
 
@@ -97,7 +101,7 @@ export function reviewWarningResolved(warning: ReviewWarning, decisions: Record<
 export function reviewProposalDecisions(warning: ReviewWarning, decisions: Record<string, ReviewCapability>) {
   const next = { ...decisions };
   for (const row of warning.occurrences) {
-    if (warning.kind === "ai-cleanup" && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
+    if (warning.kind === "ai-cleanup" && !decisions[row.id] && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
   }
   return next;
 }

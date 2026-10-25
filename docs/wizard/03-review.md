@@ -8,7 +8,7 @@ protects source integrity and audiobook quality without asking the user to rerea
 ## Phase contract
 
 ```text
-Input:  accepted Dialogue revision + deterministic warning groups
+Input:  accepted Dialogue revision + deterministic warnings + Luna cleanup proposals
 Work:   inspect source evidence → choose an allowed action per occurrence/group
 Output: source-linked warning decisions and reviewed chapter assignments
 Gate:   every blocking warning is resolved; upstream-changing choices rerun upstream work
@@ -18,11 +18,14 @@ Example: a repeated running header can be marked `exclude`; a suspicious empty p
 until visually confirmed or re-extracted. The PDF and accepted Dialogue evidence are never silently
 rewritten.
 
-## AI use — NO AI
+## AI cleanup scan
 
-Review has no model endpoint, prompt, model input or model output. Warning detection, bulk previews and
-decision validation are deterministic. A `rerun-extraction` or `rerun-dialogue` choice returns the user
-to that phase; Review itself does not ask a model to repair source text or speakers.
+Review sends bounded spoken-text windows and nearby context to the `gpt-6-luna` Decisions API.
+Flagged or uncertain windows receive a Luna repair pass. Exact source-linked corrections are shown
+in the AI cleanup category; nothing changes until the user accepts the review. Unsupported or unsafe
+repairs remain source checks. Review does not guess characters or change speaker assignments.
+Deterministic warnings, previews and decision validation remain local. Provider failures leave a
+retryable candidate failure, and coverage recovery skips the model pass.
 
 ## Scope
 
@@ -35,10 +38,11 @@ Review deliberately exposes a small, consequence-oriented warning vocabulary:
 - page number;
 - web address;
 - footnote;
-- front or back matter.
+- front or back matter;
+- AI cleanup.
 
 Chapter starts remain a separate binary decision because they assign chapter ownership rather than
-change delivery. Internal detector codes and near-duplicate categories are normalized into the eight
+change delivery. Internal detector codes and near-duplicate categories are normalized into the
 warning types above.
 
 Web-address detection is conservative: explicit `http://`, `https://`, and `www.` forms are
@@ -71,7 +75,10 @@ their original line-only range rather than absorbing uncertain prose.
 Decisions such as keep, narrate or exclude are validated locally. There is no defer action: every
 surfaced warning receives an explicit decision. Problems that require source or Dialogue changes
 return to the relevant upstream phase and require a complete new candidate.
-Review runs no character, speaker-attribution or source-repair model.
+AI cleanup offers **Apply correction** or **Keep original text** per occurrence. The category-level
+**Apply remaining proposals** action selects only undecided corrections and preserves existing
+choices. Source checks without a correction still need individual decisions. Accepted corrections
+change rendered text while retaining original source evidence and speaker assignments.
 
 Every warning group receives an explicit policy. A result may apply per occurrence or to a previewed
 set of identical matches. A failed Extraction-to-Dialogue coverage invariant is not presented as a
@@ -100,7 +107,8 @@ without replacing its source evidence. Cast cannot start while blocking warnings
 ## Tests
 
 - every current warning detector and executable action;
-- no Review model endpoint, repair job or character/speaker guessing path;
+- bounded Decisions and repair requests, failure recovery and no character/speaker guessing;
+- exact repair provenance, source preservation and recording-script application;
 - per-occurrence and previewed bulk decisions;
 - source reconstruction and Dialogue revision linkage;
 - wrapped and adjacent-page footnotes, plus chapter/list negative boundaries;

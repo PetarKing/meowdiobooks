@@ -1,4 +1,11 @@
 const zhCN: Record<string, string> = {
+  "Keep original text": "保留原文",
+  "Apply correction": "应用修改",
+  "AI cleanup category actions": "AI 文本清理类别操作",
+  "Apply only the remaining undecided corrections. Your existing choices stay unchanged. Source checks still need individual decisions.": "仅应用尚未决定的修改建议。现有选择保持不变。原文检查仍需逐项决定。",
+  "Apply remaining {{count}} proposal": "应用剩余 {{count}} 项建议",
+  "Apply remaining {{count}} proposals": "应用剩余 {{count}} 项建议",
+
   "Keep the original text for this suggestion.": "为此建议保留原文。",
   "AI cleanup": "AI 文本清理",
   "Apply proposal": "应用修改建议",
@@ -11,9 +18,6 @@ const zhCN: Record<string, string> = {
   "No correction was proposed. Check the source before keeping this text or trying extraction again.": "没有可用的修改建议。请对照原文，然后选择保留文字或重新提取。",
   "Each suggestion keeps its own decision. Changes apply when you accept the review.": "每项建议都可单独决定。接受审核时才会应用修改。",
   "Does this text match the source?": "这段文字是否与原文一致？",
-  "Apply every proposed correction?": "是否应用全部修改建议？",
-  "Select all {{count}} corrections, including previously kept proposals. Suggestions without a correction still need a decision. You can change any choice before accepting the review.": "选择全部 {{count}} 项修改，包括此前选择保留原文的建议。没有修改方案的建议仍需单独决定。接受审核前可更改任意选择。",
-  "Apply all {{count}} proposals": "应用全部 {{count}} 项建议",
 
   "Opening your book": "正在打开你的书籍",
   "Retry": "重试",

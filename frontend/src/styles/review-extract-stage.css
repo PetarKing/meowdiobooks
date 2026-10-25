@@ -112,3 +112,8 @@
 .cleanup-deletion { color: var(--color-muted); }
 
 .ai-cleanup-source mark { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.cleanup-category-actions { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border, var(--line)); }
+.cleanup-category-actions > b { display: block; font-size: .85rem; }
+.cleanup-category-actions > p { font-size: .8rem; line-height: 1.6; color: var(--color-muted, var(--muted)); }
+.cleanup-category-actions .review-bulk-button { width: 100%; white-space: normal; }

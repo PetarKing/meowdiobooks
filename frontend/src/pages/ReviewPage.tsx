@@ -35,7 +35,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const isAiCleanup = warning?.kind === "ai-cleanup";
   const selectedAction = occurrence && isAiCleanup ? reviewDecisions[occurrence.id] : warning && reviewDecisions[warning.id];
   const occurrenceActions = warning && occurrence ? reviewOccurrenceActions(warning, occurrence) : [];
-  const proposalCount = isAiCleanup ? warning.occurrences.filter((row) => reviewOccurrenceActions(warning, row).includes("repair")).length : 0;
+  const cleanupWarning = candidateWarnings.find((row) => row.kind === "ai-cleanup");
+  const proposalCount = cleanupWarning?.occurrences.filter((row) => !reviewDecisions[row.id] && reviewOccurrenceActions(cleanupWarning, row).includes("repair")).length ?? 0;
   const boundary = boundaries[Math.min(activeBoundary, Math.max(0, boundaries.length - 1))];
   const showingBoundary = boundaries.length > 0 && (activeReviewGroup === "chapters" || candidateWarnings.length === 0);
   const complete = candidateWarnings.every((row) => reviewWarningResolved(row, reviewDecisions)) && boundaries.every((row) => Boolean(boundaryDecisions[row.id]));
@@ -103,10 +104,11 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   function applyAllProposals() {
-    if (!warning) return;
-    const next = reviewProposalDecisions(warning, reviewDecisions);
+    if (!cleanupWarning) return;
+    const next = reviewProposalDecisions(cleanupWarning, reviewDecisions);
     setReviewDecisions(next);
-    const unresolved = warning.occurrences.findIndex((row) => !next[row.id]);
+    openWarning(candidateWarnings.indexOf(cleanupWarning));
+    const unresolved = cleanupWarning.occurrences.findIndex((row) => !next[row.id]);
     if (unresolved >= 0) setActiveOccurrence(unresolved);
   }
 
@@ -184,6 +186,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           {boundaries.length > 0 && <button data-review-group="chapters" className={[showingBoundary ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
           {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} className={[!showingBoundary && index === activeWarning ? "active" : "", reviewWarningResolved(row, reviewDecisions) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewWarningResolved(row, reviewDecisions) ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t(row.occurrences.length === 1 ? "1 occurrence · {{severity}}" : "{{count}} occurrences · {{severity}}", { count: row.occurrences.length, severity: t(row.severity) })}</small></span></button>)}
         </nav>
+        {proposalCount > 0 && <section className="cleanup-category-actions" aria-label={t("AI cleanup category actions")}><b>{t("AI cleanup")}</b><p>{t("Apply only the remaining undecided corrections. Your existing choices stay unchanged. Source checks still need individual decisions.")}</p><button className="ghost review-bulk-button" onClick={applyAllProposals}>{t(proposalCount === 1 ? "Apply remaining {{count}} proposal" : "Apply remaining {{count}} proposals", { count: proposalCount })}</button></section>}
       </aside>
       <div className={["review-workspace", showingBoundary ? "chapter-workspace" : "warning-workspace"].join(" ")}>
         {showingBoundary && boundary ? <>
@@ -213,7 +216,6 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <div className="review-scope"><b>{t(isAiCleanup || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(isAiCleanup ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>
             <h3>{t(isAiCleanup && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(warning.kind))}</h3>
             <div className="resolution-options">{occurrenceActions.map((action) => <button key={action} aria-pressed={selectedAction === action} className={selectedAction === action ? "selected" : ""} onClick={() => isAiCleanup ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, warning))}</b><small>{reviewConsequence(action, isAiCleanup ? { ...warning, occurrences: [occurrence] } : warning, t)}</small></button>)}</div>
-            {isAiCleanup && proposalCount > 0 && <div className="chapter-bulk-choice"><span><b>{t("Apply every proposed correction?")}</b><small>{t("Select all {{count}} corrections, including previously kept proposals. Suggestions without a correction still need a decision. You can change any choice before accepting the review.", { count: proposalCount })}</small></span><button className="ghost review-bulk-button" disabled={warning.occurrences.filter((row) => reviewOccurrenceActions(warning, row).includes("repair")).every((row) => reviewDecisions[row.id] === "repair")} onClick={applyAllProposals}>{t("Apply all {{count}} proposals", { count: proposalCount })}</button></div>}
           </section>
         </> : null}
       </div>
