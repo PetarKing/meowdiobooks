@@ -71,6 +71,10 @@ Missing legacy scope uses neutral progress rather than inventing an all-chapter 
 retains the initial job scope even when later polls omit payload. Partial failures select only requested
 pending tracks when any remain, including tracks already published before reattachment; when no
 requested pending tracks remain, current requested recordings are selected for Export.
+Generation request errors appear once beside the built-in Generate action, with localized copy and
+any reviewed support reference. The shell retains errors from unrelated operations, workflow-return
+Retry actions, custom step views and views without that action; message text alone never determines
+which surface owns an error.
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 

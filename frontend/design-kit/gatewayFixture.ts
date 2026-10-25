@@ -179,7 +179,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
             : "Checking dialogue speakers",
         error:
           gatewayVariant === "generate-failed"
-            ? "Chapter generation stopped before Chapter 4. The first three chapters are still saved."
+            ? "We couldn’t create the audio. Please try again. Reference: 0123456789abcdef0123456789abcdef."
             : undefined,
         result: { revision: `${stage}-fixture-draft` },
       };

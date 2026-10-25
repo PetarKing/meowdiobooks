@@ -217,10 +217,12 @@ export async function enterScenario(
         return;
       case "generate-selected":
         await click(prefix("Generate {{count}} selected", { count: 3 }));
-        if (metadata.gatewayVariant === "generate-failed")
-          await expect(await page.findByRole("alert")).toHaveTextContent(
-            t("Something went wrong while completing this step. Try again; your accepted work is unchanged."),
-          );
+        if (metadata.gatewayVariant === "generate-failed") {
+          const action = await page.findByRole("region", { name: t("Generation action") });
+          await expect(await within(action).findByRole("alert")).toHaveTextContent(t("We couldn’t create the audio. Please try again."));
+          await expect(page.getAllByRole("alert")).toHaveLength(1);
+          await expect(within(action).getByRole("alert")).toHaveTextContent("0123456789abcdef0123456789abcdef");
+        }
         else
           await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
         return;

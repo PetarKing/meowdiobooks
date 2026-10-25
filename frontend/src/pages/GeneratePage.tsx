@@ -7,16 +7,18 @@ import { WorkflowEmpty } from "../components/WorkflowPage";
 import { ChapterAudioPlayer } from "../components/ChapterAudioPlayer";
 import { useLayoutEffect, useRef, type ReactNode } from "react";
 import { StepEyebrow } from "../pages/shared";
+import { localizeErrorMessage } from "../workflow/presentation";
 import {
   chapterDuration,
+  hasGenerationAction,
   longChapterSplitSeconds,
   targetChapterPartSeconds
 } from "../workflow/generation";
 
-export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "error" | "chapterFilter" | "continueToExport" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "snapshot" | "splitChapterId" | "splitLongChapter" | "t">;
+export type GeneratePageModel = Pick<WorkflowModel, "gateway" | "book" | "busy" | "chapterFilter" | "continueToExport" | "generateChapters" | "generationEstimatePolicy" | "generationSamples" | "listeningChapterId" | "selectedChapters" | "setChapterFilter" | "setListeningChapterId" | "setSelectedChapters" | "setSplitChapterId" | "snapshot" | "splitChapterId" | "splitLongChapter" | "t">;
 
-export function GeneratePage({ model, purchase }: { model: GeneratePageModel; purchase?: GenerationPurchasePresentation; }) {
-  const { busy, error, chapterFilter: requestedChapterFilter, continueToExport, generateChapters, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, snapshot, splitChapterId, splitLongChapter, t } = model;
+export function GeneratePage({ model, purchase, error }: { model: GeneratePageModel; purchase?: GenerationPurchasePresentation; error?: string; }) {
+  const { busy, chapterFilter: requestedChapterFilter, continueToExport, generateChapters, listeningChapterId, selectedChapters, setChapterFilter, setListeningChapterId, setSelectedChapters, setSplitChapterId, snapshot, splitChapterId, splitLongChapter, t } = model;
   if (!snapshot?.recordingScript) return null;
   const generated = snapshot?.generatedChapters ?? [];
   const chapters = snapshot?.chapters ?? [];
@@ -126,8 +128,8 @@ export function GeneratePage({ model, purchase }: { model: GeneratePageModel; pu
         </article>;
       })}</div>
       {!visibleChapters.length && <WorkflowEmpty className="chapter-filter-empty" symbol="♪" title={t("No chapters in this view.")} copy={t("Choose another filter to see the rest of the book.")} />}
-      {(availableChapters.length > 0 || currentGenerated.length > 0) && <GenerationActionDock ariaLabel={t("Generation action")} compact={visibleChapters.length > 3}>
-        {error && <p className="generation-error"><b>{t("Generation needs attention")}</b><span>{t(error, { defaultValue: error })}</span></p>}
+      {hasGenerationAction(snapshot) && <GenerationActionDock ariaLabel={t("Generation action")} compact={visibleChapters.length > 3}>
+        {error && <p className="generation-error" role="alert"><b>{t("Generation needs attention")}</b><span>{localizeErrorMessage(error, t)}</span></p>}
         <div className="generation-selection-copy"><span className="selection-spark" aria-hidden="true">{selectedChapters.length ? "✦" : "♪"}</span><div><b>{selectedChapters.length ? selectedChapters.length === 1 ? t("1 chapter selected") : t("{{count}} chapters selected", { count: selectedChapters.length }) : currentGenerated.length ? currentGenerated.length === 1 ? t("1 chapter is ready") : t("{{count}} chapters are ready", { count: currentGenerated.length }) : t("Choose chapters to generate")}</b>{selectedReadyChapterIds.length > 0 && selectedPendingChapterIds.length > 0 && <p className="generation-kept-audio">{selectedReadyChapterIds.length === 1 ? t("1 selected chapter is already generated and will be kept.") : t("{{count}} selected chapters are already generated and will be kept.", { count: selectedReadyChapterIds.length })}</p>}</div></div>
         <div className="generation-selection-actions">
           {canSplitSelectedChapter && <button className="chapter-split-button" type="button" aria-label={t("Split {{title}} into shorter chapters", { title: selectedLongChapter?.title || t("long chapter") })} onClick={() => setSplitChapterId(selectedLongChapter?.id)}><span aria-hidden="true">↯</span><span>{t("Split this into shorter chapters?")}</span></button>}
