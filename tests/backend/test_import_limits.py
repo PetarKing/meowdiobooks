@@ -40,3 +40,26 @@ def test_limit_precedes_document_parser(tmp_path):
         response = client.post('/api/books/import', files={'file': ('invalid.pdf', b'not a PDF' * 10)})
         assert response.status_code == 413
         assert app.state.books.all() == []
+
+
+@pytest.mark.parametrize('suffix', ['pdf', 'epub', 'txt', 'md'])
+def test_host_limit_applies_to_every_supported_source_before_parsing(tmp_path, suffix):
+    with TestClient(create_app_v2(tmp_path, max_import_bytes=8)) as client:
+        response = client.post('/api/books/import', files={'file': (f'book.{suffix}', b'x' * 9)})
+        assert response.status_code == 413
+
+
+@pytest.mark.parametrize('suffix,limit', [('epub', 64 * 1024 * 1024), ('txt', 20 * 1024 * 1024), ('md', 20 * 1024 * 1024)])
+def test_host_setting_never_raises_existing_format_ceiling(tmp_path, suffix, limit):
+    from unittest.mock import AsyncMock
+    from starlette.datastructures import UploadFile
+    app = create_app_v2(tmp_path, max_import_bytes=500_000_000)
+    endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', '') == '/api/books/import')
+    upload = UploadFile(filename=f'book.{suffix}', file=BytesIO())
+    # Feed existing 1 MiB chunks to exercise the streaming count without a large fixture.
+    upload.read = AsyncMock(side_effect=[b'x' * (1024 * 1024)] * (limit // (1024 * 1024)) + [b'x'])
+    import asyncio
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException) as error:
+        asyncio.run(endpoint(upload))
+    assert error.value.status_code == 413

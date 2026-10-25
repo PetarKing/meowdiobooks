@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { ActionRequiredError } from "../api/actionRequired";
 import i18n, { changeAppLocale } from "../i18n";
-import { localizeErrorMessage, localizeProcessMessage, message, userFacingDetail } from "./presentation";
+import { formatFileSize, localizeErrorMessage, localizeProcessMessage, message, userFacingDetail } from "./presentation";
 import { reviewGuidance } from "./review";
 import type { ReviewWarning } from "../api/contracts";
 
@@ -100,5 +100,14 @@ describe("workflow service copy boundary", () => {
     const fallback = "Compare the highlighted text with your source document.";
     expect(userFacingDetail("A word is split across two lines.", fallback)).toBe("A word is split across two lines.");
     expect(userFacingDetail("Luna returned overlapping source offsets", fallback)).toBe(fallback);
+  });
+});
+
+
+describe("file-size units", () => {
+  it("labels binary measurements explicitly so decimal upload ceilings are unambiguous", () => {
+    expect(formatFileSize(1_000_001)).toBe("977 KiB");
+    expect(formatFileSize(1024 * 1024)).toBe("1.0 MiB");
+    expect(formatFileSize(1024 ** 3)).toBe("1.0 GiB");
   });
 });
