@@ -15,7 +15,10 @@ python -m ruff check src/meowdiobooks/backend/queue.py src/meowdiobooks/backend/
 ```
 
 On macOS / Python 3.12, the final backend run passed 758 tests with three decoder/model tests excluded.
-The targeted lint check and TypeScript check of the translation catalog passed. The environment emitted
+The targeted lint check and TypeScript check of the translation catalog passed. After integrating
+the concurrent copy change from main, 19 presentation/action-required frontend tests also passed.
+The initial attempt using the companion frontend dependency tree could not resolve the Core test
+setup; rerunning with the existing Core dependency tree passed. The environment emitted
 one existing Starlette/httpx deprecation warning. An earlier run including the optional real audio
 decoder could not run that scenario because `mlx_audio` was not installed; this is not a model or
 real-provider execution claim.

@@ -8,6 +8,23 @@ import type { ReviewWarning } from "../api/contracts";
 afterEach(async () => { await changeAppLocale("en"); });
 
 describe("workflow service copy boundary", () => {
+  it.each(["en", "zh-CN"] as const)("keeps reviewed failure recovery copy in %s", async (locale) => {
+    await changeAppLocale(locale);
+    for (const raw of [
+      "We couldn’t transcribe the voice sample. Please try again.",
+      "We couldn’t prepare the voice sample. Please try again.",
+      "We couldn’t create the voice audition. Please try again.",
+      "We couldn’t create the audiobook download. Please try again.",
+      "Audio export is temporarily unavailable. Please try again later.",
+      "The voice draft changed. Refresh before adding or removing auditions.",
+      "Review the dialogue rules and resolve conflicting matches before continuing.",
+    ]) {
+      expect(message(new Error(raw))).toBe(raw);
+      const rendered = localizeErrorMessage(raw, i18n.t);
+      if (locale === "zh-CN") expect(rendered).toMatch(/[\u4e00-\u9fff]/);
+    }
+  });
+
   it.each(["en", "zh-CN"] as const)("presents old and unknown provider progress without diagnostics in %s", async (locale) => {
     await changeAppLocale(locale);
     for (const raw of [

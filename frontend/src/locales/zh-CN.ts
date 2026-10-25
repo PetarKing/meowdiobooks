@@ -1449,7 +1449,6 @@ const zhCN: Record<string, string> = {
   "We couldn’t transcribe the voice sample. Please try again.": "无法转录声音样本。请重试。",
   "We couldn’t create the voice audition. Please try again.": "无法创建声音试听。请重试。",
   "The voice draft changed. Refresh before adding or removing auditions.": "声音草稿已更改。请刷新后再添加或移除试听。",
-  "Import the source document again before continuing.": "请重新导入原文后再继续。",
   "Review the dialogue rules and resolve conflicting matches before continuing.": "请检查对白规则并解决匹配冲突后再继续。",
 };
 
