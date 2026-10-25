@@ -7,7 +7,8 @@ for both remote passes. No local decision model is selected or silently used as 
 ## User decisions and source ownership
 
 The AI cleanup category shows exact source text, its suggested replacement, and a reason. Users can
-keep a passage, accept a proposed repair individually, or accept all available proposals. A flagged
+keep a passage, accept a proposed repair individually, or apply all remaining undecided proposals
+without changing earlier choices. A flagged
 passage without a safe proposal remains available for source inspection and extraction recovery.
 Nothing is silently accepted because a detector or repair model was confident.
 

@@ -4,9 +4,9 @@ English | [简体中文](README.zh-CN.md)
 
 ![Meowdiobooks — a local audiobook studio](docs/assets/meowdiobooks-hero.png)
 
-> **Alpha · macOS · Apple Silicon** — the complete workflow runs locally by default. This release is
-> for early adopters comfortable installing the documented local model stack and reviewing key
-> AI-assisted decisions. Book-length work stays private on your Mac and runs at its hardware speed.
+> **Alpha · macOS · Apple Silicon** — local audio production with cloud-assisted cleanup. This release
+> is for early adopters comfortable installing the documented local model stack and reviewing key
+> AI-assisted decisions. Review sends bounded book passages to OpenAI Luna and requires an API key.
 
 **Transform a raw PDF into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
 
