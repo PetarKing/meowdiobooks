@@ -404,7 +404,9 @@ export function useWorkflowModel({
   const recoveryStageIndex = stageIndex("review");
 
   const routeStage = (requestedStage: number, current = snapshot) => (
-    current?.dialogueRecovery && requestedStage >= recoveryStageIndex
+    ["epub", "text"].includes(current?.book.sourceKind ?? "") && stages[requestedStage]?.builtin === "extract"
+      ? stageIndex("dialogue")
+      : current?.dialogueRecovery && requestedStage >= recoveryStageIndex
       ? recoveryStageIndex
       : requestedStage
   );
@@ -447,7 +449,7 @@ export function useWorkflowModel({
         ...(occurrencePolicies.length ? [occurrencePolicies] : []),
       ).then(async (preview) => {
         if (disposed) return;
-        await decodeImage(preview.imageUrl);
+        if (preview.imageUrl) await decodeImage(preview.imageUrl);
         if (!disposed) setReviewTranscriptPreview(preview);
       }).catch((reason) => {
         if (!disposed) {

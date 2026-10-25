@@ -14,9 +14,9 @@ PYTHONPATH=src python -m pytest -q tests/backend -m 'not uses_audio_decoder and 
 python -m ruff check src/meowdiobooks/backend/queue.py src/meowdiobooks/backend/app_v2.py src/meowdiobooks/backend/audio.py src/meowdiobooks/backend/transcription.py src/meowdiobooks/backend/errors.py tests/backend/test_job_diagnostics.py tests/backend/test_operation_diagnostics.py tests/backend/test_app_v2.py
 ```
 
-On macOS / Python 3.12, the final backend run passed 758 tests with three decoder/model tests excluded.
+On macOS / Python 3.12, the final backend run passed 831 tests with three decoder/model tests excluded.
 The targeted lint check and TypeScript check of the translation catalog passed. After integrating
-the concurrent copy change from main, 22 presentation/action-required frontend tests also passed.
+the concurrent copy and PDF/EPUB/text import changes from main, 22 presentation/action-required frontend tests also passed.
 The frontend production build passed with its existing bundle-size advisory.
 The initial attempt using the companion frontend dependency tree could not resolve the Core test
 setup; rerunning with the existing Core dependency tree passed. The environment emitted
