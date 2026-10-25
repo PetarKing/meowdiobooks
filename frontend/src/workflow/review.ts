@@ -130,7 +130,7 @@ export function reviewWarningResolved(warning: ReviewWarning, decisions: Record<
 export function reviewProposalDecisions(warning: ReviewWarning, decisions: Record<string, ReviewCapability>) {
   const next = { ...decisions };
   for (const row of warning.occurrences) {
-    if (reviewUsesOccurrenceDecisions(warning) && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
+    if (next[row.id] === undefined && reviewUsesOccurrenceDecisions(warning) && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
   }
   return next;
 }

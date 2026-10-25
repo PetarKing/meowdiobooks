@@ -62,7 +62,7 @@ their original line-only range rather than absorbing uncertain prose.
 
 ## User sees
 
-- warning groups with severity and occurrence counts;
+- numbered warning groups with occurrence counts and blocking labels where needed;
 - exact source plus adjacent context;
 - proposed change and consequence preview;
 - next/previous occurrence navigation;
@@ -80,9 +80,11 @@ When a correction matches a deterministic finding, that occurrence moves to AI s
 source evidence and ID intact. It is not shown twice, and empty groups are removed.
 The AI group's choices are **Keep**, **Leave**, and **Apply all AI suggestions**. Keep preserves the
 current occurrence's original text; Leave excludes that occurrence from speech. Apply all selects
-every available correction in the AI group, including previously kept or excluded proposals. The user
-can then override individual items. The button stays in the group's decision panel and is disabled
-when every correction is selected. Source checks without corrections still need individual decisions.
+only undecided corrections in the AI group. Every existing Keep, Leave or correction choice is
+preserved, including overrides made after a bulk action. The button shows the number of undecided
+suggestions, stays in the group's decision panel, and is disabled when none remain. Source checks
+without corrections still need individual decisions. A warning beside this bulk option highlights
+its scope; normal review groups do not carry a generic warning badge.
 Only one example is displayed at a time, with previous/next navigation and an occurrence count.
 Accepted corrections change rendered text while retaining original source evidence and speaker
 assignments.

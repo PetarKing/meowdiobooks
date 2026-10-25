@@ -3005,6 +3005,7 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: /Try extraction again/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
     expect(screen.getByText('Remove the flagged text from the audiobook transcript.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toHaveTextContent('Apply 1 undecided AI suggestion.')
     fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
     expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeDisabled()
     expect(screen.getByText('No correction was proposed. Check the source before keeping or leaving out this text.')).toBeInTheDocument()
@@ -3013,11 +3014,11 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-ai', 1, [], [
-      { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
+      { occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
     ])
     fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-ai', [
-      { occurrenceIds: ['join'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
+      { occurrenceIds: ['join'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
     ]))
   })
 
@@ -3053,19 +3054,27 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Corrected fragment 149')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
     expect(screen.getByText('Example 2 of 150')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Leave This highlighted/ }))
+    expect(screen.getByText('Example 3 of 150')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toHaveTextContent('Apply 148 undecided AI suggestions.')
     fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
     expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
-    fireEvent.click(screen.getByRole('button', { name: /^Leave This highlighted/ }))
-    expect(screen.getByRole('button', { name: /^Leave This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: /^Keep Keep the original/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+    expect(screen.getByRole('button', { name: /^Leave This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+    expect(screen.getByText('AI correction selected for this example. It will apply when you accept the review.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toHaveTextContent('No undecided AI suggestions.')
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     const policies = vi.mocked(wizardApi.previewReviewTranscript).mock.lastCall![4]
     expect(policies).toHaveLength(150)
-    expect(policies?.slice(0, 3)).toEqual([{ occurrenceId: 'ai-0', action: 'exclude' }, { occurrenceId: 'ai-1', action: 'keep' }, { occurrenceId: 'ai-2', action: 'repair' }])
+    expect(policies?.slice(0, 3)).toEqual([{ occurrenceId: 'ai-0', action: 'keep' }, { occurrenceId: 'ai-1', action: 'exclude' }, { occurrenceId: 'ai-2', action: 'keep' }])
   })
 
   it('shows the complete read-only transcript beside the synchronized PDF page', async () => {

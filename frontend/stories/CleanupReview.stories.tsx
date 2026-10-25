@@ -40,7 +40,7 @@ export const SourceCheckAfterBulkApply: Story = {
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
-export const KeptChoiceCanBeAppliedByBulk: Story = {
+export const KeptChoiceIsPreservedByBulk: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
@@ -49,10 +49,9 @@ export const KeptChoiceCanBeAppliedByBulk: Story = {
     await expect(canvas.getByRole("button", { name: /^Apply all AI suggestions/ })).toBeDisabled();
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
-    await expect(canvas.getByRole("button", { name: /^Keep Keep the original/ })).toHaveAttribute("aria-pressed", "false");
-    await expect(canvas.getByText("AI correction selected for this example. It will apply when you accept the review.")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: /^Keep Keep the original/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(canvas.getByRole("button", { name: /^Leave This highlighted/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all AI suggestions/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: /^Apply all AI suggestions/ })).toBeDisabled();
   },
 };
 export const ConsolidatedSourceWarning: Story = {
@@ -81,6 +80,6 @@ export const ManySuggestions: Story = {
     await userEvent.click(canvas.getByRole("button", { name: /^Apply all AI suggestions/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: /^Keep Keep the original/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all AI suggestions/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: /^Apply all AI suggestions/ })).toBeDisabled();
   },
 };
