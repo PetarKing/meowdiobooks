@@ -192,7 +192,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Alice' })).toBeInTheDocument()
     expect(screen.getByText('12 chapters')).toBeInTheDocument()
     expect(screen.queryByText('Down the Rabbit-Hole · The Pool of Tears')).not.toBeInTheDocument()
-    expect(screen.getByText('12.0 MB')).toBeInTheDocument()
+    expect(screen.getByText('12.0 MiB')).toBeInTheDocument()
     expect(screen.getByText('High-quality M4B')).toBeInTheDocument()
     expect(screen.getByAltText('Cover of Alice')).toHaveAttribute('src', '/api/library/export-1/cover')
 
@@ -1039,9 +1039,9 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('radio', { name: /High-quality M4B/ })).toBeChecked()
     expect(screen.getByRole('radio', { name: /Smaller M4B/ })).not.toBeChecked()
     expect(screen.getByRole('radio', { name: /MP3 chapters.*ZIP download/ })).not.toBeChecked()
-    expect(screen.getByText('≈ 172 KB')).toBeInTheDocument()
-    expect(screen.getByText('≈ 86 KB')).toBeInTheDocument()
-    expect(screen.getByText('≈ 129 KB')).toBeInTheDocument()
+    expect(screen.getByText('≈ 172 KiB')).toBeInTheDocument()
+    expect(screen.getByText('≈ 86 KiB')).toBeInTheDocument()
+    expect(screen.getByText('≈ 129 KiB')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Create high-quality M4B →' })).toBeEnabled()
 
     vi.mocked(wizardApi.createAudioExport).mockResolvedValue({
@@ -2358,6 +2358,31 @@ describe('v2 wizard', () => {
     }))
   })
 
+  it('shows the host import limit and rejects an oversized replacement before sending it', async () => {
+    render(<App maxImportBytes={10_000_000} />)
+    expect(screen.getByText('Up to 10 MB')).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    fireEvent.change(input, { target: { files: [new File(['small'], 'small.pdf')] } })
+    const oversized = new File(['synthetic'], 'large.pdf')
+    Object.defineProperty(oversized, 'size', { value: 10_000_001 })
+    fireEvent.change(screen.getByLabelText('Choose another file'), { target: { files: [oversized] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
+    expect(await screen.findByText('Choose a file no larger than 10 MB.')).toBeInTheDocument()
+    expect(wizardApi.importBook).not.toHaveBeenCalled()
+    const boundary = new File(['synthetic'], 'boundary.pdf')
+    Object.defineProperty(boundary, 'size', { value: 10_000_000 })
+    vi.mocked(wizardApi.importBook).mockRejectedValueOnce(new Error('Synthetic parser response'))
+    fireEvent.change(screen.getByLabelText('Choose another file'), { target: { files: [boundary] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
+    await waitFor(() => expect(wizardApi.importBook).toHaveBeenCalledExactlyOnceWith(boundary))
+    expect(screen.queryByText('Choose a file no larger than 10 MB.')).not.toBeInTheDocument()
+  })
+
+  it('keeps the standalone import ceiling at 500 MB', () => {
+    render(<App />)
+    expect(screen.getByText('Up to 500 MB')).toBeInTheDocument()
+  })
+
   it('adds an imported book to the local library without a second collection request', async () => {
     const imported = { id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 }
     vi.mocked(wizardApi.importBook).mockResolvedValue({ book: imported, representativePages: [{ page: 1, reason: 'opening' }], duplicate: false })
@@ -2442,8 +2467,8 @@ describe('v2 wizard', () => {
     await screen.findByRole('heading', { name: 'Your local books' })
     await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledWith('book-1'))
     expect(screen.getByRole('heading', { name: 'Your local books' })).toBeInTheDocument()
-    expect(screen.getAllByText('12.0 MB used')).toHaveLength(1)
-    expect(screen.getByText('120 pages · 12.0 MB')).toBeInTheDocument()
+    expect(screen.getAllByText('12.0 MiB used')).toHaveLength(1)
+    expect(screen.getByText('120 pages · 12.0 MiB')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete Alice' }))
     expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('source file, extracted text, dialogue and cast choices, chapter audio, and saved progress')
     expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('Finished exports stay in Library.')
@@ -2465,7 +2490,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.listBookJobs).toHaveBeenCalledTimes(6))
     expect(screen.getByText('6 books')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Start another book' })).toBeInTheDocument()
-    expect(screen.getByText('6.0 MB used')).toBeInTheDocument()
+    expect(screen.getByText('6.0 MiB used')).toBeInTheDocument()
     expect(document.querySelectorAll('.recent-books article')).toHaveLength(6)
   })
 

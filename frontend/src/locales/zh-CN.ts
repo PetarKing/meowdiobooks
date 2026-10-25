@@ -410,6 +410,8 @@ const zhCN: Record<string, string> = {
   "Import book": "导入书籍",
   "Choose book": "选择书籍",
   "PDF, EPUB, TXT, Markdown": "PDF、EPUB、TXT、Markdown",
+  "Up to {{size}} MB": "最大 {{size}} MB",
+  "Choose a file no larger than {{size}} MB.": "请选择不超过 {{size}} MB 的文件。",
   "Work in progress": "正在制作",
   "1 book": "1 本书",
   "{{count}} books": "{{count}} 本书",

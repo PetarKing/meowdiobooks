@@ -23,6 +23,8 @@ export interface AppProps {
   onAppearanceChange?: (appearance: import('./useAppearance').Appearance) => void;
   presentationPalette?: PresentationPalette;
   gateway?: WorkflowGateway;
+  /** Maximum source file bytes; hosts must enforce the same limit on their server. */
+  maxImportBytes?: number;
   /** Scope browser return hints to the host identity; omit for the local application. */
   workflowPersistenceNamespace?: string;
   /** Explicit host return destination, including a job already dispatched by the host. */

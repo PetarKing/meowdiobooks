@@ -3,10 +3,10 @@ import { StudioHero } from "../components/StudioHero";
 import { Panel } from "../components/Ui";
 import { formatFileSize } from "../workflow/presentation";
 
-export type HomePageModel = Pick<WorkflowModel, "books" | "booksError" | "booksLoading" | "refreshBooks" | "busy" | "deletingBookId" | "file" | "importBook" | "navigateProduct" | "openBook" | "openingBookId" | "setBookPendingDeletion" | "setFile" | "t">;
+export type HomePageModel = Pick<WorkflowModel, "books" | "booksError" | "booksLoading" | "refreshBooks" | "busy" | "deletingBookId" | "file" | "importBook" | "importLimitMB" | "navigateProduct" | "openBook" | "openingBookId" | "setBookPendingDeletion" | "setFile" | "t">;
 
 export function HomePage({ model }: { model: HomePageModel; }) {
-  const { books, booksError, booksLoading, refreshBooks, busy, deletingBookId, file, importBook, navigateProduct, openBook, openingBookId, setBookPendingDeletion, setFile, t } = model;
+  const { books, booksError, booksLoading, refreshBooks, busy, deletingBookId, file, importBook, importLimitMB, navigateProduct, openBook, openingBookId, setBookPendingDeletion, setFile, t } = model;
   const totalAssetBytes = books.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
 
   return <>
@@ -26,7 +26,7 @@ export function HomePage({ model }: { model: HomePageModel; }) {
         </div> : <label className="quick-upload">
           <input type="file" accept=".pdf,.epub,.txt,.md,application/pdf,application/epub+zip,text/plain,text/markdown" onChange={(event) => setFile(event.target.files?.[0])} />
           <span className="quick-upload-icon" aria-hidden="true">＋</span>
-          <span><strong>{t("Choose book")}</strong><small>{t("PDF, EPUB, TXT, Markdown")}</small></span>
+          <span><strong>{t("Choose book")}</strong><small>{t("PDF, EPUB, TXT, Markdown")}</small><small>{t("Up to {{size}} MB", { size: importLimitMB })}</small></span>
           <span className="upload-arrow" aria-hidden="true">↗</span>
         </label>}
         {file && <p className="import-storage-note">{t("books.importStorageNotice", { ns: "edition" })}</p>}

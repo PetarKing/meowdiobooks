@@ -79,6 +79,8 @@ const editionErrorKeys = new Set([
 ]);
 
 export function localizeErrorMessage(value: string, t: TFunction) {
+  const importLimit = value.match(/^Choose a file no larger than ([\d.,]+) MB\.$/);
+  if (importLimit) return t("Choose a file no larger than {{size}} MB.", { size: importLimit[1] });
   const referenced = referencedOperationError(value);
   if (referenced) return t("{{message}} Reference: {{reference}}.", {
     message: t(referenced.message), reference: referenced.reference,
@@ -138,10 +140,10 @@ export function localizeProcessMessage(value: string, t: TFunction) {
 }
 
 export function formatFileSize(bytes: number) {
-  if (bytes === 0) return "0 KB";
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+  if (bytes === 0) return "0 KiB";
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KiB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
+  return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GiB`;
 }
 
 const audioExportBitrates: Record<AudioExportPreset, number> = {

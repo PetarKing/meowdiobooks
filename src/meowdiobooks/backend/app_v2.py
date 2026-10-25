@@ -462,6 +462,7 @@ def create_app_v2(
     on_job_failed: JobFailureReporter | None = None,
     on_operation_failed: Callable[[str, str | None, Exception], None] | None = None,
     file_processor: FileProcessor | None = None,
+    max_import_bytes: int = 500_000_000,
     on_cast_voice_revisions_changed: (
         Callable[[Path, frozenset[str]], None] | None
     ) = None,
@@ -480,6 +481,8 @@ def create_app_v2(
     their export hook and model store both commit successfully.
     """
 
+    if type(max_import_bytes) is not int or not 0 < max_import_bytes <= 500_000_000:
+        raise ValueError("max_import_bytes must be a positive integer at most 500000000")
     root = Path(data_dir)
     if not retain_local_library_exports and on_library_exported is None:
         raise ValueError(
@@ -1453,13 +1456,16 @@ def create_app_v2(
         limit = 20 * 1024 * 1024 if suffix in {".txt", ".md"} else (
             64 * 1024 * 1024 if suffix == ".epub" else 500_000_000
         )
+        limit = min(limit, max_import_bytes)
         chunks: list[bytes] = []
         total = 0
         while chunk := await file.read(1024 * 1024):
             total += len(chunk)
             if total > limit:
-                label = "20 MiB" if suffix in {".txt", ".md"} else "64 MiB" if suffix == ".epub" else "500 MB"
-                raise HTTPException(status_code=413, detail=f"Book exceeds the {label} limit")
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Book exceeds the {limit / 1_000_000:g} MB limit",
+                )
             chunks.append(chunk)
         raw = b"".join(chunks)
         # Parsing yields to other requests. Serialize import validation and commit
