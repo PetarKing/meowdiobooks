@@ -44,8 +44,10 @@ Before the wizard, **PDF intake** stores the exact PDF bytes and hash. **No AI.*
    if the user enables focused attribution. The accepted result owns exact source ranges.
 3. **Review** resolves source-quality warnings and chapter starts with explicit user actions. Luna's
    Decisions API scans bounded text, then Luna proposes corrections for flagged passages. Each
-   correction can be applied or kept unchanged; a bulk action selects all corrections. Corrections
-   for already detected issues appear with those findings instead of creating duplicate AI warnings.
+   repairable finding belongs to the numbered **AI suggestions** group, including matching
+   deterministic findings moved there without duplication. The choices are **Keep**, **Leave**, and
+   **Apply all AI suggestions**. Bulk selects only undecided corrections and preserves all existing
+   choices; individual items remain editable afterward.
 4. **Cast & Voices** asks Qwen about each literal label, the user confirms identities, and Qwen suggests
    editable voice settings. VoiceDesign produces designed auditions; alternatively, Qwen3-ASR drafts
    an uploaded sample's transcript for user correction and Qwen Base produces a cloned audition. The

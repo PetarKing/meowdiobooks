@@ -688,7 +688,7 @@ def test_review_bulk_preview_is_local_and_model_repair_endpoint_is_absent(tmp_pa
         assert missing.status_code in {404, 405}
 
 
-def test_review_upstream_action_returns_explicit_rerun_contract_without_publish(
+def test_review_rejects_removed_reextraction_choice_without_publish(
     tmp_path, monkeypatch
 ):
     pages = [{"page": 1, "text": "Alice saw � smoke.", "warnings": []}]
@@ -709,7 +709,8 @@ def test_review_upstream_action_returns_explicit_rerun_contract_without_publish(
             f"/api/books/{book_id}/stages/review/candidates/{result['revision']}"
         ).json()
         occurrences = [row for warning in review["warnings"] for row in warning["occurrences"]]
-        repair = next(row for row in occurrences if "rerun-extraction" in row["availableActions"])
+        assert all("rerun-extraction" not in row["availableActions"] for row in occurrences)
+        repair = occurrences[0]
         decisions = [
             {
                 "occurrenceIds": [row["id"]],
@@ -727,10 +728,7 @@ def test_review_upstream_action_returns_explicit_rerun_contract_without_publish(
         )
 
         assert response.status_code == 409
-        detail = response.json()["detail"]
-        assert detail["requiresNewUpstreamRevision"] is True
-        assert detail["reviewPublished"] is False
-        assert detail["actions"][0]["nextStage"] == "extract"
+        assert "not supported" in response.json()["detail"]
         assert (
             "review" not in client.get(f"/api/books/{book_id}/snapshot").json()["activeArtifacts"]
         )
@@ -1400,8 +1398,8 @@ def test_cleanup_failure_retry_preview_acceptance_and_reopen(tmp_path, monkeypat
         candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{result['revision']}").json()
         ai = next(row for warning in candidate['warnings'] for row in warning['occurrences']
                   if row.get('proposalStatus'))
-        assert ai['kind'] == 'suspicious-extraction'
-        assert not any(w['kind'] == 'ai-cleanup' for w in candidate['warnings'])
+        assert ai['kind'] == 'ai-cleanup'
+        assert sum(row['source'] == ai['source'] for w in candidate['warnings'] for row in w['occurrences']) == 1
         assert ai['replacement'] == 'broken'
         policies = [{'warningId': row['id'], 'action': 'keep'} for row in candidate['warnings']
                     if row.get('decisionScope') != 'occurrence']
