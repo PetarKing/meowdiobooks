@@ -141,3 +141,12 @@ describe("verified script direction decisions", () => {
     expect(reviewOccurrenceActions(legacy, legacy.occurrences[0])).toEqual(["keep", "exclude", "narrate"]);
   });
 });
+
+
+it("preserves only explicit continuous context metadata through normalization", () => {
+  const rows = ["continuous", undefined, "guessed"].map((contextLayout, i) => ({
+    ...cleanupWarning.occurrences[0], id: `context-${i}`, contextLayout,
+  }));
+  const [warning] = normalizeCandidateWarnings({ warnings: [{ ...cleanupWarning, occurrences: rows }] });
+  expect(warning.occurrences.map((row) => row.contextLayout)).toEqual(["continuous", undefined, undefined]);
+});

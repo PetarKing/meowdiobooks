@@ -25,6 +25,7 @@ def test_label_and_whitespace_do_not_hide_neighboring_prose():
            'source': '[said softly]', 'id': 'unchanged'}
     original = deepcopy(cue)
     add_source_context([cue], extraction['blocks'])
+    assert cue['contextLayout'] == 'continuous'
     assert cue['contextBefore'] == 'The door was locked. She turned to her brother.\n\nMARA: '
     assert 'Stay close.' in cue['contextAfter']
     assert cue['contextAfter'].endswith('He nodded and took her hand.')
@@ -92,3 +93,11 @@ def test_saved_chapter_candidates_gain_context_without_changing_identity():
     assert result['contextAfter'].strip() == 'Morning came at last.'
     assert {key: result[key] for key in boundary} == boundary
     assert 'contextBefore' not in boundary
+
+
+def test_unanchored_legacy_context_is_not_claimed_to_be_continuous():
+    row = {'source': 'CHAPTER II', 'contextBefore': 'The visitor left.',
+           'contextAfter': 'Morning came.'}
+    original = deepcopy(row)
+    add_source_context([row], [{'id': 'b', 'text': 'CHAPTER II'}])
+    assert row == original

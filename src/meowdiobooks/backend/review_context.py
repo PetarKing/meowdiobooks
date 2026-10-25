@@ -63,6 +63,7 @@ def add_source_context(
             continue
         start, end = anchor[0] + start, anchor[0] + end
         left, right = max(0, start - _LIMIT), min(len(document), end + _LIMIT)
+        occurrence["contextLayout"] = "continuous"
         occurrence["contextBefore"] = _before(document[left:start], left > 0)
         occurrence["contextAfter"] = _after(document[end:right], right < len(document))
         # Empty-page targets have no adjacent characters whose spacing must be kept.

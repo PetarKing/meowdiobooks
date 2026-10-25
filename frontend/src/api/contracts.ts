@@ -227,6 +227,8 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  /** Context preserves whitespace adjacent to the anchored source. */
+  contextLayout?: "continuous";
   recommendedAction?: "exclude";
   cueVerification?: "verified";
   readerState?: "narrator" | "assigned-speaker" | "mixed";
@@ -255,6 +257,7 @@ export interface ReviewWarning {
 }
 
 export interface BoundaryCandidate {
+  contextLayout?: "continuous";
   contextBefore?: string;
   contextAfter?: string;
   id: string;

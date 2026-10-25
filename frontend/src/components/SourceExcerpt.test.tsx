@@ -17,3 +17,24 @@ describe('source evidence', () => {
     expect(container.querySelector('mark')).toHaveTextContent('Only evidence');
   });
 });
+
+
+describe('continuous source passages', () => {
+  it('keeps the source speaker and speech together without inventing labels or changing characters', () => {
+    const before = 'The floorboards creaked.\n\nMARA: ';
+    const source = '[said softly]';
+    const after = ' Stay close. If they hear us, run.\n\nHe nodded.';
+    const { container } = render(<SourceExcerpt layout="passage" label="Manuscript context" source={source} contextBefore={before} contextAfter={after} />);
+    expect(screen.getByLabelText('Manuscript context').textContent).toBe(before + source + after);
+    expect(container.querySelector('.source-focus')?.textContent).toBe('MARA: [said softly] Stay close. If they hear us, run.');
+    expect(container.querySelector('mark')?.textContent).toBe(source);
+    expect(container.querySelectorAll('p')).toHaveLength(0);
+  });
+  it('preserves multiline targets and literal markup at document edges', () => {
+    const source = '第一章\n<script>do not interpret</script> & “words”';
+    const { container } = render(<SourceExcerpt layout="passage" source={source} />);
+    expect(container.querySelector('.source-passage')?.textContent).toBe(source);
+    expect(container.querySelector('mark')?.textContent).toBe(source);
+    expect(container.querySelector('script')).toBeNull();
+  });
+});
