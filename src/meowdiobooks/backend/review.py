@@ -86,6 +86,12 @@ _PERIPHERAL = re.compile(
     r"translation note|acknowledgements?|about the author|index|bibliography)\b",
     re.IGNORECASE,
 )
+_CREDIT_HEADING = re.compile(
+    r"^\s*(?:(?:(?:human|machine)\s+)?translated\s+by|proofread\s+by|"
+    r"japanese\s+to\s+english\s+checking\s+by|art\s+sources?)\s*:\s*$",
+    re.IGNORECASE,
+)
+_LINE_HYPHEN = re.compile(r"(?<![\w-])[A-Za-z]{2,}[-\u00ad][ \t\r]*\n[ \t]*[a-z]{2,}(?![\w-])")
 
 
 def build_review_workspace(
@@ -106,7 +112,7 @@ def build_review_workspace(
     occurrences: list[dict[str, Any]] = []
     coverage_failures = _coverage_occurrences(blocks, spans)
     occurrences.extend(_empty_occurrences(blocks))
-    occurrences.extend(_text_occurrences(blocks))
+    occurrences.extend(_text_occurrences(blocks, spans))
     occurrences.extend(_stage_direction_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
@@ -632,8 +638,12 @@ def _stage_direction_occurrences(blocks, spans):
     return result
 
 
-def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    result = _footnote_occurrences(blocks)
+def _text_occurrences(
+    blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    numbered_edges = _numbered_edge_occurrences(blocks)
+    numbered_pages = {row["page"] for row in numbered_edges}
+    result = [*_footnote_occurrences(blocks), *_credit_occurrences(blocks, spans), *numbered_edges]
     edge_lines: dict[str, list[tuple[Mapping[str, Any], int, int, str]]] = defaultdict(list)
     page_blocks: dict[int, list[str]] = defaultdict(list)
     for block in blocks:
@@ -645,6 +655,14 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
         block_id = str(block["id"])
         is_first_block = block_id == siblings[0]
         is_last_block = block_id == siblings[-1]
+        for match in _LINE_HYPHEN.finditer(text):
+            occurrence = _from_match(
+                "suspicious-extraction", block, match,
+                "Possible line-wrapped word. Check the source before joining: a genuine "
+                "compound or interrupted speech must retain its hyphen. Do not exclude the word.",
+            )
+            occurrence["detectionRule"] = "line-wrap-hyphen"
+            result.append(occurrence)
         for line_index, match in enumerate(lines):
             value = match.group(0)
             stripped = value.strip()
@@ -684,7 +702,10 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
             is_edge = (is_first_block and line_index < 2) or (
                 is_last_block and line_index >= max(0, len(lines) - 2)
             )
-            if is_edge and _PAGE_NUMBER.fullmatch(stripped):
+            if (
+                is_edge and _PAGE_NUMBER.fullmatch(stripped)
+                and not (is_first_block and line_index < 2 and int(block["page"]) in numbered_pages)
+            ):
                 result.append(
                     _from_match("page-number", block, match, "Page-number-shaped edge line.")
                 )
@@ -702,10 +723,8 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
     for rows in edge_lines.values():
         if len({int(row[0]["page"]) for row in rows}) < 2:
             continue
-        repeated_top_title = (
-            len(rows[0][3].strip()) >= 12
-            and not re.search(r":\s*\[", rows[0][3])
-            and all(row[1] == 0 for row in rows)
+        repeated_top_title = _looks_like_running_title(rows[0][3]) and all(
+            row[1] == 0 for row in rows
         )
         if not (_looks_like_page_furniture(rows[0][3]) or repeated_top_title):
             continue
@@ -723,6 +742,117 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
                 )
             )
     return result
+
+
+def _numbered_edge_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Find changing folios attached to a repeated publisher/edition label.
+
+    Keep each original evidence string and match key: digit normalization is only
+    detection evidence, never authority for an identical-evidence bulk decision.
+    """
+    pages: dict[int, list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
+    for block in blocks:
+        pages[int(block["page"])].extend(
+            (block, match) for match in re.finditer(r"[^\n]+", str(block["text"]))
+            if match.group().strip()
+        )
+    candidates: dict[tuple[str, int], list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
+    for page, lines in pages.items():
+        if not lines:
+            continue
+        # A numbered publisher footer is a stronger signal than an isolated
+        # numeral at the top of a page (often a chapter/section number).
+        block, match = lines[-1]
+        label = re.fullmatch(r"\s*(?P<label>[^\d\n]{3,60}?)\s*(?P<number>\d{1,4})\s*", match.group())
+        if label is None:
+            continue
+        name = label["label"].strip()
+        if any(not word[:1].isupper() for word in name.split()):
+            continue
+        if not (
+            re.search(r"\b(?:press|publishing|editions?|translations?)\b|mtls?\b", name, re.I)
+            or re.fullmatch(r"[A-Z][a-z]+[A-Z][A-Za-z]+", name)
+        ):
+            continue
+        key = (" ".join(name.casefold().split()), int(label["number"]) - page)
+        candidates[key].append((block, match))
+    result = []
+    for rows in candidates.values():
+        if len({int(block["page"]) for block, _ in rows}) < 2:
+            continue
+        for block, match in rows:
+            occurrence = _from_match(
+                "page-number", block, match,
+                "Numbered page-edge publisher label repeats with a consistent page offset.",
+            )
+            occurrence["detectionRule"] = "numbered-publisher-footer"
+            result.append(occurrence)
+    return result
+
+
+def _credit_occurrences(
+    blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Keep contributor names with an explicit heading, bounded to its paragraph.
+
+    Do not infer continuation across source blocks or pages: a short name-shaped
+    line there may instead be a chapter title or story text.
+    """
+    result = []
+    for block in blocks:
+        text = str(block["text"])
+        lines = list(re.finditer(r"[^\n]+", text))
+        for index, match in enumerate(lines):
+            if not _CREDIT_HEADING.fullmatch(match.group()):
+                continue
+            if any(
+                str(span.get("blockId")) == str(block["id"])
+                and span.get("renderRole") == "dialogue"
+                and int(span.get("spokenStart", span.get("sourceStart", 0))) < match.end()
+                and int(span.get("spokenEnd", span.get("sourceEnd", 0))) > match.start()
+                for span in spans
+            ):
+                continue
+            end = match.end()
+            for following in lines[index + 1:]:
+                value = following.group().strip()
+                if (
+                    text[end:following.start()].count("\n") > 1
+                    or not _credit_name(value)
+                    or any(
+                        str(span.get("blockId")) == str(block["id"])
+                        and span.get("renderRole") == "dialogue"
+                        and int(span.get("sourceStart", 0)) < following.end()
+                        and int(span.get("sourceEnd", 0)) > following.start()
+                        for span in spans
+                    )
+                ):
+                    break
+                end = following.end()
+            occurrence = _occurrence(
+                "front-back-matter", str(block["id"]), match.start(), end,
+                text[match.start():end], int(block["page"]),
+                "Production credit heading and adjacent contributor names; verify before excluding.",
+                block_text=text,
+            )
+            occurrence["detectionRule"] = "production-credit-block"
+            result.append(occurrence)
+    return result
+
+
+def _credit_name(value: str) -> bool:
+    if (
+        not value or len(value) > 80 or _NOTE_SECTION_BOUNDARY.match(value)
+        or re.match(r"^(?:The|A|An)\s", value)
+    ):
+        return False
+    # Names/handles only. Quotes, sentence punctuation, scene separators and
+    # ordinary lowercase prose terminate the credit. This intentionally abstains
+    # on ambiguous multiline editorial disclaimers and contributor continuations.
+    words = value.split()
+    return len(words) <= 5 and all(
+        re.fullmatch(r"[A-Z@][\w'’.-]*", word) and not word.endswith(".") for word in words
+    )
 
 
 def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -788,7 +918,9 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
                 pending_tail = None
                 line_index += 1
                 continue
-            if not _is_footnote_marker(stripped):
+            if not _is_footnote_marker(stripped) or (
+                not section_active and not re.match(r"^\s*(?:\[\d{1,3}\]|[*†‡])", stripped)
+            ):
                 line_index += 1
                 continue
 
@@ -869,12 +1001,20 @@ def _looks_like_page_furniture(value: str) -> bool:
     """Conservatively distinguish repeated furniture from repeated novel prose."""
     stripped = value.strip()
     folded = stripped.casefold()
-    if re.search(r":\s*\[", stripped):
+    if re.search(r":\s*\[", stripped) or stripped.startswith(('"', "'", "“", "‘", "「", "『")):
         return False
     if re.search(r"https?://|www\.|@\w|\b(?:translated|proofread|translation notes?|art sources?)\b", folded):
         return True
-    alphanumeric = sum(character.isalnum() for character in stripped)
-    return bool(stripped) and alphanumeric / len(stripped) < 0.35
+    return False
+
+
+def _looks_like_running_title(value: str) -> bool:
+    """Require a short title-shaped line, not just repeated first-page prose."""
+    stripped = value.strip()
+    if not 12 <= len(stripped) <= 100 or re.search(r'[\[\]"“”「」『』:!?.,;]', stripped):
+        return False
+    words = stripped.split()
+    return 2 <= len(words) <= 10 and sum(word[:1].isupper() for word in words) / len(words) >= 0.5
 
 
 def _metadata_occurrences(
