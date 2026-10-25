@@ -34,7 +34,6 @@ class RecordingModel:
     '花園裡的貓正在安靜地散步。 嗯。',
     '嗯。 啊。 好。 花園裡的貓正在安靜地散步。',
     'An ordinary first sentence. Another ordinary sentence.',
-    'An ordinary first sentence. ... Another ordinary sentence.',
 ])
 def test_ordinary_turns_keep_complete_context_without_changing_text(text):
     units = _synthesis_units(text)
@@ -55,14 +54,16 @@ def test_long_passages_preserve_fragments_and_every_cleaned_source_character(fra
     text = ' '.join(sentences)
     units = _synthesis_units(text)
     assert len(text) > 500
-    assert len(units) == 8
-    assert fragment not in units
+    if fragment != '...':
+        assert fragment not in units
     assert ' '.join(units) == text
 
 
 def test_long_passage_sentence_boundaries_and_unsplittable_words_remain_intact():
     sentences = ['This is an ordinary sentence with enough context.'] * 12
-    assert _synthesis_units(' '.join(sentences)) == sentences
+    assert _synthesis_units(' '.join(sentences)) == [
+        ' '.join(sentences[index:index + 2]) for index in range(0, 12, 2)
+    ]
     unsplittable = 'a' * 501
     assert _synthesis_units(unsplittable) == [unsplittable]
 
@@ -371,3 +372,124 @@ def test_failed_recovery_preserves_previous_published_chapter(tmp_path, monkeypa
         }, 'english', lambda *args: None)
     assert latest.read_text() == '{"revision":"previous"}'
     assert not list(chapter.glob('.*.staging'))
+
+
+@pytest.mark.parametrize('separator', ['...', '…', '.....', '……', '...?!', '…”'])
+def test_ellipsis_forces_split_even_without_whitespace(separator):
+    text = f'Wait{separator}Come back here.'
+    assert _synthesis_units(text) == [f'Wait{separator}', 'Come back here.']
+
+
+def test_target_chooses_nearest_boundary_on_either_side_and_preserves_long_sentence():
+    # 81 + 40 + space = 122: crossing is closer to 120 than stopping at 81.
+    first, second, third = 'A' * 80 + '.', 'B' * 39 + '.', 'C' * 95 + '.'
+    assert _synthesis_units(f'{first} {second} {third}') == [f'{first} {second}', third]
+    # 101 + 80 + space = 182: stopping below target is closer.
+    first, second = 'A' * 100 + '.', 'B' * 79 + '.'
+    assert _synthesis_units(f'{first} {second}') == [first, second]
+    assert _synthesis_units('A' * 1000 + '.') == ['A' * 1000 + '.']
+
+
+def test_ellipsis_pause_is_exact_and_never_a_spoken_punctuation_request(tmp_path):
+    model = RecordingModel()
+    model.sample_rate = 24_000
+    segment = recovery_segment(tmp_path)
+    audio = _synthesize(model, '…Wait...Come back here…', segment, tmp_path, 'english')
+    assert [call['text'] for call in model.calls] == ['Wait...', 'Come back here…']
+    expected = np.concatenate([
+        np.zeros(6000), [0.1, -0.1], np.zeros(6000), [0.1, -0.1], np.zeros(6000),
+    ]).astype(np.float32)
+    np.testing.assert_array_equal(audio, expected)
+
+
+def test_short_word_after_ellipsis_retains_bounded_recovery(tmp_path):
+    model = ShortWordRecoveryModel()
+    recoveries = []
+    audio = _synthesize(model, 'A complete thought…Erm..', recovery_segment(tmp_path),
+                        tmp_path, 'english', recoveries=recoveries)
+    assert len(audio) == 6004
+    assert len(model.calls) == 5
+    assert recoveries[0]['unitIndex'] == 2
+    assert model.calls[-1]['text'] == 'Erm..'
+    assert 'ref_text' not in model.calls[-1]
+
+
+def test_multilingual_sentence_boundaries_preserve_nonwhitespace_characters():
+    text = '這是第一句話而且有足夠的長度。' * 20 + '嗯…下一段也應該獨立。'
+    units = _synthesis_units(text)
+    assert len(units) > 2
+    assert ''.join(''.join(units).split()) == ''.join(text.split())
+    assert all(unit.endswith(('。', '…')) for unit in units)
+
+
+def test_ellipsis_receipt_describes_actual_pause_and_units(tmp_path, monkeypatch):
+    import json
+    from meowdiobooks.backend import tts_v2
+    model = ShortWordRecoveryModel()
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: (model, lambda: None))
+    segment = recovery_segment(tmp_path, text='Wait…Come back here.')
+    results = tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', {
+        'contract': 'meowdiobooks.render-plan.v2',
+        'chapters': [{'chapterId': 'chapter', 'segments': [segment]}],
+    }, 'english', lambda *args: None)
+    metadata = json.loads(Path(results[0]['metadataPath']).read_text())
+    assert metadata['renderer']['chunking'] == {
+        'policy': 'sentence-target-ellipsis-v1', 'targetCharacters': 120,
+        'ellipsisPauseSeconds': 0.25,
+    }
+    assert metadata['segments'][0]['synthesisUnits'] == [
+        {'text': 'Wait…', 'pauseAfterSeconds': 0.25},
+        {'text': 'Come back here.', 'pauseAfterSeconds': 0.0},
+    ]
+    rate, audio = wavfile.read(results[0]['artifactPath'])
+    assert len(audio) == 4 + rate // 4
+
+
+@pytest.mark.parametrize('closing', ['」', '』', '”', '”』'])
+@pytest.mark.parametrize('terminator', ['。', '！？', '？！'])
+def test_cjk_closing_quotes_remain_with_the_preceding_sentence(closing, terminator):
+    first = '「' + '貓' * 119 + terminator + closing
+    second = '下一句話有足夠多個字。'
+    assert _synthesis_units(first + second) == [first, second]
+
+
+@pytest.mark.parametrize('value', ['', '0', '-1', '1.5', 'abc'])
+def test_invalid_target_fails_before_acquiring_model(tmp_path, monkeypatch, value):
+    from meowdiobooks.backend import tts_v2
+    monkeypatch.setenv('MEOWDIOBOOKS_TTS_TARGET_CHARACTERS', value)
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: pytest.fail('Model must not load'))
+    with pytest.raises(tts_v2.TTSContractError, match='positive integer'):
+        tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', {
+            'contract': 'meowdiobooks.render-plan.v2',
+            'chapters': [{'chapterId': 'chapter', 'segments': []}],
+        }, 'english', lambda *args: None)
+
+
+def test_configured_target_controls_calls_and_receipt(tmp_path, monkeypatch):
+    import json
+    from meowdiobooks.backend import tts_v2
+    model = ShortWordRecoveryModel()
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: (model, lambda: None))
+    sentence = 'This complete sentence describes the quiet room beside the garden and the open window.'
+    text = ' '.join([sentence] * 3)
+    plan = {'contract': 'meowdiobooks.render-plan.v2', 'chapters': [
+        {'chapterId': 'chapter', 'segments': [recovery_segment(tmp_path, text=text)]},
+    ]}
+    for target, calls in [(120, 3), (240, 1)]:
+        monkeypatch.setenv('MEOWDIOBOOKS_TTS_TARGET_CHARACTERS', str(target))
+        model.calls.clear()
+        result = tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', plan,
+                                          'english', lambda *args: None)
+        assert len(model.calls) == calls
+        metadata = json.loads(Path(result[0]['metadataPath']).read_text())
+        assert metadata['renderer']['chunking']['targetCharacters'] == target
+        assert [row['text'] for row in metadata['segments'][0]['synthesisUnits']] == [
+            call['text'] for call in model.calls
+        ]
+
+
+@pytest.mark.parametrize('title', ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'J.'])
+def test_sentence_target_does_not_cut_after_titles_or_initials(title):
+    first = 'The room was quiet and everyone watched the garden while waiting patiently for the messenger. '
+    following = f'{title} Brown ' + 'walked slowly ' * 10 + 'home.'
+    assert _synthesis_units(first + following) == [first.strip(), following]
