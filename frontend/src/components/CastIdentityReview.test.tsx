@@ -128,6 +128,19 @@ describe("CastIdentityReview", () => {
 
   afterEach(() => vi.restoreAllMocks());
 
+  it("keeps source passages intact while replacing technical generated explanations", () => {
+    const technicalCast: CastArtifact = { ...cast,
+      proposals: cast.proposals.map((row) => ({ ...row, reason: "Qwen API returned a JSON schema match" })),
+      dossiers: cast.dossiers.map((row) => ({ ...row, examples: [{ source: "The model explained the API in this book." }] })),
+    };
+    render(<CastIdentityReview cast={technicalCast} decisions={{}} setDecisions={() => undefined} resolvedLabels={[]} setResolvedLabels={() => undefined} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} hideVoiceSettings />);
+    fireEvent.click(screen.getByRole("button", { name: "Inspect Cecilus" }));
+    const dialog = screen.getByRole("dialog", { name: "Inspect Cecilus" });
+    expect(dialog).not.toHaveTextContent("Qwen API returned a JSON schema match");
+    expect(dialog).toHaveTextContent("Check the examples before deciding whether these names belong together.");
+    expect(dialog).toHaveTextContent("The model explained the API in this book.");
+  });
+
   it("keeps reclassification hidden unless cast editing explicitly enables it", () => {
     const reclassify = vi.fn();
     const { rerender } = render(<Harness />);

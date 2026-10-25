@@ -237,6 +237,13 @@ artifact may keep public downstream consumers; an incompatible artifact requires
 replacement of those consumers. Account, billing, tenant, object-storage, and queue identifiers never
 belong in public artifact JSON.
 
+The `showVoiceModelControls` and `advancedDialogueRules` UI capabilities default to `true` for
+local installations, where users may configure the voice runtime and speaker-matching rules.
+A companion that manages those choices sets them to `false`: the workflow retains its current
+voice selection, language, auditions, reuse choices, and quote checks, while model names and
+advanced rule editors are omitted from the interface. These capabilities do not change provider
+selection or permission to run a command.
+
 Edition translations change presentation only. They must not be used to disguise an unavailable
 capability: filesystem actions, provider routes, and supplier-cost visibility remain explicit typed
 composition choices. Every edition bundle must implement the complete key contract for every supported

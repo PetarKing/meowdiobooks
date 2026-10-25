@@ -241,13 +241,13 @@ createRoot(document.getElementById('root')!).render(<App {...hostComposition} ga
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.goto(`${base}/?handoff`);
-      await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Core processing' }) }).waitFor();
+      await page.getByRole('dialog').filter({ has: page.getByRole('heading', { name: 'Working on your book…' }) }).waitFor();
       const before = await page.evaluate(() => ({ position: document.body.style.position, overflow: document.documentElement.style.overflow }));
       assert.deepEqual(before, { position: 'fixed', overflow: 'hidden' });
       await page.evaluate(() => window.finishFundingHandoff());
       const funding = page.getByRole('dialog', { name: 'Host funding handoff' });
       await funding.waitFor();
-      await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')].some(element => element.textContent.includes('Core processing')));
+      await page.waitForFunction(() => ![...document.querySelectorAll('[role="dialog"]')].some(element => element.textContent.includes('Working on your book…')));
       const after = await funding.evaluate(element => ({ position: document.body.style.position, overflow: document.documentElement.style.overflow, focused: element.contains(document.activeElement), inert: Boolean(element.closest('[inert]')) }));
       assert.deepEqual(after, { position: 'fixed', overflow: 'hidden', focused: true, inert: false }, 'Core cleanup must retain hosted modal ownership across App and /ui bundles');
       await page.keyboard.press('Tab');

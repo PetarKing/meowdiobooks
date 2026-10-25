@@ -52,6 +52,10 @@ export interface WorkflowCapabilities {
   localDialogueAttribution: boolean;
   showExecutionBadge: boolean;
   showProviderCostReceipts: boolean;
+  /** Expose model configuration for installations whose users manage the voice runtime. */
+  showVoiceModelControls: boolean;
+  /** Expose advanced speaker-matching rules for installations whose users manage extraction. */
+  advancedDialogueRules: boolean;
 }
 
 export interface WorkflowStepOverrideProps {

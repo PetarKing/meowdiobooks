@@ -78,7 +78,7 @@ export async function enterScenario(
     if (metadata.story.actions.includes("open-book-error")) {
       await userEvent.click(book);
       await expect(await canvas.findByRole("alert")).toHaveTextContent(
-        "could not be opened",
+        t("Something went wrong while completing this step. Try again; your accepted work is unchanged."),
       );
     } else {
       await expect(book).toBeVisible();
@@ -219,7 +219,7 @@ export async function enterScenario(
         await click(prefix("Generate {{count}} selected", { count: 3 }));
         if (metadata.gatewayVariant === "generate-failed")
           await expect(await page.findByRole("alert")).toHaveTextContent(
-            "Chapter generation stopped",
+            t("Something went wrong while completing this step. Try again; your accepted work is unchanged."),
           );
         else
           await waitFor(() => expect(page.getByRole("dialog")).toBeVisible());
