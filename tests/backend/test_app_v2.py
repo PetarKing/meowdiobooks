@@ -60,6 +60,16 @@ def _wait(client: TestClient, job_id: str) -> dict:
     raise AssertionError(f"Job {job_id} did not finish")
 
 
+def _wait_for_log(caplog, message: str) -> None:
+    # Job settlement precedes diagnostic reporting on the worker thread.
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline:
+        if message in caplog.text:
+            return
+        time.sleep(0.01)
+    raise AssertionError(f"Expected diagnostic was not logged: {message}")
+
+
 def _process(client: TestClient, book_id: str, stage: str, settings: dict) -> dict:
     queued = client.post(
         f"/api/books/{book_id}/stages/{stage}/process",
@@ -513,7 +523,7 @@ def test_dialogue_conflicts_block_processing_before_qwen_runs(tmp_path, monkeypa
 
         assert finished["status"] == "failed"
         assert "conflicting matches" in finished["error"]
-        assert "overlapping regex claim" in caplog.text
+        _wait_for_log(caplog, "overlapping regex claim")
         assert qwen_calls == []
 
 
@@ -650,7 +660,7 @@ def test_extraction_rejects_a_changed_imported_source_before_parsing(tmp_path, m
 
         assert failed["status"] == "failed"
         assert failed["error"] == "Import the source document again before continuing."
-        assert "integrity check failed" in caplog.text
+        _wait_for_log(caplog, "integrity check failed")
         assert called is False
 
 
