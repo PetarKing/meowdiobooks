@@ -8,6 +8,9 @@ The checked-in [`models.toml`](../models.toml) is the runtime source of truth. P
 home-relative (`~/...`) or relative to the repository root. The default entries preserve the models
 used to develop and verify the alpha.
 
+For measured local alternatives, listening scores and precision tradeoffs, see the
+[local TTS benchmark report](LOCAL_TTS_BENCHMARKS.md).
+
 ## What runs what
 
 | Work | Runtime | Lifecycle |

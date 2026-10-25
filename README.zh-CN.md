@@ -220,6 +220,7 @@ npm --prefix frontend run build
 - [演示：从原文到音频](docs/DEMO.md)
 - [设置与模型文件](docs/SETUP.md)
 - [本地模型与配置](docs/MODELS.md)
+- [本地语音模型基准与精度比较](docs/LOCAL_TTS_BENCHMARKS.md)
 - [路线图](docs/ROADMAP.md)
 - [工作流程指南](docs/wizard/README.md)
 - [M4B 导出](docs/M4B_EXPORT.md)

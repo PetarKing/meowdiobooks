@@ -37,6 +37,9 @@ Primary sources:
 
 ### 1. Base quantization follow-up
 
+The complete [local TTS benchmark report](LOCAL_TTS_BENCHMARKS.md) records all tested alternatives,
+both listening rounds, exact pins, timings and limitations.
+
 The default is now Base 1.7B eight-bit, pinned in `models.toml`; VoiceDesign remains BF16.
 A controlled English listening screen compared four-bit, eight-bit and BF16 Base with identical
 references, text and synthesis settings. The two-voice follow-up supported eight-bit as the practical

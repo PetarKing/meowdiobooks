@@ -235,6 +235,7 @@ the [contributor reference](docs/CONTRIBUTING.md), including the
 - [Demo: source to audio](docs/DEMO.md)
 - [Setup and model assets](docs/SETUP.md)
 - [Local models and configuration](docs/MODELS.md)
+- [Local TTS benchmarks and precision comparison](docs/LOCAL_TTS_BENCHMARKS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Workflow guide](docs/wizard/README.md)
 - [Audiobook export](docs/M4B_EXPORT.md)
