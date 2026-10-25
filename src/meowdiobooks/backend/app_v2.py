@@ -99,6 +99,7 @@ from .documents import (
     EXTRACTION_METHOD_VERSION,
     extract_full_document,
     extract_pdf_page,
+    SUPPORTED_SUFFIXES,
     imported_book_id,
     inspect_source,
     pdf_metadata,
@@ -602,17 +603,17 @@ def create_app_v2(
 
     def process_extraction(command: ExtractBook, report) -> dict[str, object]:
         book = require_book(command.book_id)
-        if not book.source_name or book.source_kind != "pdf":
-            raise ValueError("Extraction requires an imported PDF")
+        if not book.source_name or book.source_kind not in {"pdf", "epub", "text"}:
+            raise ValueError("Extraction requires an imported document")
         source = source_path(root, book.id, book.source_name)
         digest = hashlib.sha256()
         with source.open("rb") as stream:
             while chunk := stream.read(1024 * 1024):
                 digest.update(chunk)
         if not book.source_hash or digest.hexdigest() != book.source_hash:
-            raise ValueError("Imported source integrity check failed; re-import the PDF")
-        method = command.settings.method
-        report(2, "Extracting the complete PDF")
+            raise ValueError("Imported source integrity check failed; re-import the document")
+        method = command.settings.method if book.source_kind == "pdf" else "text"
+        report(2, "Extracting the complete document")
         package = package_for(book.id)
         pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
             source,
@@ -629,7 +630,7 @@ def create_app_v2(
             {
                 "revision": revision,
                 "method": method,
-                "methodVersion": EXTRACTION_METHOD_VERSION,
+                "methodVersion": "text-v1" if method == "text" else EXTRACTION_METHOD_VERSION,
                 "sourceHash": book.source_hash,
                 "pageCount": len(pages),
                 "pages": pages,
@@ -1422,16 +1423,21 @@ def create_app_v2(
     @app.post("/api/books/import", status_code=status.HTTP_201_CREATED)
     async def import_book(file: UploadFile = File(...)) -> dict[str, Any]:
         filename = Path(file.filename or "").name
-        if Path(filename).suffix.casefold() != ".pdf":
-            raise HTTPException(status_code=415, detail="Use a PDF")
+        if Path(filename).suffix.casefold() not in SUPPORTED_SUFFIXES:
+            raise HTTPException(status_code=415, detail="Use a PDF, EPUB, TXT, or Markdown file")
+        suffix = Path(filename).suffix.casefold()
+        limit = 20 * 1024 * 1024 if suffix in {".txt", ".md"} else (
+            64 * 1024 * 1024 if suffix == ".epub" else 500_000_000
+        )
+        limit = min(limit, max_import_bytes)
         chunks: list[bytes] = []
         total = 0
         while chunk := await file.read(1024 * 1024):
             total += len(chunk)
-            if total > max_import_bytes:
+            if total > limit:
                 raise HTTPException(
                     status_code=413,
-                    detail=f"Book exceeds the {max_import_bytes / 1_000_000:g} MB limit",
+                    detail=f"Book exceeds the {limit / 1_000_000:g} MB limit",
                 )
             chunks.append(chunk)
         raw = b"".join(chunks)
@@ -1456,7 +1462,7 @@ def create_app_v2(
                 )
             canonical = source_path(root, existing.id, existing.source_name)
             if not canonical.is_file():
-                raise HTTPException(status_code=409, detail="The existing imported PDF is missing")
+                raise HTTPException(status_code=409, detail="The existing imported document is missing")
             digest = hashlib.sha256()
             with canonical.open("rb") as stream:
                 while stored_chunk := stream.read(1024 * 1024):
@@ -1464,7 +1470,7 @@ def create_app_v2(
             if not existing.source_hash or digest.hexdigest() != existing.source_hash:
                 raise HTTPException(
                     status_code=409,
-                    detail="The existing imported PDF failed its integrity check",
+                    detail="The existing imported document failed its integrity check",
                 )
             return {
                 "book": {
@@ -1475,6 +1481,11 @@ def create_app_v2(
                 "representativePages": representative_pages(existing.page_count or 1),
             }
         target = source_path(root, book_id, filename)
+        package_created = not package_for(book_id).exists()
+        artifact_root = package_for(book_id) / "artifacts"
+        prior_artifacts = set(artifact_root.rglob("*"))
+        latest_path = artifact_root / "latest.json"
+        prior_latest = latest_path.read_bytes() if latest_path.is_file() else None
         created = not target.exists()
         if created:
             atomic_write(target, raw)
@@ -1507,10 +1518,30 @@ def create_app_v2(
         )
         try:
             books.put(book)
+            if source_kind != "pdf":
+                try:
+                    result = await run_in_threadpool(
+                        process_extraction, ExtractBook(book_id=book.id, settings={"method": "text"}),
+                        lambda *_args: None,
+                    )
+                except (OSError, ValueError) as error:
+                    raise HTTPException(status_code=422, detail=str(error)) from error
+                await run_in_threadpool(
+                    accept_stage, book.id, "extract", StageAcceptRequest(revision=str(result["revision"])),
+                )
+                book = require_book(book.id)
             if on_book_imported is not None:
                 on_book_imported(book, target)
         except BaseException:
             books.delete(book.id)
+            if package_created:
+                shutil.rmtree(package_for(book.id), ignore_errors=True)
+            elif source_kind != "pdf":
+                for path in artifact_root.rglob("*"):
+                    if path.is_file() and path not in prior_artifacts:
+                        path.unlink(missing_ok=True)
+                if prior_latest is not None:
+                    atomic_write(latest_path, prior_latest)
             if created:
                 target.unlink(missing_ok=True)
             raise
@@ -1826,15 +1857,17 @@ def create_app_v2(
             result = (file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page)(
                 source, package_for(book.id) / "preview", body.page, body.method
             )
-            (file_processor.render_pdf_page if file_processor is not None else render_pdf_page)(
-                source, package_for(book.id) / "preview", body.page,
-            )
+            if book.source_kind == "pdf":
+                (file_processor.render_pdf_page if file_processor is not None else render_pdf_page)(
+                    source, package_for(book.id) / "preview", body.page,
+                )
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return {
             **result,
             "pageCount": book.page_count,
-            "imageUrl": f"/api/books/{book.id}/pages/{body.page}/image",
+            "imageUrl": f"/api/books/{book.id}/pages/{body.page}/image" if book.source_kind == "pdf" else None,
+            "sourceText": result["text"] if book.source_kind != "pdf" else None,
         }
 
     @app.post("/api/books/{book_id}/exports/m4b")
@@ -2170,7 +2203,8 @@ def create_app_v2(
             return {
                 **result,
                 "pageCount": book.page_count or result["pageCount"],
-                "imageUrl": f"/api/books/{book_id}/pages/{body.page}/image",
+                "imageUrl": f"/api/books/{book_id}/pages/{body.page}/image" if book.source_kind == "pdf" else None,
+                "sourceText": next((row["text"] for row in extraction["pages"] if row["page"] == body.page), "") if book.source_kind != "pdf" else None,
                 "published": False,
             }
         except (ValueError, RuntimeError, ReviewContractError) as error:

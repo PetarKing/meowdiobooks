@@ -33,8 +33,9 @@ export function StageLaunch({ children }: { children: ReactNode; }) {
   return <WorkflowLaunch>{children}</WorkflowLaunch>;
 }
 
-export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
-  imageUrl?: string;
+export function PageComparison({ sourceText, imageUrl, imageAlt, imageZoom, imageControls, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
+  imageUrl?: string | null;
+  sourceText?: string | null;
   imageAlt: string;
   imageZoom?: number;
   imageControls?: ReactNode;
@@ -48,6 +49,7 @@ export function PageComparison({ imageUrl, imageAlt, imageZoom, imageControls, r
   return <div className={`compare extract-compare page-comparison ${className}`.trim()}>
     <div className="paper" tabIndex={0} role="region" aria-label={t("ORIGINAL PAGE")}>
       {imageControls ? <div className="paper-heading"><span>{t("ORIGINAL PAGE")}</span>{imageControls}</div> : <span>{t("ORIGINAL PAGE")}</span>}
+      {sourceText != null && <pre>{sourceText}</pre>}
       {imageUrl && (imageZoom
         ? <div className="pdf-preview-frame"><img src={imageUrl} alt={imageAlt} style={{ width: `${imageZoom}%` }} /></div>
         : <img src={imageUrl} alt={imageAlt} />)}
@@ -74,7 +76,7 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
   const pdfZoom = reviewPdfZoomLevels[pdfZoomIndex];
   const changePage = (next: number) => onPageChange(Math.min(safePageCount, Math.max(1, next)));
   return <>
-    <PageTitle stage="review" step={t("Step 3 · Final check")} title={t("Read it once like a listener.")} copy={t("Compare the PDF and audiobook transcript page by page. This preview does not change your book.")} />
+    <PageTitle stage="review" step={t("Step 3 · Final check")} title={t("Read it once like a listener.")} copy={t("Compare the source and audiobook transcript section by section. This preview does not change your book.")} />
     <section className="panel review-transcript-panel">
       <div className="transcript-page-control">
         <button type="button" aria-label={t("Previous transcript page")} disabled={page <= 1 || loading} onClick={() => changePage(page - 1)}>←</button>
@@ -82,11 +84,11 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
         <output aria-live="polite">{page} / {safePageCount}</output>
         <button type="button" aria-label={t("Next transcript page")} disabled={page >= safePageCount || loading} onClick={() => changePage(page + 1)}>→</button>
       </div>
-      <PageComparison imageUrl={preview?.imageUrl} imageAlt={t("Original PDF page {{page}}", { page: preview?.page ?? page })} imageZoom={pdfZoom} imageControls={<div className="pdf-zoom-controls" role="group" aria-label={t("PDF preview zoom")}>
+      <PageComparison sourceText={preview?.sourceText} imageUrl={preview?.imageUrl} imageAlt={t("Original PDF page {{page}}", { page: preview?.page ?? page })} imageZoom={pdfZoom} imageControls={preview?.imageUrl ? <div className="pdf-zoom-controls" role="group" aria-label={t("PDF preview zoom")}>
         <button type="button" aria-label={t("Zoom out PDF preview")} disabled={pdfZoomIndex === 0} onClick={() => setPdfZoomIndex((current) => Math.max(0, current - 1))}>−</button>
         <output aria-live="polite">{pdfZoom}%</output>
         <button type="button" aria-label={t("Zoom in PDF preview")} disabled={pdfZoomIndex === reviewPdfZoomLevels.length - 1} onClick={() => setPdfZoomIndex((current) => Math.min(reviewPdfZoomLevels.length - 1, current + 1))}>+</button>
-      </div>} rightLabel={t("AUDIOBOOK TRANSCRIPT")} rightMeta={<small>{loading ? t("Loading page {{page}}…", { page }) : t("Read-only preview")}</small>} rightClassName="review-transcript-pane" className={`review-transcript-compare ${loading ? "loading" : ""}`}>
+      </div> : undefined} rightLabel={t("AUDIOBOOK TRANSCRIPT")} rightMeta={<small>{loading ? t("Loading page {{page}}…", { page }) : t("Read-only preview")}</small>} rightClassName="review-transcript-pane" className={`review-transcript-compare ${loading ? "loading" : ""}`}>
         {preview?.spans.length ? <article aria-label={t("Audiobook transcript page {{page}}", { page: preview.page })} onCopy={(event) => event.preventDefault()}>
           {preview.spans.map((span) => <p key={span.id} className={`transcript-span ${span.reader === "Narrator" ? "narration" : span.kind}`}><b>{t(span.reader, { defaultValue: span.reader })}{span.kind === "excluded" && span.warningKind ? <small> · {t(reviewWarningLabel(span.warningKind))}</small> : null}</b><span>{span.text}</span></p>)}
         </article> : loading ? <div className="transcript-loading">{t("Opening the transcript…")}</div> : <div className="transcript-empty"><span aria-hidden="true">☾</span><b>{t("No spoken text on this page")}</b><small>{t("The source page may be blank or everything on it was excluded.")}</small></div>}

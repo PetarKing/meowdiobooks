@@ -105,6 +105,23 @@ async function open(
 describe('v2 wizard', () => {
   beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); window.history.replaceState({}, "", "/"); vi.mocked(normalizeDialogueArtifact).mockReturnValue(undefined); vi.mocked(wizardApi.listBooks).mockResolvedValue([]); vi.mocked(wizardApi.listBookJobs).mockResolvedValue([]); vi.mocked(wizardApi.listLibrary).mockResolvedValue([]); vi.mocked(wizardApi.transcribeVoiceSample).mockResolvedValue({ text: 'Automatic draft.', language: 'English' }); vi.mocked(wizardApi.previewReviewTranscript).mockImplementation(async (_bookId, _revision, page) => ({ page, pageCount: 120, imageUrl: `/page-${page}.png`, published: false, summary: { spoken: 2, dialogue: 1, excluded: 0 }, spans: [{ id: `n-${page}`, kind: 'narration', reader: 'Narrator', text: 'Alice was beginning to get very tired.', blockId: `p${page}`, sourceStart: 0, sourceEnd: 39 }, { id: `d-${page}`, kind: 'dialogue', reader: 'Alice', text: 'What is the use of a book?', blockId: `p${page}`, sourceStart: 40, sourceEnd: 70 }] })) })
 
+  it.each(['epub', 'text'])('skips extraction and visibly disables it for %s imports and restores', async sourceKind => {
+    const snapshot = { ...base, book: { ...base.book, sourceKind, filename: `alice.${sourceKind === 'text' ? 'txt' : 'epub'}`, completedStages: ['import', 'extract'] as WizardStage[] }, generatedChapters: [] }
+    await open(snapshot)
+    expect(screen.getByRole('button', { name: 'Extract Not needed' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Dialogue In progress' })).toHaveAttribute('aria-current', 'step')
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('redirects an old Extract return hint for a text source to Dialogue', async () => {
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, book: { ...base.book, sourceKind: 'text', completedStages: ['import', 'extract'] }, generatedChapters: [] })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'extract' }} />)
+    await screen.findByRole('button', { name: 'Dialogue In progress' })
+    expect(screen.getByRole('button', { name: 'Extract Not needed' })).toBeDisabled()
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+  })
+
   it('resolves export cover media only while Export is visible', async () => {
     const sourcePageImageUrl = vi.fn(() => '/host-cover.png')
     const gateway: WorkflowGateway = Object.assign(Object.create(wizardApi), { sourcePageImageUrl })
@@ -2342,27 +2359,27 @@ describe('v2 wizard', () => {
 
   it('shows the host import limit and rejects an oversized replacement before sending it', async () => {
     render(<App maxImportBytes={10_000_000} />)
-    expect(screen.getByText('PDF · up to 10 MB')).toBeInTheDocument()
+    expect(screen.getByText('Up to 10 MB')).toBeInTheDocument()
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
     fireEvent.change(input, { target: { files: [new File(['small'], 'small.pdf')] } })
     const oversized = new File(['synthetic'], 'large.pdf')
     Object.defineProperty(oversized, 'size', { value: 10_000_001 })
-    fireEvent.change(screen.getByLabelText('Choose another PDF'), { target: { files: [oversized] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    fireEvent.change(screen.getByLabelText('Choose another file'), { target: { files: [oversized] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
     expect(await screen.findByText('Choose a file no larger than 10 MB.')).toBeInTheDocument()
     expect(wizardApi.importBook).not.toHaveBeenCalled()
     const boundary = new File(['synthetic'], 'boundary.pdf')
     Object.defineProperty(boundary, 'size', { value: 10_000_000 })
     vi.mocked(wizardApi.importBook).mockRejectedValueOnce(new Error('Synthetic parser response'))
-    fireEvent.change(screen.getByLabelText('Choose another PDF'), { target: { files: [boundary] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    fireEvent.change(screen.getByLabelText('Choose another file'), { target: { files: [boundary] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
     await waitFor(() => expect(wizardApi.importBook).toHaveBeenCalledExactlyOnceWith(boundary))
     expect(screen.queryByText('Choose a file no larger than 10 MB.')).not.toBeInTheDocument()
   })
 
   it('keeps the standalone import ceiling at 500 MB', () => {
     render(<App />)
-    expect(screen.getByText('PDF · up to 500 MB')).toBeInTheDocument()
+    expect(screen.getByText('Up to 500 MB')).toBeInTheDocument()
   })
 
   it('adds an imported book to the local library without a second collection request', async () => {
@@ -2377,7 +2394,7 @@ describe('v2 wizard', () => {
     render(<App />)
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')
     fireEvent.change(input!, { target: { files: [new File(['pdf'], 'alice.pdf', { type: 'application/pdf' })] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
     await screen.findByRole('navigation', { name: 'Wizard stages' })
     expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByText('Step 1 · Extract')).toBeInTheDocument()
@@ -2452,7 +2469,7 @@ describe('v2 wizard', () => {
     expect(screen.getAllByText('12.0 MB used')).toHaveLength(1)
     expect(screen.getByText('120 pages · 12.0 MB')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete Alice' }))
-    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('PDF, extracted text, dialogue and cast choices, chapter audio, and saved progress')
+    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('source file, extracted text, dialogue and cast choices, chapter audio, and saved progress')
     expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('Finished exports stay in Library.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete working files' }))

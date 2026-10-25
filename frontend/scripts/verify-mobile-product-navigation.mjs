@@ -39,7 +39,7 @@ try {
       assert.equal(await homeLibrary.isVisible(), false, 'Mobile home link should stay hidden on desktop');
       await headerTabs.getByRole('button', { name: /Library/ }).click();
       await page.getByRole('button', { name: 'Go to Home' }).click();
-      assert(await page.getByRole('button', { name: 'Choose PDF' }).isVisible());
+      assert(await page.getByRole('button', { name: 'Choose book' }).isVisible());
     }
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert(overflow <= 1, `${width}px overflow: ${overflow}`);

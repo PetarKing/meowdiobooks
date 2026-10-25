@@ -409,7 +409,9 @@ export function useWorkflowModel({
   const recoveryStageIndex = stageIndex("review");
 
   const routeStage = (requestedStage: number, current = snapshot) => (
-    current?.dialogueRecovery && requestedStage >= recoveryStageIndex
+    ["epub", "text"].includes(current?.book.sourceKind ?? "") && stages[requestedStage]?.builtin === "extract"
+      ? stageIndex("dialogue")
+      : current?.dialogueRecovery && requestedStage >= recoveryStageIndex
       ? recoveryStageIndex
       : requestedStage
   );
@@ -452,7 +454,7 @@ export function useWorkflowModel({
         ...(occurrencePolicies.length ? [occurrencePolicies] : []),
       ).then(async (preview) => {
         if (disposed) return;
-        await decodeImage(preview.imageUrl);
+        if (preview.imageUrl) await decodeImage(preview.imageUrl);
         if (!disposed) setReviewTranscriptPreview(preview);
       }).catch((reason) => {
         if (!disposed) {
@@ -933,8 +935,13 @@ export function useWorkflowModel({
 
   async function importBook() {
     if (!file) return;
-    if (file.size > maxImportBytes) {
-      setError(t("Choose a file no larger than {{size}} MB.", { size: importLimitMB }));
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    const formatLimit = extension === "epub" ? 64 * 1024 * 1024
+      : extension === "txt" || extension === "md" ? 20 * 1024 * 1024 : 500_000_000;
+    const fileLimit = Math.min(maxImportBytes, formatLimit);
+    if (file.size > fileLimit) {
+      const size = new Intl.NumberFormat(uiLocale, { maximumFractionDigits: 6 }).format(fileLimit / 1_000_000);
+      setError(t("Choose a file no larger than {{size}} MB.", { size }));
       return;
     }
     setBusy(true);

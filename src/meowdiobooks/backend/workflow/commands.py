@@ -14,7 +14,7 @@ class CommandModel(BaseModel):
 
 
 class ExtractionSettings(CommandModel):
-    method: Literal["liteparse", "native", "layout"] = "liteparse"
+    method: Literal["liteparse", "native", "layout", "text"] = "liteparse"
 
 
 class RegexProfile(CommandModel):
