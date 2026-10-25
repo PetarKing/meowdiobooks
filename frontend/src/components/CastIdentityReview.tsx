@@ -1,3 +1,4 @@
+import { userFacingDetail } from "../workflow/presentation";
 import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
 import { DismissibleDetails } from "./DismissibleDetails";
@@ -602,7 +603,7 @@ function EvidenceCard({ label, dossier, proposal, primary = false, action }: { l
   const { t } = useTranslation();
   return <article className="cast-alias-card">
     <header><div><b>{label}</b><small>{t("{{count}} lines", { count: dossier?.occurrenceCount ?? 0 })}</small></div><div>{primary && <span className="primary-label-badge">{t("Primary label")}</span>}{action}</div></header>
-    {proposal?.reason && <p className="cast-reason">{proposal.reason}</p>}
+    {proposal?.reason && <p className="cast-reason">{t(userFacingDetail(proposal.reason, "Check the examples before deciding whether these names belong together."))}</p>}
     <div className="cast-line-list">{dossier?.examples?.slice(0, 3).map((row, index) => <blockquote key={index}><small>{row.page ? t("Page {{page}}", { page: row.page }) : t("Example {{number}}", { number: index + 1 })}</small>{row.contextBefore && <p>{row.contextBefore}</p>}<mark>{row.sourceText ?? row.source ?? row.text ?? t("No source line available")}</mark>{row.contextAfter && <p>{row.contextAfter}</p>}</blockquote>)}</div>
   </article>;
 }

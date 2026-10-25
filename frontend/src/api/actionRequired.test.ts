@@ -40,7 +40,7 @@ describe('provider-neutral required actions', () => {
   });
 
   it('does not suppress arbitrary errors or malformed action descriptors', () => {
-    expect(message(new Error('Try this step again.'))).toBe('Try this step again.');
+    expect(message(new Error('Try this step again.'))).toBe('Something went wrong while completing this step. Try again; your accepted work is unchanged.');
     for (const value of [null, [], {}, { ...action, code: '' }, { ...action, context: [] }, { ...action, message: 3 }]) {
       expect(readActionRequired(value)).toBeUndefined();
     }

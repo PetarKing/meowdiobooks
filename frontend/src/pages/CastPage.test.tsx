@@ -10,13 +10,13 @@ const quote: CastingPreview = {
   options: [{ modelId: "qwen", label: "Studio", description: "Designed voices", estimatedCostMinor: 294 }],
 };
 
-async function openVoiceDesign(fetchPreview: NonNullable<WorkflowGateway["previewCasting"]>) {
+async function openVoiceDesign(fetchPreview: NonNullable<WorkflowGateway["previewCasting"]>, showVoiceModelControls = true) {
   const snapshot: WizardSnapshot = {
     ...snapshotFor("cast-identities"),
     book: { ...snapshotFor("cast-identities").book, completedStages: ["import", "extract", "dialogue", "review"] },
     activeArtifacts: { extraction: "e1", dialogue: "d1", review: "r1" },
     cast: { revision: "cast-draft", phase: "identity-review", dossiers: [], proposals: [], voiceModel: "qwen", language: "english" },
-    voiceModels: [{ id: "qwen", label: "Studio", supportedLanguages: ["english", "french"] }],
+    voiceModels: [{ id: "other", label: "Other provider", supportedLanguages: ["english"] }, { id: "qwen", label: "Studio", supportedLanguages: ["english", "french"] }],
     voiceSelection: { modelId: "qwen", language: "english" },
     castingPreviewAvailable: true,
   };
@@ -27,7 +27,7 @@ async function openVoiceDesign(fetchPreview: NonNullable<WorkflowGateway["previe
     previewCasting: fetchPreview,
     processStage,
   };
-  render(<App gateway={gateway} />);
+  render(<App gateway={gateway} capabilities={{ showVoiceModelControls }} />);
   fireEvent.click(await screen.findByRole("button", { name: /Alice.*Continue/ }));
   const navigation = await screen.findByRole("navigation", { name: "Wizard stages" });
   fireEvent.click(within(navigation).getByText("Cast & voices"));
@@ -41,6 +41,106 @@ describe("Voice design language confirmation", () => {
     localStorage.clear();
     sessionStorage.clear();
     window.history.replaceState({}, "", "/");
+  });
+
+  it("hides provider choices in enhanced casting while retaining the restored model and its quote", async () => {
+    const fetchPreview = vi.fn().mockResolvedValue({ ...quote, options: [
+      { modelId: "other", label: "Other provider", description: "Technical provider details", estimatedCostMinor: 100 },
+      ...quote.options!,
+    ] });
+    const { processStage } = await openVoiceDesign(fetchPreview, false);
+    await screen.findByText("≈ €2.94");
+    expect(screen.getByRole("button", { name: /Create new voices/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Studio|Other provider|Technical provider details|Designed voices/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Voice model" })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({
+      voiceModel: "qwen", language: "english", castingPreviewFingerprint: "english-quote",
+    })));
+  });
+
+  it.each([true, false])("lets a user refresh unavailable voice options without revealing providers (enhanced: %s)", async (enhanced) => {
+    const snapshot: WizardSnapshot = {
+      ...snapshotFor("cast-identities"),
+      book: { ...snapshotFor("cast-identities").book, completedStages: ["import", "extract", "dialogue", "review"] },
+      activeArtifacts: { extraction: "e1", dialogue: "d1", review: "r1" },
+      cast: { revision: "cast-draft", phase: "identity-review", dossiers: [], proposals: [] },
+      voiceModels: [
+        { id: "first", label: "First provider", supportedLanguages: ["french"] },
+        { id: "host-default", label: "Preferred provider", supportedLanguages: ["english"] },
+      ],
+      voiceSelection: { modelId: "host-default", language: "english" },
+      recoverableStages: { cast: { attempt: 1, message: "Saved", proposalRevision: "cast-draft", modelId: "retired-provider", language: "english" } },
+      castingPreviewAvailable: enhanced,
+    };
+    const processStage = vi.fn().mockResolvedValue({ id: "cast-job", status: "failed", error: "Synthetic stop after submission" });
+    const previewCasting = vi.fn().mockResolvedValue({ ...quote, options: [
+      { modelId: "first", label: "First provider", description: "Provider details", estimatedCostMinor: 100 },
+      { modelId: "host-default", label: "Preferred provider", description: "Other provider details", estimatedCostMinor: 294 },
+    ] });
+    const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), previewCasting, processStage };
+    render(<App gateway={gateway} capabilities={{ showVoiceModelControls: false }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    const refresh = await screen.findByRole("button", { name: "Refresh voice options" });
+    expect(processStage).not.toHaveBeenCalled();
+    if (enhanced) {
+      await screen.findByRole("alert");
+      expect(previewCasting).toHaveBeenCalledWith(fixtureBook.id, expect.objectContaining({ voiceModel: "retired-provider" }));
+    }
+    expect(screen.getByRole("button", { name: "Continue voice generation →" })).toBeDisabled();
+    expect(screen.queryByText(/First provider|Preferred provider|Provider details|Other provider details|retired-provider/)).not.toBeInTheDocument();
+    fireEvent.click(refresh);
+    expect(screen.queryByRole("button", { name: "Refresh voice options" })).not.toBeInTheDocument();
+    if (enhanced) {
+      fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
+      await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+      expect(previewCasting).toHaveBeenLastCalledWith(fixtureBook.id, expect.objectContaining({ voiceModel: "host-default" }));
+    }
+    const continueButton = screen.getByRole("button", { name: enhanced ? "Continue →" : "Generate required auditions →" });
+    expect(continueButton).toBeEnabled();
+    expect(screen.queryByText(/First provider|Preferred provider|Provider details|Other provider details/)).not.toBeInTheDocument();
+    fireEvent.click(continueButton);
+    await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({ voiceModel: "host-default", language: "english" })));
+  });
+
+  it("hides model details from an accepted cast", async () => {
+    const snapshot = snapshotFor("cast-accepted");
+    const gateway = { ...createFixtureGateway("cast-accepted"), getBookSnapshot: vi.fn().mockResolvedValue({
+      ...snapshot,
+      voiceModels: [{ id: "private-model-id", label: "Private provider model", supportedLanguages: ["english"] }],
+      voiceSelection: { modelId: "private-model-id", language: "english" },
+    }) };
+    render(<App gateway={gateway} capabilities={{ showVoiceModelControls: false }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    await screen.findByRole("heading", { name: "Cast and voices ready" });
+    expect(screen.queryByText(/Voice model|Private provider model|private-model-id/)).not.toBeInTheDocument();
+    expect(screen.getByText("Assigned voices")).toBeInTheDocument();
+    expect(screen.getByText("Audition language")).toBeInTheDocument();
+  });
+
+  it("hides the fallback picker and submits the recovered model without replacing it", async () => {
+    const snapshot: WizardSnapshot = {
+      ...snapshotFor("cast-identities"),
+      book: { ...snapshotFor("cast-identities").book, completedStages: ["import", "extract", "dialogue", "review"] },
+      activeArtifacts: { extraction: "e1", dialogue: "d1", review: "r1" },
+      cast: { revision: "cast-draft", phase: "identity-review", dossiers: [], proposals: [] },
+      voiceModels: [
+        { id: "first", label: "First provider", supportedLanguages: ["english"] },
+        { id: "saved", label: "Saved provider", supportedLanguages: ["english"] },
+      ],
+      voiceSelection: { modelId: "first", language: "english" },
+      recoverableStages: { cast: { attempt: 1, message: "Saved", proposalRevision: "cast-draft", modelId: "saved", language: "english" } },
+      castingPreviewAvailable: false,
+    };
+    const processStage = vi.fn().mockResolvedValue({ id: "cast-job", status: "failed", error: "Synthetic stop after submission" });
+    const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), processStage };
+    render(<App gateway={gateway} capabilities={{ showVoiceModelControls: false }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    const continueButton = await screen.findByRole("button", { name: "Continue voice generation →" });
+    expect(screen.queryByRole("combobox", { name: "Voice model" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/First provider|Saved provider/)).not.toBeInTheDocument();
+    expect(continueButton).toBeEnabled();
+    fireEvent.click(continueButton);
+    await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({ voiceModel: "saved", language: "english" })));
   });
 
   it("keeps the settled quote valid when the user confirms its default language", async () => {
