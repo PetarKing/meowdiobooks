@@ -120,6 +120,16 @@ the selected local adapter returns editable text plus an optional detected langu
 is published as an artifact. The current adapter is MLX-Audio on Apple Silicon. A Linux adapter may
 implement the same function and HTTP/gateway response without changing Cast UI or accepted voice data.
 
+### Import limits
+
+Hosts can supply `maxImportBytes` to the workflow App and `max_import_bytes` to
+`create_app_v2`. Both default to 500,000,000 bytes and accept only positive integers up to
+that ceiling. The App displays the effective decimal MB limit and rejects oversized files before
+calling its gateway, including replacement selections. The API independently counts file bytes
+before parsing or writing a book. A host must supply matching values and separately bound the
+entire incoming multipart request before its parser, allowing room for multipart overhead and any
+proxy limit. The UI check is a convenience, not an authorization or resource boundary.
+
 ### Untrusted PDF parsing
 
 Hosts may supply a `file_processor` implementing `FileProcessor` to `create_app_v2`. Import inspection

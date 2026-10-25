@@ -2340,6 +2340,31 @@ describe('v2 wizard', () => {
     }))
   })
 
+  it('shows the host import limit and rejects an oversized replacement before sending it', async () => {
+    render(<App maxImportBytes={10_000_000} />)
+    expect(screen.getByText('PDF · up to 10 MB')).toBeInTheDocument()
+    const input = document.querySelector<HTMLInputElement>('input[type="file"]')!
+    fireEvent.change(input, { target: { files: [new File(['small'], 'small.pdf')] } })
+    const oversized = new File(['synthetic'], 'large.pdf')
+    Object.defineProperty(oversized, 'size', { value: 10_000_001 })
+    fireEvent.change(screen.getByLabelText('Choose another PDF'), { target: { files: [oversized] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    expect(await screen.findByText('Choose a file no larger than 10 MB.')).toBeInTheDocument()
+    expect(wizardApi.importBook).not.toHaveBeenCalled()
+    const boundary = new File(['synthetic'], 'boundary.pdf')
+    Object.defineProperty(boundary, 'size', { value: 10_000_000 })
+    vi.mocked(wizardApi.importBook).mockRejectedValueOnce(new Error('Synthetic parser response'))
+    fireEvent.change(screen.getByLabelText('Choose another PDF'), { target: { files: [boundary] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    await waitFor(() => expect(wizardApi.importBook).toHaveBeenCalledExactlyOnceWith(boundary))
+    expect(screen.queryByText('Choose a file no larger than 10 MB.')).not.toBeInTheDocument()
+  })
+
+  it('keeps the standalone import ceiling at 500 MB', () => {
+    render(<App />)
+    expect(screen.getByText('PDF · up to 500 MB')).toBeInTheDocument()
+  })
+
   it('adds an imported book to the local library without a second collection request', async () => {
     const imported = { id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 }
     vi.mocked(wizardApi.importBook).mockResolvedValue({ book: imported, representativePages: [{ page: 1, reason: 'opening' }], duplicate: false })

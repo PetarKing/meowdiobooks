@@ -455,6 +455,7 @@ def create_app_v2(
     chapter_audio_source: ChapterAudioSource | None = None,
     job_preflight: Callable[[], None] | None = None,
     file_processor: FileProcessor | None = None,
+    max_import_bytes: int = 500_000_000,
     on_cast_voice_revisions_changed: (
         Callable[[Path, frozenset[str]], None] | None
     ) = None,
@@ -473,6 +474,8 @@ def create_app_v2(
     their export hook and model store both commit successfully.
     """
 
+    if type(max_import_bytes) is not int or not 0 < max_import_bytes <= 500_000_000:
+        raise ValueError("max_import_bytes must be a positive integer at most 500000000")
     root = Path(data_dir)
     if not retain_local_library_exports and on_library_exported is None:
         raise ValueError(
@@ -1425,8 +1428,11 @@ def create_app_v2(
         total = 0
         while chunk := await file.read(1024 * 1024):
             total += len(chunk)
-            if total > 500_000_000:
-                raise HTTPException(status_code=413, detail="Book exceeds the 500 MB limit")
+            if total > max_import_bytes:
+                raise HTTPException(
+                    status_code=413,
+                    detail=f"Book exceeds the {max_import_bytes / 1_000_000:g} MB limit",
+                )
             chunks.append(chunk)
         raw = b"".join(chunks)
         # Parsing yields to other requests. Serialize import validation and commit
