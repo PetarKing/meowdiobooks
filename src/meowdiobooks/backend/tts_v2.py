@@ -29,9 +29,11 @@ class TTSContractError(ValueError):
 
 _CHAPTER_GAP_SECONDS = 0.24
 _WAV_COPY_SAMPLES = 256 * 1024
-# Application chunking policy, not a model/API limit: ordinary dialogue turns
-# retain their full context. Only longer passages need sentence-based splitting.
-_SYNTHESIS_CONTEXT_CHARACTERS = 500
+# Application policy, not a model/API limit. Pick the nearest sentence boundary;
+# never cut a sentence solely to meet this target. Ellipses take precedence.
+_SYNTHESIS_TARGET_CHARACTERS = 120
+_ELLIPSIS_PAUSE_SECONDS = 0.25
+_ELLIPSIS_BOUNDARY = re.compile(r'(?:\.{3,}|…+)[.!?]*["\'”’»）】」』]*')
 # A very short isolated fragment can make a reference-conditioned model emit EOS
 # immediately. Keep it with nearby words from the same accepted voice segment.
 _MIN_SYNTHESIS_ALNUM = 8
@@ -62,6 +64,7 @@ def render_plan_audio(
     chapters = list(plan.get("chapters", []))
     if not chapters:
         raise TTSContractError("Render plan contains no selected chapters")
+    target_characters = _configured_synthesis_target()
     cleanup_stale_audio_staging(package)
 
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -116,7 +119,8 @@ def render_plan_audio(
                     )
                     recoveries: list[dict[str, Any]] = []
                     rendered = [
-                        _synthesize(model, text, member, package, language, recoveries=recoveries)
+                        _synthesize(model, text, member, package, language, recoveries=recoveries,
+                                    target_characters=target_characters)
                         for member in unit
                     ]
                     audio = mix_audio_tracks(rendered) if len(rendered) > 1 else rendered[0]
@@ -127,6 +131,10 @@ def render_plan_audio(
                         **segment,
                         "index": index,
                         "file": str(path.relative_to(staging)),
+                        "synthesisUnits": [
+                            {"text": unit, "pauseAfterSeconds": _pause_after(unit)}
+                            for unit in _synthesis_units(text, target_characters=target_characters)
+                        ],
                     }
                     if recoveries:
                         metadata_row["synthesisRecoveries"] = recoveries
@@ -168,6 +176,11 @@ def render_plan_audio(
                     "renderer": {
                         "model": "qwen-1.7b-base-4bit",
                         "language": language,
+                        "chunking": {
+                            "policy": "sentence-target-ellipsis-v1",
+                            "targetCharacters": target_characters,
+                            "ellipsisPauseSeconds": _ELLIPSIS_PAUSE_SECONDS,
+                        },
                     },
                 }
                 write_json(staging / "metadata.json", receipt)
@@ -352,6 +365,7 @@ def _synthesize(
     language: str,
     *,
     recoveries: list[dict[str, Any]] | None = None,
+    target_characters: int = _SYNTHESIS_TARGET_CHARACTERS,
 ) -> np.ndarray:
     reference = Path(str(segment.get("referenceAudio", "")))
     if not reference.is_absolute():
@@ -370,8 +384,13 @@ def _synthesize(
             f"Accepted voice reference is unavailable for {segment.get('effectiveCharacterId')}"
         )
     rendered: list[np.ndarray] = []
-    units = _synthesis_units(text)
+    units = _synthesis_units(text, target_characters=target_characters)
     for unit_index, unit in enumerate(units, 1):
+        # Leading/punctuation-only ellipses are pauses, never model requests.
+        if not _clean_text(unit):
+            rendered.append(np.zeros(int(model.sample_rate * _pause_after(unit)),
+                                     dtype=np.float32))
+            continue
         errors: list[str] = []
         no_result_attempts = 0
         for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
@@ -401,7 +420,7 @@ def _synthesize(
             # exact accepted WAV and source word, without transcript prefill. This
             # is explicit per-unit recovery, never a change to accepted Cast state.
             recovered = False
-            if (reference_mode == "transcript-conditioned" and len(units) == 1
+            if (reference_mode == "transcript-conditioned"
                     and len(unit) <= 32 and len(unit.split()) == 1
                     and no_result_attempts == len(QWEN_GENERATION_ATTEMPTS)):
                 for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
@@ -435,6 +454,8 @@ def _synthesize(
                     f"No audio for segment {segment.get('id')} unit {unit_index}: "
                     + "; ".join(errors)
                 )
+        if pause := _pause_after(unit):
+            rendered.append(np.zeros(int(model.sample_rate * pause), dtype=np.float32))
     if not rendered:
         raise TTSContractError(f"Render segment {segment.get('id')} produced no audio")
     return np.concatenate(rendered)
@@ -445,35 +466,94 @@ def _clean_text(text: str) -> str:
     return value if any(character.isalnum() for character in value) else ""
 
 
-def _synthesis_units(text: str) -> list[str]:
+def _configured_synthesis_target() -> int:
+    value = os.environ.get("MEOWDIOBOOKS_TTS_TARGET_CHARACTERS", str(_SYNTHESIS_TARGET_CHARACTERS))
+    try:
+        target = int(value)
+    except ValueError:
+        target = 0
+    if target <= 0:
+        raise TTSContractError("MEOWDIOBOOKS_TTS_TARGET_CHARACTERS must be a positive integer")
+    return target
+
+
+def _pause_after(unit: str) -> float:
+    match = _ELLIPSIS_BOUNDARY.search(unit)
+    return _ELLIPSIS_PAUSE_SECONDS if match and match.end() == len(unit) else 0.0
+
+
+def _synthesis_units(
+    text: str, *, target_characters: int = _SYNTHESIS_TARGET_CHARACTERS,
+) -> list[str]:
+    """Pack whole sentences near the target, with unconditional ellipsis breaks.
+
+    Short fragments borrow context only inside their ellipsis-delimited block.
+    Punctuation and words are retained; whitespace between requests is immaterial.
+    """
     cleaned = _clean_text(text)
     if not cleaned:
         return []
-    if len(cleaned) <= _SYNTHESIS_CONTEXT_CHARACTERS:
-        return [cleaned]
-    pieces = re.split(
-        r"(?<=[.!?…。！？])\s+|(?<=[.!?…。！？][\"'”’»）】」』])\s+",
-        cleaned,
-    )
     units: list[str] = []
+    start = 0
+    for boundary in _ELLIPSIS_BOUNDARY.finditer(cleaned):
+        units.extend(_sentence_units(cleaned[start:boundary.end()].strip(), target_characters))
+        start = boundary.end()
+    units.extend(_sentence_units(cleaned[start:].strip(), target_characters))
+    return units
+
+
+def _sentence_units(block: str, target_characters: int) -> list[str]:
+    if not block:
+        return []
+    # Consume a whole closing-quote run before a boundary, including CJK text
+    # that does not place whitespace between sentences.
+    boundaries = re.finditer(
+        r"[.!?][\"'”’»）】」』]*(?:\s+|$)|[。！？]+[\"'”’»）】」』]*\s*", block,
+    )
+    pieces: list[str] = []
+    start = 0
+    for boundary in boundaries:
+        # A period in a common title or initial is not a sentence ending.
+        if re.search(r"\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|vs|e\.g|i\.e|[A-Z])\.$",
+                     block[:boundary.start() + 1]):
+            continue
+        pieces.append(block[start:boundary.end()].strip())
+        start = boundary.end()
+    if start < len(block):
+        pieces.append(block[start:])
+    # First attach tiny fragments to neighboring sentences. This protects short
+    # tails without borrowing words across an ellipsis or accepted voice segment.
+    sentences: list[str] = []
     pending: list[str] = []
-    pending_alnum = 0
     for piece in pieces:
         if not piece:
             continue
         pending.append(piece)
-        pending_alnum += sum(character.isalnum() for character in piece)
-        if pending_alnum >= _MIN_SYNTHESIS_ALNUM:
-            units.append(" ".join(pending))
+        if sum(character.isalnum() for part in pending for character in part) >= _MIN_SYNTHESIS_ALNUM:
+            sentences.append(" ".join(pending))
             pending = []
-            pending_alnum = 0
     if pending:
-        remainder = " ".join(pending)
-        if units:
-            units[-1] += " " + remainder
+        tail = " ".join(pending)
+        if sentences:
+            sentences[-1] += " " + tail
         else:
-            # A standalone short segment must still be spoken, never discarded.
-            units.append(remainder)
+            sentences.append(tail)
+
+    units: list[str] = []
+    current = ""
+    for sentence in sentences:
+        combined = f"{current} {sentence}" if current else sentence
+        if current and (
+            len(current) >= target_characters
+            or abs(len(current) - target_characters)
+            <= abs(len(combined) - target_characters)
+        ):
+            units.append(current)
+            current = sentence
+        else:
+            current = combined
+    if current:
+        units.append(current)
     return units
 
 
