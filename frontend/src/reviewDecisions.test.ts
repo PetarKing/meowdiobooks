@@ -3,7 +3,7 @@ import type { ReviewWarning } from "./api/contracts";
 import { buildReviewPreviewPolicies, buildReviewWarningDecisions } from "./reviewDecisions";
 import { normalizeCandidateWarnings, reviewOccurrenceActions, reviewProposalDecisions, reviewWarningResolved, reviewActionTitle, reviewConsequence } from "./workflow/review";
 
-import { cleanupWarning } from "../design-kit/cleanupFixture";
+import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 
 describe("AI cleanup decisions", () => {
   it("retains deletion and row-specific capabilities when a candidate is restored", () => {
@@ -16,8 +16,8 @@ describe("AI cleanup decisions", () => {
 
   it("bulk applies only actual corrections and leaves unresolved source checks pending", () => {
     const choices = reviewProposalDecisions(cleanupWarning, { join: "keep" });
-    expect(choices).toEqual({ join: "keep", delete: "repair" });
-    expect(reviewProposalDecisions(cleanupWarning, { join: "repair", delete: "keep" })).toEqual({ join: "repair", delete: "keep" });
+    expect(choices).toEqual({ join: "repair", delete: "repair" });
+    expect(reviewProposalDecisions(cleanupWarning, { join: "repair", delete: "keep" })).toEqual({ join: "repair", delete: "repair" });
     expect(reviewWarningResolved(cleanupWarning, choices)).toBe(false);
     expect(reviewWarningResolved(cleanupWarning, { ...choices, missing: "keep" })).toBe(true);
     const guarded = { ...cleanupWarning, occurrences: [{ ...cleanupWarning.occurrences[2], availableActions: ["keep", "repair"] as const }] };
@@ -43,6 +43,27 @@ describe("AI cleanup decisions", () => {
       expect(reviewConsequence("keep", { ...warning, readerState })).not.toMatch(/narrator/i);
     }
     expect(reviewConsequence("narrate", { ...warning, readerState: "assigned-speaker" })).toContain("narrator instead");
+  });
+
+  it("restores and serializes consolidated deterministic rows individually", async () => {
+    const warning = normalizeCandidateWarnings(JSON.parse(JSON.stringify({ warnings: [consolidatedCleanupWarning] })))[0];
+    expect(warning.decisionScope).toBe("occurrence");
+    expect(warning.occurrences[0]).toMatchObject({ readerState: "assigned-speaker", cleanupReason: "Join a word split across a printed line.", proposalStatus: "proposed" });
+    expect(reviewOccurrenceActions(warning, warning.occurrences[1])).toEqual(["keep", "exclude", "rerun-extraction"]);
+    const choices = reviewProposalDecisions(warning, { join: "keep", ordinary: "exclude", missing: "keep" });
+    expect(choices).toEqual({ join: "repair", ordinary: "exclude", delete: "repair", missing: "keep" });
+    expect(reviewWarningResolved(warning, choices)).toBe(true);
+    const preview = vi.fn();
+    const decisions = await buildReviewWarningDecisions("book", "rev", [warning], choices, preview);
+    expect(decisions).toEqual(warning.occurrences.map((row) => ({ occurrenceIds: [row.id], action: choices[row.id], provenance: "user" })));
+    expect(preview).not.toHaveBeenCalled();
+    expect(buildReviewPreviewPolicies([warning], choices)).toEqual({ policies: [], occurrencePolicies: warning.occurrences.map((row) => ({ occurrenceId: row.id, action: choices[row.id] })) });
+  });
+
+  it("applies proposals across deterministic and AI categories without changing ordinary row choices", () => {
+    const novel = { ...cleanupWarning, occurrences: [{ ...cleanupWarning.occurrences[0], id: "novel" }] };
+    const choices = [consolidatedCleanupWarning, novel].reduce((selected, warning) => reviewProposalDecisions(warning, selected), { ordinary: "exclude", join: "keep", novel: "keep" } as Record<string, import("./api/contracts").ReviewCapability>);
+    expect(choices).toEqual({ ordinary: "exclude", join: "repair", novel: "repair", delete: "repair" });
   });
 
   it("serializes separate choices with no identical-match bulk authorization", async () => {

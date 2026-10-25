@@ -13,6 +13,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 
@@ -228,11 +229,89 @@ def add_cleanup_proposals(
                for other in rows[:index]):
             raise ReviewContractError("Cleanup proposals overlap")
     _add_adjacent_context(rows, blocks)
-    warnings = [*workspace.get("warnings", []), *_group_occurrences(rows, dialogue.get("spans", []))]
+    # Preserve deterministic IDs and grouping/history. A model can add a correction to an
+    # existing finding without creating a second decision about the same defect.
+    warnings = deepcopy(list(workspace.get("warnings", [])))
+    existing = [(warning, occurrence) for warning in warnings
+                for occurrence in warning.get("occurrences", [])
+                if occurrence.get("kind") != "ai-cleanup"]
+    novel = []
+    for row in rows:
+        exact = [(warning, occurrence, row["replacement"])
+                 for warning, occurrence in existing
+                 if all(occurrence.get(key) == row[key]
+                        for key in ("blockId", "sourceStart", "sourceEnd", "source"))]
+        matches = exact or _project_cleanup_anchor(row, existing)
+        if len(matches) != 1:
+            # Partial overlaps or multiple possible owners are not proof of one issue.
+            # Keep the usable proposal; never silently discard a correction.
+            novel.append(row)
+            continue
+        warning, occurrence, replacement = matches[0]
+        cleanup_reason = row["reason"]
+        if occurrence.get("cleanupReason") and occurrence["cleanupReason"] != cleanup_reason:
+            cleanup_reason = f"{occurrence['cleanupReason']}\n{cleanup_reason}"
+        occurrence.update({
+            "replacement": replacement, "proposalStatus": row["proposalStatus"],
+            "model": row["model"], "cleanupReason": cleanup_reason,
+            "matchKey": _digest([occurrence["source"], replacement]),
+        })
+        if replacement is not None:
+            occurrence["availableActions"] = list(dict.fromkeys(
+                [*occurrence["availableActions"], "repair"]
+            ))
+        warning["decisionScope"] = "occurrence"
+        # A group with mixed reader roles must not label every occurrence as mixed.
+        # Its row states were derived from each exact source range during detection.
+        for member in warning["occurrences"]:
+            if member.get("readerState") == "narrator":
+                member["availableActions"] = [action for action in member["availableActions"]
+                                              if action != "narrate"]
+        warning["availableActions"] = list(dict.fromkeys(
+            action for member in warning["occurrences"] for action in member["availableActions"]
+        ))
+    warnings.extend(_group_occurrences(novel, dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
             "cleanupSummary": dict(result.get("summary", {})),
             "summary": {**workspace["summary"], "groups": len(warnings),
                         "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
+
+
+def _project_cleanup_anchor(
+    proposal: Mapping[str, Any],
+    existing: Sequence[tuple[dict[str, Any], dict[str, Any]]],
+) -> list[tuple[dict[str, Any], dict[str, Any], str | None]]:
+    """Remove unchanged disambiguating context around one known deterministic issue.
+
+    Do not trim a replacement to its minimal character difference: that would turn a whole-word
+    source anchor into a deletion of a hyphen. Preserve the deterministic evidence range instead.
+    """
+    replacement = proposal.get("replacement")
+    if replacement is None:
+        # An unrepairable subrange is additional evidence for the containing source warning,
+        # not a second cleanup decision. A unique owner is still required by the caller.
+        return [(warning, occurrence, None) for warning, occurrence in existing
+                if occurrence.get("blockId") == proposal["blockId"]
+                and occurrence["sourceStart"] <= proposal["sourceStart"]
+                < proposal["sourceEnd"] <= occurrence["sourceEnd"]]
+    if not isinstance(replacement, str):
+        return []
+    result = []
+    for warning, occurrence in existing:
+        if (occurrence.get("blockId") != proposal["blockId"]
+                or not proposal["sourceStart"] <= occurrence["sourceStart"]
+                < occurrence["sourceEnd"] <= proposal["sourceEnd"]):
+            continue
+        left = occurrence["sourceStart"] - proposal["sourceStart"]
+        right = occurrence["sourceEnd"] - proposal["sourceStart"]
+        prefix, suffix = proposal["source"][:left], proposal["source"][right:]
+        if (len(replacement) < len(prefix) + len(suffix)
+                or not replacement.startswith(prefix) or not replacement.endswith(suffix)):
+            continue
+        middle = replacement[len(prefix):len(replacement) - len(suffix) if suffix else None]
+        if middle != occurrence["source"]:
+            result.append((warning, occurrence, middle))
+    return result
 
 
 def accept_review_revision(
@@ -413,7 +492,9 @@ def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]
             continue
         key = str(decision["occurrenceId"])
         row = occurrences.get(key)
-        if row is None or row.get("kind") != "ai-cleanup" or not isinstance(row.get("replacement"), str):
+        if (row is None or row.get("proposalStatus") != "proposed"
+                or "repair" not in row.get("availableActions", [])
+                or not isinstance(row.get("replacement"), str)):
             raise ReviewContractError("Repair requires a durable cleanup proposal")
         result[key] = row
     return result
@@ -531,11 +612,17 @@ def preview_review_transcript_page(
         warning = warnings.get(warning_id)
         if warning is None:
             raise ReviewContractError(f"Unknown Review warning group: {warning_id}")
+        if warning.get("decisionScope") == "occurrence" or warning.get("kind") == "ai-cleanup":
+            raise ReviewContractError("Occurrence-scoped warnings require individual preview policies")
         for occurrence in warning.get("occurrences", []):
             _validate_action(occurrence, action)
         chosen[warning_id] = action
 
-    ai_occurrences = {key: row for key, row in occurrences.items() if row.get("kind") == "ai-cleanup"}
+    occurrence_groups = {key for key, warning in warnings.items()
+                         if warning.get("decisionScope") == "occurrence"
+                         or warning.get("kind") == "ai-cleanup"}
+    ai_occurrences = {str(row["id"]): row for key in occurrence_groups
+                      for row in warnings[key].get("occurrences", [])}
     ai_chosen: dict[str, str] = {}
     for policy in occurrence_policies:
         key = str(policy.get("occurrenceId", ""))
@@ -546,7 +633,7 @@ def preview_review_transcript_page(
         ai_chosen[key] = action
     if set(ai_chosen) != set(ai_occurrences):
         raise ReviewContractError("Every cleanup proposal must be decided before preview")
-    missing = sorted(key for key in warnings if key not in chosen and warnings[key].get("kind") != "ai-cleanup")
+    missing = sorted(key for key in warnings if key not in chosen and key not in occurrence_groups)
     if missing:
         raise ReviewContractError(
             "Every Review warning group must be decided before previewing the final transcript"
@@ -555,7 +642,7 @@ def preview_review_transcript_page(
     decisions = [
         {"occurrenceId": str(occurrence["id"]), "action": chosen[warning_id]}
         for warning_id, warning in warnings.items()
-        if warning.get("kind") != "ai-cleanup"
+        if warning_id not in occurrence_groups
         for occurrence in warning.get("occurrences", [])
     ] + [{"occurrenceId": key, "action": action} for key, action in ai_chosen.items()]
     rendered = apply_review_render_policies(

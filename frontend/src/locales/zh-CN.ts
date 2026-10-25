@@ -1,4 +1,10 @@
 const zhCN: Record<string, string> = {
+  "Cleanup correction actions": "文本清理修改操作",
+  "Cleanup corrections · {{count}}": "文本清理修改 · {{count}}",
+  "Apply all corrections, including those you previously chose to keep. Source checks still need individual decisions.": "应用全部修改，包括此前选择保留原文的建议。原文检查仍需逐项决定。",
+
+  "Apply all corrections": "应用全部修改",
+  "Apply all {{count}} corrections, including those you previously chose to keep. Source checks still need individual decisions.": "应用全部 {{count}} 项修改，包括此前选择保留原文的建议。原文检查仍需逐项决定。",
   "Keep original text": "保留原文",
   "Apply correction": "应用修改",
   "AI cleanup category actions": "AI 文本清理类别操作",

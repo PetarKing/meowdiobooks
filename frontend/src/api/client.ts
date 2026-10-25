@@ -639,6 +639,8 @@ function normalizeExamples(value: unknown): DialogueExample[] {
 function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warnings"][number] {
   const occurrences = Array.isArray(raw.occurrences) ? raw.occurrences as Array<Record<string, unknown>> : [];
   return {
+    decisionScope: raw.decisionScope as import("./contracts").ReviewWarning["decisionScope"],
+    readerState: raw.readerState as import("./contracts").ReviewWarning["readerState"],
     id: String(raw.id ?? raw.kind ?? "warning"),
     kind: String(raw.kind ?? "review-warning"),
     detail: String(raw.detail ?? raw.reason ?? "Inspect this anchored source issue."),
@@ -646,6 +648,9 @@ function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warning
       ? String(raw.severity)
       : "warning") as WizardSnapshot["warnings"][number]["severity"],
     occurrences: occurrences.map((row) => ({
+      readerState: row.readerState as import("./contracts").WarningOccurrence["readerState"],
+      proposalStatus: row.proposalStatus as import("./contracts").WarningOccurrence["proposalStatus"],
+      cleanupReason: row.cleanupReason == null ? undefined : String(row.cleanupReason),
       id: String(row.id ?? ""),
       source: String(row.source ?? row.text ?? ""),
       text: String(row.text ?? row.source ?? ""),

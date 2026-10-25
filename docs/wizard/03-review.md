@@ -75,9 +75,10 @@ their original line-only range rather than absorbing uncertain prose.
 Decisions such as keep, narrate or exclude are validated locally. There is no defer action: every
 surfaced warning receives an explicit decision. Problems that require source or Dialogue changes
 return to the relevant upstream phase and require a complete new candidate.
-AI cleanup offers **Apply correction** or **Keep original text** per occurrence. The category-level
-**Apply remaining proposals** action selects only undecided corrections and preserves existing
-choices. Source checks without a correction still need individual decisions. Accepted corrections
+Proposal-backed findings offer **Apply correction** or **Keep original text** per occurrence.
+Corrections for an already detected issue appear with that finding instead of a duplicate AI warning.
+The decision queue's **Apply all corrections** action selects every correction, including proposals
+previously kept. Source checks without a correction still need individual decisions. Accepted corrections
 change rendered text while retaining original source evidence and speaker assignments.
 
 Every warning group receives an explicit policy. A result may apply per occurrence or to a previewed

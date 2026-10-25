@@ -9,3 +9,14 @@ export const cleanupWarning: ReviewWarning = {
   ],
 };
 
+
+export const consolidatedCleanupWarning: ReviewWarning = {
+  id: "suspicious-group", kind: "suspicious-extraction", decisionScope: "occurrence", detail: "Check source text", severity: "warning", readerState: "mixed",
+  availableActions: ["keep", "exclude", "rerun-extraction", "repair"],
+  occurrences: [
+    { ...cleanupWarning.occurrences[0], proposalStatus: "proposed", cleanupReason: "Join a word split across a printed line.", reason: "Line-wrap hyphen detected.", readerState: "assigned-speaker" },
+    { id: "ordinary", source: "A strange fragment.", text: "A strange fragment.", page: 2, readerState: "assigned-speaker", availableActions: ["keep", "exclude", "rerun-extraction"] },
+    { ...cleanupWarning.occurrences[1], proposalStatus: "proposed", readerState: "narrator" },
+    { ...cleanupWarning.occurrences[2], proposalStatus: "source_review", readerState: "narrator" },
+  ],
+};

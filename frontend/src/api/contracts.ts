@@ -225,6 +225,9 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  readerState?: "narrator" | "assigned-speaker" | "mixed";
+  proposalStatus?: "proposed" | "source_review";
+  cleanupReason?: string;
   replacement?: string;
   availableActions?: ReviewCapability[];
   id: string;
@@ -237,6 +240,7 @@ export interface WarningOccurrence {
 }
 
 export interface ReviewWarning {
+  decisionScope?: "occurrence" | "identical-evidence" | "warning-kind";
   id: string;
   kind: string;
   detail: string;

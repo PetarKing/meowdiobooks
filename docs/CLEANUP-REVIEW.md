@@ -6,9 +6,14 @@ for both remote passes. No local decision model is selected or silently used as 
 
 ## User decisions and source ownership
 
-The AI cleanup category shows exact source text, its suggested replacement, and a reason. Users can
-keep a passage, accept a proposed repair individually, or apply all remaining undecided proposals
-without changing earlier choices. A flagged
+Review shows exact source text, its suggested replacement, and a reason. When deterministic checks
+already identify the same source issue, the correction appears with that existing finding instead of
+creating another AI cleanup finding. Matching requires an exact source range, an unambiguous contained
+source check, or a correction whose unchanged surrounding text can be removed without changing the
+edit. Ambiguous overlaps remain separate evidence rather than discarding a correction. Additional
+findings appear in AI cleanup. Users can keep a
+passage, apply a correction individually, or apply all corrections from the decision queue. The bulk
+action also changes previously kept proposals to apply; individual choices remain editable. A flagged
 passage without a safe proposal remains available for source inspection and extraction recovery.
 Nothing is silently accepted because a detector or repair model was confident.
 
