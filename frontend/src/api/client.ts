@@ -191,10 +191,10 @@ export class HttpWizardApi implements WorkflowGateway {
     return this.request(`/books/${bookId}/review/bulk-preview`, { method: 'POST', body: JSON.stringify({ revision, occurrenceId, action }) });
   }
 
-  previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[]): Promise<import('./contracts').ReviewTranscriptPreview> {
+  previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[], occurrencePolicies?: import('./contracts').ReviewTranscriptOccurrencePolicy[]): Promise<import('./contracts').ReviewTranscriptPreview> {
     return this.request(`/books/${bookId}/review/transcript-preview`, {
       method: 'POST',
-      body: JSON.stringify({ revision, page, policies }),
+      body: JSON.stringify({ revision, page, policies, ...(occurrencePolicies?.length ? { occurrencePolicies } : {}) }),
     });
   }
 
@@ -653,6 +653,8 @@ function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warning
       contextBefore: row.contextBefore == null ? undefined : String(row.contextBefore),
       contextAfter: row.contextAfter == null ? undefined : String(row.contextAfter),
       reason: row.reason == null ? undefined : String(row.reason),
+      replacement: typeof row.replacement === "string" ? row.replacement : undefined,
+      availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String) as import("./contracts").ReviewCapability[] : undefined,
     })),
     availableActions: Array.isArray(raw.availableActions)
       ? raw.availableActions.map(String).filter((action) => action !== "defer") as WizardSnapshot["warnings"][number]["availableActions"]

@@ -11,6 +11,13 @@ Meowdiobooks alpha currently supports macOS on Apple Silicon (`arm64`) only.
 - FFmpeg for audiobook export
 - At least 18 GB unified memory and roughly 30 GB free storage recommended
 - Approximately 14 GB for the pinned local language, voice and speech-recognition models
+- An OpenAI API key with access to `gpt-6-luna`, the Decisions API, and Responses for cleanup Review
+
+Set `OPENAI_API_KEY` in the process environment (or an ignored local `.env` file) before starting the
+app. Review sends bounded passages to OpenAI and presents correction proposals for your approval.
+It cannot run this pass offline and does not fall back to a local decision model. See
+[cleanup review](CLEANUP-REVIEW.md). Never commit credentials or copy a hosted operator key into a
+public checkout.
 
 ## Install standard dependencies
 

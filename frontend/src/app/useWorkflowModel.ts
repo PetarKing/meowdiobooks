@@ -1,3 +1,5 @@
+import { buildReviewPreviewPolicies } from "../reviewDecisions";
+import { normalizeCandidateWarnings } from "../workflow/review";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { wizardApi as defaultWorkflowGateway, normalizeDialogueArtifact } from "../api/client";
@@ -433,13 +435,14 @@ export function useWorkflowModel({
     if (!reviewFinalCheck || !book || !reviewCandidate?.revision) return;
     let disposed = false;
     setReviewPreviewLoading(true);
-    const policies = Object.entries(reviewDecisions).map(([warningId, action]) => ({ warningId, action }));
+    const { policies, occurrencePolicies } = buildReviewPreviewPolicies(normalizeCandidateWarnings(reviewCandidate), reviewDecisions);
     const timer = window.setTimeout(() => {
       void gateway.previewReviewTranscript(
         book.id,
         String(reviewCandidate.revision),
         reviewPreviewPage,
         policies,
+        ...(occurrencePolicies.length ? [occurrencePolicies] : []),
       ).then(async (preview) => {
         if (disposed) return;
         await decodeImage(preview.imageUrl);
@@ -457,7 +460,7 @@ export function useWorkflowModel({
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [book, gateway, reviewCandidate?.revision, reviewDecisions, reviewFinalCheck, reviewPreviewPage]);
+  }, [book, gateway, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewPage]);
 
   useEffect(() => {
     setBooks([]);

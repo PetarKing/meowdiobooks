@@ -4,7 +4,8 @@ Status: current alpha architecture.
 
 Meowdiobooks is a complete local application. The [source setup](SETUP.md) builds and installs the
 API, local workflow runtime, compiled browser application, model registry, and command-line entrypoint.
-No account, hosted service, private repository, database, or network provider is required to run it.
+No Meowdiobooks account, private repository, or database is required. Cleanup Review uses OpenAI
+Luna and requires network access and an OpenAI API key; local voice generation remains local.
 
 ## Composition
 
@@ -169,6 +170,16 @@ store-wide failures remain explicit errors; isolation does not turn an inaccessi
 empty shelf.
 
 ## Authority and publication
+
+Review combines deterministic warnings with a Luna Decisions scan and bounded Luna correction
+proposals. The shared implementation and source-linked acceptance contract live in core; hosts supply
+credentials, request admission and separate Review usage observers. Every edition uses Luna for this
+pass. A provider failure fails the candidate explicitly without publishing partial or clean results.
+The `ai-cleanup` category records an individual keep/repair/source-review choice for each occurrence.
+Bulk acceptance expands to explicit individual choices rather than claiming different edits have
+identical evidence. Accepted replacements change only rendered speech: source offsets, source text,
+and speaker assignments remain unchanged. Recording scripts verify replacements against the accepted
+Review snapshot before using them. See [cleanup review](CLEANUP-REVIEW.md) for limitations and setup.
 
 The backend is authoritative for accepted state. The browser may prepare settings and decisions, but
 it cannot publish artifacts or infer that a stage is accepted.

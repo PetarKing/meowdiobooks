@@ -21,6 +21,10 @@ class ReviewContractError(ValueError):
 
 
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
+    "ai-cleanup": {
+        "severity": "warning",
+        "actions": ("keep", "repair", "rerun-extraction"),
+    },
     "stage-direction": {
         "severity": "warning",
         "actions": ("keep", "exclude", "narrate"),
@@ -176,6 +180,61 @@ def preview_bulk_decision(
     }
 
 
+def add_cleanup_proposals(
+    workspace: Mapping[str, Any], extraction: Mapping[str, Any],
+    dialogue: Mapping[str, Any], result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Attach validated model suggestions without changing any accepted source."""
+    blocks = _normalise_blocks(extraction)
+    index = {str(block["id"]): block for block in blocks}
+    rows = []
+    for proposal in result.get("occurrences", []):
+        block = index.get(str(proposal.get("blockId", "")))
+        start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
+        if (block is None or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(block["text"])
+                or block["text"][start:end] != proposal.get("source")):
+            raise ReviewContractError("Cleanup proposal does not match its exact source")
+        replacement = proposal.get("replacement")
+        if replacement is not None and not isinstance(replacement, str):
+            raise ReviewContractError("Cleanup replacement must be text or null")
+        if replacement == proposal["source"]:
+            raise ReviewContractError("Cleanup proposal must change the highlighted text")
+        if replacement is not None and not any(
+            str(span.get("blockId")) == str(block["id"])
+            and int(span.get("spokenStart", span.get("sourceStart", 0))) <= start
+            and end <= int(span.get("spokenEnd", span.get("sourceEnd", 0)))
+            for span in dialogue.get("spans", [])
+        ):
+            raise ReviewContractError("Cleanup repairs must stay inside one spoken source span")
+        row = _occurrence("ai-cleanup", str(block["id"]), start, end,
+                          proposal["source"], int(block["page"]),
+                          str(proposal.get("reason") or "Check this text against the source."),
+                          block_text=block["text"])
+        row.update({"replacement": replacement,
+                    "proposalStatus": "proposed" if replacement is not None else "source_review",
+                    "model": "gpt-6-luna",
+                    "availableActions": ["keep", "repair"] if replacement is not None
+                    else ["keep", "rerun-extraction"]})
+        # Even identical source strings can have different suggested replacements.
+        row["matchKey"] = _digest([row["source"], replacement])
+        rows.append(row)
+    if len({row["id"] for row in rows}) != len(rows):
+        raise ReviewContractError("Cleanup proposals repeat a source range")
+    for index, row in enumerate(rows):
+        if any(row["blockId"] == other["blockId"]
+               and max(row["sourceStart"], other["sourceStart"])
+               < min(row["sourceEnd"], other["sourceEnd"])
+               for other in rows[:index]):
+            raise ReviewContractError("Cleanup proposals overlap")
+    _add_adjacent_context(rows, blocks)
+    warnings = [*workspace.get("warnings", []), *_group_occurrences(rows, dialogue.get("spans", []))]
+    return {**dict(workspace), "warnings": warnings,
+            "cleanupSummary": dict(result.get("summary", {})),
+            "summary": {**workspace["summary"], "groups": len(warnings),
+                        "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
+
+
 def accept_review_revision(
     workspace: Mapping[str, Any],
     decisions: Sequence[Mapping[str, Any]],
@@ -243,6 +302,7 @@ def accept_review_revision(
         "dialogueRevision": str(workspace["dialogueRevision"]),
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
+        "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
         "decisions": ordered,
         "consequencePreview": _aggregate_consequences(ordered),
         "requiresNewUpstreamRevision": any(row["action"] in _UPSTREAM_ACTIONS for row in ordered),
@@ -322,7 +382,117 @@ def apply_review_render_policies(
             action = owner[2] if owner is not None else "keep"
             occurrence_id = owner[3] if owner is not None else None
             result.append(_review_policy_span(span, piece_start, piece_end, action, occurrence_id))
-    return {**dict(dialogue), "spans": result}
+    return {**dict(dialogue), "spans": _apply_cleanup_repairs(result, review)}
+
+
+def _repair_text(span: Mapping[str, Any], edits: Sequence[Mapping[str, Any]]) -> str:
+    start = int(span.get("sourceStart", 0))
+    source = str(span.get("source", ""))
+    spoken_start = int(span.get("spokenStart", start))
+    spoken_end = int(span.get("spokenEnd", span.get("sourceEnd", start + len(source))))
+    text = source[spoken_start - start:spoken_end - start]
+    last = spoken_end
+    for edit in sorted(edits, key=lambda row: row["sourceStart"], reverse=True):
+        left, right = int(edit["sourceStart"]), int(edit["sourceEnd"])
+        if (span.get("blockId") != edit.get("blockId")
+                or not spoken_start <= left < right <= last
+                or source[left - start:right - start] != edit.get("source")
+                or not isinstance(edit.get("replacement"), str)):
+            raise ReviewContractError("Cleanup repair no longer matches its spoken source range")
+        text = text[:left - spoken_start] + edit["replacement"] + text[right - spoken_start:]
+        last = left
+    return text
+
+
+def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])}
+    result = {}
+    for decision in review.get("decisions", []):
+        if decision.get("action") != "repair":
+            continue
+        key = str(decision["occurrenceId"])
+        row = occurrences.get(key)
+        if row is None or row.get("kind") != "ai-cleanup" or not isinstance(row.get("replacement"), str):
+            raise ReviewContractError("Repair requires a durable cleanup proposal")
+        result[key] = row
+    return result
+
+
+def _apply_cleanup_repairs(
+    spans: Sequence[Mapping[str, Any]], review: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    edits = _accepted_repairs(review)
+    assigned: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
+    for key, edit in edits.items():
+        overlaps = [(index, span) for index, span in enumerate(spans)
+                    if span.get("blockId") == edit.get("blockId")
+                    and max(int(span["sourceStart"]), int(edit["sourceStart"]))
+                    < min(int(span["sourceEnd"]), int(edit["sourceEnd"]))]
+        if overlaps and all(span.get("reviewAction") == "exclude" for _, span in overlaps):
+            # An explicit removal makes a proposed spelling fix irrelevant to narration.
+            continue
+        if len(overlaps) != 1:
+            raise ReviewContractError("Cleanup repair crosses another review decision; keep it or revise that decision")
+        index, span = overlaps[0]
+        _repair_text(span, [edit])
+        assigned[index].append({**edit, "id": key})
+    result = []
+    for index, raw in enumerate(spans):
+        span = dict(raw)
+        if index in assigned:
+            span["text"] = _repair_text(span, assigned[index])
+            span["reviewRepairs"] = [row["id"] for row in assigned[index]]
+            span["reviewAction"] = "repair" if span["text"].strip() else "exclude"
+            span["reviewRevision"] = review.get("revision")
+            if span["reviewAction"] == "exclude":
+                span["renderRole"] = "narration"
+            span["origin"] = "review:repair"
+        result.append(span)
+    return result
+
+
+def review_source_validation_view(
+    dialogue: Mapping[str, Any], review: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify accepted replacements, then expose original playable text to source validators."""
+    edits = _accepted_repairs(review)
+    spans = []
+    seen: set[str] = set()
+    for raw in dialogue.get("spans", []):
+        span = dict(raw)
+        ids = span.get("reviewRepairs", [])
+        if ids:
+            if (span.get("reviewRevision") != review.get("revision")
+                    or any(key not in edits or key in seen for key in ids)):
+                raise ReviewContractError("Rendered cleanup is not bound to the accepted review")
+            if _repair_text(span, [edits[key] for key in ids]) != span.get("text"):
+                raise ReviewContractError("Rendered cleanup differs from its accepted proposal")
+            seen.update(ids)
+            start = int(span.get("sourceStart", 0))
+            left = int(span.get("spokenStart", start)) - start
+            right = int(span.get("spokenEnd", span["sourceEnd"])) - start
+            span["text"] = str(span["source"])[left:right]
+        spans.append(span)
+    # Accepted edits cannot disappear merely because a renderer omitted their metadata.
+    # Only an explicit source exclusion can make a repair irrelevant to narration.
+    occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])}
+    excluded = [occurrences[str(row["occurrenceId"])] for row in review.get("decisions", [])
+                if row.get("action") == "exclude" and str(row.get("occurrenceId")) in occurrences]
+    for key in set(edits) - seen:
+        edit = edits[key]
+        cursor = int(edit["sourceStart"])
+        for row in sorted(excluded, key=lambda row: row["sourceStart"]):
+            if row.get("blockId") == edit.get("blockId") and int(row["sourceStart"]) <= cursor:
+                cursor = max(cursor, int(row["sourceEnd"]))
+        owners = [span for span in spans if span.get("blockId") == edit.get("blockId")
+                  and max(int(span["sourceStart"]), int(edit["sourceStart"]))
+                  < min(int(span["sourceEnd"]), int(edit["sourceEnd"]))]
+        if (cursor < int(edit["sourceEnd"]) or not owners
+                or any(span.get("reviewAction") != "exclude" for span in owners)):
+            raise ReviewContractError("Accepted cleanup repair is missing from the rendered transcript")
+    return {**dict(dialogue), "spans": spans}
 
 
 def preview_review_transcript_page(
@@ -333,6 +503,7 @@ def preview_review_transcript_page(
     *,
     page: int,
     page_count: int | None = None,
+    occurrence_policies: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Render one read-only page of the would-be accepted audiobook transcript."""
 
@@ -364,7 +535,18 @@ def preview_review_transcript_page(
             _validate_action(occurrence, action)
         chosen[warning_id] = action
 
-    missing = sorted(set(warnings) - set(chosen))
+    ai_occurrences = {key: row for key, row in occurrences.items() if row.get("kind") == "ai-cleanup"}
+    ai_chosen: dict[str, str] = {}
+    for policy in occurrence_policies:
+        key = str(policy.get("occurrenceId", ""))
+        if key not in ai_occurrences or key in ai_chosen:
+            raise ReviewContractError("Cleanup preview requires unique known occurrence IDs")
+        action = str(policy.get("action", ""))
+        _validate_action(ai_occurrences[key], action)
+        ai_chosen[key] = action
+    if set(ai_chosen) != set(ai_occurrences):
+        raise ReviewContractError("Every cleanup proposal must be decided before preview")
+    missing = sorted(key for key in warnings if key not in chosen and warnings[key].get("kind") != "ai-cleanup")
     if missing:
         raise ReviewContractError(
             "Every Review warning group must be decided before previewing the final transcript"
@@ -373,8 +555,9 @@ def preview_review_transcript_page(
     decisions = [
         {"occurrenceId": str(occurrence["id"]), "action": chosen[warning_id]}
         for warning_id, warning in warnings.items()
+        if warning.get("kind") != "ai-cleanup"
         for occurrence in warning.get("occurrences", [])
-    ]
+    ] + [{"occurrenceId": key, "action": action} for key, action in ai_chosen.items()]
     rendered = apply_review_render_policies(
         dialogue,
         {"warningSnapshot": list(warnings.values()), "decisions": decisions},
@@ -1191,7 +1374,8 @@ def _group_occurrences(
                     action for action in available_actions if action != "narrate"
                 ]
             for occurrence in evidence_group:
-                occurrence["availableActions"] = list(available_actions)
+                if kind != "ai-cleanup":
+                    occurrence["availableActions"] = list(available_actions)
             suffix = (
                 f":{evidence_group[0]['matchKey']}"
                 if kind == "repeated-matter"
@@ -1207,6 +1391,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
+                        "occurrence" if kind == "ai-cleanup" else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"
@@ -1308,6 +1493,8 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
         "audio": (
             "excluded"
             if action == "exclude"
+            else "corrected"
+            if action == "repair"
             else "narrator"
             if action == "narrate"
             else "unchanged"
@@ -1320,7 +1507,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             else ["review", "cast", "script", "generate"]
             if action == "rerun-dialogue"
             else ["generate"]
-            if action in {"exclude", "narrate"}
+            if action in {"exclude", "narrate", "repair"}
             else []
         ),
     }
