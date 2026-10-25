@@ -62,6 +62,8 @@ const editionErrorKeys = new Set([
 ]);
 
 export function localizeErrorMessage(value: string, t: TFunction) {
+  const importLimit = value.match(/^Choose a file no larger than ([\d.,]+) MB\.$/);
+  if (importLimit) return t("Choose a file no larger than {{size}} MB.", { size: importLimit[1] });
   const paused = value.match(pausedVoices);
   if (paused) return t(paused[2]
     ? "Voice generation paused at {{name}}. {{completed}} of {{total}} voices are saved. Choose Continue voice generation to resume."

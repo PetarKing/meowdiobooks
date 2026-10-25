@@ -111,3 +111,12 @@ describe("file-size units", () => {
     expect(formatFileSize(1024 ** 3)).toBe("1.0 GiB");
   });
 });
+
+
+it("retranslates an existing import-limit error after changing language", async () => {
+  const error = "Choose a file no larger than 99 MB.";
+  await changeAppLocale("zh-CN");
+  expect(localizeErrorMessage(error, i18n.t)).toBe("请选择不超过 99 MB 的文件。");
+  await changeAppLocale("en");
+  expect(localizeErrorMessage(error, i18n.t)).toBe(error);
+});

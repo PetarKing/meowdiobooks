@@ -941,7 +941,7 @@ export function useWorkflowModel({
     const fileLimit = Math.min(maxImportBytes, formatLimit);
     if (file.size > fileLimit) {
       const size = new Intl.NumberFormat(uiLocale, { maximumFractionDigits: 6 }).format(fileLimit / 1_000_000);
-      setError(t("Choose a file no larger than {{size}} MB.", { size }));
+      setError(`Choose a file no larger than ${size} MB.`);
       return;
     }
     setBusy(true);
