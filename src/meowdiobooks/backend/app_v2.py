@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import hashlib
 import logging
@@ -19,6 +20,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse, Response
+from starlette.concurrency import run_in_threadpool
 from meowdiobooks.assets import application_root, frontend_dist_path
 from meowdiobooks.util import atomic_write
 
@@ -104,6 +106,7 @@ from .documents import (
     source_path,
 )
 from .generation_status import chapter_audio_stale_reasons, generated_chapters
+from .file_processing import FileProcessor
 from .models import (
     AudioExportPreset,
     Book,
@@ -446,6 +449,7 @@ def create_app_v2(
     retain_local_library_exports: bool = True,
     chapter_audio_source: ChapterAudioSource | None = None,
     job_preflight: Callable[[], None] | None = None,
+    file_processor: FileProcessor | None = None,
     on_cast_voice_revisions_changed: (
         Callable[[Path, frozenset[str]], None] | None
     ) = None,
@@ -602,7 +606,7 @@ def create_app_v2(
         method = command.settings.method
         report(2, "Extracting the complete PDF")
         package = package_for(book.id)
-        pages = extract_full_document(
+        pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
             source,
             package / "preview",
             method,
@@ -1379,6 +1383,7 @@ def create_app_v2(
     app.state.job_queue = queue
     app.state.workflow_runner = runner
     app.state.workflow_definition = PUBLIC_WORKFLOW
+    import_lock = asyncio.Lock()
 
     @app.get("/api/health")
     def health() -> dict[str, str]:
@@ -1397,6 +1402,12 @@ def create_app_v2(
                 raise HTTPException(status_code=413, detail="Book exceeds the 500 MB limit")
             chunks.append(chunk)
         raw = b"".join(chunks)
+        # Parsing yields to other requests. Serialize import validation and commit
+        # within this app so duplicate uploads cannot overwrite an existing book.
+        async with import_lock:
+            return await finish_import(raw, filename)
+
+    async def finish_import(raw: bytes, filename: str) -> dict[str, Any]:
         book_id, source_hash = imported_book_id(raw)
         if book_id_for_source is not None:
             book_id = book_id_for_source(source_hash)
@@ -1435,12 +1446,16 @@ def create_app_v2(
         if created:
             atomic_write(target, raw)
         try:
-            source_kind, page_count = inspect_source(target)
+            source_kind, page_count = await run_in_threadpool(
+                file_processor.inspect_source if file_processor is not None else inspect_source, target,
+            )
+            metadata = await run_in_threadpool(
+                file_processor.pdf_metadata if file_processor is not None else pdf_metadata, target,
+            )
         except (OSError, ValueError) as error:
             if created:
                 target.unlink(missing_ok=True)
             raise HTTPException(status_code=422, detail=str(error)) from error
-        metadata = pdf_metadata(target)
         book = Book(
             id=book_id,
             title=metadata.get("title") or Path(filename).stem,
@@ -1775,10 +1790,12 @@ def create_app_v2(
             if not book.source_name or not book.page_count or body.page > book.page_count:
                 raise ValueError("Page is outside this document")
             source = source_path(root, book.id, book.source_name)
-            result = extract_pdf_page(
+            result = (file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page)(
                 source, package_for(book.id) / "preview", body.page, body.method
             )
-            render_pdf_page(source, package_for(book.id) / "preview", body.page)
+            (file_processor.render_pdf_page if file_processor is not None else render_pdf_page)(
+                source, package_for(book.id) / "preview", body.page,
+            )
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
         return {
@@ -1897,7 +1914,9 @@ def create_app_v2(
 
         source = source_path(root, book.id, book.source_name or "book.pdf")
         try:
-            metadata = pdf_metadata(source)
+            metadata = await run_in_threadpool(
+                file_processor.pdf_metadata if file_processor is not None else pdf_metadata, source,
+            )
         except (OSError, ValueError):
             metadata = {}
         title = (
@@ -1913,21 +1932,29 @@ def create_app_v2(
         temp_root = root / "tmp"
         temp_root.mkdir(parents=True, exist_ok=True)
         work = Path(tempfile.mkdtemp(prefix=f"m4b-{book.id}-", dir=temp_root))
-        if custom_cover:
-            cover = work / f"cover{custom_cover[1]}"
-            cover.write_bytes(custom_cover[0])
-        else:
-            try:
-                cover = render_pdf_page(source, package / "preview", body.coverPage)
-            except (OSError, RuntimeError, subprocess.SubprocessError):
-                cover = (
-                    repo_root / "frontend" / "src" / "assets" / "brand" / "meowdiobooks-mark.png"
-                )
-        partial = len(export_chapters) != len(chapter_order)
-        profile = audio_export_profile(body.preset)
-        filename = export_filename(title, partial=partial, preset=body.preset)
-        output = work / filename
         try:
+            if custom_cover:
+                cover = work / f"cover{custom_cover[1]}"
+                cover.write_bytes(custom_cover[0])
+            elif file_processor is not None:
+                # A host rejection must fail closed; its permitted paths and policy
+                # may not include the local application's fallback asset.
+                cover = await run_in_threadpool(
+                    file_processor.render_pdf_page, source, package / "preview", body.coverPage,
+                )
+            else:
+                try:
+                    cover = await run_in_threadpool(
+                        render_pdf_page, source, package / "preview", body.coverPage,
+                    )
+                except (OSError, RuntimeError, subprocess.SubprocessError):
+                    cover = (
+                        repo_root / "frontend" / "src" / "assets" / "brand" / "meowdiobooks-mark.png"
+                    )
+            partial = len(export_chapters) != len(chapter_order)
+            profile = audio_export_profile(body.preset)
+            filename = export_filename(title, partial=partial, preset=body.preset)
+            output = work / filename
             with ExitStack() as audio_sources:
                 materialized_chapters: list[M4BChapter] = []
                 for chapter in export_chapters:
@@ -1948,7 +1975,8 @@ def create_app_v2(
                     materialized_chapters.append(
                         M4BChapter(chapter.chapter_id, chapter.title, materialized_path)
                     )
-                package_audio_export(
+                await run_in_threadpool(
+                    file_processor.package_audio_export if file_processor is not None else package_audio_export,
                     materialized_chapters,
                     output,
                     title=title,
@@ -1960,7 +1988,7 @@ def create_app_v2(
         except FFmpegUnavailableError as error:
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(status_code=503, detail=str(error)) from error
-        except M4BExportError as error:
+        except (M4BExportError, ValueError) as error:
             shutil.rmtree(work, ignore_errors=True)
             raise HTTPException(status_code=422, detail=str(error)) from error
         except (OSError, RuntimeError) as error:
@@ -1969,6 +1997,9 @@ def create_app_v2(
                 status_code=409,
                 detail="Chapter audio could not be prepared for export",
             ) from error
+        except BaseException:
+            shutil.rmtree(work, ignore_errors=True)
+            raise
         library_root.mkdir(parents=True, exist_ok=True)
         destination = _available_library_path(library_root, filename)
         chapter_positions = [
@@ -2259,11 +2290,16 @@ def create_app_v2(
                 raise HTTPException(status_code=413, detail="Voice sample exceeds the 25 MB limit")
             chunks.append(chunk)
         try:
-            normalized, _duration = normalize_voice_sample(b"".join(chunks), filename)
+            normalized, _duration = await run_in_threadpool(
+                file_processor.normalize_voice_sample if file_processor is not None else normalize_voice_sample,
+                b"".join(chunks), filename,
+            )
             with tempfile.NamedTemporaryFile(suffix=".wav") as sample:
                 sample.write(normalized)
                 sample.flush()
-                draft = voice_sample_transcriber(repo_root, book_id, Path(sample.name))
+                draft = await run_in_threadpool(
+                    voice_sample_transcriber, repo_root, book_id, Path(sample.name),
+                )
         except RuntimeError as error:
             action_error = action_required_http_exception(error)
             if action_error is not None:
@@ -2353,7 +2389,10 @@ def create_app_v2(
                 raise HTTPException(status_code=413, detail="Voice sample exceeds the 25 MB limit")
             chunks.append(chunk)
         try:
-            normalized, duration = normalize_voice_sample(b"".join(chunks), filename)
+            normalized, duration = await run_in_threadpool(
+                file_processor.normalize_voice_sample if file_processor is not None else normalize_voice_sample,
+                b"".join(chunks), filename,
+            )
         except ValueError as error:
             raise HTTPException(status_code=422, detail=str(error)) from error
 
@@ -2381,7 +2420,8 @@ def create_app_v2(
             raise HTTPException(status_code=422, detail="Cast voice has an invalid storage path")
         try:
             atomic_write(reference_output, normalized)
-            audition = voice_sample_auditioner(
+            audition = await run_in_threadpool(
+                voice_sample_auditioner,
                 repo_root,
                 package,
                 book_id,
@@ -2705,7 +2745,10 @@ def create_app_v2(
             )
         return book.model_dump(mode="json")
 
-    app.router.routes.extend(create_media_router(root, require_book, package_for).routes)
+    app.router.routes.extend(create_media_router(
+        root, require_book, package_for,
+        page_renderer=file_processor.render_pdf_page if file_processor is not None else None,
+    ).routes)
     app.router.routes.extend(
         create_library_router(
             library,

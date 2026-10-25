@@ -3,6 +3,7 @@ import json
 from contextlib import contextmanager
 from io import BytesIO
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from fastapi.testclient import TestClient
@@ -872,7 +873,12 @@ def test_generated_chapter_can_open_in_the_default_mac_audio_app(tmp_path, monke
     assert opened == [(["open", str(wav)], {"check": True, "capture_output": True})]
 
 
-def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, monkeypatch):
+@pytest.mark.parametrize("processor_mode", [
+    "default", "host", "cover-value-error", "cover-runtime-error", "package-value-error",
+])
+def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
+    tmp_path, monkeypatch, processor_mode,
+):
     cover = tmp_path / "cover.png"
     cover.write_bytes(b"cover")
     captured = {}
@@ -891,6 +897,9 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             materialized.unlink(missing_ok=True)
 
     def fake_package(chapters, output, **metadata):
+        if processor_mode == "package-value-error":
+            output.write_bytes(b"incomplete export")
+            raise ValueError("Packaging rejected")
         captured["chapters"] = chapters
         captured["audio_bytes"] = [chapter.audio_path.read_bytes() for chapter in chapters]
         captured["metadata"] = metadata
@@ -900,11 +909,30 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
 
     def fake_render_pdf_page(_source, _cache, page):
         rendered_pages.append(page)
+        if processor_mode == "cover-value-error":
+            raise ValueError("Cover rejected")
+        if processor_mode == "cover-runtime-error":
+            raise RuntimeError("Cover worker failed")
         return cover
 
     monkeypatch.setattr("meowdiobooks.backend.app_v2.render_pdf_page", fake_render_pdf_page)
     monkeypatch.setattr("meowdiobooks.backend.app_v2.package_audio_export", fake_package)
-    with TestClient(create_app_v2(tmp_path, chapter_audio_source=materialize_audio)) as client:
+    processor = None
+    if processor_mode != "default":
+        from meowdiobooks.backend.documents import inspect_source, pdf_metadata
+
+        processor = SimpleNamespace(
+            inspect_source=inspect_source, pdf_metadata=pdf_metadata,
+            render_pdf_page=fake_render_pdf_page, package_audio_export=fake_package,
+        )
+
+        def forbidden(*_args, **_kwargs):
+            pytest.fail("Export escaped the configured processor")
+
+        monkeypatch.setattr("meowdiobooks.backend.app_v2.render_pdf_page", forbidden)
+        monkeypatch.setattr("meowdiobooks.backend.app_v2.package_audio_export", forbidden)
+    with TestClient(create_app_v2(tmp_path, chapter_audio_source=materialize_audio,
+                                file_processor=processor)) as client:
         imported = client.post(
             "/api/books/import",
             files={"file": ("fallback.pdf", _metadata_pdf(), "application/pdf")},
@@ -992,6 +1020,17 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(tmp_path, mo
             json={"chapters": [{"chapterId": "opening-matter", "revision": "render-1"}]},
         )
 
+        if processor_mode not in {"default", "host"}:
+            assert response.status_code == (409 if processor_mode == "cover-runtime-error" else 422)
+            assert not list((tmp_path / "tmp").glob("m4b-*"))
+            assert all(not path.exists() for path in materialized_paths)
+            assert (render / "chapter.wav").read_bytes() == b"wav"
+            assert client.get("/api/library").json() == []
+            if processor_mode.startswith("cover-"):
+                assert not materialized_paths
+            else:
+                assert materialized_paths
+            return
         assert response.status_code == 200, response.text
         assert response.content == b"packaged-m4b"
         assert [chapter.title for chapter in captured["chapters"]] == ["Opening matter"]
