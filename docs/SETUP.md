@@ -10,7 +10,7 @@ Meowdiobooks alpha currently supports macOS on Apple Silicon (`arm64`) only.
 - LiteParse for the LiteParse extraction option
 - FFmpeg for audiobook export
 - At least 18 GB unified memory and roughly 30 GB free storage recommended
-- Approximately 14 GB for the pinned local language, voice and speech-recognition models
+- Approximately 15 GB for the pinned local language, voice and speech-recognition models
 
 ## Install standard dependencies
 
@@ -32,7 +32,7 @@ The alpha deliberately does not install AI runtimes or model weights automatical
 | Document analysis | Qwen3.5 9B Q4_K_M | `.local/models/qwen35-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf` |
 | Local LLM runtime | llama.cpp b9637 | `.local/llama.cpp/b9637/llama-server` |
 | Voice auditions | Qwen3-TTS VoiceDesign 1.7B | `models/qwen_1_7b_voice_design/` |
-| Chapter rendering | Qwen3-TTS Base 1.7B 4-bit | `models/qwen_1_7b_base_4bit/` |
+| Chapter rendering | Qwen3-TTS Base 1.7B 8-bit | `models/qwen_1_7b_base_8bit/` |
 | Voice-sample transcript drafts | Qwen3-ASR 0.6B 4-bit | `models/qwen3_asr_0_6b_4bit/` |
 
 Model and runtime directories are ignored by Git. Follow the [local-model guide](MODELS.md) for exact

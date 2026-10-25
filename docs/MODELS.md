@@ -2,7 +2,7 @@
 
 Meowdiobooks does not download or update AI runtimes or model weights automatically. Model downloads
 are large, and users should be able to review their source, license, revision and destination first.
-The complete default set uses roughly 14 GB.
+The complete default set uses roughly 15 GB.
 
 The checked-in [`models.toml`](../models.toml) is the runtime source of truth. Paths may be absolute,
 home-relative (`~/...`) or relative to the repository root. The default entries preserve the models
@@ -40,9 +40,9 @@ uvx --from "huggingface-hub[hf_xet]" hf download \
   --local-dir models/qwen_1_7b_voice_design
 
 uvx --from "huggingface-hub[hf_xet]" hf download \
-  mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit \
-  --revision 37e955a1deb861c088ae5f3a67043185f3d1a60c \
-  --local-dir models/qwen_1_7b_base_4bit
+  mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit \
+  --revision e7dd0585652209fa0d7783659aad4e8a324de11c \
+  --local-dir models/qwen_1_7b_base_8bit
 
 uvx --from "huggingface-hub[hf_xet]" hf download \
   mlx-community/Qwen3-ASR-0.6B-4bit \
@@ -67,6 +67,17 @@ The configured executable must then exist at `.local/llama.cpp/b9637/llama-serve
 install a compatible llama.cpp build yourself and change `runtime_path` in `models.toml` to its
 absolute executable path. Build compatibility can affect prompts and output contracts; run the full
 test suite before treating a different build as supported.
+
+## Upgrading from the four-bit renderer
+
+Download the pinned eight-bit Base checkpoint above before adopting the new catalog. The default
+renderer directory is now `models/qwen_1_7b_base_8bit`; existing four-bit weights are not moved,
+renamed or deleted. Custom catalogs remain under the operator's control.
+
+Voice design stays on the existing VoiceDesign BF16 checkpoint. Both uploaded-reference cloning
+and chapter rendering use Base eight-bit. Recipe version `2` identifies this changed composition,
+so the application refreshes stale audition packs through the normal review flow. Existing audio
+files are preserved. Neither weight precision nor this update adds performance-cue support.
 
 ## Verify setup
 

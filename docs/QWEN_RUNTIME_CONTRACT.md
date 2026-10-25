@@ -10,7 +10,7 @@ deterministic.
 |---|---|---|
 | Qwen3.5 9B Q4_K_M through pinned `llama.cpp`, or the explicitly selected OpenAI-compatible remote Dialogue profile | Small, focused text decisions and suggestions | No |
 | Qwen3-TTS VoiceDesign 1.7B | Creates audition/reference WAVs from text plus voice direction | No |
-| Qwen3-TTS Base 1.7B 4-bit | Renders accepted book text using a reference WAV and its exact matching transcript | No |
+| Qwen3-TTS Base 1.7B 8-bit | Renders accepted book text using a reference WAV and its exact matching transcript | No |
 
 The default text and voice models run locally, and heavy local models run sequentially. Dialogue may
 instead use an explicitly selected OpenAI-compatible remote profile, which receives only the selected
