@@ -68,10 +68,16 @@ class ReviewTranscriptPolicyRequest(ApiRequest):
     action: str = Field(min_length=1)
 
 
+class ReviewOccurrencePolicyRequest(ApiRequest):
+    occurrenceId: str = Field(min_length=1)
+    action: str = Field(min_length=1)
+
+
 class ReviewTranscriptPreviewRequest(ApiRequest):
     revision: str = Field(min_length=1)
     page: int = Field(ge=1)
     policies: list[ReviewTranscriptPolicyRequest] = Field(default_factory=list)
+    occurrencePolicies: list[ReviewOccurrencePolicyRequest] = Field(default_factory=list)
 
 
 class CastingPreviewRequest(CastSettings):

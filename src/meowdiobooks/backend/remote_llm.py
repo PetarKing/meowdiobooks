@@ -368,3 +368,84 @@ def remote_usage_cost(
     return float(sum(count * rate for count, rate in zip(
         (uncached, cached, cache_write, completion), rates, strict=True
     )) / 1_000_000)
+
+
+def remote_decisions_completion(
+    repo_root: Path,
+    config: RemoteTextModelConfig,
+    prompt: str,
+    questions: list[dict[str, Any]],
+    *,
+    usage_observer: RemoteUsageObserver | None = None,
+    request_admission: RemoteRequestAdmission | None = None,
+) -> dict[str, Any]:
+    """Run a bounded Decisions request through the same admission/settlement contract.
+
+    Decisions has no generated output tokens. The positive one-token admission bound keeps
+    compatibility with compositions requiring finite positive reservations; settlement receives
+    the provider's actual zero output usage. Invalid/missing answers are never interpreted here.
+    """
+    if config.model != "gpt-6-luna":
+        raise ValueError("Cleanup Decisions requires gpt-6-luna")
+    key = configured_api_key(repo_root, config.api_key_env)
+    if not key:
+        raise RemoteModelUnavailableError(
+            f"{config.display_name} is not configured. Add {config.api_key_env} and try again."
+        )
+    encoded = json.dumps({
+        "model": config.model, "input": prompt, "questions": questions,
+    }, ensure_ascii=False).encode("utf-8")
+    for attempt, delay in enumerate((2, 5, 10, 0), 1):
+        completion = admit_remote_request(
+            config, request_admission, payload_bytes=len(encoded), max_output_tokens=1,
+            attempt=attempt,
+        )
+        request = urllib.request.Request(
+            f"{config.base_url}/decisions", data=encoded,
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            raw = urllib.request.urlopen(request, timeout=90).read()
+        except urllib.error.HTTPError as error:
+            _observe_remote_call(
+                config, usage_observer, completion=completion, outcome="http-error",
+                attempt=attempt, ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                http_status=error.code,
+            )
+            if error.code not in {429, 500, 502, 503, 504} or not delay:
+                break
+        except (OSError, urllib.error.URLError):
+            _observe_remote_call(
+                config, usage_observer, completion=completion, outcome="transport-error",
+                attempt=attempt, ambiguous_billable=True,
+            )
+            if not delay:
+                break
+        else:
+            try:
+                response = json.loads(raw)
+                if not isinstance(response, dict):
+                    raise ValueError("Expected an object")
+            except (ValueError, TypeError):
+                _observe_remote_call(
+                    config, usage_observer, completion=completion, outcome="invalid-response",
+                    attempt=attempt, ambiguous_billable=True,
+                )
+                # A malformed successful response might have been billed. Fail explicitly rather
+                # than charging again for a schema error that retrying cannot reliably resolve.
+                break
+            usage = response.get("usage")
+            _observe_remote_call(
+                config, usage_observer, completion=completion, outcome="response",
+                attempt=attempt, ambiguous_billable=not isinstance(usage, Mapping) or not usage,
+                model=str(response.get("model") or config.model),
+                reported_model=response.get("model"), service_tier=response.get("service_tier"),
+                usage=usage if isinstance(usage, Mapping) else {},
+            )
+            return response
+        if delay:
+            time.sleep(delay)
+    raise RemoteModelUnavailableError(
+        "The cleanup Decisions check was interrupted. Try again; accepted work is unchanged."
+    )

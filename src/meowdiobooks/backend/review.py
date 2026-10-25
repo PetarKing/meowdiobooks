@@ -13,6 +13,7 @@ import json
 import re
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 
@@ -21,6 +22,10 @@ class ReviewContractError(ValueError):
 
 
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
+    "ai-cleanup": {
+        "severity": "warning",
+        "actions": ("keep", "repair", "rerun-extraction"),
+    },
     "stage-direction": {
         "severity": "warning",
         "actions": ("keep", "exclude", "narrate"),
@@ -86,6 +91,12 @@ _PERIPHERAL = re.compile(
     r"translation note|acknowledgements?|about the author|index|bibliography)\b",
     re.IGNORECASE,
 )
+_CREDIT_HEADING = re.compile(
+    r"^\s*(?:(?:(?:human|machine)\s+)?translated\s+by|proofread\s+by|"
+    r"japanese\s+to\s+english\s+checking\s+by|art\s+sources?)\s*:\s*$",
+    re.IGNORECASE,
+)
+_LINE_HYPHEN = re.compile(r"(?<![\w-])[A-Za-z]{2,}[-\u00ad][ \t\r]*\n[ \t]*[a-z]{2,}(?![\w-])")
 
 
 def build_review_workspace(
@@ -106,7 +117,7 @@ def build_review_workspace(
     occurrences: list[dict[str, Any]] = []
     coverage_failures = _coverage_occurrences(blocks, spans)
     occurrences.extend(_empty_occurrences(blocks))
-    occurrences.extend(_text_occurrences(blocks))
+    occurrences.extend(_text_occurrences(blocks, spans))
     occurrences.extend(_stage_direction_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
@@ -168,6 +179,139 @@ def preview_bulk_decision(
         "consequence": consequence,
         "previewToken": token,
     }
+
+
+def add_cleanup_proposals(
+    workspace: Mapping[str, Any], extraction: Mapping[str, Any],
+    dialogue: Mapping[str, Any], result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Attach validated model suggestions without changing any accepted source."""
+    blocks = _normalise_blocks(extraction)
+    index = {str(block["id"]): block for block in blocks}
+    rows = []
+    for proposal in result.get("occurrences", []):
+        block = index.get(str(proposal.get("blockId", "")))
+        start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
+        if (block is None or type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(block["text"])
+                or block["text"][start:end] != proposal.get("source")):
+            raise ReviewContractError("Cleanup proposal does not match its exact source")
+        replacement = proposal.get("replacement")
+        if replacement is not None and not isinstance(replacement, str):
+            raise ReviewContractError("Cleanup replacement must be text or null")
+        if replacement == proposal["source"]:
+            raise ReviewContractError("Cleanup proposal must change the highlighted text")
+        if replacement is not None and not any(
+            str(span.get("blockId")) == str(block["id"])
+            and int(span.get("spokenStart", span.get("sourceStart", 0))) <= start
+            and end <= int(span.get("spokenEnd", span.get("sourceEnd", 0)))
+            for span in dialogue.get("spans", [])
+        ):
+            raise ReviewContractError("Cleanup repairs must stay inside one spoken source span")
+        row = _occurrence("ai-cleanup", str(block["id"]), start, end,
+                          proposal["source"], int(block["page"]),
+                          str(proposal.get("reason") or "Check this text against the source."),
+                          block_text=block["text"])
+        row.update({"replacement": replacement,
+                    "proposalStatus": "proposed" if replacement is not None else "source_review",
+                    "model": "gpt-6-luna",
+                    "availableActions": ["keep", "repair"] if replacement is not None
+                    else ["keep", "rerun-extraction"]})
+        # Even identical source strings can have different suggested replacements.
+        row["matchKey"] = _digest([row["source"], replacement])
+        rows.append(row)
+    if len({row["id"] for row in rows}) != len(rows):
+        raise ReviewContractError("Cleanup proposals repeat a source range")
+    for index, row in enumerate(rows):
+        if any(row["blockId"] == other["blockId"]
+               and max(row["sourceStart"], other["sourceStart"])
+               < min(row["sourceEnd"], other["sourceEnd"])
+               for other in rows[:index]):
+            raise ReviewContractError("Cleanup proposals overlap")
+    _add_adjacent_context(rows, blocks)
+    # Preserve deterministic IDs and grouping/history. A model can add a correction to an
+    # existing finding without creating a second decision about the same defect.
+    warnings = deepcopy(list(workspace.get("warnings", [])))
+    existing = [(warning, occurrence) for warning in warnings
+                for occurrence in warning.get("occurrences", [])
+                if occurrence.get("kind") != "ai-cleanup"]
+    novel = []
+    for row in rows:
+        exact = [(warning, occurrence, row["replacement"])
+                 for warning, occurrence in existing
+                 if all(occurrence.get(key) == row[key]
+                        for key in ("blockId", "sourceStart", "sourceEnd", "source"))]
+        matches = exact or _project_cleanup_anchor(row, existing)
+        if len(matches) != 1:
+            # Partial overlaps or multiple possible owners are not proof of one issue.
+            # Keep the usable proposal; never silently discard a correction.
+            novel.append(row)
+            continue
+        warning, occurrence, replacement = matches[0]
+        cleanup_reason = row["reason"]
+        if occurrence.get("cleanupReason") and occurrence["cleanupReason"] != cleanup_reason:
+            cleanup_reason = f"{occurrence['cleanupReason']}\n{cleanup_reason}"
+        occurrence.update({
+            "replacement": replacement, "proposalStatus": row["proposalStatus"],
+            "model": row["model"], "cleanupReason": cleanup_reason,
+            "matchKey": _digest([occurrence["source"], replacement]),
+        })
+        if replacement is not None:
+            occurrence["availableActions"] = list(dict.fromkeys(
+                [*occurrence["availableActions"], "repair"]
+            ))
+        warning["decisionScope"] = "occurrence"
+        # A group with mixed reader roles must not label every occurrence as mixed.
+        # Its row states were derived from each exact source range during detection.
+        for member in warning["occurrences"]:
+            if member.get("readerState") == "narrator":
+                member["availableActions"] = [action for action in member["availableActions"]
+                                              if action != "narrate"]
+        warning["availableActions"] = list(dict.fromkeys(
+            action for member in warning["occurrences"] for action in member["availableActions"]
+        ))
+    warnings.extend(_group_occurrences(novel, dialogue.get("spans", [])))
+    return {**dict(workspace), "warnings": warnings,
+            "cleanupSummary": dict(result.get("summary", {})),
+            "summary": {**workspace["summary"], "groups": len(warnings),
+                        "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
+
+
+def _project_cleanup_anchor(
+    proposal: Mapping[str, Any],
+    existing: Sequence[tuple[dict[str, Any], dict[str, Any]]],
+) -> list[tuple[dict[str, Any], dict[str, Any], str | None]]:
+    """Remove unchanged disambiguating context around one known deterministic issue.
+
+    Do not trim a replacement to its minimal character difference: that would turn a whole-word
+    source anchor into a deletion of a hyphen. Preserve the deterministic evidence range instead.
+    """
+    replacement = proposal.get("replacement")
+    if replacement is None:
+        # An unrepairable subrange is additional evidence for the containing source warning,
+        # not a second cleanup decision. A unique owner is still required by the caller.
+        return [(warning, occurrence, None) for warning, occurrence in existing
+                if occurrence.get("blockId") == proposal["blockId"]
+                and occurrence["sourceStart"] <= proposal["sourceStart"]
+                < proposal["sourceEnd"] <= occurrence["sourceEnd"]]
+    if not isinstance(replacement, str):
+        return []
+    result = []
+    for warning, occurrence in existing:
+        if (occurrence.get("blockId") != proposal["blockId"]
+                or not proposal["sourceStart"] <= occurrence["sourceStart"]
+                < occurrence["sourceEnd"] <= proposal["sourceEnd"]):
+            continue
+        left = occurrence["sourceStart"] - proposal["sourceStart"]
+        right = occurrence["sourceEnd"] - proposal["sourceStart"]
+        prefix, suffix = proposal["source"][:left], proposal["source"][right:]
+        if (len(replacement) < len(prefix) + len(suffix)
+                or not replacement.startswith(prefix) or not replacement.endswith(suffix)):
+            continue
+        middle = replacement[len(prefix):len(replacement) - len(suffix) if suffix else None]
+        if middle != occurrence["source"]:
+            result.append((warning, occurrence, middle))
+    return result
 
 
 def accept_review_revision(
@@ -237,6 +381,7 @@ def accept_review_revision(
         "dialogueRevision": str(workspace["dialogueRevision"]),
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
+        "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
         "decisions": ordered,
         "consequencePreview": _aggregate_consequences(ordered),
         "requiresNewUpstreamRevision": any(row["action"] in _UPSTREAM_ACTIONS for row in ordered),
@@ -316,7 +461,119 @@ def apply_review_render_policies(
             action = owner[2] if owner is not None else "keep"
             occurrence_id = owner[3] if owner is not None else None
             result.append(_review_policy_span(span, piece_start, piece_end, action, occurrence_id))
-    return {**dict(dialogue), "spans": result}
+    return {**dict(dialogue), "spans": _apply_cleanup_repairs(result, review)}
+
+
+def _repair_text(span: Mapping[str, Any], edits: Sequence[Mapping[str, Any]]) -> str:
+    start = int(span.get("sourceStart", 0))
+    source = str(span.get("source", ""))
+    spoken_start = int(span.get("spokenStart", start))
+    spoken_end = int(span.get("spokenEnd", span.get("sourceEnd", start + len(source))))
+    text = source[spoken_start - start:spoken_end - start]
+    last = spoken_end
+    for edit in sorted(edits, key=lambda row: row["sourceStart"], reverse=True):
+        left, right = int(edit["sourceStart"]), int(edit["sourceEnd"])
+        if (span.get("blockId") != edit.get("blockId")
+                or not spoken_start <= left < right <= last
+                or source[left - start:right - start] != edit.get("source")
+                or not isinstance(edit.get("replacement"), str)):
+            raise ReviewContractError("Cleanup repair no longer matches its spoken source range")
+        text = text[:left - spoken_start] + edit["replacement"] + text[right - spoken_start:]
+        last = left
+    return text
+
+
+def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
+    occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])}
+    result = {}
+    for decision in review.get("decisions", []):
+        if decision.get("action") != "repair":
+            continue
+        key = str(decision["occurrenceId"])
+        row = occurrences.get(key)
+        if (row is None or row.get("proposalStatus") != "proposed"
+                or "repair" not in row.get("availableActions", [])
+                or not isinstance(row.get("replacement"), str)):
+            raise ReviewContractError("Repair requires a durable cleanup proposal")
+        result[key] = row
+    return result
+
+
+def _apply_cleanup_repairs(
+    spans: Sequence[Mapping[str, Any]], review: Mapping[str, Any],
+) -> list[dict[str, Any]]:
+    edits = _accepted_repairs(review)
+    assigned: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
+    for key, edit in edits.items():
+        overlaps = [(index, span) for index, span in enumerate(spans)
+                    if span.get("blockId") == edit.get("blockId")
+                    and max(int(span["sourceStart"]), int(edit["sourceStart"]))
+                    < min(int(span["sourceEnd"]), int(edit["sourceEnd"]))]
+        if overlaps and all(span.get("reviewAction") == "exclude" for _, span in overlaps):
+            # An explicit removal makes a proposed spelling fix irrelevant to narration.
+            continue
+        if len(overlaps) != 1:
+            raise ReviewContractError("Cleanup repair crosses another review decision; keep it or revise that decision")
+        index, span = overlaps[0]
+        _repair_text(span, [edit])
+        assigned[index].append({**edit, "id": key})
+    result = []
+    for index, raw in enumerate(spans):
+        span = dict(raw)
+        if index in assigned:
+            span["text"] = _repair_text(span, assigned[index])
+            span["reviewRepairs"] = [row["id"] for row in assigned[index]]
+            span["reviewAction"] = "repair" if span["text"].strip() else "exclude"
+            span["reviewRevision"] = review.get("revision")
+            if span["reviewAction"] == "exclude":
+                span["renderRole"] = "narration"
+            span["origin"] = "review:repair"
+        result.append(span)
+    return result
+
+
+def review_source_validation_view(
+    dialogue: Mapping[str, Any], review: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Verify accepted replacements, then expose original playable text to source validators."""
+    edits = _accepted_repairs(review)
+    spans = []
+    seen: set[str] = set()
+    for raw in dialogue.get("spans", []):
+        span = dict(raw)
+        ids = span.get("reviewRepairs", [])
+        if ids:
+            if (span.get("reviewRevision") != review.get("revision")
+                    or any(key not in edits or key in seen for key in ids)):
+                raise ReviewContractError("Rendered cleanup is not bound to the accepted review")
+            if _repair_text(span, [edits[key] for key in ids]) != span.get("text"):
+                raise ReviewContractError("Rendered cleanup differs from its accepted proposal")
+            seen.update(ids)
+            start = int(span.get("sourceStart", 0))
+            left = int(span.get("spokenStart", start)) - start
+            right = int(span.get("spokenEnd", span["sourceEnd"])) - start
+            span["text"] = str(span["source"])[left:right]
+        spans.append(span)
+    # Accepted edits cannot disappear merely because a renderer omitted their metadata.
+    # Only an explicit source exclusion can make a repair irrelevant to narration.
+    occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])}
+    excluded = [occurrences[str(row["occurrenceId"])] for row in review.get("decisions", [])
+                if row.get("action") == "exclude" and str(row.get("occurrenceId")) in occurrences]
+    for key in set(edits) - seen:
+        edit = edits[key]
+        cursor = int(edit["sourceStart"])
+        for row in sorted(excluded, key=lambda row: row["sourceStart"]):
+            if row.get("blockId") == edit.get("blockId") and int(row["sourceStart"]) <= cursor:
+                cursor = max(cursor, int(row["sourceEnd"]))
+        owners = [span for span in spans if span.get("blockId") == edit.get("blockId")
+                  and max(int(span["sourceStart"]), int(edit["sourceStart"]))
+                  < min(int(span["sourceEnd"]), int(edit["sourceEnd"]))]
+        if (cursor < int(edit["sourceEnd"]) or not owners
+                or any(span.get("reviewAction") != "exclude" for span in owners)):
+            raise ReviewContractError("Accepted cleanup repair is missing from the rendered transcript")
+    return {**dict(dialogue), "spans": spans}
 
 
 def preview_review_transcript_page(
@@ -327,6 +584,7 @@ def preview_review_transcript_page(
     *,
     page: int,
     page_count: int | None = None,
+    occurrence_policies: Sequence[Mapping[str, Any]] = (),
 ) -> dict[str, Any]:
     """Render one read-only page of the would-be accepted audiobook transcript."""
 
@@ -354,11 +612,28 @@ def preview_review_transcript_page(
         warning = warnings.get(warning_id)
         if warning is None:
             raise ReviewContractError(f"Unknown Review warning group: {warning_id}")
+        if warning.get("decisionScope") == "occurrence" or warning.get("kind") == "ai-cleanup":
+            raise ReviewContractError("Occurrence-scoped warnings require individual preview policies")
         for occurrence in warning.get("occurrences", []):
             _validate_action(occurrence, action)
         chosen[warning_id] = action
 
-    missing = sorted(set(warnings) - set(chosen))
+    occurrence_groups = {key for key, warning in warnings.items()
+                         if warning.get("decisionScope") == "occurrence"
+                         or warning.get("kind") == "ai-cleanup"}
+    ai_occurrences = {str(row["id"]): row for key in occurrence_groups
+                      for row in warnings[key].get("occurrences", [])}
+    ai_chosen: dict[str, str] = {}
+    for policy in occurrence_policies:
+        key = str(policy.get("occurrenceId", ""))
+        if key not in ai_occurrences or key in ai_chosen:
+            raise ReviewContractError("Cleanup preview requires unique known occurrence IDs")
+        action = str(policy.get("action", ""))
+        _validate_action(ai_occurrences[key], action)
+        ai_chosen[key] = action
+    if set(ai_chosen) != set(ai_occurrences):
+        raise ReviewContractError("Every cleanup proposal must be decided before preview")
+    missing = sorted(key for key in warnings if key not in chosen and key not in occurrence_groups)
     if missing:
         raise ReviewContractError(
             "Every Review warning group must be decided before previewing the final transcript"
@@ -367,8 +642,9 @@ def preview_review_transcript_page(
     decisions = [
         {"occurrenceId": str(occurrence["id"]), "action": chosen[warning_id]}
         for warning_id, warning in warnings.items()
+        if warning_id not in occurrence_groups
         for occurrence in warning.get("occurrences", [])
-    ]
+    ] + [{"occurrenceId": key, "action": action} for key, action in ai_chosen.items()]
     rendered = apply_review_render_policies(
         dialogue,
         {"warningSnapshot": list(warnings.values()), "decisions": decisions},
@@ -632,8 +908,12 @@ def _stage_direction_occurrences(blocks, spans):
     return result
 
 
-def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    result = _footnote_occurrences(blocks)
+def _text_occurrences(
+    blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    numbered_edges = _numbered_edge_occurrences(blocks)
+    numbered_pages = {row["page"] for row in numbered_edges}
+    result = [*_footnote_occurrences(blocks), *_credit_occurrences(blocks, spans), *numbered_edges]
     edge_lines: dict[str, list[tuple[Mapping[str, Any], int, int, str]]] = defaultdict(list)
     page_blocks: dict[int, list[str]] = defaultdict(list)
     for block in blocks:
@@ -645,6 +925,14 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
         block_id = str(block["id"])
         is_first_block = block_id == siblings[0]
         is_last_block = block_id == siblings[-1]
+        for match in _LINE_HYPHEN.finditer(text):
+            occurrence = _from_match(
+                "suspicious-extraction", block, match,
+                "Possible line-wrapped word. Check the source before joining: a genuine "
+                "compound or interrupted speech must retain its hyphen. Do not exclude the word.",
+            )
+            occurrence["detectionRule"] = "line-wrap-hyphen"
+            result.append(occurrence)
         for line_index, match in enumerate(lines):
             value = match.group(0)
             stripped = value.strip()
@@ -684,7 +972,10 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
             is_edge = (is_first_block and line_index < 2) or (
                 is_last_block and line_index >= max(0, len(lines) - 2)
             )
-            if is_edge and _PAGE_NUMBER.fullmatch(stripped):
+            if (
+                is_edge and _PAGE_NUMBER.fullmatch(stripped)
+                and not (is_first_block and line_index < 2 and int(block["page"]) in numbered_pages)
+            ):
                 result.append(
                     _from_match("page-number", block, match, "Page-number-shaped edge line.")
                 )
@@ -702,10 +993,8 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
     for rows in edge_lines.values():
         if len({int(row[0]["page"]) for row in rows}) < 2:
             continue
-        repeated_top_title = (
-            len(rows[0][3].strip()) >= 12
-            and not re.search(r":\s*\[", rows[0][3])
-            and all(row[1] == 0 for row in rows)
+        repeated_top_title = _looks_like_running_title(rows[0][3]) and all(
+            row[1] == 0 for row in rows
         )
         if not (_looks_like_page_furniture(rows[0][3]) or repeated_top_title):
             continue
@@ -723,6 +1012,117 @@ def _text_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any
                 )
             )
     return result
+
+
+def _numbered_edge_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Find changing folios attached to a repeated publisher/edition label.
+
+    Keep each original evidence string and match key: digit normalization is only
+    detection evidence, never authority for an identical-evidence bulk decision.
+    """
+    pages: dict[int, list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
+    for block in blocks:
+        pages[int(block["page"])].extend(
+            (block, match) for match in re.finditer(r"[^\n]+", str(block["text"]))
+            if match.group().strip()
+        )
+    candidates: dict[tuple[str, int], list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
+    for page, lines in pages.items():
+        if not lines:
+            continue
+        # A numbered publisher footer is a stronger signal than an isolated
+        # numeral at the top of a page (often a chapter/section number).
+        block, match = lines[-1]
+        label = re.fullmatch(r"\s*(?P<label>[^\d\n]{3,60}?)\s*(?P<number>\d{1,4})\s*", match.group())
+        if label is None:
+            continue
+        name = label["label"].strip()
+        if any(not word[:1].isupper() for word in name.split()):
+            continue
+        if not (
+            re.search(r"\b(?:press|publishing|editions?|translations?)\b|mtls?\b", name, re.I)
+            or re.fullmatch(r"[A-Z][a-z]+[A-Z][A-Za-z]+", name)
+        ):
+            continue
+        key = (" ".join(name.casefold().split()), int(label["number"]) - page)
+        candidates[key].append((block, match))
+    result = []
+    for rows in candidates.values():
+        if len({int(block["page"]) for block, _ in rows}) < 2:
+            continue
+        for block, match in rows:
+            occurrence = _from_match(
+                "page-number", block, match,
+                "Numbered page-edge publisher label repeats with a consistent page offset.",
+            )
+            occurrence["detectionRule"] = "numbered-publisher-footer"
+            result.append(occurrence)
+    return result
+
+
+def _credit_occurrences(
+    blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
+) -> list[dict[str, Any]]:
+    """Keep contributor names with an explicit heading, bounded to its paragraph.
+
+    Do not infer continuation across source blocks or pages: a short name-shaped
+    line there may instead be a chapter title or story text.
+    """
+    result = []
+    for block in blocks:
+        text = str(block["text"])
+        lines = list(re.finditer(r"[^\n]+", text))
+        for index, match in enumerate(lines):
+            if not _CREDIT_HEADING.fullmatch(match.group()):
+                continue
+            if any(
+                str(span.get("blockId")) == str(block["id"])
+                and span.get("renderRole") == "dialogue"
+                and int(span.get("spokenStart", span.get("sourceStart", 0))) < match.end()
+                and int(span.get("spokenEnd", span.get("sourceEnd", 0))) > match.start()
+                for span in spans
+            ):
+                continue
+            end = match.end()
+            for following in lines[index + 1:]:
+                value = following.group().strip()
+                if (
+                    text[end:following.start()].count("\n") > 1
+                    or not _credit_name(value)
+                    or any(
+                        str(span.get("blockId")) == str(block["id"])
+                        and span.get("renderRole") == "dialogue"
+                        and int(span.get("sourceStart", 0)) < following.end()
+                        and int(span.get("sourceEnd", 0)) > following.start()
+                        for span in spans
+                    )
+                ):
+                    break
+                end = following.end()
+            occurrence = _occurrence(
+                "front-back-matter", str(block["id"]), match.start(), end,
+                text[match.start():end], int(block["page"]),
+                "Production credit heading and adjacent contributor names; verify before excluding.",
+                block_text=text,
+            )
+            occurrence["detectionRule"] = "production-credit-block"
+            result.append(occurrence)
+    return result
+
+
+def _credit_name(value: str) -> bool:
+    if (
+        not value or len(value) > 80 or _NOTE_SECTION_BOUNDARY.match(value)
+        or re.match(r"^(?:The|A|An)\s", value)
+    ):
+        return False
+    # Names/handles only. Quotes, sentence punctuation, scene separators and
+    # ordinary lowercase prose terminate the credit. This intentionally abstains
+    # on ambiguous multiline editorial disclaimers and contributor continuations.
+    words = value.split()
+    return len(words) <= 5 and all(
+        re.fullmatch(r"[A-Z@][\w'’.-]*", word) and not word.endswith(".") for word in words
+    )
 
 
 def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -788,7 +1188,9 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
                 pending_tail = None
                 line_index += 1
                 continue
-            if not _is_footnote_marker(stripped):
+            if not _is_footnote_marker(stripped) or (
+                not section_active and not re.match(r"^\s*(?:\[\d{1,3}\]|[*†‡])", stripped)
+            ):
                 line_index += 1
                 continue
 
@@ -869,12 +1271,20 @@ def _looks_like_page_furniture(value: str) -> bool:
     """Conservatively distinguish repeated furniture from repeated novel prose."""
     stripped = value.strip()
     folded = stripped.casefold()
-    if re.search(r":\s*\[", stripped):
+    if re.search(r":\s*\[", stripped) or stripped.startswith(('"', "'", "“", "‘", "「", "『")):
         return False
     if re.search(r"https?://|www\.|@\w|\b(?:translated|proofread|translation notes?|art sources?)\b", folded):
         return True
-    alphanumeric = sum(character.isalnum() for character in stripped)
-    return bool(stripped) and alphanumeric / len(stripped) < 0.35
+    return False
+
+
+def _looks_like_running_title(value: str) -> bool:
+    """Require a short title-shaped line, not just repeated first-page prose."""
+    stripped = value.strip()
+    if not 12 <= len(stripped) <= 100 or re.search(r'[\[\]"“”「」『』:!?.,;]', stripped):
+        return False
+    words = stripped.split()
+    return 2 <= len(words) <= 10 and sum(word[:1].isupper() for word in words) / len(words) >= 0.5
 
 
 def _metadata_occurrences(
@@ -1051,7 +1461,8 @@ def _group_occurrences(
                     action for action in available_actions if action != "narrate"
                 ]
             for occurrence in evidence_group:
-                occurrence["availableActions"] = list(available_actions)
+                if kind != "ai-cleanup":
+                    occurrence["availableActions"] = list(available_actions)
             suffix = (
                 f":{evidence_group[0]['matchKey']}"
                 if kind == "repeated-matter"
@@ -1067,6 +1478,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
+                        "occurrence" if kind == "ai-cleanup" else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"
@@ -1168,6 +1580,8 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
         "audio": (
             "excluded"
             if action == "exclude"
+            else "corrected"
+            if action == "repair"
             else "narrator"
             if action == "narrate"
             else "unchanged"
@@ -1180,7 +1594,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             else ["review", "cast", "script", "generate"]
             if action == "rerun-dialogue"
             else ["generate"]
-            if action in {"exclude", "narrate"}
+            if action in {"exclude", "narrate", "repair"}
             else []
         ),
     }

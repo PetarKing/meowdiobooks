@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from .dialogue import malformed_playable_spans
+from .review import ReviewContractError, review_source_validation_view
 
 
 class RecordingScriptContractError(ValueError):
@@ -42,7 +43,7 @@ def build_recording_script(
         )
     if str(cast.get("reviewRevision", review_revision)) != review_revision:
         raise RecordingScriptContractError("Cast does not reference the accepted Review revision")
-    malformed = malformed_playable_spans(dialogue)
+    malformed = malformed_playable_spans(review_source_validation_view(dialogue, review))
     if malformed:
         raise RecordingScriptContractError(
             f"Dialogue span {malformed[0].get('id', 'unknown')} has an invalid text range; "
@@ -70,6 +71,9 @@ def build_recording_script(
                 "text": text,
                 "sourceText": str(span.get("source", "")),
                 "provenance": (
+                    "review:repair:" + ",".join(span["reviewRepairs"])
+                    if span.get("reviewRepairs")
+                    else
                     "source-delimiter"
                     if span.get("origin") == "source-delimiter"
                     else f"review:{span.get('reviewOccurrenceId')}:exclude"
@@ -275,8 +279,12 @@ def recording_script_matches(
         "review": str(review.get("revision") or ""),
         "cast": str(cast.get("revision") or ""),
     }
+    try:
+        source_view = review_source_validation_view(dialogue, review)
+    except ReviewContractError:
+        return False
     return (
-        not malformed_playable_spans(dialogue)
+        not malformed_playable_spans(source_view)
         and not recording_script_blockers(script)
         and script.get("inputRevisions") == expected
     )

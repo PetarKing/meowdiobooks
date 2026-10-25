@@ -21,6 +21,15 @@ from meowdiobooks.backend.models import Job, LibraryExport
 from meowdiobooks.backend.review import ReviewContractError
 
 
+@pytest.fixture(autouse=True)
+def offline_cleanup_provider(monkeypatch):
+    """These lifecycle tests isolate provider behavior, tested in test_cleanup_remote."""
+    monkeypatch.setattr(
+        "meowdiobooks.backend.cleanup_remote.run_cleanup_review",
+        lambda *args, **kwargs: {"occurrences": [], "summary": {"inputWindows": 0}},
+    )
+
+
 def _pdf(text: str = "Subaru: [Run!]") -> bytes:
     output = BytesIO()
     canvas = Canvas(output)
@@ -1352,3 +1361,76 @@ def test_snapshot_excludes_candidates_bound_to_other_inputs(tmp_path, monkeypatc
         assert pending["review"]["revision"] == review["revision"]
         _accept(client, book_id, "review", review["revision"])
         assert client.get(f"/api/books/{book_id}/snapshot").json()["pendingCandidates"] == {}
+
+
+def test_cleanup_failure_retry_preview_acceptance_and_reopen(tmp_path, monkeypatch):
+    source = "Ada: [A bro-\nken sign.]"
+    monkeypatch.setattr("meowdiobooks.backend.app_v2.extract_full_document",
+                        lambda *_args: [{"page": 1, "text": source, "warnings": []}])
+    calls = []
+
+    def reviewer(_root, extraction, dialogue, report, **kwargs):
+        calls.append(kwargs)
+        if len(calls) == 1:
+            raise RuntimeError("Cleanup provider unavailable; retry review")
+        block = extraction['blocks'][0]
+        start = block['text'].index('bro-\nken')
+        return {'occurrences': [{'blockId': block['id'], 'sourceStart': start,
+                                'sourceEnd': start + 8, 'source': 'bro-\nken',
+                                'replacement': 'broken', 'reason': 'Line wrap.'}],
+                'summary': {'model': 'gpt-6-luna', 'inputWindows': 1, 'proposals': 1}}
+
+    observer, admission = lambda *_: None, lambda *_: None
+    app = create_app_v2(tmp_path, cleanup_reviewer=reviewer,
+                        cleanup_usage_observer=observer, cleanup_request_admission=admission)
+    with TestClient(app) as client:
+        book_id = client.post('/api/books/import',
+                              files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()['book']['id']
+        extraction = _process(client, book_id, 'extract', {'method': 'native'})
+        _accept(client, book_id, 'extract', extraction['revision'])
+        dialogue = _process(client, book_id, 'dialogue', {'strategy': 'narrate'})
+        _accept(client, book_id, 'dialogue', dialogue['revision'])
+        queued = client.post(f'/api/books/{book_id}/stages/review/process', json={'settings': {}})
+        failed = _wait(client, queued.json()['id'])
+        assert failed['status'] == 'failed'
+        snapshot = client.get(f'/api/books/{book_id}/snapshot').json()
+        assert 'review' not in snapshot['activeArtifacts']
+        assert 'review' not in snapshot['pendingCandidates']
+        result = _process(client, book_id, 'review', {})
+        candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{result['revision']}").json()
+        ai = next(row for warning in candidate['warnings'] for row in warning['occurrences']
+                  if row.get('proposalStatus'))
+        assert ai['kind'] == 'suspicious-extraction'
+        assert not any(w['kind'] == 'ai-cleanup' for w in candidate['warnings'])
+        assert ai['replacement'] == 'broken'
+        policies = [{'warningId': row['id'], 'action': 'keep'} for row in candidate['warnings']
+                    if row.get('decisionScope') != 'occurrence']
+        preview = client.post(f'/api/books/{book_id}/review/transcript-preview', json={
+            'revision': result['revision'], 'page': 1, 'policies': policies,
+            'occurrencePolicies': [{'occurrenceId': ai['id'], 'action': 'repair'}],
+        })
+        assert preview.status_code == 200, preview.text
+        assert any(row['text'] == 'A broken sign.' for row in preview.json()['spans'])
+        choices = [{'occurrenceIds': [row['id']],
+                    'action': 'repair' if row.get('proposalStatus') == 'proposed' else 'keep'}
+                   for warning in candidate['warnings'] for row in warning['occurrences']]
+        _accept(client, book_id, 'review', result['revision'], choices)
+        accepted = read_artifact(tmp_path / 'packages' / book_id, 'review')
+        assert accepted['cleanupSummary']['model'] == 'gpt-6-luna'
+        write_artifact(tmp_path / 'packages' / book_id, 'cast', {
+            'revision': 'cast-cleanup', 'dialogueRevision': dialogue['revision'],
+            'reviewRevision': accepted['revision'], 'identities': [], 'labelToCharacterId': {},
+        })
+        first_script = client.post(f'/api/books/{book_id}/recording-script/prepare')
+        second_script = client.post(f'/api/books/{book_id}/recording-script/prepare')
+        assert first_script.status_code == second_script.status_code == 200, first_script.text
+        assert first_script.json()['revision'] == second_script.json()['revision']
+        assert any(row['text'] == 'A broken sign.' for row in first_script.json()['entries'])
+        assert read_artifact(tmp_path / 'packages' / book_id, 'extraction')['revision'] == extraction['revision']
+        assert read_artifact(tmp_path / 'packages' / book_id, 'dialogue')['revision'] == dialogue['revision']
+    with TestClient(create_app_v2(tmp_path, cleanup_reviewer=reviewer)) as reopened:
+        snapshot = reopened.get(f'/api/books/{book_id}/snapshot').json()
+        assert snapshot['activeArtifacts']['review'] == accepted['revision']
+        assert 'review' not in snapshot['pendingCandidates']
+    assert len(calls) == 2
+    assert all(row['usage_observer'] is observer and row['request_admission'] is admission for row in calls)

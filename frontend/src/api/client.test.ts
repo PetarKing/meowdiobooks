@@ -1,3 +1,4 @@
+import { consolidatedCleanupWarning } from "../../design-kit/cleanupFixture";
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { HttpWizardApi, normalizeDialogueArtifact } from './client'
 
@@ -240,13 +241,21 @@ describe('HttpWizardApi', () => {
     }))
   })
 
+  it('serializes AI occurrence policies without expanding them to warning groups', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const occurrencePolicies = [{ occurrenceId: 'repair-1', action: 'repair' as const }, { occurrenceId: 'source-check', action: 'keep' as const }]
+    await new HttpWizardApi('/api').previewReviewTranscript('book-1', 'review-ai', 1, [], occurrencePolicies)
+    expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/review/transcript-preview', expect.objectContaining({ body: JSON.stringify({ revision: 'review-ai', page: 1, policies: [], occurrencePolicies }) }))
+  })
+
   it('normalizes the clean v2 snapshot into the frontend wizard contract', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
       book: {
         id: 'book-1', title: 'Alice', author: 'Lewis Carroll', source_name: 'alice.pdf', page_count: 120,
         accepted_stage_revisions: [{ stage: 'import', revision: 1 }, { stage: 'extract', revision: 1 }],
       },
-      activeArtifacts: { extraction: 'extract-1' }, pendingCandidates: { dialogue: { revision: 'dialogue-pending', status: 'candidate' } }, dialogue: {}, reviewWarnings: [],
+      activeArtifacts: { extraction: 'extract-1' }, pendingCandidates: { dialogue: { revision: 'dialogue-pending', status: 'candidate' } }, dialogue: {}, reviewWarnings: [consolidatedCleanupWarning],
       dialogueRecovery: {
         kind: 'malformed-playable-span', spanIds: ['span:p48-b2:1373-1372'], page: 48,
         availableActions: ['rerun-dialogue'],
@@ -263,6 +272,8 @@ describe('HttpWizardApi', () => {
       kind: 'malformed-playable-span', spanIds: ['span:p48-b2:1373-1372'], page: 48,
       availableActions: ['rerun-dialogue'],
     })
+    expect(snapshot.warnings[0]).toMatchObject({ decisionScope: "occurrence", readerState: "mixed" })
+    expect(snapshot.warnings[0].occurrences[2]).toMatchObject({ replacement: "", availableActions: ["keep", "repair"], readerState: "narrator", proposalStatus: "proposed" })
     expect(snapshot.chapters).toEqual([])
   })
 

@@ -4,9 +4,9 @@ English | [简体中文](README.zh-CN.md)
 
 ![Meowdiobooks — a local audiobook studio](docs/assets/meowdiobooks-hero.png)
 
-> **Alpha · macOS · Apple Silicon** — the complete workflow runs locally by default. This release is
-> for early adopters comfortable installing the documented local model stack and reviewing key
-> AI-assisted decisions. Book-length work stays private on your Mac and runs at its hardware speed.
+> **Alpha · macOS · Apple Silicon** — local audio production with cloud-assisted cleanup. This release
+> is for early adopters comfortable installing the documented local model stack and reviewing key
+> AI-assisted decisions. Review sends bounded book passages to OpenAI Luna and requires an API key.
 
 **Transform a raw PDF into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
 
@@ -24,9 +24,11 @@ source or making every decision on the user's behalf.
 - **Design or clone voices locally.** Tune Qwen voice traits, or provide a 3–30 second WAV, MP3 or
   FLAC sample. Local speech recognition drafts the sample transcript for correction, and the reviewed
   audio/text pair becomes that character's private, book-scoped voice reference.
-- **Local by default, cost-conscious when remote.** The complete workflow can run on a supported Mac.
-  For larger Dialogue reviews, an explicitly selected OpenAI-compatible profile sends only the
-  selected source passages to the configured provider and presents its estimated cost before the run.
+- **Local audio, cloud-assisted cleanup.** The application runs on a supported Mac. Review sends
+  bounded text passages to OpenAI Luna through the Decisions API and requests correction proposals
+  for flagged text. You can keep the original or accept proposals individually or together before
+  audio generation. An OpenAI API key is required for this pass; there is no local model fallback.
+  Dialogue attribution still offers its separately selected local or remote profile.
 
 ## See the workflow
 

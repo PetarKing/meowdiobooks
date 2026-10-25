@@ -39,7 +39,7 @@ Extract, Generate and Export use narrower variants because they do not publish s
 |---|---|---|
 | [Extract](01-extract.md) | Imported PDF → accepted page/block text | **NO AI** |
 | [Dialogue](02-dialogue.md) | Accepted extraction → narration/dialogue spans | **OPTIONAL AI** — only selected unresolved turns |
-| [Review](03-review.md) | Accepted Dialogue + warnings → explicit warning decisions | **NO AI** |
+| [Review](03-review.md) | Accepted Dialogue + warnings + cleanup proposals → explicit decisions | **AI REQUIRED** — Luna Decisions scan and flagged-text repair proposals; skipped during source-coverage recovery |
 | [Cast & Voices](04-cast-and-voices.md) | Literal labels → reviewed identities + accepted designed or cloned voice references | **AI REQUIRED** — text classification, voice suggestions and auditions; optional ASR draft for uploaded samples |
 | [Generate](06-generate.md) | Accepted artifacts → cached recording script → chapter WAVs | **AI REQUIRED** — TTS synthesis only |
 | [Export](07-export.md) | Selected current chapter WAVs → M4B or MP3 chapter ZIP | **NO AI** |
@@ -62,9 +62,9 @@ validation, hashing, regexes and file conversion are deterministic application w
 Dialogue has its own result review: the user inspects deterministic/AI dialogue results before
 accepting the Dialogue revision.
 
-The later Review phase is not a second dialogue acceptance. It handles seven consequence-oriented
+The later Review phase is not a second dialogue acceptance. It handles consequence-oriented
 warning types: empty page, suspicious extraction, reading order, repeated matter, page number,
-footnote and front/back matter. Chapter starts remain a separate binary decision. A malformed
+web address, footnote, front/back matter and AI cleanup. Chapter starts remain a separate binary decision. A malformed
 Extraction-to-Dialogue coverage invariant opens a recovery route instead of masquerading as another
 content warning.
 

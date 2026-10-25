@@ -1,3 +1,4 @@
+import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -2983,6 +2984,69 @@ describe('v2 wizard', () => {
 
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
     expect(screen.queryByText('Same decision for every heading?')).not.toBeInTheDocument()
+  })
+
+  it('restores AI cleanup proposals, accepts individual and bulk choices, and previews exact occurrence policies', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+      pendingCandidates: { review: { revision: 'review-ai', status: 'candidate' } },
+    }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-ai', warnings: [cleanupWarning], boundaryCandidates: [] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByText('broken')).toBeInTheDocument()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    const remaining = screen.getByRole('button', { name: 'Apply all corrections' })
+    expect(within(screen.getByRole('complementary', { name: 'Decision queue' })).getByRole('button', { name: 'Apply all corrections' })).toBe(remaining)
+    expect(remaining.closest('.resolution-panel')).toBeNull()
+    const individualActions = [...screen.getByRole('button', { name: /^Apply correction/ }).parentElement!.querySelectorAll('button')]
+    expect(individualActions.map((button) => button.textContent)).toEqual([expect.stringContaining('Apply correction'), expect.stringContaining('Keep original text')])
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    expect(screen.getByText('Remove the flagged text from the audiobook transcript.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Apply all corrections' }))
+    expect(screen.getByRole('button', { name: 'Apply all corrections' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: /^Apply correction/ })).not.toBeInTheDocument()
+    expect(screen.getByText('No correction was proposed. Check the source before keeping this text or trying extraction again.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-ai', 1, [], [
+      { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-ai', [
+      { occurrenceIds: ['join'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
+    ]))
+    expect(wizardApi.previewReviewBulk).not.toHaveBeenCalled()
+  })
+
+  it('reviews consolidated corrections inside a deterministic category with ordinary per-row choices', async () => {
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-consolidated', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-consolidated', warnings: [consolidatedCleanupWarning], boundaryCandidates: [] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByText('broken')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'AI cleanup' })).not.toBeInTheDocument()
+    expect(screen.getByText('Join a word split across a printed line.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    expect(screen.queryByLabelText('Proposed correction')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Keep as is/ })).toHaveTextContent('current reader')
+    expect(screen.queryByRole('button', { name: /^Keep with narrator/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Leave out/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Apply all corrections' }))
+    expect(screen.getByRole('button', { name: 'Apply all corrections' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-consolidated', 1, [], [
+      { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'ordinary', action: 'exclude' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
+    ])
   })
 
   it('shows the complete read-only transcript beside the synchronized PDF page', async () => {
