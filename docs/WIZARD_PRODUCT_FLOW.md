@@ -42,8 +42,9 @@ Before the wizard, **PDF intake** stores the exact PDF bytes and hash. **No AI.*
 1. **Extract** produces page/block text. **No AI.**
 2. **Dialogue** deterministically captures `Dr. Vey` and may ask Qwen who speaks the unlabelled quote
    if the user enables focused attribution. The accepted result owns exact source ranges.
-3. **Review** resolves a small set of source-quality warnings and chapter starts with explicit user
-   actions. **No AI.**
+3. **Review** resolves source-quality warnings and chapter starts with explicit user actions. Luna's
+   Decisions API scans bounded text, then Luna proposes corrections for flagged passages. Each
+   correction can be applied or kept unchanged; a bulk action selects remaining undecided proposals.
 4. **Cast & Voices** asks Qwen about each literal label, the user confirms identities, and Qwen suggests
    editable voice settings. VoiceDesign produces designed auditions; alternatively, Qwen3-ASR drafts
    an uploaded sample's transcript for user correction and Qwen Base produces a cloned audition. The
@@ -59,8 +60,9 @@ voice revisions. Detailed prompt/input/output examples live in each linked phase
 ## AI boundary at a glance
 
 ```text
-Deterministic only:  PDF intake → Extract → Review → recording-script/render-plan compilation → Export
+Deterministic only:  PDF intake → Extract → recording-script/render-plan compilation → Export
 Optional text AI:   Dialogue attribution
+Required in Review: Luna Decisions scan → flagged-text repair proposals (except coverage recovery)
 Required in Cast:   label classification → voice suggestion → VoiceDesign or sample-cloned audition
 Optional in Cast:   Qwen3-ASR editable transcript draft for an uploaded sample
 Required in audio:  Qwen Base synthesis during Generate
@@ -70,8 +72,8 @@ Every semantic model result is reviewed before acceptance. PDF intake accepts ve
 Extract uses pre-run page previews and publishes the complete run atomically; Generate publishes only
 a complete playable chapter, which is then reviewed by listening. The dedicated **Review** phase is
 different: it resolves empty-page, suspicious-extraction, reading-order, repeated-matter, page-number,
-footnote and front/back-matter warnings after Dialogue has been reviewed. A source-coverage invariant
-failure routes to upstream recovery rather than becoming an eighth warning category.
+web-address, footnote, front/back-matter and AI-cleanup warnings after Dialogue has been reviewed.
+A source-coverage invariant failure routes to upstream recovery rather than becoming a content warning.
 
 ## Non-negotiable invariants
 
