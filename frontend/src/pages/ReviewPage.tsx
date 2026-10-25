@@ -210,7 +210,9 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           <section className="review-evidence chapter-review-evidence">
             <div className="review-group-heading"><span><h2>{t("Chapter starts")}</h2></span><Tag tone="good">{t("Structure")}</Tag></div>
             <div className="occurrence-meta"><b>{t("Heading {{current}} of {{total}}", { current: activeBoundary + 1, total: boundaries.length })}</b><span>{t("Page {{page}}", { page: boundary.page })}</span></div>
+            <div className="source-window" aria-label={t("Manuscript context")}><div className="context-boundary">{t("Text immediately before")}</div><p className="context">{boundary.contextBefore || t("No earlier text is available in this preview.")}</p></div>
             <div className="chapter-heading-evidence" aria-label={t("Chapter heading evidence")}><span>{t("Possible chapter heading")}</span><i aria-hidden="true">✦</i><h3>{boundary.source}</h3><p>{t(userFacingDetail(boundary.reason, "Detected from an explicit standalone chapter heading."))}</p></div>
+            <div className="source-window"><div className="context-boundary">{t("Text immediately after")}</div><p className="context">{boundary.contextAfter || t("No later text is available in this preview.")}</p></div>
             <p className="evidence-help">{t("This sets where the next audio chapter begins. The heading text stays unchanged.")}</p>
             <div className="warning-nav"><button disabled={activeBoundary === 0} onClick={() => setActiveBoundary(activeBoundary - 1)}>← {t("Previous heading")}</button><button disabled={activeBoundary >= boundaries.length - 1} onClick={() => setActiveBoundary(activeBoundary + 1)}>{t("Next heading")} →</button></div>
           </section>

@@ -26,6 +26,16 @@ its exact source range and replacement. A deletion can remove real story content
 is exact, so users should inspect proposals before accepting them. The transcript preview includes
 selected repairs before publication.
 
+## Surrounding source context
+
+All Review warning categories and chapter starts include nearby source sentences, including adjacent
+extraction blocks even when the local context is only a speaker label or whitespace. The preview aims
+for roughly 180 characters on each side, extending to a sentence boundary within 600 characters.
+Longer excerpts show an ellipsis; paragraph breaks remain visible. Only the flagged range is editable.
+This display context does not change classifier prompts, source anchors, choices, or bulk behavior.
+Existing saved Extraction candidates gain context when Review is run; already saved Review candidates
+retain their original snapshot until regenerated.
+
 ## Script directions
 
 A separate **Script directions** review group contains only verified delivery-cue suggestions.

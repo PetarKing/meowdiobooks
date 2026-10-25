@@ -218,3 +218,18 @@ def test_separate_explicit_passage_exclusion_retains_existing_cross_category_pre
     script = build_recording_script(rendered, review, {'revision': 'c1'}, revision='s1')
     assert all(row['kind'] == 'omission' for row in script['entries'])
     assert ''.join(row['sourceText'] for row in script['entries']) == block['text']
+
+
+def test_verified_cue_review_keeps_full_sentence_and_neighboring_block_context():
+    spoken = 'Stay close and ' + 'watch the shadows along the narrow passage ' * 5 + 'until I return.'
+    extraction, dialogue, workspace, _ = fixture((
+        'MARA: [said softly] ' + spoken,
+        'BOB: [whispering] I will wait beside the door.',
+    ))
+    first, second = cues(workspace)
+    assert spoken in first['contextAfter']
+    assert 'MARA:' in second['contextBefore']
+    assert spoken in second['contextBefore']
+    assert first['source'] == '[said softly]'
+    assert first['sourceStart'] == 6
+    assert workspace['sourceReconstruction']['status'] == 'exact'

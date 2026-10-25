@@ -255,6 +255,8 @@ export interface ReviewWarning {
 }
 
 export interface BoundaryCandidate {
+  contextBefore?: string;
+  contextAfter?: string;
   id: string;
   page: number;
   source: string;

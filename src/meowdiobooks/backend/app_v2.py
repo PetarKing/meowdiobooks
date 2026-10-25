@@ -732,7 +732,6 @@ def create_app_v2(
                 **workspace,
                 "revision": revision,
                 "status": "candidate",
-                "boundaryCandidates": extraction.get("boundaryCandidates", []),
             },
             publish=False,
         )
