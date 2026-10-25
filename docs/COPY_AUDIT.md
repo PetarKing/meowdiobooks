@@ -75,3 +75,9 @@ checks, and all 96 `visual:review` cases across light/dark desktop/mobile. The l
 Storybook run used installed Chrome; consumer/visual gates used the pinned Playwright
 browser downloaded into a temporary directory. Synthetic consumer assertions now expect
 the safe progress fallback instead of raw internal job wording.
+
+Combined-release review with EPUB/text import support replaced PDF-specific Review and recovery
+instructions with source-document wording. Reviewed import errors retain their useful format,
+encoding, size, and empty-document guidance in both languages; technical diagnostics remain hidden.
+After these integration edits, the full frontend suite passed 465 tests, build and lint passed,
+and 12 bilingual desktop/mobile Review and recovery screens passed browser verification.

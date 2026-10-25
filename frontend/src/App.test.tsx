@@ -516,7 +516,7 @@ describe('v2 wizard', () => {
     await open(recoverySnapshot)
 
     expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
-    expect(screen.getByText('Part of the transcript on page 48 could not be matched to your PDF. No audio was generated or changed.')).toBeInTheDocument()
+    expect(screen.getByText('Part of the transcript on page 48 could not be matched to your source document. No audio was generated or changed.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Complete' })).toHaveClass('active')
     expect(screen.queryByRole('button', { name: /Generate .* selected/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cast & voices Complete' }))
@@ -3293,7 +3293,7 @@ describe('v2 wizard', () => {
     expect(within(excerpt).getByText('Text immediately after')).toBeInTheDocument()
     expect(screen.queryByText('SOURCE EVIDENCE')).not.toBeInTheDocument()
     expect(screen.queryByText('PROPOSED OUTCOME')).not.toBeInTheDocument()
-    expect(screen.getByText('Does this text match the PDF?')).toBeInTheDocument()
+    expect(screen.getByText('Does this text match the source?')).toBeInTheDocument()
 
     const choices = screen.getAllByRole('button').filter((button) => ['Keep as is', 'Leave out', 'Use narrator instead'].includes(button.querySelector('b')?.textContent ?? ''))
     expect(choices.map((button) => button.querySelector('b')?.textContent)).toEqual([

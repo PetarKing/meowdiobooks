@@ -34,7 +34,11 @@ export function message(reason: unknown) {
   if (/Could not remove this book's working files/i.test(raw)) return "errors.deleteWorkingData";
   if (/No voice auditions could be created/i.test(raw)) return "No voice auditions could be created. Try again; your accepted choices are unchanged.";
   if (/network|failed to fetch|load failed|connection|offline|timed? out|timeout/i.test(raw)) return "The connection was interrupted. Check your connection and try again. Your accepted work is unchanged.";
-  if (/source integrity|imported PDF.*(?:missing|integrity)|Extraction requires an imported PDF|Accept import first/i.test(raw)) return "Import the PDF again before continuing.";
+  if (/source integrity|imported (?:PDF|source|document).*(?:missing|integrity)|Extraction requires an imported PDF|Accept import first/i.test(raw)) return "Import the source document again before continuing.";
+  if (raw === "Text file contains binary control characters") return "Save this file as plain UTF-8 text before importing.";
+  if (raw === "Unsupported text document format") return "Use a PDF, EPUB, TXT, or Markdown file";
+  if (raw === "EPUB archive must be 64 MiB or smaller") return "EPUB files must be 64 MiB or smaller.";
+  if (raw === "The EPUB archive is malformed or unsupported" || raw === "The uploaded file is not a valid EPUB") return "This EPUB could not be read. Try another copy of the book.";
   if (raw === "Export chapters are required") return "Choose a chapter to export.";
   if (/audition recipe changed|complete audition pack/i.test(raw)) return "Your voices need refreshing before you continue.";
   if (/require an editable (?:Voice draft|Cast candidate)/i.test(raw)) return "Reopen Cast & voices to change this audition.";
