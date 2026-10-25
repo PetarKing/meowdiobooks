@@ -41,11 +41,11 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
   if (kind === "reading-order" && action === "keep") return reviewText(t, "Accept the extracted order for all {{count}} highlighted locations.", { count });
   if (action === "keep" && readerState === "narrator") return reviewText(t, "{{subject}} will be read by the narrator.", { subject });
   return ({
-    repair: reviewText(t, "Apply this exact correction to the audiobook transcript. Your PDF stays unchanged."),
+    repair: reviewText(t, "Apply this exact correction to the audiobook transcript. Your source stays unchanged."),
     keep: reviewText(t, readerState === "mixed" || count > 1 ? "{{subject}} will keep their current readers." : "{{subject}} will keep its current reader.", { subject }),
-    exclude: reviewText(t, "{{subject}} will not be spoken. Your PDF stays unchanged.", { subject }),
+    exclude: reviewText(t, "{{subject}} will not be spoken. Your source stays unchanged.", { subject }),
     narrate: reviewText(t, "{{subject}} will be read by the narrator instead.", { subject }),
-    "rerun-extraction": reviewText(t, "Run extraction again from the same PDF."),
+    "rerun-extraction": reviewText(t, "Read the source again."),
     "rerun-dialogue": reviewText(t, "Rebuild who reads the detected dialogue."),
   } as Record<ReviewCapability, string>)[action];
 }
@@ -53,7 +53,7 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
 export function reviewQuestion(kind: string) {
   if (kind === "ai-cleanup") return "Apply this proposed correction?";
   if (kind === "empty-page") return "Is this page intentionally empty?";
-  if (kind === "suspicious-extraction") return "Does this text match the PDF?";
+  if (kind === "suspicious-extraction") return "Does this text match the source?";
   if (kind === "reading-order") return "Is this in the right reading order?";
   if (kind === "repeated-matter") return "Should listeners hear this repeated text?";
   if (kind === "page-number") return "Should listeners hear this page number?";
@@ -67,7 +67,7 @@ export function reviewGuidance(warning: ReviewWarning) {
   const guidance: Partial<Record<string, string>> = {
     "ai-cleanup": "OpenAI Decisions flags possible cleanup errors and Luna proposes corrections. Check each change against the source before applying it.",
     "empty-page": "No text was extracted from this page. Confirm it when the source page is intentionally blank or visual-only; try another extraction when visible words are missing.",
-    "suspicious-extraction": "Check whether the highlighted words match the PDF. Keep correct text, leave out debris, or try extraction again.",
+    "suspicious-extraction": "Check whether the highlighted words match the source. Keep correct text, leave out debris, or try extraction again.",
     "reading-order": "The extractor reported a possible column or reading-order problem. Accept it only when the highlighted source follows the order a listener should hear.",
     "repeated-matter": "This text repeats near page edges and may be a header or footer. Remove running matter; keep repeated prose that belongs to the story.",
     "page-number": "The highlighted value looks like a printed page number. Remove it unless it is meaningful story text.",

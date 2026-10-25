@@ -25,7 +25,7 @@ type GuideStage = Exclude<WizardStage, "import"> | "export";
 const guides: Record<GuideStage, PhaseGuide> = {
   extract: {
     number: "01", label: "Extract", title: "Check the reading order.",
-    intro: "Compare the PDF with the extracted text. Check for missing or out-of-order passages. Your accepted text is replaced only when the full extraction succeeds.",
+    intro: "Compare the source with the extracted text. Check for missing or out-of-order passages. Your accepted text is replaced only when the full extraction succeeds.",
     route: ["Start with LiteParse", "Compare the sample pages", "Try another parser if needed"],
     moves: [
       { cue: "A→B", title: "Follow the reading order", detail: "Columns, captions, headings, and footnotes should follow the reading order." },

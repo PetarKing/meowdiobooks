@@ -8,7 +8,7 @@ English | [简体中文](README.zh-CN.md)
 > is for early adopters comfortable installing the documented local model stack and reviewing key
 > AI-assisted decisions. Review sends bounded book passages to OpenAI Luna and requires an API key.
 
-**Transform a raw PDF into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
+**Transform a PDF, EPUB, or text file into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
 
 Meowdiobooks handles the production work between source and sound: extraction, dialogue attribution,
 character reconciliation, voice design or local cloning, chapter rendering and audiobook export. It is built for books that
@@ -79,7 +79,7 @@ is not speech, and narrator prose. The walkthrough shows the reviewed artifacts 
 the linked audio was generated from that accepted cast and render plan by the production renderer:
 
 ```text
-PDF → extracted text → dialogue attribution → character reconciliation → voice casting → WAV → M4B / MP3
+PDF / EPUB / text → source text → dialogue attribution → character reconciliation → voice casting → WAV → M4B / MP3
 ```
 
 | Source evidence | Accepted result | Audio behavior |
@@ -109,7 +109,9 @@ Generate → Export**. See the
 
 ## Alpha scope
 
-Today, Meowdiobooks supports local PDFs up to 500 MB on Apple Silicon Macs. PDF extraction,
+Meowdiobooks supports local PDF, EPUB, UTF-8 TXT, and Markdown files on Apple Silicon Macs.
+PDFs can be up to 500 MB; text files up to 20 MiB. EPUB archives are bounded to 2,000 entries,
+8 MiB per entry, 64 MiB expanded, and 20 MiB of readable text. PDF extraction,
 attribution, identity reconciliation, voice design and cloning, chapter generation, and audiobook export
 work. The alpha is intended for testing and refinement, not unattended production: results are probabilistic,
 persisted alpha data may break between versions, and there is no supported model installer yet.
@@ -178,7 +180,12 @@ an active generation remains owned by the original backend process.
 
 ## Limitations
 
-- PDF is the only input; encrypted PDFs are unsupported.
+- Encrypted PDFs and EPUBs are unsupported. EPUB reading sections must be XHTML; embedded
+  SVG, audio, video, objects, and XML entities are rejected. Image-only sections have no spoken
+  text; image descriptions are kept when supplied. Markdown is read literally as text.
+- EPUB and text imports skip Extract (shown disabled) and open Dialogue. Long passages use
+  stable reading sections rather than printed pages; Review keeps the source text visible.
+  EPUB spine order includes supplementary sections. Text imports use a default cover or your upload.
 - Image-only, malformed, multi-column, or layout-heavy PDFs may extract poorly or fail.
 - Dialogue attribution, character reconciliation, and voice design require review.
 - Heavy work is serialized for one local user and can take substantially longer than playback.
@@ -196,7 +203,7 @@ See [current coverage and review boundaries](docs/KNOWN_GENERALIZATION_RISKS.md)
 Meowdiobooks specializes in the complete transformation of dialogue-heavy PDFs into reviewable cast
 productions: page-aware extraction, source-anchored attribution, explicit uncertainty, identity and
 group reconciliation, voice auditions, chapter generation and audiobook export in one guided workflow. Its
-current input and hardware support are intentionally focused on PDFs and Apple Silicon.
+current hardware support is focused on Apple Silicon.
 
 Related open-source projects explore a broader audiobook-generation space:
 

@@ -66,7 +66,7 @@ describe("interface localization", () => {
       { page: 48 },
     )).toBe("此对话稿在第 48 页包含无效的文本范围。没有生成或更改任何音频。");
     expect(reviewConsequence("exclude", pageNumberWarning, i18n.t)).toBe(
-      "全部 2 处高亮文本不会被朗读。PDF 原文件保持不变。",
+      "全部 2 处高亮文本不会被朗读。源文件保持不变。",
     );
   });
 

@@ -3,6 +3,10 @@
 The local application uses its normal functions when no processor is supplied.
 Compositions can run these operations in restricted processes while retaining the
 same workflow artifacts. Authentication, sandbox policy and limits belong to the host.
+
+The PDF-named methods are retained for adapter compatibility: metadata and page text
+also dispatch EPUB/TXT/Markdown by source suffix. For these sources render_pdf_page
+returns a generated neutral cover; previews use inert sourceText instead of an image.
 """
 
 from __future__ import annotations

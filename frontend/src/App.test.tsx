@@ -105,6 +105,23 @@ async function open(
 describe('v2 wizard', () => {
   beforeEach(() => { vi.clearAllMocks(); localStorage.clear(); window.history.replaceState({}, "", "/"); vi.mocked(normalizeDialogueArtifact).mockReturnValue(undefined); vi.mocked(wizardApi.listBooks).mockResolvedValue([]); vi.mocked(wizardApi.listBookJobs).mockResolvedValue([]); vi.mocked(wizardApi.listLibrary).mockResolvedValue([]); vi.mocked(wizardApi.transcribeVoiceSample).mockResolvedValue({ text: 'Automatic draft.', language: 'English' }); vi.mocked(wizardApi.previewReviewTranscript).mockImplementation(async (_bookId, _revision, page) => ({ page, pageCount: 120, imageUrl: `/page-${page}.png`, published: false, summary: { spoken: 2, dialogue: 1, excluded: 0 }, spans: [{ id: `n-${page}`, kind: 'narration', reader: 'Narrator', text: 'Alice was beginning to get very tired.', blockId: `p${page}`, sourceStart: 0, sourceEnd: 39 }, { id: `d-${page}`, kind: 'dialogue', reader: 'Alice', text: 'What is the use of a book?', blockId: `p${page}`, sourceStart: 40, sourceEnd: 70 }] })) })
 
+  it.each(['epub', 'text'])('skips extraction and visibly disables it for %s imports and restores', async sourceKind => {
+    const snapshot = { ...base, book: { ...base.book, sourceKind, filename: `alice.${sourceKind === 'text' ? 'txt' : 'epub'}`, completedStages: ['import', 'extract'] as WizardStage[] }, generatedChapters: [] }
+    await open(snapshot)
+    expect(screen.getByRole('button', { name: 'Extract Not needed' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Dialogue In progress' })).toHaveAttribute('aria-current', 'step')
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('redirects an old Extract return hint for a text source to Dialogue', async () => {
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base, book: { ...base.book, sourceKind: 'text', completedStages: ['import', 'extract'] }, generatedChapters: [] })
+    render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'extract' }} />)
+    await screen.findByRole('button', { name: 'Dialogue In progress' })
+    expect(screen.getByRole('button', { name: 'Extract Not needed' })).toBeDisabled()
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+  })
+
   it('resolves export cover media only while Export is visible', async () => {
     const sourcePageImageUrl = vi.fn(() => '/host-cover.png')
     const gateway: WorkflowGateway = Object.assign(Object.create(wizardApi), { sourcePageImageUrl })
@@ -2352,7 +2369,7 @@ describe('v2 wizard', () => {
     render(<App />)
     const input = document.querySelector<HTMLInputElement>('input[type="file"]')
     fireEvent.change(input!, { target: { files: [new File(['pdf'], 'alice.pdf', { type: 'application/pdf' })] } })
-    fireEvent.click(screen.getByRole('button', { name: 'Import PDF →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Import book →' }))
     await screen.findByRole('navigation', { name: 'Wizard stages' })
     expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
     expect(screen.getByText('Step 1 · Extract')).toBeInTheDocument()
@@ -2427,7 +2444,7 @@ describe('v2 wizard', () => {
     expect(screen.getAllByText('12.0 MB used')).toHaveLength(1)
     expect(screen.getByText('120 pages · 12.0 MB')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Delete Alice' }))
-    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('PDF, extracted text, dialogue and cast choices, chapter audio, and saved progress')
+    expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('source file, extracted text, dialogue and cast choices, chapter audio, and saved progress')
     expect(screen.getByRole('dialog', { name: 'Delete “Alice”?' })).toHaveTextContent('Finished exports stay in Library.')
 
     fireEvent.click(screen.getByRole('button', { name: 'Delete working files' }))
@@ -3265,7 +3282,7 @@ describe('v2 wizard', () => {
     expect(within(excerpt).getByText('Text immediately after')).toBeInTheDocument()
     expect(screen.queryByText('SOURCE EVIDENCE')).not.toBeInTheDocument()
     expect(screen.queryByText('PROPOSED OUTCOME')).not.toBeInTheDocument()
-    expect(screen.getByText('Does this text match the PDF?')).toBeInTheDocument()
+    expect(screen.getByText('Does this text match the source?')).toBeInTheDocument()
 
     const choices = screen.getAllByRole('button').filter((button) => ['Keep as is', 'Leave out', 'Use narrator instead'].includes(button.querySelector('b')?.textContent ?? ''))
     expect(choices.map((button) => button.querySelector('b')?.textContent)).toEqual([

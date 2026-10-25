@@ -161,6 +161,22 @@ PDF extraction. Companion deployments must consume a new immutable release to ad
 The dependency rationale also includes pdfminer's
 [removal of unsafe pickle-based CMap loading](https://github.com/pdfminer/pdfminer.six/releases/tag/20251230).
 
+### EPUB and text imports
+
+EPUB, UTF-8 TXT, and Markdown retain the original source hash and bytes. Their deterministic
+`text-v1` reader publishes the normal Extraction artifact during import, before the import hook;
+the UI opens Dialogue and visibly disables Extract. Markdown stays literal. EPUB reads XHTML
+in spine order (including supplementary entries), retaining paragraph boundaries and image alt
+text. Long sections are split at newline/word boundaries up to 6,000 characters; section numbers
+occupy the existing page fields. Review returns inert `sourceText` instead of `imageUrl`, and
+export uses a generated cover or a supplied image. No source HTML is rendered or executed.
+
+All reads retain the optional FileProcessor boundary, including its legacy PDF-named methods.
+There is no host-to-local parsing fallback. ZIP members are never unpacked; paths, member count,
+per-member and cumulative expanded sizes, duplicate resources, XML entities, unsupported embedded
+content, invalid UTF-8 and empty text are validated. The new readers add no runtime dependencies.
+Import failure rolls back new extraction artifacts and restores pre-existing artifact pointers.
+
 ### Book-list fault isolation
 
 Book discovery validates each record and workspace independently. A malformed book is omitted from
