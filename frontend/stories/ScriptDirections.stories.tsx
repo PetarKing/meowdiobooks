@@ -27,6 +27,8 @@ export const Suggestions: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "Script directions" })).toBeVisible();
+    await expect(canvas.getByText(/The floorboards creaked/)).toBeVisible();
+    await expect(canvas.getByText(/If they hear us/)).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };

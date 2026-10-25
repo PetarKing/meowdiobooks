@@ -110,6 +110,8 @@ export function snapshotFor(id: ScenarioId): WizardSnapshot {
             source: c.title,
             page: c.startPage,
             reason: "Standalone heading in the source.",
+            contextBefore: "The room fell quiet as the last visitor left.",
+            contextAfter: "Morning came at last. Alice opened the curtains and looked out across the garden.",
           }))
         : [],
     reviewInspection: {

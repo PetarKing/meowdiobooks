@@ -3275,7 +3275,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({
       revision: 'review-2',
-      boundaryCandidates: [{ id: 'b1', page: 2, source: 'Chapter 1', reason: 'Standalone heading' }],
+      boundaryCandidates: [{ id: 'b1', page: 2, source: 'Chapter 1', reason: 'Standalone heading', contextBefore: 'The last visitor left.', contextAfter: 'Morning came at last.' }],
       warnings: [{
         id: 'matter', kind: 'repeated-matter', severity: 'warning', detail: 'Repeated edge text',
         availableActions: ['keep', 'exclude'], occurrences: [{ id: 'o1', page: 4, source: 'ALICE' }],
@@ -3291,6 +3291,8 @@ describe('v2 wizard', () => {
     expect(groups.closest('.review-queue')).toBeInTheDocument()
     expect(screen.getByText('Decision queue')).toBeInTheDocument()
 
+    expect(screen.getByText('The last visitor left.')).toBeInTheDocument()
+    expect(screen.getByText('Morning came at last.')).toBeInTheDocument()
     const workspace = document.querySelector('.review-workspace')
     fireEvent.click(within(groups).getByRole('button', { name: /Repeated page matter/ }))
     expect(await screen.findByText('ALICE')).toBeInTheDocument()

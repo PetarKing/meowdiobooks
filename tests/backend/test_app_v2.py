@@ -1536,3 +1536,23 @@ def test_verified_script_cues_failure_retry_manual_choice_and_recording(tmp_path
         assert snapshot['activeArtifacts']['review'] == accepted['revision']
         assert 'review' not in snapshot['pendingCandidates']
     assert len(calls) == 2
+
+
+def test_review_candidate_api_enriches_saved_extraction_chapter_context(tmp_path, monkeypatch):
+    pages = [{'page': 1, 'text': 'The last visitor left.\n\nCHAPTER II\n\nMorning came at last.', 'warnings': []}]
+    monkeypatch.setattr('meowdiobooks.backend.app_v2.extract_full_document',
+                        lambda *_args: pages)
+    with TestClient(create_app_v2(tmp_path)) as client:
+        imported = client.post('/api/books/import',
+            files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()
+        book_id = imported['book']['id']
+        extraction = _process(client, book_id, 'extract', {'method': 'native'})
+        _accept(client, book_id, 'extract', extraction['revision'])
+        dialogue = _process(client, book_id, 'dialogue', {'strategy': 'narrate'})
+        _accept(client, book_id, 'dialogue', dialogue['revision'])
+        review = _process(client, book_id, 'review', {})
+        candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{review['revision']}").json()
+        boundary = candidate['boundaryCandidates'][0]
+        assert boundary['source'] == 'CHAPTER II'
+        assert boundary['contextBefore'].strip() == 'The last visitor left.'
+        assert boundary['contextAfter'].strip() == 'Morning came at last.'

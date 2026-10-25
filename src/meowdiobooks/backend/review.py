@@ -16,6 +16,8 @@ from collections.abc import Mapping, Sequence
 from copy import deepcopy
 from typing import Any
 
+from .review_context import add_source_context
+
 
 class ReviewContractError(ValueError):
     """Raised when a Review revision would be ambiguous or lossy."""
@@ -120,8 +122,10 @@ def build_review_workspace(
     occurrences.extend(_text_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
-    _add_adjacent_context(occurrences, blocks)
+    add_source_context(occurrences, blocks)
     warnings = _group_occurrences(occurrences, spans)
+    boundaries = deepcopy(list(extraction.get("boundaryCandidates", [])))
+    add_source_context(boundaries, blocks)
 
     return {
         "contract": "meowdiobooks.review-workspace.v2",
@@ -143,6 +147,7 @@ def build_review_workspace(
             else None
         ),
         "warnings": warnings,
+        "boundaryCandidates": boundaries,
         "summary": {
             "groups": len(warnings),
             "occurrences": sum(len(row["occurrences"]) for row in warnings),
@@ -233,7 +238,7 @@ def add_cleanup_proposals(
                < min(row["sourceEnd"], other["sourceEnd"])
                for other in rows[:index]):
             raise ReviewContractError("Cleanup proposals overlap")
-    _add_adjacent_context(rows, blocks)
+    add_source_context(rows, blocks)
     # Preserve deterministic IDs and evidence. Repairable findings move into the AI
     # category, so the same defect never asks for two decisions.
     warnings = deepcopy(list(workspace.get("warnings", [])))
@@ -337,7 +342,7 @@ def _verified_script_occurrences(blocks, dialogue, result):
         # Identical cue words are not identical evidence in different story contexts.
         row["matchKey"] = _digest([row["blockId"], start, end, row["source"]])
         rows.append(row)
-    _add_adjacent_context(rows, blocks)
+    add_source_context(rows, blocks)
     return rows
 
 
@@ -1478,29 +1483,6 @@ def _deduplicate_occurrences(rows: Sequence[dict[str, Any]]) -> list[dict[str, A
         elif row["reason"] not in existing["reason"]:
             existing["reason"] += " " + row["reason"]
     return list(result.values())
-
-
-def _add_adjacent_context(
-    occurrences: Sequence[dict[str, Any]], blocks: Sequence[Mapping[str, Any]]
-) -> None:
-    """Fill missing context from neighboring non-empty extraction blocks."""
-    positions = {str(block["id"]): index for index, block in enumerate(blocks)}
-    for occurrence in occurrences:
-        position = positions.get(str(occurrence["blockId"]))
-        if position is None:
-            continue
-        if not occurrence["contextBefore"]:
-            for block in reversed(blocks[:position]):
-                text = str(block["text"]).strip()
-                if text:
-                    occurrence["contextBefore"] = text[-180:]
-                    break
-        if not occurrence["contextAfter"]:
-            for block in blocks[position + 1 :]:
-                text = str(block["text"]).strip()
-                if text:
-                    occurrence["contextAfter"] = text[:180]
-                    break
 
 
 def _group_occurrences(
