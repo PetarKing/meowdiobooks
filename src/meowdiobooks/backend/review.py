@@ -118,7 +118,6 @@ def build_review_workspace(
     coverage_failures = _coverage_occurrences(blocks, spans)
     occurrences.extend(_empty_occurrences(blocks))
     occurrences.extend(_text_occurrences(blocks, spans))
-    occurrences.extend(_stage_direction_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
     _add_adjacent_context(occurrences, blocks)
@@ -188,6 +187,7 @@ def add_cleanup_proposals(
     """Attach validated model suggestions without changing any accepted source."""
     blocks = _normalise_blocks(extraction)
     index = {str(block["id"]): block for block in blocks}
+    cue_rows = _verified_script_occurrences(blocks, dialogue, result.get("scriptDirections", {}))
     rows = []
     for proposal in result.get("occurrences", []):
         block = index.get(str(proposal.get("blockId", "")))
@@ -196,6 +196,11 @@ def add_cleanup_proposals(
                 or not 0 <= start < end <= len(block["text"])
                 or block["text"][start:end] != proposal.get("source")):
             raise ReviewContractError("Cleanup proposal does not match its exact source")
+        if "scriptDirections" in result:
+            from .script_cues import bracket_ranges
+            if any(max(start, left) < min(end, right)
+                   for left, right in bracket_ranges(block["text"])):
+                raise ReviewContractError("General cleanup cannot override protected bracketed content")
         replacement = proposal.get("replacement")
         if replacement is not None and not isinstance(replacement, str):
             raise ReviewContractError("Cleanup replacement must be text or null")
@@ -278,11 +283,108 @@ def add_cleanup_proposals(
         warning["availableActions"] = list(dict.fromkeys(
             action for member in members for action in member["availableActions"]
         ))
-    warnings.extend(_group_occurrences(novel, dialogue.get("spans", [])))
+    warnings.extend(_group_occurrences([*cue_rows, *novel], dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
             "cleanupSummary": dict(result.get("summary", {})),
+            "scriptDirectionsSummary": dict(result.get("scriptDirections", {}).get("summary", {})),
             "summary": {**workspace["summary"], "groups": len(warnings),
                         "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
+
+
+def _is_verified_cue(occurrence: Mapping[str, Any]) -> bool:
+    return (occurrence.get("kind") == "stage-direction"
+            and occurrence.get("cueVerification") == "verified")
+
+
+def _verified_script_occurrences(blocks, dialogue, result):
+    """Admit only exact eligible anchors from the dedicated conservative classifier."""
+    from .script_cues import script_cue_candidates
+
+    if not isinstance(result, Mapping):
+        raise ReviewContractError("Script directions result must be an object")
+    proposals = result.get("occurrences", [])
+    if not proposals:
+        return []
+    candidates = {
+        (row["blockId"], row["sourceStart"], row["sourceEnd"], row["source"])
+        for row in script_cue_candidates({"blocks": blocks}, dialogue)
+    }
+    by_id = {str(block["id"]): block for block in blocks}
+    rows = []
+    seen = set()
+    for proposal in proposals:
+        if not isinstance(proposal, Mapping):
+            raise ReviewContractError("Script direction proposal must be an object")
+        start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
+        if (type(start) is not int or type(end) is not int
+                or not isinstance(proposal.get("source"), str)):
+            raise ReviewContractError("Script direction proposal has an invalid source range")
+        anchor = (str(proposal.get("blockId", "")), start, end, proposal["source"])
+        if (anchor not in candidates or anchor in seen
+                or proposal.get("recommendedAction") != "exclude"
+                or proposal.get("policy") != "decisions-luna-script-directions-v1"
+                or proposal.get("model") != "gpt-6-luna"):
+            raise ReviewContractError("Script direction proposal does not match verified eligible source")
+        seen.add(anchor)
+        block = by_id[anchor[0]]
+        row = _occurrence("stage-direction", anchor[0], start, end, anchor[3],
+                          int(block["page"]),
+                          "AI checks agree this is a delivery instruction. Leave it unspoken or keep the original text.",
+                          block_text=block["text"])
+        row.update(cueVerification="verified", recommendedAction="exclude",
+                   policy=proposal["policy"], model=proposal["model"],
+                   availableActions=["keep", "exclude"])
+        # Identical cue words are not identical evidence in different story contexts.
+        row["matchKey"] = _digest([row["blockId"], start, end, row["source"]])
+        rows.append(row)
+    _add_adjacent_context(rows, blocks)
+    return rows
+
+
+def _validate_verified_cue_sources(dialogue, review, *, rendered=False):
+    """Bind cue omissions to exact immutable source and to their accepted choices."""
+    occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])}
+    cues = {key: row for key, row in occurrences.items() if _is_verified_cue(row)}
+    if not cues:
+        return
+    choices = {str(row.get("occurrenceId")): str(row.get("action"))
+               for row in review.get("decisions", [])}
+    spans = list(dialogue.get("spans", []))
+    for key, cue in cues.items():
+        start, end = cue["sourceStart"], cue["sourceEnd"]
+        owners = sorted((span for span in spans if span.get("blockId") == cue["blockId"]
+                         and max(start, int(span["sourceStart"])) < min(end, int(span["sourceEnd"]))),
+                        key=lambda span: int(span["sourceStart"]))
+        cursor, pieces = start, []
+        for span in owners:
+            left, right = max(start, int(span["sourceStart"])), min(end, int(span["sourceEnd"]))
+            if left != cursor:
+                raise ReviewContractError("Script direction no longer has exact source coverage")
+            pieces.append(str(span.get("source", ""))[left - int(span["sourceStart"]):right - int(span["sourceStart"])])
+            cursor = right
+            if rendered:
+                # Other explicit, narrower source policies retain their established precedence.
+                policies = [(row["sourceEnd"] - row["sourceStart"], choices[other_key])
+                            for other_key, row in occurrences.items()
+                            if choices.get(other_key) in {"exclude", "narrate"}
+                            and row.get("blockId") == cue["blockId"]
+                            and row["sourceStart"] <= left < right <= row["sourceEnd"]]
+                expected = min(policies)[1] if policies else "keep"
+                if span.get("reviewAction", "keep") != expected:
+                    raise ReviewContractError("Rendered script direction differs from its accepted choice")
+        if cursor != end or "".join(pieces) != cue.get("source"):
+            raise ReviewContractError("Script direction no longer matches its exact source")
+    if rendered:
+        for span in spans:
+            key = str(span.get("reviewOccurrenceId"))
+            if key not in cues:
+                continue
+            cue = cues[key]
+            if (choices.get(key) != "exclude" or span.get("reviewAction") != "exclude"
+                    or span.get("blockId") != cue["blockId"]
+                    or not cue["sourceStart"] <= int(span["sourceStart"]) < int(span["sourceEnd"]) <= cue["sourceEnd"]):
+                raise ReviewContractError("Rendered script direction omission exceeds its accepted source")
 
 
 def _project_cleanup_anchor(
@@ -373,6 +475,11 @@ def accept_review_revision(
                 "provenance": str(raw.get("provenance") or "user"),
             }
 
+    for key, occurrence in occurrence_index.items():
+        if key not in accepted and _is_verified_cue(occurrence):
+            accepted[key] = {"occurrenceId": key, "warningId": occurrence["warningId"],
+                             "action": "keep", "consequence": _consequence("keep", 1),
+                             "provenance": "preserve-undecided-script-direction"}
     missing = sorted(set(occurrence_index) - set(accepted))
     if missing:
         raise ReviewContractError(
@@ -390,6 +497,7 @@ def accept_review_revision(
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
         "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
+        "scriptDirectionsSummary": dict(workspace.get("scriptDirectionsSummary", {})),
         "decisions": ordered,
         "consequencePreview": _aggregate_consequences(ordered),
         "requiresNewUpstreamRevision": any(row["action"] in _UPSTREAM_ACTIONS for row in ordered),
@@ -413,6 +521,7 @@ def apply_review_render_policies(
     dialogue: Mapping[str, Any], review: Mapping[str, Any]
 ) -> dict[str, Any]:
     """Apply accepted exclude/narrate ranges without changing source coverage."""
+    _validate_verified_cue_sources(dialogue, review)
     occurrences = {
         str(row["id"]): row
         for warning in review.get("warningSnapshot", [])
@@ -545,6 +654,7 @@ def review_source_validation_view(
     dialogue: Mapping[str, Any], review: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Verify accepted replacements, then expose original playable text to source validators."""
+    _validate_verified_cue_sources(dialogue, review, rendered=True)
     edits = _accepted_repairs(review)
     spans = []
     seen: set[str] = set()
@@ -639,6 +749,9 @@ def preview_review_transcript_page(
         action = str(policy.get("action", ""))
         _validate_action(ai_occurrences[key], action)
         ai_chosen[key] = action
+    for key, occurrence in ai_occurrences.items():
+        if key not in ai_chosen and _is_verified_cue(occurrence):
+            ai_chosen[key] = "keep"
     if set(ai_chosen) != set(ai_occurrences):
         raise ReviewContractError("Every cleanup proposal must be decided before preview")
     missing = sorted(key for key in warnings if key not in chosen and key not in occurrence_groups)
@@ -873,47 +986,6 @@ def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         for page, page_blocks in by_page.items()
         if not any(str(block["text"]).strip() for block in page_blocks)
     ]
-
-
-def _stage_direction_occurrences(blocks, spans):
-    """Offer explicit script parentheticals for review; never strip prose globally."""
-    by_id = {str(block["id"]): block for block in blocks}
-    result = []
-    for span in spans:
-        prefix = str(span.get("source", ""))[:int(span.get("spokenStart", 0)) - int(span.get("sourceStart", 0))]
-        if span.get("origin") != "regex:label-colon-line" and not (
-            span.get("renderRole") == "dialogue" and re.fullmatch(r"\s*[^:()]+:\s*", prefix)
-        ):
-            continue
-        block = by_id.get(str(span.get("blockId")))
-        if block is None:
-            continue
-        text = str(block["text"])
-        start = int(span["spokenStart"])
-        end = int(span["spokenEnd"])
-        if not 0 <= start < end <= len(text):
-            # Existing coverage diagnostics own malformed source boundaries.
-            continue
-        depth = 0
-        cue_start = None
-        ranges = []
-        for offset in range(start, end):
-            if text[offset] == "(":
-                if depth == 0:
-                    cue_start = offset
-                depth += 1
-            elif text[offset] == ")" and depth:
-                depth -= 1
-                if depth == 0:
-                    ranges.append((cue_start, offset + 1))
-        for cue_start, cue_end in ranges:
-            result.append(_occurrence(
-                "stage-direction", str(block["id"]), cue_start, cue_end,
-                text[cue_start:cue_end], int(block["page"]),
-                "Parenthetical script direction. Leave delivery and sound cues unspoken, "
-                "or choose the narrator for descriptive action.", block_text=text,
-            ))
-    return result
 
 
 def _text_occurrences(
@@ -1469,8 +1541,10 @@ def _group_occurrences(
                     action for action in available_actions if action != "narrate"
                 ]
             for occurrence in evidence_group:
-                if kind != "ai-cleanup":
+                if kind != "ai-cleanup" and not _is_verified_cue(occurrence):
                     occurrence["availableActions"] = list(available_actions)
+            if kind == "stage-direction" and all(_is_verified_cue(row) for row in evidence_group):
+                available_actions = ["keep", "exclude"]
             suffix = (
                 f":{evidence_group[0]['matchKey']}"
                 if kind == "repeated-matter"
@@ -1486,7 +1560,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
-                        "occurrence" if kind == "ai-cleanup" else
+                        "occurrence" if kind == "ai-cleanup" or all(_is_verified_cue(row) for row in evidence_group) else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"

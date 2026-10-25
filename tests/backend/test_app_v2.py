@@ -1432,3 +1432,73 @@ def test_cleanup_failure_retry_preview_acceptance_and_reopen(tmp_path, monkeypat
         assert 'review' not in snapshot['pendingCandidates']
     assert len(calls) == 2
     assert all(row['usage_observer'] is observer and row['request_admission'] is admission for row in calls)
+
+
+def test_verified_script_cues_failure_retry_manual_choice_and_recording(tmp_path, monkeypatch):
+    from meowdiobooks.backend.script_cues import script_cue_candidates
+
+    source = 'ALICE: (said softly) Stay here.\nBOB: (said angrily) Go away.'
+    monkeypatch.setattr('meowdiobooks.backend.app_v2.extract_full_document',
+                        lambda *_args: [{'page': 1, 'text': source, 'warnings': []}])
+    calls = []
+
+    def reviewer(_root, extraction, dialogue, _report, **_kwargs):
+        calls.append(True)
+        if len(calls) == 1:
+            raise RuntimeError('Script direction verifier unavailable; retry review')
+        rows = [{**row, 'policy': 'decisions-luna-script-directions-v1',
+                 'model': 'gpt-6-luna', 'recommendedAction': 'exclude'}
+                for row in script_cue_candidates(extraction, dialogue)]
+        assert len(rows) == 2
+        return {'occurrences': [], 'scriptDirections': {'occurrences': rows,
+                'summary': {'candidates': 2, 'proposals': 2, 'kept': 0}}}
+
+    with TestClient(create_app_v2(tmp_path, cleanup_reviewer=reviewer)) as client:
+        book_id = client.post('/api/books/import',
+            files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()['book']['id']
+        extraction = _process(client, book_id, 'extract', {'method': 'native'})
+        _accept(client, book_id, 'extract', extraction['revision'])
+        dialogue = _process(client, book_id, 'dialogue', {'strategy': 'narrate'})
+        _accept(client, book_id, 'dialogue', dialogue['revision'])
+        queued = client.post(f'/api/books/{book_id}/stages/review/process', json={'settings': {}})
+        assert _wait(client, queued.json()['id'])['status'] == 'failed'
+        snapshot = client.get(f'/api/books/{book_id}/snapshot').json()
+        assert 'review' not in snapshot['activeArtifacts']
+        assert 'review' not in snapshot['pendingCandidates']
+        result = _process(client, book_id, 'review', {})
+        candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{result['revision']}").json()
+        cues = next(w for w in candidate['warnings'] if w['kind'] == 'stage-direction')['occurrences']
+        selected = {cues[0]['id']: 'keep', cues[1]['id']: 'exclude'}
+        policies = [{'warningId': w['id'], 'action': 'keep'} for w in candidate['warnings']
+                    if w.get('decisionScope') != 'occurrence']
+        preview = client.post(f'/api/books/{book_id}/review/transcript-preview', json={
+            'revision': result['revision'], 'page': 1, 'policies': policies,
+            'occurrencePolicies': [{'occurrenceId': key, 'action': action} for key, action in selected.items()],
+        })
+        assert preview.status_code == 200, preview.text
+        assert any(row['text'] == '(said angrily)' and row['kind'] == 'excluded'
+                   for row in preview.json()['spans'])
+        choices = [{'occurrenceIds': [row['id']], 'action': selected.get(row['id'], 'keep')}
+                   for w in candidate['warnings'] for row in w['occurrences']]
+        _accept(client, book_id, 'review', result['revision'], choices)
+        package = tmp_path / 'packages' / book_id
+        accepted = read_artifact(package, 'review')
+        assert {row['occurrenceId']: row['action'] for row in accepted['decisions']} == selected
+        write_artifact(package, 'cast', {'revision': 'cast-script-cues',
+            'dialogueRevision': dialogue['revision'], 'reviewRevision': accepted['revision'],
+            'identities': [], 'labelToCharacterId': {}})
+        first = client.post(f'/api/books/{book_id}/recording-script/prepare')
+        second = client.post(f'/api/books/{book_id}/recording-script/prepare')
+        assert first.status_code == second.status_code == 200, first.text
+        assert first.json()['revision'] == second.json()['revision']
+        entries = first.json()['entries']
+        speech = ''.join(row['text'] for row in entries)
+        assert '(said softly)' in speech and '(said angrily)' not in speech
+        assert any(row['kind'] == 'omission' and row['sourceText'] == '(said angrily)' for row in entries)
+        assert read_artifact(package, 'extraction')['revision'] == extraction['revision']
+        assert read_artifact(package, 'dialogue')['revision'] == dialogue['revision']
+    with TestClient(create_app_v2(tmp_path, cleanup_reviewer=reviewer)) as client:
+        snapshot = client.get(f'/api/books/{book_id}/snapshot').json()
+        assert snapshot['activeArtifacts']['review'] == accepted['revision']
+        assert 'review' not in snapshot['pendingCandidates']
+    assert len(calls) == 2

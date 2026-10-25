@@ -23,6 +23,7 @@ from .remote_llm import (
     remote_decisions_completion,
 )
 from .workflow.runtime import ProgressReporter
+from .script_cues import bracket_ranges, review_script_directions
 
 POLICY_ID = "decisions-luna-cleanup-v1"
 MAX_WINDOW_CHARACTERS = 1200
@@ -272,6 +273,8 @@ def run_cleanup_review(
     """
     decisions_config, repair_config = cleanup_model_configs(repo_root, models_path=models_path)
     windows = cleanup_windows(extraction, dialogue)
+    protected = {str(block["id"]): bracket_ranges(str(block["text"]))
+                 for block in extraction.get("blocks", [])}
     report(5, f"Checking {len(windows)} text windows with Luna Decisions")
     stopped = Event()
     progress_lock = Lock()
@@ -315,6 +318,9 @@ def run_cleanup_review(
             reason = proposal["reason"] or "Luna flagged this passage for source review."
         rows = []
         for start, end, replacement in edits:
+            if any(max(window["sourceStart"] + start, left) < min(window["sourceStart"] + end, right)
+                   for left, right in protected.get(window["blockId"], [])):
+                continue  # Script/prose brackets belong to the guarded cue pass, never generic deletion.
             rows.append({
                 **window, "sourceStart": window["sourceStart"] + start,
                 "sourceEnd": window["sourceStart"] + end, "source": window["source"][start:end],
@@ -323,7 +329,9 @@ def run_cleanup_review(
                 "contextAfter": (window["source"][end:] + window["contextAfter"])[:180],
                 "model": repair_config.model, "policy": POLICY_ID,
             })
-        if not rows:
+        protected_window = any(max(window["sourceStart"], left) < min(window["sourceEnd"], right)
+                               for left, right in protected.get(window["blockId"], []))
+        if not rows and not edits and not protected_window:
             rows.append({**window, "replacement": None, "reason": reason,
                          "proposalStatus": "source_review", "model": repair_config.model,
                          "policy": POLICY_ID})
@@ -360,8 +368,13 @@ def run_cleanup_review(
         raise CleanupReviewError("The cleanup review did not process every source window.")
     ordered = [by_id[window["windowId"]] for window in windows]
     occurrences = [row for result in ordered for row in result["occurrences"]]
-    report(95, "Luna cleanup proposals are ready for review")
+    script_directions = review_script_directions(
+        repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
+        usage_observer=usage_observer, request_admission=admission,
+    )
+    report(99, "Luna cleanup proposals are ready for review")
     return {
+        "scriptDirections": script_directions,
         "occurrences": occurrences,
         "summary": {
             "model": repair_config.model, "policy": POLICY_ID, "inputWindows": len(windows),
