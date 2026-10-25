@@ -338,7 +338,7 @@ export interface CastArtifact {
   dossiers: CastDossier[];
   proposals: CastProposal[];
   processing?: { labels?: number; batches?: number; model?: string };
-  narrator?: CastVoice;
+  narrator?: CastVoice | null;
   identities?: CastVoice[];
   language?: string;
   voiceModel?: string;

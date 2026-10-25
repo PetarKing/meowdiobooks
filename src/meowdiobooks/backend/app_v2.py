@@ -69,6 +69,7 @@ from .cast_runtime import (
     _audition_identity,
     _audition_line,
     _cast_with_line_counts,
+    cast_voice_targets,
     _expand_cast_label_mapping,
     _has_complete_audition_pack,
     _rebase_accepted_cast,
@@ -799,7 +800,16 @@ def create_app_v2(
                     default_voice_model=default_voice_id,
                 )
             if reusable is not None:
-                return finish(reusable, "Existing cast and auditions ready for review")
+                narrator_count = _apply_cast_line_counts(
+                    reusable, reusable,
+                    apply_review_render_policies(dialogue, review).get("spans", []),
+                )
+                if not narrator_count:
+                    reusable["narrator"] = None
+                elif isinstance(reusable.get("narrator"), dict):
+                    reusable["narrator"]["lineCount"] = narrator_count
+                if not narrator_count or reusable.get("narrator"):
+                    return finish(reusable, "Existing cast and auditions ready for review")
             report(2, "Building contextual identity dossiers")
             spans = list(dialogue.get("spans", []))
             extraction = read_artifact(package, "extraction")
@@ -959,7 +969,7 @@ def create_app_v2(
             finalized = finalize_identity_mapping(proposal.get("proposals", []), decisions)
             _expand_cast_label_mapping(finalized, proposal)
             narrator_line_count = _apply_cast_line_counts(
-                finalized, proposal, dialogue.get("spans", [])
+                finalized, proposal, apply_review_render_policies(dialogue, review).get("spans", [])
             )
             model_id = str(settings.get("voiceModel", proposal.get("voiceModel", default_voice_id)))
             language = normalize_language(
@@ -1021,10 +1031,7 @@ def create_app_v2(
                 if cast_voice_reuse is None:
                     raise CastContractError("Voice reuse is unavailable")
                 report(1, "Matching voices from selected books")
-                targets = [*finalized["identities"], {
-                    "characterId": "narrator", "name": "Narrator", "category": "narrator",
-                    "lineCount": narrator_line_count,
-                }]
+                targets = cast_voice_targets(finalized, proposal, dialogue, review)
                 imported = validated_imported_voices(
                     cast_voice_reuse.apply(
                         book.id, package, targets, source_book_ids, language, model_id,
@@ -1045,7 +1052,11 @@ def create_app_v2(
                 for row in finalized["identities"]
                 if str(row["characterId"]) not in matched
             ]
-            include_narrator_profile = not same_language and "narrator" not in imported
+            include_narrator_profile = (
+                narrator_line_count > 0
+                and (not same_language or not proposal.get("narrator"))
+                and "narrator" not in imported
+            )
             profiles: dict[str, dict[str, str]] = {}
             if profile_targets or include_narrator_profile:
                 checkpoint_key = profile_checkpoint_key(
@@ -1196,7 +1207,7 @@ def create_app_v2(
                      or (same_language and previous_narrator.get("reusedVoiceSnapshot") is True))
                 and _has_complete_audition_pack(previous_narrator)
             )
-            if not reusable_narrator:
+            if narrator_line_count and not reusable_narrator:
                 narrator_profile = (
                     deepcopy(previous_narrator.get("voiceSettings"))
                     if same_language
@@ -1259,7 +1270,9 @@ def create_app_v2(
                 report(90, "Cast labels updated; all existing auditions remain valid")
                 generated = []
             by_id = {str(row["id"]): row for row in generated}
-            if reusable_narrator:
+            if not narrator_line_count:
+                narrator = None
+            elif reusable_narrator:
                 assert isinstance(previous_narrator, dict)
                 narrator = {
                     **previous_narrator,
@@ -1682,7 +1695,7 @@ def create_app_v2(
             None,
         )
         visible_cast = cast_with_recipe_freshness(
-            _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue)
+            _cast_with_line_counts(current.get("cast") or pending_cast or {}, dialogue, review)
         )
         recoverable_stages = _recoverable_stages(jobs.all(), book.id)
         malformed_dialogue_recovery = dialogue_recovery(dialogue)
@@ -2239,9 +2252,10 @@ def create_app_v2(
             if (proposal.get("phase") == "audition-review"
                     and preview_language == normalize_language(proposal.get("language", "english"))):
                 _reuse_unchanged_cast_voices(finalized, proposal)
-            targets = [*finalized["identities"], {
-                "characterId": "narrator", "name": "Narrator", "category": "narrator",
-            }]
+            targets = cast_voice_targets(
+                finalized, proposal,
+                read_artifact(package, "dialogue"), read_artifact(package, "review"),
+            )
             source_ids = validate_source_book_ids(body.sourceBookIds, book_id)
             model_id = str(body.voiceModel or proposal.get("voiceModel") or default_voice_id)
             language = normalize_language(body.language or proposal.get("language") or "english")
@@ -2277,7 +2291,8 @@ def create_app_v2(
             raise HTTPException(status_code=404, detail=f"{stage.title()} candidate not found")
         if parsed == WizardStage.CAST:
             candidate = _cast_with_line_counts(
-                candidate, read_artifact(package_for(book_id), "dialogue")
+                candidate, read_artifact(package_for(book_id), "dialogue"),
+                read_artifact(package_for(book_id), "review")
             )
         return candidate
 
@@ -2651,6 +2666,12 @@ def create_app_v2(
                     raise CastContractError(
                         "Resolve identities and generate auditions before acceptance"
                     )
+                narrator_required = any(
+                    row["characterId"] == "narrator"
+                    for row in cast_voice_targets(candidate, candidate, dialogue, review)
+                )
+                if narrator_required and not isinstance(candidate.get("narrator"), dict):
+                    raise CastContractError("Generate and accept the required narrator voice")
             if parsed == WizardStage.REVIEW:
                 warning_decisions = [row for row in body.decisions if row.get("occurrenceIds")]
                 boundary_decisions = [row for row in body.decisions if row.get("boundaryId")]
@@ -3080,12 +3101,16 @@ def _accept_voice_revisions(
         row.pop("referenceAudio", None)
         accepted_by_id[character_id] = row
 
-    narrator_id = str(required[0]["characterId"])
-    accepted["narrator"] = accepted_by_id[narrator_id]
-    accepted["identities"] = [accepted_by_id[str(row["characterId"])] for row in required[1:]]
+    narrator = candidate.get("narrator")
+    accepted["narrator"] = (
+        accepted_by_id[str(narrator["characterId"])] if isinstance(narrator, dict) else None
+    )
+    accepted["identities"] = [
+        accepted_by_id[str(row["characterId"])] for row in candidate.get("identities", [])
+    ]
     blockers = cast_progression_blockers(accepted)
-    if blockers or not accepted["narrator"].get("voiceAccepted"):
-        raise CastContractError("; ".join(blockers or ["Accept the narrator voice"]))
+    if blockers:
+        raise CastContractError("; ".join(blockers))
     return accepted
 
 

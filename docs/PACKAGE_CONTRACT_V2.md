@@ -156,7 +156,10 @@ Cast references accepted Dialogue and Review revisions. It contains:
 - fuzzy and Qwen proposals plus explicit identity-review decisions;
 - durable character/group IDs;
 - complete literal-label-to-character-ID mapping and alias lineage;
-- one narrator identity;
+- a narrator identity when reviewed playable spans route to narration or narrator fallback;
+  otherwise `narrator` is `null` and needs no profiling, audition, or voice approval.
+  Narration containing only whitespace or punctuation is retained as source-delimiter omissions
+  in the recording script; punctuation-only attributed dialogue remains playable;
 - immutable voice-candidate metadata for audit and current-Cast voice binaries for playback;
 - editable voice settings and their exact compiled VoiceDesign direction per candidate;
 - line counts used to order Cast/Voice review without changing identity authority;
@@ -171,7 +174,7 @@ Cast references accepted Dialogue and Review revisions. It contains:
   IDs whose own accepted voice revisions remain authoritative.
 
 Fuzzy similarity and model proposals never perform a material merge automatically. Flagged identity
-decisions block auditions. Missing or unaccepted narrator/character voices and incomplete group voice
+decisions block auditions. Missing or unaccepted required narrator/character voices and incomplete group voice
 routes block later phases. Layered routing never changes label, alias, or identity semantics. One Cast
 revision never mixes auditions from different recipe versions.
 
@@ -191,8 +194,9 @@ exports are independent outputs and are never deleted by this replacement.
 The recording script references exact Dialogue, Review and Cast revisions. It is prepared automatically
 on first entry to Generate and reused while all three inputs match.
 
-It faithfully owns every accepted source span exactly once. Review exclusions become explicit
-`omission` entries; every other dialogue and narration span becomes a `source` entry in original order.
+It faithfully owns every accepted source span exactly once. Review exclusions and narration containing
+only whitespace or punctuation become explicit `omission` entries. Nonverbal narration gaps retain
+`source-delimiter` provenance; every other span becomes a `source` entry in original order.
 The script stores backend-owned whole-book and chapter metrics, including chapters with no playable
 text. It has no model call and no separate user acceptance step. Publishing any upstream change removes
 the active script pointer; immutable prior scripts remain available for audio-staleness comparison.

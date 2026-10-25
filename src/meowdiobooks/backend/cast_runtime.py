@@ -15,6 +15,8 @@ from .cast_service import (
     validate_audition_line,
 )
 from .languages import audition_line
+from .voice_routing import is_narration_delimiter, narrator_route
+from .review import apply_review_render_policies
 
 
 def _voice_identity_signature(identity: dict[str, Any]) -> tuple[str, frozenset[str]]:
@@ -162,27 +164,50 @@ def _apply_cast_line_counts(
     finalized["identities"].sort(
         key=lambda row: (-int(row.get("lineCount", 0)), label_comparison_key(row.get("name", "")))
     )
-    narrator_labels = {
-        label_comparison_key(row.get("label", ""))
-        for row in finalized.get("identityReviewDecisions", [])
-        if row.get("category") == "narrator"
-    }
-    narration = sum(
-        1
-        for row in spans
-        if row.get("renderRole") == "narration"
-        and any(character.isalnum() for character in str(row.get("text", "")))
+    mapping = finalized.get("labelToCharacterId", {})
+    return sum(
+        1 for row in spans
+        if row.get("reviewAction") != "exclude"
+        and str(row.get("text", ""))
+        and not is_narration_delimiter(row)
+        and narrator_route(row, mapping)[0]
     )
-    return narration + sum(counts.get(label, 0) for label in narrator_labels)
 
 
-def _cast_with_line_counts(cast: dict[str, Any], dialogue: dict[str, Any]) -> dict[str, Any]:
+def cast_voice_targets(
+    finalized: dict[str, Any], proposal: dict[str, Any],
+    dialogue: dict[str, Any], review: dict[str, Any],
+) -> list[dict[str, Any]]:
+    """Plan required voice targets without mutating inputs or calling providers.
+
+    Hosts use the same reviewed source routing for cost estimates and reuse previews.
+    """
+    planned = deepcopy(finalized)
+    planned.setdefault("identities", [])
+    planned.setdefault("labelToCharacterId", {})
+    _expand_cast_label_mapping(planned, proposal)
+    narrator_count = _apply_cast_line_counts(
+        planned, proposal, apply_review_render_policies(dialogue, review).get("spans", []),
+    )
+    targets = planned["identities"]
+    if narrator_count:
+        targets.append({
+            "characterId": "narrator", "name": "Narrator", "category": "narrator",
+            "lineCount": narrator_count,
+        })
+    return targets
+
+
+def _cast_with_line_counts(
+    cast: dict[str, Any], dialogue: dict[str, Any], review: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Backfill display counts for older immutable Cast artifacts without rewriting them."""
 
     if not cast or cast.get("phase") not in {"audition-review", "accepted"}:
         return cast
     enriched = deepcopy(cast)
-    narrator_count = _apply_cast_line_counts(enriched, enriched, list(dialogue.get("spans", [])))
+    rendered = apply_review_render_policies(dialogue, review or {})
+    narrator_count = _apply_cast_line_counts(enriched, enriched, list(rendered.get("spans", [])))
     if isinstance(enriched.get("narrator"), dict):
         enriched["narrator"]["lineCount"] = narrator_count
     return enriched
