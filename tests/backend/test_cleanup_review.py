@@ -150,7 +150,7 @@ def test_accept_all_is_explicit_individual_decisions_not_identical_evidence_bulk
     assert apply_review_render_policies(dialogue, review)['spans'][0]['text'] == 'An broken sign.'
 
 
-def test_exact_cleanup_match_enriches_existing_finding_without_duplicate_or_mutation():
+def test_exact_cleanup_match_moves_to_ai_category_without_duplicate_or_mutation():
     extraction, dialogue, _, proposal = fixture()
     deterministic = build_review_workspace(extraction, dialogue)
     before = deepcopy(deterministic)
@@ -160,9 +160,9 @@ def test_exact_cleanup_match_enriches_existing_finding_without_duplicate_or_muta
     assert deterministic == before
     rows = [row for warning in workspace['warnings'] for row in warning['occurrences']]
     assert len(rows) == deterministic['summary']['occurrences']
-    assert not any(row['kind'] == 'ai-cleanup' for row in rows)
     row = next(row for row in rows if row['id'] == known['id'])
-    assert row['kind'] == 'suspicious-extraction'
+    assert row['kind'] == 'ai-cleanup'
+    assert row['warningId'] == 'review:ai-cleanup'
     assert row['source'] == known['source']
     assert row['reason'] == known['reason']
     assert row['cleanupReason'] == proposal['reason']
@@ -182,7 +182,7 @@ def test_disambiguating_ai_context_projects_onto_existing_whole_word_anchor():
     workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
                                       extraction, dialogue, {'occurrences': [proposal]})
     rows = [row for warning in workspace['warnings'] for row in warning['occurrences']]
-    assert not any(row['kind'] == 'ai-cleanup' for row in rows)
+    assert sum(row['kind'] == 'ai-cleanup' for row in rows) == 1
     enriched = next(row for row in rows if row.get('proposalStatus'))
     assert enriched['source'] == 'bro-\nken'
     assert enriched['replacement'] == 'broken'
@@ -212,31 +212,27 @@ def test_source_review_exact_duplicate_retains_existing_deterministic_choices():
     assert row['proposalStatus'] == 'source_review'
     assert row['replacement'] is None
     assert 'repair' not in row['availableActions']
-    assert {'keep', 'exclude', 'rerun-extraction'} <= set(row['availableActions'])
+    assert {'keep', 'exclude'} <= set(row['availableActions'])
+    assert 'rerun-extraction' not in row['availableActions']
 
 
-def test_augmented_group_requires_individual_choices_for_ordinary_rows_too():
+def test_moved_correction_and_remaining_deterministic_group_have_separate_policies():
     extraction, dialogue, workspace, _ = fixture('Ada: [A bro-\nken sign and a dam-\naged fence.]')
     group = next(w for w in workspace['warnings'] if w['kind'] == 'suspicious-extraction')
-    assert group['decisionScope'] == 'occurrence'
-    assert len(group['occurrences']) == 2
-    enriched = next(row for row in group['occurrences'] if row.get('proposalStatus'))
-    ordinary = next(row for row in group['occurrences'] if not row.get('proposalStatus'))
-    assert 'repair' not in ordinary['availableActions']
+    ai = next(w for w in workspace['warnings'] if w['kind'] == 'ai-cleanup')
+    assert group['decisionScope'] == 'warning-kind'
+    assert len(group['occurrences']) == group['occurrenceCount'] == 1
+    assert group['occurrences'][0]['source'] == 'dam-\naged'
+    assert ai['decisionScope'] == 'occurrence'
+    enriched = ai['occurrences'][0]
     policies = [{'warningId': w['id'], 'action': 'keep'} for w in workspace['warnings']
                 if w.get('decisionScope') != 'occurrence']
-    selected = [{'occurrenceId': enriched['id'], 'action': 'repair'}]
     with pytest.raises(ReviewContractError, match='Every cleanup'):
-        preview_review_transcript_page(extraction, dialogue, workspace, policies, page=1,
-                                       occurrence_policies=selected)
-    selected.append({'occurrenceId': ordinary['id'], 'action': 'keep'})
+        preview_review_transcript_page(extraction, dialogue, workspace, policies, page=1)
+    selected = [{'occurrenceId': enriched['id'], 'action': 'repair'}]
     preview = preview_review_transcript_page(extraction, dialogue, workspace, policies, page=1,
                                             occurrence_policies=selected)
     assert preview['spans'][0]['text'] == 'A broken sign and a dam-\naged fence.'
-    with pytest.raises(ReviewContractError, match='individual preview'):
-        preview_review_transcript_page(extraction, dialogue, workspace,
-                                       [*policies, {'warningId': group['id'], 'action': 'keep'}],
-                                       page=1, occurrence_policies=selected)
     review = accept_review_revision(workspace, decisions(workspace), revision='mixed-choices')
     script = build_recording_script(apply_review_render_policies(dialogue, review), review,
                                     {'revision': 'c1'}, revision='s1')
@@ -256,9 +252,10 @@ def test_augmented_group_preserves_individual_reader_roles():
     workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
                                       extraction, dialogue, {'occurrences': [proposal]})
     group = next(w for w in workspace['warnings'] if w['kind'] == 'suspicious-extraction')
-    assert group['readerState'] == 'mixed'
-    rows = {row['blockId']: row for row in group['occurrences']}
+    assert group['readerState'] == 'narrator'
+    rows = {row['blockId']: row for w in workspace['warnings'] for row in w['occurrences']}
     assert rows['b']['readerState'] != 'narrator'
+    assert rows['b']['kind'] == 'ai-cleanup'
     assert rows['narration']['readerState'] == 'narrator'
     assert 'narrate' not in rows['narration']['availableActions']
 
@@ -293,3 +290,55 @@ def test_nested_source_review_with_multiple_containing_owners_stays_separate():
     assert ai['replacement'] is None
     assert all(not row.get('proposalStatus') for w in result['warnings'] if w['kind'] != 'ai-cleanup'
                for row in w['occurrences'])
+
+
+def test_leave_ai_suggestion_excludes_only_anchored_text_and_preserves_source():
+    _, dialogue, workspace, _ = fixture()
+    review = accept_review_revision(workspace, decisions(workspace, 'exclude'), revision='leave-ai')
+    rendered = apply_review_render_policies(dialogue, review)
+    assert ''.join(row['text'] for row in rendered['spans'] if row.get('renderRole') != 'excluded') == 'A  sign.'
+    assert ''.join(row['source'] for row in rendered['spans']) == dialogue['spans'][0]['source']
+
+
+def test_new_review_findings_do_not_offer_pdf_reextraction():
+    from meowdiobooks.backend.review import WARNING_CONFIG
+    assert all('rerun-extraction' not in config['actions'] for config in WARNING_CONFIG.values())
+
+
+def test_ai_corrections_form_last_group_with_no_empty_or_duplicate_groups():
+    source = 'Ada: [A bro-\nken sign and a dam-\naged fence.]'
+    extraction, dialogue, _, proposal = fixture(source)
+    credit = 'Human translated by:'
+    extraction['blocks'].append({'id': 'credit', 'page': 2, 'text': credit})
+    dialogue['spans'].append({'id': 'credit-span', 'blockId': 'credit', 'page': 2,
+        'sourceStart': 0, 'sourceEnd': len(credit), 'source': credit, 'text': credit,
+        'renderRole': 'narration', 'chapterId': 'chapter-1'})
+    workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
+                                      extraction, dialogue, {'occurrences': [proposal]})
+    assert [w['kind'] for w in workspace['warnings']] == [
+        'suspicious-extraction', 'front-back-matter', 'ai-cleanup']
+    rows = [row for w in workspace['warnings'] for row in w['occurrences']]
+    assert len({row['id'] for row in rows}) == len(rows)
+    assert sum(row['source'] == 'bro-\nken' for row in rows) == 1
+    assert all(w['occurrenceCount'] == len(w['occurrences']) > 0 for w in workspace['warnings'])
+
+
+def test_no_ai_repairs_preserves_narrate_policy_for_mixed_deterministic_group():
+    extraction, dialogue, _, _ = fixture()
+    text = 'A dam-\naged fence.'
+    extraction['blocks'].append({'id': 'n', 'page': 1, 'text': text})
+    dialogue['spans'].append({'id': 'n-span', 'blockId': 'n', 'page': 1,
+        'sourceStart': 0, 'sourceEnd': len(text), 'source': text, 'text': text,
+        'renderRole': 'narration', 'chapterId': 'chapter-1'})
+    workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
+                                      extraction, dialogue, {'occurrences': []})
+    group = next(w for w in workspace['warnings'] if w['kind'] == 'suspicious-extraction')
+    assert group['readerState'] == 'mixed'
+    assert all('narrate' in row['availableActions'] for row in group['occurrences'])
+    policies = [{'warningId': w['id'], 'action': 'narrate' if w is group else 'keep'}
+                for w in workspace['warnings']]
+    preview = preview_review_transcript_page(extraction, dialogue, workspace, policies, page=1)
+    assert preview['page'] == 1
+    choices = [{'occurrenceIds': [row['id']], 'action': 'narrate' if w is group else 'keep'}
+               for w in workspace['warnings'] for row in w['occurrences']]
+    accept_review_revision(workspace, choices, revision='mixed-narration')

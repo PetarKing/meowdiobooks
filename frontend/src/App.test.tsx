@@ -2986,33 +2986,30 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Same decision for every heading?')).not.toBeInTheDocument()
   })
 
-  it('restores AI cleanup proposals, accepts individual and bulk choices, and previews exact occurrence policies', async () => {
+  it('restores AI suggestions as a category with Keep, Leave and persistent bulk options', async () => {
     const snapshot: WizardSnapshot = {
-      ...base,
-      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
-      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
-      pendingCandidates: { review: { revision: 'review-ai', status: 'candidate' } },
+      ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-ai', status: 'candidate' } },
     }
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-ai', warnings: [cleanupWarning], boundaryCandidates: [] })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
     expect(await screen.findByText('broken')).toBeInTheDocument()
-    expect(wizardApi.processStage).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
-    const remaining = screen.getByRole('button', { name: 'Apply all corrections' })
-    expect(within(screen.getByRole('complementary', { name: 'Decision queue' })).getByRole('button', { name: 'Apply all corrections' })).toBe(remaining)
-    expect(remaining.closest('.resolution-panel')).toBeNull()
-    const individualActions = [...screen.getByRole('button', { name: /^Apply correction/ }).parentElement!.querySelectorAll('button')]
-    expect(individualActions.map((button) => button.textContent)).toEqual([expect.stringContaining('Apply correction'), expect.stringContaining('Keep original text')])
-    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    const apply = screen.getByRole('button', { name: /^Apply all AI suggestions/ })
+    expect(apply.closest('.resolution-panel')).not.toBeNull()
+    expect(apply).toHaveClass('cleanup-bulk-warning')
+    expect(screen.getByRole('heading', { name: 'AI suggestions' }).closest('.review-group-heading')).not.toHaveTextContent('warning')
+    expect(screen.getByRole('complementary', { name: 'Decision queue' })).not.toHaveTextContent('warning')
+    expect(within(screen.getByRole('complementary', { name: 'Decision queue' })).queryByRole('button', { name: /^Apply all/ })).not.toBeInTheDocument()
+    expect([...apply.parentElement!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep', 'Leave', 'Apply all AI suggestions'])
+    expect(screen.queryByRole('button', { name: /Try extraction again/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
     expect(screen.getByText('Remove the flagged text from the audiobook transcript.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Apply all corrections' }))
-    expect(screen.getByRole('button', { name: 'Apply all corrections' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: /^Apply correction/ })).not.toBeInTheDocument()
-    expect(screen.getByText('No correction was proposed. Check the source before keeping this text or trying extraction again.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeDisabled()
+    expect(screen.getByText('No correction was proposed. Check the source before keeping or leaving out this text.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
-    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-ai', 1, [], [
@@ -3022,31 +3019,53 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-ai', [
       { occurrenceIds: ['join'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
     ]))
-    expect(wizardApi.previewReviewBulk).not.toHaveBeenCalled()
   })
 
-  it('reviews consolidated corrections inside a deterministic category with ordinary per-row choices', async () => {
+  it('moves saved overlapping corrections into AI suggestions without duplicating source-only warnings', async () => {
     const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-consolidated', status: 'candidate' } } }
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-consolidated', warnings: [consolidatedCleanupWarning], boundaryCandidates: [] })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    expect(await screen.findByText('broken')).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'AI cleanup' })).not.toBeInTheDocument()
-    expect(screen.getByText('Join a word split across a printed line.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
-    expect(screen.queryByLabelText('Proposed correction')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Keep as is/ })).toHaveTextContent('current reader')
-    expect(screen.queryByRole('button', { name: /^Keep with narrator/ })).not.toBeInTheDocument()
+    expect(await screen.findByText('A strange fragment.')).toBeInTheDocument()
+    expect(screen.queryByText('broken')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Try extraction again/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Leave out/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Apply all corrections' }))
-    expect(screen.getByRole('button', { name: 'Apply all corrections' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
+    fireEvent.click(screen.getByRole('button', { name: /AI suggestions.*2 occurrences/ }))
+    expect(screen.getByText('broken')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
+    expect(screen.getByText('AI correction selected for this example. It will apply when you accept the review.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-consolidated', 1, [], [
-      { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'ordinary', action: 'exclude' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
+      { occurrenceId: 'ordinary', action: 'exclude' }, { occurrenceId: 'missing', action: 'keep' }, { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'delete', action: 'repair' },
     ])
+  })
+
+  it('keeps 150 AI suggestions bounded to one example and allows overrides after bulk applying', async () => {
+    const many = { ...cleanupWarning, occurrences: Array.from({ length: 150 }, (_, i) => ({ ...cleanupWarning.occurrences[0], id: `ai-${i}`, source: `Source fragment ${i}`, replacement: `Corrected fragment ${i}` })) }
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-many', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-many', warnings: [many], boundaryCandidates: [] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByText('Example 1 of 150')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Proposed correction')).toHaveLength(1)
+    expect(screen.queryByText('Corrected fragment 149')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
+    expect(screen.getByText('Example 2 of 150')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all AI suggestions/ }))
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Leave This highlighted/ }))
+    expect(screen.getByRole('button', { name: /^Leave This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /^Apply all AI suggestions/ })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Keep Keep the original/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    const policies = vi.mocked(wizardApi.previewReviewTranscript).mock.lastCall![4]
+    expect(policies).toHaveLength(150)
+    expect(policies?.slice(0, 3)).toEqual([{ occurrenceId: 'ai-0', action: 'exclude' }, { occurrenceId: 'ai-1', action: 'keep' }, { occurrenceId: 'ai-2', action: 'repair' }])
   })
 
   it('shows the complete read-only transcript beside the synchronized PDF page', async () => {
@@ -3321,7 +3340,7 @@ describe('v2 wizard', () => {
     expect(await screen.findByRole('heading', { name: 'The transcript needs rebuilding before review.' })).toBeInTheDocument()
     expect(screen.getByText(/Extraction completed successfully/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Rebuild Dialogue/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Try another extraction/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Try another extraction/ })).not.toBeInTheDocument()
     expect(screen.queryByText('malformed coverage')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review complete transcript →' })).not.toBeInTheDocument()
   })

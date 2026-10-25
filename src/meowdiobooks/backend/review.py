@@ -24,7 +24,7 @@ class ReviewContractError(ValueError):
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
     "ai-cleanup": {
         "severity": "warning",
-        "actions": ("keep", "repair", "rerun-extraction"),
+        "actions": ("keep", "exclude", "repair"),
     },
     "stage-direction": {
         "severity": "warning",
@@ -32,15 +32,15 @@ WARNING_CONFIG: dict[str, dict[str, Any]] = {
     },
     "empty-page": {
         "severity": "blocking",
-        "actions": ("keep", "rerun-extraction"),
+        "actions": ("keep",),
     },
     "suspicious-extraction": {
         "severity": "warning",
-        "actions": ("keep", "narrate", "exclude", "rerun-extraction"),
+        "actions": ("keep", "narrate", "exclude"),
     },
     "reading-order": {
         "severity": "warning",
-        "actions": ("keep", "rerun-extraction"),
+        "actions": ("keep",),
     },
     "repeated-matter": {
         "severity": "warning",
@@ -215,8 +215,8 @@ def add_cleanup_proposals(
         row.update({"replacement": replacement,
                     "proposalStatus": "proposed" if replacement is not None else "source_review",
                     "model": "gpt-6-luna",
-                    "availableActions": ["keep", "repair"] if replacement is not None
-                    else ["keep", "rerun-extraction"]})
+                    "availableActions": ["keep", "exclude", "repair"] if replacement is not None
+                    else ["keep", "exclude"]})
         # Even identical source strings can have different suggested replacements.
         row["matchKey"] = _digest([row["source"], replacement])
         rows.append(row)
@@ -229,8 +229,8 @@ def add_cleanup_proposals(
                for other in rows[:index]):
             raise ReviewContractError("Cleanup proposals overlap")
     _add_adjacent_context(rows, blocks)
-    # Preserve deterministic IDs and grouping/history. A model can add a correction to an
-    # existing finding without creating a second decision about the same defect.
+    # Preserve deterministic IDs and evidence. Repairable findings move into the AI
+    # category, so the same defect never asks for two decisions.
     warnings = deepcopy(list(workspace.get("warnings", [])))
     existing = [(warning, occurrence) for warning in warnings
                 for occurrence in warning.get("occurrences", [])
@@ -257,18 +257,26 @@ def add_cleanup_proposals(
             "matchKey": _digest([occurrence["source"], replacement]),
         })
         if replacement is not None:
-            occurrence["availableActions"] = list(dict.fromkeys(
-                [*occurrence["availableActions"], "repair"]
-            ))
-        warning["decisionScope"] = "occurrence"
-        # A group with mixed reader roles must not label every occurrence as mixed.
-        # Its row states were derived from each exact source range during detection.
-        for member in warning["occurrences"]:
-            if member.get("readerState") == "narrator":
+            warning["occurrences"].remove(occurrence)
+            occurrence.update(kind="ai-cleanup", availableActions=["keep", "exclude", "repair"])
+            novel.append(occurrence)
+        else:
+            warning["decisionScope"] = "occurrence"
+    warnings = [warning for warning in warnings if warning["occurrences"]]
+    for warning in warnings:
+        # Moving a correction can change both the count and the remaining reader roles.
+        members = warning["occurrences"]
+        warning["occurrenceCount"] = len(members)
+        warning["readerState"] = _combined_reader_state(
+            [str(member["readerState"]) for member in members]
+        )
+        for member in members:
+            if (warning.get("decisionScope") == "occurrence"
+                    or warning["readerState"] == "narrator") and member.get("readerState") == "narrator":
                 member["availableActions"] = [action for action in member["availableActions"]
                                               if action != "narrate"]
         warning["availableActions"] = list(dict.fromkeys(
-            action for member in warning["occurrences"] for action in member["availableActions"]
+            action for member in members for action in member["availableActions"]
         ))
     warnings.extend(_group_occurrences(novel, dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
