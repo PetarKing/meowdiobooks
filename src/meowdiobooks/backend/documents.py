@@ -1,4 +1,4 @@
-"""Local PDF import, preview, and extraction operations."""
+"""Local source import, preview, and extraction operations."""
 
 from __future__ import annotations
 
@@ -16,7 +16,9 @@ from pypdf.errors import PyPdfError
 
 from meowdiobooks.util import sha256_bytes
 
-SUPPORTED_SUFFIXES = {".pdf"}
+from .text_documents import TEXT_SUFFIXES, read_text_document
+
+SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
 EXTRACTION_METHOD_VERSION = "documents-v3"
 _LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
 
@@ -31,6 +33,9 @@ def inspect_source(path: Path) -> tuple[str, int]:
     suffix = path.suffix.lower()
     if suffix not in SUPPORTED_SUFFIXES:
         raise ValueError(f"Unsupported file type: {suffix or 'missing extension'}")
+    if suffix in TEXT_SUFFIXES:
+        sections, _ = read_text_document(path)
+        return ("epub" if suffix == ".epub" else "text"), len(sections)
     with path.open("rb") as source:
         signature = source.read(5)
     if signature != b"%PDF-":
@@ -46,6 +51,8 @@ def inspect_source(path: Path) -> tuple[str, int]:
 
 def pdf_metadata(path: Path) -> dict[str, str]:
     """Read non-empty display metadata without treating it as source structure."""
+    if path.suffix.lower() in TEXT_SUFFIXES:
+        return read_text_document(path)[1]
     metadata = PdfReader(path).metadata
     if metadata is None:
         return {}
@@ -80,6 +87,19 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
 
 
 def render_pdf_page(source: Path, cache_root: Path, page: int, *, command_runner=None) -> Path:
+    if source.suffix.lower() in TEXT_SUFFIXES:
+        # Non-paginated sources have text previews and a neutral export cover.
+        from PIL import Image, ImageDraw
+
+        output = cache_root / "text-cover.png"
+        if not output.is_file():
+            output.parent.mkdir(parents=True, exist_ok=True)
+            cover = Image.new("RGB", (600, 800), "#f5eedf")
+            draw = ImageDraw.Draw(cover)
+            draw.rounded_rectangle((100, 200, 500, 600), radius=24, outline="#59394c", width=8)
+            draw.line((300, 220, 300, 580), fill="#59394c", width=6)
+            cover.save(output)
+        return output
     output = cache_root / "pages" / f"page-{page:04d}.png"
     if output.is_file():
         return output
@@ -157,6 +177,13 @@ def _normalise_liteparse_page_text(page: Mapping[str, Any]) -> str:
 def extract_pdf_page(
     source: Path, cache_root: Path, page: int, method: str, *, command_runner=None,
 ) -> dict[str, Any]:
+    if source.suffix.lower() in TEXT_SUFFIXES:
+        pages = extract_full_document(source, cache_root, method)
+        if not 1 <= page <= len(pages):
+            raise ValueError("Page is outside this document")
+        return {**pages[page - 1], "elapsedSeconds": 0, "cached": False}
+    if method == "text":
+        raise ValueError("Use a PDF extraction method for PDF sources")
     started = time.perf_counter()
     cache_method = _LITEPARSE_CACHE_KEY if method == "liteparse" else method
     cache = cache_root / "extraction" / cache_method / f"page-{page:04d}.json"
@@ -244,9 +271,18 @@ def extract_full_document(
     report: Callable[[float, str | None], None] | None = None,
     *, command_runner=None,
 ) -> list[dict[str, Any]]:
-    """Extract every PDF page with one user-accepted method."""
+    """Read every PDF page or stable text section through the same artifact contract."""
     command_options = {"command_runner": command_runner} if command_runner is not None else {}
     notify = report or (lambda _progress, _message=None: None)
+    if source.suffix.lower() in TEXT_SUFFIXES:
+        if method != "text":
+            raise ValueError("Use direct text extraction for EPUB and text sources")
+        sections, _ = read_text_document(source)
+        notify(90, f"Read {len(sections)} text sections")
+        return [{"page": index, "text": text, "method": "text", "warnings": _warnings(text)}
+                for index, text in enumerate(sections, 1)]
+    if method == "text":
+        raise ValueError("Use a PDF extraction method for PDF sources")
     if method == "liteparse":
         notify(10, "Running LiteParse over the complete document")
         raw_pages = extract_full_liteparse(source, cache_root, **command_options)

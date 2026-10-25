@@ -6,7 +6,7 @@ export type WizardStage =
   | "cast"
   | "generate";
 
-export type ExtractionMethod = "liteparse" | "native" | "layout";
+export type ExtractionMethod = "liteparse" | "native" | "layout" | "text";
 export type DialogueStrategy = "fill-gaps" | "narrate";
 export type DialogueAttributionTarget = "open-speakers" | "unlabelled-candidates";
 export type DialogueAttributionRoute = "local" | "remote";
@@ -26,6 +26,7 @@ export interface Book {
   title: string;
   author: string;
   filename: string;
+  sourceKind?: string;
   pageCount?: number;
   completedStages: readonly WizardStage[];
 }
@@ -46,7 +47,8 @@ export interface ExtractionPreview {
   warnings: Array<{ code: string; label: string }>;
   elapsedSeconds: number;
   cached: boolean;
-  imageUrl: string;
+  imageUrl?: string | null;
+  sourceText?: string | null;
 }
 
 export interface DialogueExample {
@@ -524,7 +526,8 @@ export interface ReviewTranscriptSpan {
 export interface ReviewTranscriptPreview {
   page: number;
   pageCount: number;
-  imageUrl: string;
+  imageUrl?: string | null;
+  sourceText?: string | null;
   spans: ReviewTranscriptSpan[];
   summary: { spoken: number; dialogue: number; excluded: number };
   published: false;

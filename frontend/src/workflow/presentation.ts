@@ -37,7 +37,8 @@ export function message(reason: unknown) {
   if (/source integrity|imported (?:PDF|source|document).*(?:missing|integrity)|Extraction requires an imported PDF|Accept import first/i.test(raw)) return "Import the source document again before continuing.";
   if (raw === "Text file contains binary control characters") return "Save this file as plain UTF-8 text before importing.";
   if (raw === "Unsupported text document format") return "Use a PDF, EPUB, TXT, or Markdown file";
-  if (raw === "EPUB archive must be 64 MiB or smaller") return "EPUB files must be 64 MiB or smaller.";
+  if (raw === "Book exceeds the 20 MiB limit") return "Text files must be 20 MiB or smaller";
+  if (raw === "EPUB archive must be 64 MiB or smaller" || raw === "Book exceeds the 64 MiB limit") return "EPUB files must be 64 MiB or smaller.";
   if (raw === "The EPUB archive is malformed or unsupported" || raw === "The uploaded file is not a valid EPUB") return "This EPUB could not be read. Try another copy of the book.";
   if (raw === "Export chapters are required") return "Choose a chapter to export.";
   if (/audition recipe changed|complete audition pack/i.test(raw)) return "Your voices need refreshing before you continue.";

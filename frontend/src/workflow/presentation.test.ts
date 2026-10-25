@@ -56,6 +56,12 @@ describe("workflow service copy boundary", () => {
     }
     expect(message(new Error("Text file contains binary control characters"))).toBe("Save this file as plain UTF-8 text before importing.");
     expect(message(new Error("The EPUB archive is malformed or unsupported"))).toBe("This EPUB could not be read. Try another copy of the book.");
+    for (const limit of [20, 64]) {
+      const rendered = localizeErrorMessage(message(new Error(`Book exceeds the ${limit} MiB limit`)), i18n.t);
+      expect(rendered).toContain(`${limit} MiB`);
+      expect(rendered).not.toMatch(/Something went wrong/);
+      if (locale === "zh-CN") expect(rendered).toMatch(/[\u4e00-\u9fff]/);
+    }
   });
 
   it("keeps actionable file and language errors, but does not display raw service exceptions", () => {

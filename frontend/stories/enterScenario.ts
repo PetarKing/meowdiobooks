@@ -53,7 +53,7 @@ export async function enterScenario(
   }
 
   if (metadata.gatewayVariant === "empty-books") {
-    await expect(await canvas.findByText(t("Choose PDF"))).toBeVisible();
+    await expect(await canvas.findByText(t("Choose book"))).toBeVisible();
     return;
   }
 
