@@ -111,15 +111,10 @@ def _accept(client: TestClient, book_id: str, stage: str, revision: str, decisio
     )
 
 
-def _seed_reviewed_transcript(tmp_path, book_id: str):
+def _seed_reviewed_transcript(tmp_path, book_id: str, *, include_narration: bool = False):
     package = tmp_path / "packages" / book_id
-    block = {"id": "p1-b1", "page": 1, "text": "Hello"}
-    _, extraction = write_artifact(
-        package,
-        "extraction",
-        {"revision": "extract-1", "blocks": [block], "pages": [], "boundaryCandidates": []},
-    )
-    span = {
+    blocks = [{"id": "p1-b1", "page": 1, "text": "Hello"}]
+    spans = [{
         "id": "span-1",
         "blockId": "p1-b1",
         "page": 1,
@@ -130,14 +125,32 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
         "renderRole": "dialogue",
         "sourceSpeakerLabel": "Alice",
         "speakerStatus": "explicit",
-    }
+    }]
+    if include_narration:
+        blocks.append({"id": "p1-b2", "page": 1, "text": "A quiet moment."})
+        spans.append({
+            "id": "narration-1",
+            "blockId": "p1-b2",
+            "page": 1,
+            "sourceStart": 0,
+            "sourceEnd": 15,
+            "source": "A quiet moment.",
+            "text": "A quiet moment.",
+            "renderRole": "narration",
+            "speakerStatus": "not-applicable",
+        })
+    _, extraction = write_artifact(
+        package,
+        "extraction",
+        {"revision": "extract-1", "blocks": blocks, "pages": [], "boundaryCandidates": []},
+    )
     _, dialogue = write_artifact(
         package,
         "dialogue",
         {
             "revision": "dialogue-1",
             "extractionRevision": extraction["revision"],
-            "spans": [span],
+            "spans": spans,
         },
     )
     _, review = write_artifact(
@@ -152,10 +165,10 @@ def _seed_reviewed_transcript(tmp_path, book_id: str):
                 {
                     "id": "complete-document",
                     "title": "Complete document",
-                    "sourceSpanIds": ["span-1"],
+                    "sourceSpanIds": [span["id"] for span in spans],
                 }
             ],
-            "spanChapterIds": {"span-1": "complete-document"},
+            "spanChapterIds": {span["id"]: "complete-document" for span in spans},
         },
     )
     return package, dialogue, review
@@ -591,7 +604,10 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             "accent": "unspecified",
             "description": "Bright, curious young voice.",
         }
-        return {"narrator": narrator, **{row["characterId"]: character for row in identities}}
+        return {
+            **({"narrator": narrator} if _kwargs.get("include_narrator") else {}),
+            **{row["characterId"]: character for row in identities},
+        }
 
     monkeypatch.setattr("meowdiobooks.backend.app_v2.suggest_voice_settings", fake_voice_settings)
 
@@ -679,17 +695,12 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         candidate = client.get(
             f"/api/books/{book_id}/stages/cast/candidates/{audition['revision']}"
         ).json()
-        assert candidate["narrator"]["referenceText"].startswith(
-            "This is the voice of Narrator. The bright morning"
-        )
-        assert len(candidate["narrator"]["referenceText"].split()) >= 35
-        assert candidate["narrator"]["lineCount"] == 0
+        assert candidate["narrator"] is None
         assert candidate["identities"][0]["referenceText"].startswith(
             "This is the voice of Alice. The bright morning"
         )
         assert len(candidate["identities"][0]["referenceText"].split()) >= 35
         assert candidate["identities"][0]["lineCount"] == 1
-        original_narrator_revision = candidate["narrator"]["voicePreviewRevision"]
         original_alice_revision = candidate["identities"][0]["voicePreviewRevision"]
         narrated = _process(
             client,
@@ -713,6 +724,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
             f"/api/books/{book_id}/stages/cast/candidates/{narrated['revision']}"
         ).json()
         assert narrated_candidate["identities"] == []
+        assert narrated_candidate["narrator"]["lineCount"] == 1
         assert narrated_candidate["labelToCharacterId"] == {"Alice": None}
         batches_before_label_edit = len(audition_batches)
         profiles_before_label_edit = len(profile_batches)
@@ -742,7 +754,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         assert len(audition_batches) == batches_before_label_edit
         assert len(profile_batches) == profiles_before_label_edit
         assert candidate["identities"][0]["voiceSettings"] == alice_settings_before_edit
-        assert candidate["narrator"]["voicePreviewRevision"] == original_narrator_revision
+        assert candidate["narrator"] is None
         assert candidate["identities"][0]["voicePreviewRevision"] == original_alice_revision
         missing = _accept(client, book_id, "cast", edited["revision"], [])
         assert missing.status_code == 409
@@ -764,10 +776,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
         regenerated_candidate = client.get(
             f"/api/books/{book_id}/stages/cast/candidates/{regenerated['revision']}"
         ).json()
-        assert (
-            regenerated_candidate["narrator"]["voicePreviewRevision"]
-            == candidate["narrator"]["voicePreviewRevision"]
-        )
+        assert regenerated_candidate["narrator"] is None
         assert (
             regenerated_candidate["identities"][0]["voicePreviewRevision"]
             != candidate["identities"][0]["voicePreviewRevision"]
@@ -787,7 +796,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
                 "characterId": row["characterId"],
                 "voiceRevision": row["voicePreviewRevision"],
             }
-            for row in [candidate["narrator"], *candidate["identities"]]
+            for row in candidate["identities"]
         ]
         unavailable_decisions = [*stale_decisions]
         unavailable_decisions[-1] = {
@@ -813,10 +822,7 @@ def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path
                 "characterId": row["characterId"],
                 "voiceRevision": row["voicePreviewRevision"],
             }
-            for row in [
-                regenerated_candidate["narrator"],
-                *regenerated_candidate["identities"],
-            ]
+            for row in regenerated_candidate["identities"]
         ]
         assert (
             _accept(client, book_id, "cast", regenerated["revision"], current_decisions).status_code
@@ -1121,7 +1127,7 @@ def test_opt_in_profile_audition_lines_are_stored_and_reused_for_regeneration(tm
             "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
         ).json()
         book_id = imported["book"]["id"]
-        _seed_reviewed_transcript(tmp_path, book_id)
+        _seed_reviewed_transcript(tmp_path, book_id, include_narration=True)
 
         identity = _process(client, book_id, "cast", {})
         audition_result = _process(
@@ -1373,7 +1379,7 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
                 "characterId": row["characterId"],
                 "voiceRevision": row["voicePreviewRevision"],
             }
-            for row in [candidate["narrator"], *candidate["identities"]]
+            for row in candidate["identities"]
         ]
         accepted_response = _accept(
             client, book_id, "cast", audition["revision"], decisions
@@ -1387,8 +1393,9 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
         accepted = read_artifact(package, "cast")
 
     assert len(audition_batches) == 2
-    assert audition_batches[0][0] == "narrator"
-    assert len(audition_batches[0]) == 3
+    assert candidate["narrator"] is None
+    assert "narrator" not in audition_batches[0]
+    assert len(audition_batches[0]) == 2
     assert len(audition_batches[1]) == 2
     by_name = {row["name"]: row for row in candidate["identities"]}
     assert by_name["Guard"]["voicePreviewRevision"] == by_name["Rebel"][
@@ -1954,7 +1961,7 @@ def test_audio_recipe_or_model_refresh_reuses_language_bound_profiles(tmp_path):
         book_id = client.post(
             "/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}
         ).json()["book"]["id"]
-        _seed_reviewed_transcript(tmp_path, book_id)
+        _seed_reviewed_transcript(tmp_path, book_id, include_narration=True)
 
         identity = _process(client, book_id, "cast", {})
         first = _process(
@@ -2227,7 +2234,7 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
                                      for model in ("snapshot-test", "snapshot-new")],
                                  voice_languages=lambda *_: ["english"])) as client:
         book_id = client.post('/api/books/import', files={'file': ('book.pdf', _pdf(), 'application/pdf')}).json()['book']['id']
-        _seed_reviewed_transcript(tmp_path, book_id)
+        _seed_reviewed_transcript(tmp_path, book_id, include_narration=True)
         identity = _process(client, book_id, 'cast', {})
         settings = {'proposalRevision': identity['revision'], 'language': 'english', 'sourceBookIds': ['source'], 'castingPreviewFingerprint': 'bound-source-revisions'}
         preview = client.post(f'/api/books/{book_id}/cast/reuse-preview', json=settings)

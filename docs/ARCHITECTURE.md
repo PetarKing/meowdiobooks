@@ -74,6 +74,10 @@ requested pending tracks remain, current requested recordings are selected for E
 This prop grants no permission and does not change generation commands or host funding checks;
 account and payment records remain outside the workflow model and artifacts.
 
+The public `cast_runtime.cast_voice_targets` helper plans required voices from finalized identities
+and accepted Dialogue/Review routing without mutating inputs. Hosts use it for cost and reuse checks;
+zero-line narrators are absent from these targets.
+
 The public `cast_runtime` planning helpers `rebase_accepted_cast`, `reuse_unchanged_cast_voices`
 and `has_complete_audition_pack` let compositions determine existing reuse before admitting new
 provider work. They do not call providers, write files or publish artifacts. The reuse helper updates
@@ -232,6 +236,13 @@ removes, groups, or replaces stages and handlers. A replacement that preserves i
 artifact may keep public downstream consumers; an incompatible artifact requires an adapter or private
 replacement of those consumers. Account, billing, tenant, object-storage, and queue identifiers never
 belong in public artifact JSON.
+
+The `showVoiceModelControls` and `advancedDialogueRules` UI capabilities default to `true` for
+local installations, where users may configure the voice runtime and speaker-matching rules.
+A companion that manages those choices sets them to `false`: the workflow retains its current
+voice selection, language, auditions, reuse choices, and quote checks, while model names and
+advanced rule editors are omitted from the interface. These capabilities do not change provider
+selection or permission to run a command.
 
 Edition translations change presentation only. They must not be used to disguise an unavailable
 capability: filesystem actions, provider routes, and supplier-cost visibility remain explicit typed

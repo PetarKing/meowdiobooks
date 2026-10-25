@@ -111,6 +111,8 @@ const publicWorkflowCapabilities: WorkflowCapabilities = {
   localDialogueAttribution: true,
   showExecutionBadge: true,
   showProviderCostReceipts: true,
+  showVoiceModelControls: true,
+  advancedDialogueRules: true,
 };
 
 
@@ -879,7 +881,7 @@ export function useWorkflowModel({
   async function acceptCandidate(stageId: ProcessableStage, candidate: { revision?: unknown; conflicts?: unknown[]; } | undefined, decisions: AcceptanceDecision[] = []) {
     if (!book || !candidate?.revision) return;
     if (stageId === "dialogue" && candidate.conflicts?.length) {
-      setError("Resolve every overlapping regex conflict before accepting Dialogue.");
+      setError("Choose how to read each overlapping match before continuing.");
       return;
     }
     setBusy(true);
@@ -909,7 +911,7 @@ export function useWorkflowModel({
       const candidate = extractionCandidate ?? await processCandidate("extract", { method });
       if (!candidate.revision) throw new Error("extract did not return a candidate revision");
       setBusy(true);
-      setProcessMessage("Publishing extraction");
+      setProcessMessage("Saving extracted text");
       setProgress(100);
       await gateway.acceptStage(book.id, "extract", String(candidate.revision), []);
       const next = await hydrate(book.id);

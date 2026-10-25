@@ -8,6 +8,7 @@ from typing import Any
 
 from .dialogue import malformed_playable_spans
 from .review import ReviewContractError, review_source_validation_view
+from .voice_routing import is_narration_delimiter
 
 
 class RecordingScriptContractError(ValueError):
@@ -55,7 +56,8 @@ def build_recording_script(
     retained: dict[str, bool] = {}
     for span in spans:
         span_id = str(span["id"])
-        keep = span.get("reviewAction") != "exclude"
+        delimiter = is_narration_delimiter(span)
+        keep = span.get("reviewAction") != "exclude" and not delimiter
         text = str(span.get("text", span.get("source", ""))) if keep else ""
         if keep and not text:
             raise RecordingScriptContractError(
@@ -75,7 +77,7 @@ def build_recording_script(
                     if span.get("reviewRepairs")
                     else
                     "source-delimiter"
-                    if span.get("origin") == "source-delimiter"
+                    if delimiter or span.get("origin") == "source-delimiter"
                     else f"review:{span.get('reviewOccurrenceId')}:exclude"
                     if not keep
                     else "accepted-source"

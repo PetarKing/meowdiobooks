@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { CastingPreview, CastProcessSettings, WorkflowGateway, WizardSnapshot } from "../api/contracts";
+import { localizeErrorMessage, message } from "../workflow/presentation";
 import "./CastingChoice.css";
 
 interface Props {
@@ -9,12 +10,13 @@ interface Props {
   bookId: string;
   settings: CastProcessSettings;
   models?: WizardSnapshot["voiceModels"];
+  showVoiceModelControls?: boolean;
   onSourcesChange: (ids: string[]) => void;
   onModelChange: (id: string) => void;
   onReadyChange: (ready: boolean, fingerprint?: string) => void;
 }
 
-export function CastingChoice({ action, gateway, bookId, settings, models = [], onSourcesChange, onModelChange, onReadyChange }: Props) {
+export function CastingChoice({ action, gateway, bookId, settings, models = [], showVoiceModelControls = true, onSourcesChange, onModelChange, onReadyChange }: Props) {
   const { t, i18n } = useTranslation();
   const [result, setResult] = useState<{ key: string; preview: CastingPreview }>();
   const [error, setError] = useState(false);
@@ -44,7 +46,7 @@ export function CastingChoice({ action, gateway, bookId, settings, models = [], 
         if (disposed) return;
         setError(true);
         setLoading(false);
-        if (reason instanceof Error && "status" in reason && reason.status === 422) setErrorDetail(reason.message);
+        if (reason instanceof Error && "status" in reason && reason.status === 422) setErrorDetail(message(reason));
       });
     }, 150);
     return () => { disposed = true; window.clearTimeout(timer); };
@@ -77,13 +79,15 @@ export function CastingChoice({ action, gateway, bookId, settings, models = [], 
     onSourcesChange(savedSources.current);
   }
   return <section className="casting-choice" aria-label={t("Casting options")} aria-busy={!current && !error}>
-    <div className={`casting-options${sourceBooks.length ? " has-reuse" : ""}${reuseOpen ? " reuse-open" : ""}`}>
-      {options.map((option) => {
+    <div className={`casting-options${showVoiceModelControls ? "" : " managed-voices"}${sourceBooks.length ? " has-reuse" : ""}${reuseOpen ? " reuse-open" : ""}`}>
+      {showVoiceModelControls ? options.map((option) => {
         const sentences = t(option.description).match(/[^.!?。！？]+[.!?。！？]?/g) ?? [t(option.description)];
         return <button type="button" key={option.modelId} aria-pressed={!reuseOpen && settings.voiceModel === option.modelId} className={`casting-option${!reuseOpen && settings.voiceModel === option.modelId ? " selected" : ""}`} onClick={() => chooseModel(option.modelId)}>
         <span className="casting-option-heading"><b>{t(option.label)}</b><span aria-hidden="true" className="casting-radio">{!reuseOpen && settings.voiceModel === option.modelId ? "●" : "○"}</span></span>
         {!reuseOpen && option.description && <><span className="casting-option-description">{sentences[0].trim()}</span>{sentences.length > 1 && <small>{sentences.slice(1).join(" ").trim()}</small>}</>}
-      </button>; })}
+      </button>; }) : <button type="button" aria-pressed={!reuseOpen} className={`casting-option${!reuseOpen ? " selected" : ""}`} onClick={() => chooseModel(settings.voiceModel ?? "")}>
+        <span className="casting-option-heading"><b>{t("Create new voices")}</b><span aria-hidden="true" className="casting-radio">{!reuseOpen ? "●" : "○"}</span></span>
+      </button>}
       {!!sourceBooks.length && <button type="button" className={`casting-option casting-reuse-option${reuseOpen ? " selected" : ""}`} aria-pressed={reuseOpen} onClick={openReuse}>
         <span className="casting-option-heading"><b>{t("Reuse voices")}</b><span aria-hidden="true" className="casting-radio">{reuseOpen ? "●" : "○"}</span></span>
         {!reuseOpen && <><span className="casting-option-description">{t("Bring familiar voices into this book.")}</span><small>{t("Create new voices where needed.")}</small></>}
@@ -102,10 +106,10 @@ export function CastingChoice({ action, gateway, bookId, settings, models = [], 
       <div className="casting-match-summary" aria-live="polite">
         {current && selected.length > 0 ? <><p><span>{t("{{count}} exact matches", { count: preview!.exactMatchCount })}</span><span aria-hidden="true"> · </span><span>{t("Up to {{count}} new voices", { count: preview!.remainingVoiceCount })}</span></p><small>{t("AI checks for more matches when you continue.")}</small></> : <small>{t(selected.length ? "Checking exact matches…" : "Choose books to keep familiar voices.")}</small>}
       </div>
-      <div className="casting-remainder"><div className="casting-remainder-heading"><span>{t("For new voices")}</span>{activeOption && <p className="casting-quality-description">{t(activeOption.description)}</p>}</div><div className="casting-quality" role="group" aria-label={t("Casting for new voices")}>{preview?.options?.map((option) => <button key={option.modelId} type="button" aria-pressed={settings.voiceModel === option.modelId} onClick={() => { if (settings.voiceModel !== option.modelId) { onReadyChange(false); onModelChange(option.modelId); } }}>{t(option.label)}</button>)}</div></div>
+      {showVoiceModelControls && <div className="casting-remainder"><div className="casting-remainder-heading"><span>{t("For new voices")}</span>{activeOption && <p className="casting-quality-description">{t(activeOption.description)}</p>}</div><div className="casting-quality" role="group" aria-label={t("Casting for new voices")}>{preview?.options?.map((option) => <button key={option.modelId} type="button" aria-pressed={settings.voiceModel === option.modelId} onClick={() => { if (settings.voiceModel !== option.modelId) { onReadyChange(false); onModelChange(option.modelId); } }}>{t(option.label)}</button>)}</div></div>}
     </div>}
     <footer className="casting-footer"><div className="casting-estimate" aria-live="polite">
-      {error || (current && !quoteAvailable) ? <div role="alert" className="casting-preview-error"><span>{t("Couldn’t calculate casting cost.")}{errorDetail && <small className="casting-error-detail">{t(errorDetail)}</small>}</span><button type="button" className="ghost compact" onClick={() => { onReadyChange(false); setRetry((value) => value + 1); }}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : activeOption?.estimatedCostMinor != null && preview?.currency ? <div aria-label={t("Estimated cost")}><strong>≈ {new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(activeOption.estimatedCostMinor / 100)}</strong></div> : null}
+      {error || (current && !quoteAvailable) ? <div role="alert" className="casting-preview-error"><span>{t("Couldn’t calculate casting cost.")}{errorDetail && <small className="casting-error-detail">{localizeErrorMessage(errorDetail, t)}</small>}</span><button type="button" className="ghost compact" onClick={() => { onReadyChange(false); setRetry((value) => value + 1); }}>{t("Retry")}</button></div> : !current ? <div className="casting-loading" role="status">{t("Calculating…")}</div> : activeOption?.estimatedCostMinor != null && preview?.currency ? <div aria-label={t("Estimated cost")}><strong>≈ {new Intl.NumberFormat(i18n.language, { style: "currency", currency: preview.currency }).format(activeOption.estimatedCostMinor / 100)}</strong></div> : null}
     </div>{action}</footer>
   </section>;
 }

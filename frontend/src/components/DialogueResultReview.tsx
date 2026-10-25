@@ -423,7 +423,7 @@ function adjustedReaderAssignments(base: DialogueReaderAssignment[], rows: Dialo
 }
 
 function readerBreakdown(assignment: DialogueReaderAssignment, t: (key: string, options?: Record<string, unknown>) => string) {
-  if (assignment.label === "Narrator") return t("fallback lines");
+  if (assignment.label === "Narrator") return t("narrator lines");
   const parts = [assignment.known ? t("{{count}} known", { count: assignment.known }) : "", assignment.ai ? t("{{count}} AI", { count: assignment.ai }) : "", assignment.user ? t("{{count}} changed", { count: assignment.user }) : ""].filter(Boolean);
   return parts.join(" · ") || t("dialogue lines");
 }
@@ -489,7 +489,7 @@ function reviewReason(row: DialogueExample) {
   const suggestions = row.suggestedSpeakers?.length ?? 0;
   if (suggestions >= 2) return { title: "Two possible readers", short: "two possible readers", detail: "AI could not safely choose between them." };
   if (suggestions === 1) return { title: "One possible reader", short: "one possible reader", detail: "AI found a possible speaker. Please confirm." };
-  return { title: "No supported reader", short: "no supported reader", detail: "No clear speaker was found. Narrator reads this line for now." };
+  return { title: "No clear speaker", short: "no clear speaker", detail: "No clear speaker was found. Narrator reads this line for now." };
 }
 
 function prioritizeNarrator(assignments: DialogueReaderAssignment[]) {

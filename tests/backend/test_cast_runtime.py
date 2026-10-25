@@ -1,3 +1,5 @@
+import pytest
+
 from meowdiobooks.backend.cast import stable_character_id
 from meowdiobooks.backend.cast_runtime import (
     _audition_character,
@@ -147,3 +149,29 @@ def test_shared_audition_preserves_each_identity_desired_settings(tmp_path):
     assert shared["voiceCandidates"][0]["direction"] == "Bright young-adult voice"
     assert shared["voiceCandidates"][0]["source"] == "shared"
     assert shared["referenceAudio"] == "voices/guard/voice-1.wav"
+
+
+@pytest.mark.parametrize(
+    "span,mapping,expected",
+    [
+        ({"renderRole": "dialogue", "sourceSpeakerLabel": "Alice"}, {"Alice": "alice"}, 0),
+        ({"renderRole": "narration"}, {}, 1),
+        ({"renderRole": "dialogue", "sourceSpeakerLabel": "Alice"}, {"Alice": None}, 1),
+        ({"renderRole": "dialogue", "sourceSpeakerLabel": "Unknown"}, {"Alice": "alice"}, 1),
+        ({"renderRole": "dialogue"}, {"Alice": "alice"}, 1),
+        ({"renderRole": "dialogue", "speakerStatus": "unresolved"}, {}, 1),
+        ({"renderRole": "dialogue", "speakerStatus": "open-marker"}, {}, 1),
+        ({"renderRole": "narration", "reviewAction": "exclude"}, {}, 0),
+        ({"renderRole": "dialogue", "speakerLabels": ["Alice", "Bob"]},
+         {"Alice": "alice", "Bob": None}, 1),
+        ({"renderRole": "dialogue", "resolvedSpeakerLabel": "Alice", "sourceSpeakerLabel": "?"},
+         {"Alice": "alice"}, 0),
+    ],
+)
+def test_narrator_counts_follow_playable_routes_not_dossier_estimates(span, mapping, expected):
+    from meowdiobooks.backend.cast_runtime import _apply_cast_line_counts
+
+    finalized = {"identities": [], "labelToCharacterId": mapping}
+    # Stale display counts cannot create or remove a required reading voice.
+    proposal = {"dossiers": [{"label": "Alice", "occurrenceCount": 100}]}
+    assert _apply_cast_line_counts(finalized, proposal, [{"text": "Read this.", **span}]) == expected

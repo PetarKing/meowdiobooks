@@ -9,15 +9,48 @@ const preview: CastingPreview = {
   exactMatchCount: 3, totalVoiceCount: 7, remainingVoiceCount: 4, currency: "EUR",
   options: [{ modelId: "studio", label: "Studio", description: "Minor characters may share voices.", estimatedCostMinor: 175 }, { modelId: "balanced", label: "Balanced", description: "A distinct voice for each character.", estimatedCostMinor: 85 }],
 };
-function Harness({ fetchPreview = vi.fn().mockResolvedValue(preview), models }: { fetchPreview?: ReturnType<typeof vi.fn>; models?: WizardSnapshot["voiceModels"] } = {}) {
+function Harness({ fetchPreview = vi.fn().mockResolvedValue(preview), models, showVoiceModelControls = true, initialModel = "studio" }: { showVoiceModelControls?: boolean; initialModel?: string; fetchPreview?: ReturnType<typeof vi.fn>; models?: WizardSnapshot["voiceModels"] } = {}) {
   const [gateway] = useState({ previewCasting: fetchPreview } as unknown as WorkflowGateway);
   const [ids, setIds] = useState<string[]>([]);
-  const [model, setModel] = useState("studio");
+  const [model, setModel] = useState(initialModel);
   const [ready, setReady] = useState(false);
-  return <><CastingChoice gateway={gateway} bookId="current" models={models} settings={{ sourceBookIds: ids, voiceModel: model, language: "english" }} onSourcesChange={setIds} onModelChange={setModel} onReadyChange={setReady} /><button disabled={!ready}>Continue</button><output>{JSON.stringify(ids)}</output></>;
+  return <><CastingChoice showVoiceModelControls={showVoiceModelControls} gateway={gateway} bookId="current" models={models} settings={{ sourceBookIds: ids, voiceModel: model, language: "english" }} onSourcesChange={setIds} onModelChange={setModel} onReadyChange={setReady} /><button disabled={!ready}>Continue</button><output>{JSON.stringify(ids)}</output></>;
 }
 
 describe("CastingChoice", () => {
+  it("keeps the selected model and reuse choices without exposing model labels or descriptions", async () => {
+    const fetchPreview = vi.fn().mockResolvedValue(preview);
+    render(<Harness fetchPreview={fetchPreview} showVoiceModelControls={false} initialModel="balanced" models={[
+      { id: "studio", label: "Studio", supportedLanguages: ["english"] },
+      { id: "balanced", label: "Balanced", supportedLanguages: ["english"] },
+    ]} />);
+    expect(screen.queryByText("Studio")).not.toBeInTheDocument();
+    expect(screen.queryByText("Balanced")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    expect(screen.getByText("≈ €0.85")).toBeInTheDocument();
+    expect(screen.queryByText("A distinct voice for each character.")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Reuse voices/ }));
+    expect(screen.queryByRole("group", { name: "Casting for new voices" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("checkbox", { name: /The first book/ }));
+    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: ["one"], voiceModel: "balanced" })));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /Create new voices/ }));
+    await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith("current", expect.objectContaining({ sourceBookIds: [], voiceModel: "balanced" })));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Continue" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: /Reuse voices/ }));
+    expect(screen.getByRole("checkbox", { name: /The first book/ })).toBeChecked();
+    expect(screen.queryByText("Studio")).not.toBeInTheDocument();
+    expect(screen.queryByText("Balanced")).not.toBeInTheDocument();
+  });
+
+  it("does not expose technical details from a validation failure", async () => {
+    const fetchPreview = vi.fn().mockRejectedValue(Object.assign(new Error("Qwen API 422: invalid JSON characterId"), { status: 422 }));
+    render(<Harness fetchPreview={fetchPreview} showVoiceModelControls={false} />);
+    const alert = await screen.findByRole("alert");
+    expect(alert).not.toHaveTextContent(/Qwen|API|JSON|characterId/);
+    expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
+  });
+
   it.each([422, 500])("shows actionable validation detail only for a %i rejection", async (status) => {
     const fetchPreview = vi.fn().mockRejectedValue(Object.assign(new Error("Select a supported voice language"), { status }));
     render(<Harness fetchPreview={fetchPreview} />);
