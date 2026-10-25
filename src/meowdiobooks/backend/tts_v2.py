@@ -19,6 +19,7 @@ from meowdiobooks.util import write_json
 
 from .audio import QWEN_GENERATION_ATTEMPTS, mix_audio_tracks
 from .model_config import asset_path, load_model_registry
+from .native_runtime import NativeModelLoader, load_native_model
 
 
 class TTSContractError(ValueError):
@@ -37,6 +38,8 @@ def render_plan_audio(
     language: str,
     report: Callable[[float, str | None], None],
     model_id: str | None = None,
+    *,
+    model_loader: NativeModelLoader | None = None,
 ) -> list[dict[str, Any]]:
     """Render complete chapters from a v2 plan and publish each atomically.
 
@@ -56,14 +59,17 @@ def render_plan_audio(
 
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-    model, clear_cache = _load_model(repo_root, model_id)
-    sample_rate = int(model.sample_rate)
-    units_by_chapter = [_render_units(list(row.get("segments", []))) for row in chapters]
-    total = max(sum(len(rows) for rows in units_by_chapter), 1)
-    completed = 0
-    results: list[dict[str, Any]] = []
-    report(2, f"Making chapter audio from {total} passages")
+    model, clear_cache = (
+        _load_model(repo_root, model_id) if model_loader is None
+        else _load_model(repo_root, model_id, model_loader=model_loader)
+    )
     try:
+        sample_rate = int(model.sample_rate)
+        units_by_chapter = [_render_units(list(row.get("segments", []))) for row in chapters]
+        total = max(sum(len(rows) for rows in units_by_chapter), 1)
+        completed = 0
+        results: list[dict[str, Any]] = []
+        report(2, f"Making chapter audio from {total} passages")
         for chapter, render_units in zip(chapters, units_by_chapter, strict=True):
             chapter_id = str(chapter.get("chapterId", "")).strip()
             if not chapter_id:
@@ -317,15 +323,14 @@ def cleanup_stale_audio_staging(package: Path) -> None:
         shutil.rmtree(staging, ignore_errors=True)
 
 
-def _load_model(repo_root: Path, model_id: str | None) -> tuple[Any, Callable[[], None]]:
-    from mlx_audio.tts.utils import load_model
-    import mlx.core as mx
-
+def _load_model(
+    repo_root: Path, model_id: str | None, *, model_loader: NativeModelLoader | None = None,
+) -> tuple[Any, Callable[[], None]]:
     pipeline = load_model_registry(repo_root).voice_pipeline(model_id)
     path = asset_path(repo_root, pipeline.renderer_path)
     if not path.is_dir():
         raise RuntimeError("The required local voice model is not installed")
-    return load_model(path, strict=True), mx.clear_cache
+    return load_native_model(path, "tts", model_loader)
 
 
 def _synthesize(

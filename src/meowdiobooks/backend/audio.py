@@ -18,6 +18,7 @@ from scipy.io import wavfile
 from scipy.signal import resample_poly
 
 from .model_config import asset_path, load_model_registry
+from .native_runtime import NativeModelLoader, load_native_model
 
 
 # Qwen evaluates released checkpoints with the generation-config defaults below. Keep the
@@ -89,19 +90,19 @@ def generate_cloned_audition(
     text: str,
     language: str,
     model_id: str | None = None,
+    *,
+    model_loader: NativeModelLoader | None = None,
 ) -> bytes:
     """Render an audition line from a transcript-conditioned speaker reference."""
 
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-    from mlx_audio.tts.utils import load_model
-    import mlx.core as mx
 
     pipeline = load_model_registry(repo_root).voice_pipeline(model_id)
     model_path = asset_path(repo_root, pipeline.renderer_path)
     if not model_path.is_dir():
         raise RuntimeError("The required local voice model is not installed")
-    model = load_model(model_path, strict=True)
+    model, release_model = load_native_model(model_path, "tts", model_loader)
     try:
         audio = _generate_cloned_preview(
             model, text, reference_audio, reference_text, language
@@ -112,7 +113,7 @@ def generate_cloned_audition(
     finally:
         del model
         gc.collect()
-        mx.clear_cache()
+        release_model()
 
 
 def mix_audio_tracks(parts: list[np.ndarray]) -> np.ndarray:
@@ -164,11 +165,11 @@ def generate_cast_previews(
     report: Callable[[float, str | None], None],
     language: str,
     model_id: str | None = None,
+    *,
+    model_loader: NativeModelLoader | None = None,
 ) -> list[dict[str, Any]]:
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
-    from mlx_audio.tts.utils import load_model
-    import mlx.core as mx
 
     pipeline = load_model_registry(repo_root).voice_pipeline(model_id)
     model_path = asset_path(repo_root, pipeline.audition_path)
@@ -176,10 +177,10 @@ def generate_cast_previews(
         raise RuntimeError("The required local voice model is not installed")
     report(2, "Preparing voice auditions")
     report(4, "Preparing voice auditions")
-    model = load_model(model_path, strict=True)
-    report(8, "Starting voice auditions")
-    sample_rate = int(model.sample_rate)
+    model, release_model = load_native_model(model_path, "tts", model_loader)
     try:
+        report(8, "Starting voice auditions")
+        sample_rate = int(model.sample_rate)
         total = max(len(characters), 1)
         generated = 0
         for index, character in enumerate(characters, start=1):
@@ -239,7 +240,7 @@ def generate_cast_previews(
     finally:
         del model
         gc.collect()
-        mx.clear_cache()
+        release_model()
     return characters
 
 

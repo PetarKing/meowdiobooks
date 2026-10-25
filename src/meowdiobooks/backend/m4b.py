@@ -65,6 +65,7 @@ def package_audio_export(
     preset: AudioExportPreset,
     description: str | None = None,
     ffmpeg: str | None = None,
+    command_runner=None,
 ) -> Path:
     """Package selected WAV revisions using one allowlisted audiobook preset."""
     profile = audio_export_profile(preset)
@@ -78,6 +79,7 @@ def package_audio_export(
             cover=cover,
             bitrate=profile.bitrate,
             ffmpeg=ffmpeg,
+            **({"command_runner": command_runner} if command_runner is not None else {}),
         )
     return package_m4b(
         chapters,
@@ -88,6 +90,7 @@ def package_audio_export(
         cover=cover,
         bitrate=profile.bitrate,
         ffmpeg=ffmpeg,
+        **({"command_runner": command_runner} if command_runner is not None else {}),
     )
 
 
@@ -101,6 +104,7 @@ def package_m4b(
     description: str | None = None,
     bitrate: str = "128k",
     ffmpeg: str | None = None,
+    command_runner=None,
 ) -> Path:
     """Create one chaptered AAC/M4B without modifying the source WAV revisions."""
     executable = ffmpeg or shutil.which("ffmpeg")
@@ -182,7 +186,7 @@ def package_m4b(
         str(output),
     ]
     try:
-        subprocess.run(command, check=True, capture_output=True, timeout=3600)
+        (command_runner if command_runner is not None else subprocess.run)(command, check=True, capture_output=True, timeout=3600)
     except subprocess.TimeoutExpired as error:
         output.unlink(missing_ok=True)
         raise M4BExportError("FFmpeg did not finish the M4B export within one hour") from error
@@ -208,6 +212,7 @@ def package_mp3_chapters(
     description: str | None = None,
     bitrate: str = "96k",
     ffmpeg: str | None = None,
+    command_runner=None,
 ) -> Path:
     """Create a ZIP containing one ordered, tagged MP3 per selected chapter."""
     executable = ffmpeg or shutil.which("ffmpeg")
@@ -275,7 +280,7 @@ def package_mp3_chapters(
                 "comment=Cover (front)",
                 str(destination),
             ]
-            subprocess.run(command, check=True, capture_output=True, timeout=3600)
+            (command_runner if command_runner is not None else subprocess.run)(command, check=True, capture_output=True, timeout=3600)
             if not destination.is_file() or destination.stat().st_size == 0:
                 raise M4BExportError(f"FFmpeg produced no MP3 for {chapter.title}")
             packaged.append(destination)
