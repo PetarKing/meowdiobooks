@@ -71,7 +71,7 @@ The Review screenshots use the same public fixture book and neutral presentation
 
 Additional repository gates passed: `npm run storybook:check`, `npm run build-storybook`,
 71 Storybook interaction tests, the packed-package `test:consumer` development/production
-checks, and all 100 `visual:review` cases across light/dark desktop/mobile. The local
+checks, and all 96 `visual:review` cases across light/dark desktop/mobile. The local
 Storybook run used installed Chrome; consumer/visual gates used the pinned Playwright
 browser downloaded into a temporary directory. Synthetic consumer assertions now expect
 the safe progress fallback instead of raw internal job wording.
