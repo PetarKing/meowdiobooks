@@ -1,6 +1,7 @@
 """A single-worker, filesystem-persisted job queue."""
 
 import inspect
+import logging
 import threading
 from collections.abc import Callable
 from contextlib import AbstractContextManager, nullcontext
@@ -8,10 +9,15 @@ from contextlib import AbstractContextManager, nullcontext
 from .models import Job, JobStatus, utc_now
 from .action_required import extract_action_required
 from .storage import ModelStore
+from .errors import public_error_message
 
 JobHandler = Callable[..., dict[str, object] | None]
 BeforeRun = Callable[[Job], None]
 ActivityFactory = Callable[[], AbstractContextManager[object]]
+JobFailureReporter = Callable[[Job, Exception], None]
+
+logger = logging.getLogger(__name__)
+_PUBLIC_FAILURE_MESSAGE = "Something went wrong while completing this step. Try again; your accepted work is unchanged."
 
 
 class JobCancellationRequested(RuntimeError):
@@ -65,6 +71,7 @@ class JobQueue:
         *,
         before_run: BeforeRun | None = None,
         activity: ActivityFactory | None = None,
+        on_job_failed: JobFailureReporter | None = None,
     ) -> None:
         self.store = store
         self.handlers = handlers or {}
@@ -73,6 +80,7 @@ class JobQueue:
         self._thread: threading.Thread | None = None
         self._before_run = before_run
         self._activity = activity or nullcontext
+        self._on_job_failed = on_job_failed
         self._recover_interrupted_jobs()
 
     def register(self, kind: str, handler: JobHandler) -> None:
@@ -209,19 +217,17 @@ class JobQueue:
                     return self._finish_canceled(current)
                 current.status = JobStatus.FAILED
                 current.action_required = extract_action_required(failure)
-                current.error = current.action_required.message if current.action_required else str(
-                    getattr(
-                        failure,
-                        "public_message",
-                        f"{type(failure).__name__}: {failure}",
-                    )
+                current.error = current.action_required.message if current.action_required else public_error_message(
+                    failure, _PUBLIC_FAILURE_MESSAGE,
                 )
                 current.message = "Action required" if current.action_required else "Failed"
                 current.finished_at = utc_now()
                 current.updated_at = current.finished_at
                 return current
 
-            self.store.update(job.id, fail)
+            failed = self.store.update(job.id, fail)
+            if failed is not None and failed.status == JobStatus.FAILED and not failed.action_required:
+                self._report_failure(failed, failure)
             return
 
         def succeed(current: Job) -> Job:
@@ -238,6 +244,24 @@ class JobQueue:
             return current
 
         self.store.update(job.id, succeed)
+
+    def _report_failure(self, job: Job, error: Exception) -> None:
+        if self._on_job_failed is None:
+            logger.error(
+                "Workflow job failed: job_id=%s kind=%s attempt=%s",
+                job.id, job.kind, job.attempt,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+            return
+        try:
+            self._on_job_failed(job, error)
+        except Exception:
+            # The host owns diagnostic privacy. Do not fall back to logging either
+            # exception, and never let a broken reporter prevent job settlement.
+            logger.error(
+                "Workflow failure reporter failed: job_id=%s kind=%s attempt=%s",
+                job.id, job.kind, job.attempt,
+            )
 
     def _raise_if_cancellation_requested(self, job_id: str) -> None:
         current = self.store.get(job_id)

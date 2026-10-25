@@ -138,7 +138,8 @@ from .languages import (
     supported_voice_languages,
     voice_model_capabilities,
 )
-from .queue import JobQueue
+from .queue import JobFailureReporter, JobQueue
+from .errors import WorkflowInputError, public_error_message
 from .resources import SleepInhibitor, require_free_disk
 from .voice_retention import cast_voice_revisions, prune_voice_files
 from .voice_sharing import VoiceSharingPolicy, plan_shared_voices
@@ -326,7 +327,10 @@ def _validate_voice_audio(
 def _require_current_voice_draft(package: Path, revision: str) -> None:
     history = artifact_history(package, "cast")
     if not history or str(history[-1].get("revision")) != revision:
-        raise CastContractError("The Voice draft changed. Refresh before adding or removing auditions")
+        raise WorkflowInputError(
+            "The Voice draft changed. Refresh before adding or removing auditions",
+            public_message="The voice draft changed. Refresh before adding or removing auditions.",
+        )
 
 
 def _generate_voice_candidates(
@@ -455,6 +459,8 @@ def create_app_v2(
     retain_local_library_exports: bool = True,
     chapter_audio_source: ChapterAudioSource | None = None,
     job_preflight: Callable[[], None] | None = None,
+    on_job_failed: JobFailureReporter | None = None,
+    on_operation_failed: Callable[[str, str | None, Exception], None] | None = None,
     file_processor: FileProcessor | None = None,
     max_import_bytes: int = 500_000_000,
     on_cast_voice_revisions_changed: (
@@ -530,8 +536,23 @@ def create_app_v2(
             job_preflight() if job_preflight is not None else require_free_disk(root)
         ),
         activity=SleepInhibitor,
+        on_job_failed=on_job_failed,
     )
     runner = WorkflowRunner(PUBLIC_WORKFLOW)
+
+    def report_operation_failure(operation: str, book_id: str | None, error: Exception) -> None:
+        if on_operation_failed is None:
+            logger.error(
+                "Workflow operation failed: operation=%s book_id=%s", operation, book_id,
+                exc_info=(type(error), error, error.__traceback__),
+            )
+            return
+        try:
+            on_operation_failed(operation, book_id, error)
+        except Exception:
+            logger.error(
+                "Workflow failure reporter failed: operation=%s book_id=%s", operation, book_id,
+            )
 
     def require_book(book_id: str) -> Book:
         book = books.get(book_id)
@@ -611,7 +632,10 @@ def create_app_v2(
             while chunk := stream.read(1024 * 1024):
                 digest.update(chunk)
         if not book.source_hash or digest.hexdigest() != book.source_hash:
-            raise ValueError("Imported source integrity check failed; re-import the document")
+            raise WorkflowInputError(
+                "Imported source integrity check failed; re-import the document",
+                public_message="Import the source document again before continuing.",
+            )
         method = command.settings.method if book.source_kind == "pdf" else "text"
         report(2, "Extracting the complete document")
         package = package_for(book.id)
@@ -659,7 +683,10 @@ def create_app_v2(
         scan = scan_dialogue(extraction["blocks"], **dialogue_scan_settings(settings))
         blockers = dialogue_progression_blockers(scan)
         if blockers:
-            raise DialogueContractError("; ".join(blockers))
+            raise WorkflowInputError(
+                "; ".join(blockers),
+                public_message="Review the dialogue rules and resolve conflicting matches before continuing.",
+            )
         attribution_targets = list(
             settings.get("attributionTargets", ["open-speakers", "unlabelled-candidates"])
         )
@@ -2053,12 +2080,19 @@ def create_app_v2(
                 )
         except FFmpegUnavailableError as error:
             shutil.rmtree(work, ignore_errors=True)
-            raise HTTPException(status_code=503, detail=str(error)) from error
+            report_operation_failure("export", book_id, error)
+            raise HTTPException(status_code=503, detail=public_error_message(
+                error, "Audio export is temporarily unavailable. Please try again later."
+            )) from error
         except (M4BExportError, ValueError) as error:
             shutil.rmtree(work, ignore_errors=True)
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            report_operation_failure("export", book_id, error)
+            raise HTTPException(status_code=422, detail=public_error_message(
+                error, "We couldn’t create the audiobook download. Please try again."
+            )) from error
         except (OSError, RuntimeError) as error:
             shutil.rmtree(work, ignore_errors=True)
+            report_operation_failure("export", book_id, error)
             raise HTTPException(
                 status_code=409,
                 detail="Chapter audio could not be prepared for export",
@@ -2066,30 +2100,30 @@ def create_app_v2(
         except BaseException:
             shutil.rmtree(work, ignore_errors=True)
             raise
-        library_root.mkdir(parents=True, exist_ok=True)
-        destination = _available_library_path(library_root, filename)
-        chapter_positions = [
-            chapter_order.index(chapter.chapter_id) + 1 for chapter in export_chapters
-        ]
-        item = LibraryExport(
-            book_id=book.id,
-            title=title,
-            author=author,
-            description=description,
-            filename=destination.name,
-            file_path=str(destination),
-            chapter_count=len(export_chapters),
-            chapter_titles=[chapter.title for chapter in export_chapters],
-            chapter_positions=chapter_positions,
-            partial=partial,
-            size_bytes=output.stat().st_size,
-            preset=body.preset,
-            media_type=profile.media_type,
-        )
-        library_cover_root.mkdir(parents=True, exist_ok=True)
-        cover_destination = library_cover_root / f"{item.id}{cover.suffix.lower() or '.jpg'}"
-        item.cover_path = str(cover_destination)
         try:
+            library_root.mkdir(parents=True, exist_ok=True)
+            destination = _available_library_path(library_root, filename)
+            chapter_positions = [
+                chapter_order.index(chapter.chapter_id) + 1 for chapter in export_chapters
+            ]
+            item = LibraryExport(
+                book_id=book.id,
+                title=title,
+                author=author,
+                description=description,
+                filename=destination.name,
+                file_path=str(destination),
+                chapter_count=len(export_chapters),
+                chapter_titles=[chapter.title for chapter in export_chapters],
+                chapter_positions=chapter_positions,
+                partial=partial,
+                size_bytes=output.stat().st_size,
+                preset=body.preset,
+                media_type=profile.media_type,
+            )
+            library_cover_root.mkdir(parents=True, exist_ok=True)
+            cover_destination = library_cover_root / f"{item.id}{cover.suffix.lower() or '.jpg'}"
+            item.cover_path = str(cover_destination)
             _commit_library_export(
                 item,
                 audio_source=output,
@@ -2102,6 +2136,7 @@ def create_app_v2(
             )
         except (OSError, RuntimeError) as error:
             shutil.rmtree(work, ignore_errors=True)
+            report_operation_failure("export-save", book_id, error)
             raise HTTPException(
                 status_code=500,
                 detail="The audiobook was created but could not be saved to your Library",
@@ -2374,20 +2409,28 @@ def create_app_v2(
             action_error = action_required_http_exception(error)
             if action_error is not None:
                 raise action_error from error
+            report_operation_failure("transcribe", book_id, error)
             raise HTTPException(
                 status_code=503,
-                detail=getattr(error, "public_message", str(error)),
+                detail=public_error_message(error, "We couldn’t transcribe the voice sample. Please try again."),
             ) from error
         except ValueError as error:
             action_error = action_required_http_exception(error)
             if action_error is not None:
                 raise action_error from error
-            raise HTTPException(status_code=422, detail=str(error)) from error
+            if not isinstance(error, WorkflowInputError):
+                report_operation_failure("transcribe", book_id, error)
+            raise HTTPException(status_code=422, detail=public_error_message(
+                error, "We couldn’t transcribe the voice sample. Please try again."
+            )) from error
         except Exception as error:
             action_error = action_required_http_exception(error)
             if action_error is not None:
                 raise action_error from error
-            raise
+            report_operation_failure("transcribe", book_id, error)
+            raise HTTPException(status_code=503, detail=public_error_message(
+                error, "We couldn’t transcribe the voice sample. Please try again."
+            )) from error
         return {"text": draft.text, "language": draft.language}
 
     @app.post(
@@ -2463,8 +2506,15 @@ def create_app_v2(
                 file_processor.normalize_voice_sample if file_processor is not None else normalize_voice_sample,
                 b"".join(chunks), filename,
             )
-        except ValueError as error:
-            raise HTTPException(status_code=422, detail=str(error)) from error
+        except Exception as error:
+            action_error = action_required_http_exception(error)
+            if action_error is not None:
+                raise action_error from error
+            if not isinstance(error, WorkflowInputError):
+                report_operation_failure("clone", book_id, error)
+            raise HTTPException(status_code=422, detail=public_error_message(
+                error, "We couldn’t prepare the voice sample. Please try again."
+            )) from error
 
         audition_text = str(target.get("referenceText") or "").strip()
         if not audition_text:
@@ -2510,12 +2560,10 @@ def create_app_v2(
             action_error = action_required_http_exception(error)
             if action_error is not None:
                 raise action_error from error
+            report_operation_failure("clone", book_id, error)
             raise HTTPException(
                 status_code=422,
-                detail=(
-                    "Could not create a cloned audition: "
-                    f"{getattr(error, 'public_message', str(error))}"
-                ),
+                detail=public_error_message(error, "We couldn’t create the voice audition. Please try again."),
             ) from error
         preview_url = f"/api/books/{book_id}/voices/{character_id}/{voice_revision}/audio"
         candidates = [

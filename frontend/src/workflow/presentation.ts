@@ -26,9 +26,26 @@ export function userFacingDetail(value: string | undefined, fallback: string) {
 
 const pausedVoices = /^Oops—voice generation paused at (.+)\. (?:(\d+) of (\d+) completed voices are safely saved\.|No completed voices were lost\.) Choose Continue voice generation below to resume (?:from this voice|the remaining voices)\.$/;
 
+const referencedOperationErrors = new Set([
+  "We couldn’t create the audio. Please try again.",
+  "We couldn’t transcribe the voice sample. Please try again.",
+  "We couldn’t read this voice sample. Please try another recording.",
+  "We couldn’t create the audiobook download. Please try again.",
+  "We couldn’t create this page preview. Please try again.",
+  "We couldn’t read this document. Please try again or upload another file.",
+]);
+
+function referencedOperationError(value: string) {
+  const matched = value.match(/^(.+) Reference: ([0-9a-f]{32})\.$/);
+  return matched?.[0] === value && referencedOperationErrors.has(matched[1])
+    ? { message: matched[1], reference: matched[2] }
+    : undefined;
+}
+
 export function message(reason: unknown) {
   if (isActionRequiredError(reason)) return reason.handled ? '' : reason.actionRequired.message;
   const raw = reason instanceof Error ? reason.message : "";
+  if (referencedOperationError(raw)) return raw;
   if (/model.+not installed/i.test(raw)) return "errors.aiUnavailable";
   if (/Wait for this book's processing to finish/i.test(raw)) return "errors.bookProcessingActive";
   if (/Could not remove this book's working files/i.test(raw)) return "errors.deleteWorkingData";
@@ -64,6 +81,10 @@ const editionErrorKeys = new Set([
 export function localizeErrorMessage(value: string, t: TFunction) {
   const importLimit = value.match(/^Choose a file no larger than ([\d.,]+) MB\.$/);
   if (importLimit) return t("Choose a file no larger than {{size}} MB.", { size: importLimit[1] });
+  const referenced = referencedOperationError(value);
+  if (referenced) return t("{{message}} Reference: {{reference}}.", {
+    message: t(referenced.message), reference: referenced.reference,
+  });
   const paused = value.match(pausedVoices);
   if (paused) return t(paused[2]
     ? "Voice generation paused at {{name}}. {{completed}} of {{total}} voices are saved. Choose Continue voice generation to resume."

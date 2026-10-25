@@ -7,6 +7,7 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from .errors import WorkflowInputError
 from .model_config import asset_path, load_model_registry
 from .native_runtime import NativeModelLoader, load_native_model
 
@@ -58,7 +59,7 @@ def _draft_from_model(model: object, audio_path: Path) -> TranscriptionDraft:
     )
     text = " ".join(str(getattr(result, "text", "")).split()).strip()
     if not text:
-        raise ValueError("No speech could be transcribed from this sample")
+        raise WorkflowInputError("No speech could be transcribed from this sample")
     raw_language = getattr(result, "language", None)
     if isinstance(raw_language, (list, tuple)):
         detected = list(dict.fromkeys(str(value).strip() for value in raw_language if str(value).strip()))
