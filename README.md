@@ -122,7 +122,7 @@ planned directions. See the [roadmap](docs/ROADMAP.md).
 
 [`models.toml`](models.toml) is the runtime source of truth; the [model guide](docs/MODELS.md) contains
 the pinned revisions, download commands, expected paths and compatibility rules. The complete default
-local set is roughly 14 GB.
+local set is roughly 15 GB.
 
 | Step / use case | Route | Default model | Compatible configuration |
 |---|---|---|---|
@@ -130,8 +130,8 @@ local set is roughly 14 GB.
 | Large Dialogue reviews, when explicitly selected | Remote, optional | `gpt-6-luna` (`service_tier = "fast"`) through the configured OpenAI Responses profile | An OpenAI Responses profile supporting strict JSON schemas, function tools, and the bounded evidence contract |
 | Designed voice auditions | Local | [`mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) | A compatible MLX-Audio VoiceDesign checkpoint paired with a Base renderer and an explicitly validated language list |
 | Voice-sample transcript draft (STT) | Local | [`mlx-community/Qwen3-ASR-0.6B-4bit`](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-4bit) with automatic language detection | A compatible MLX-Audio Qwen3-ASR checkpoint implementing the same editable text/language result; a future Linux adapter can preserve this boundary |
-| Voice-cloned audition | Local | [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit) with the uploaded reference WAV and corrected transcript | A compatible Base checkpoint supporting transcript-conditioned `ref_audio` + `ref_text` cloning |
-| Chapter generation | Local | The same Qwen3-TTS Base 1.7B 4-bit renderer | The Base half of the selected voice pipeline, supporting every configured book language |
+| Voice-cloned audition | Local | [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit) with the uploaded reference WAV and corrected transcript | A compatible Base checkpoint supporting transcript-conditioned `ref_audio` + `ref_text` cloning |
+| Chapter generation | Local | The same Qwen3-TTS Base 1.7B 8-bit renderer | The Base half of the selected voice pipeline, supporting every configured book language |
 
 Voice cloning does not use a separate synthesis model: Qwen3-ASR proposes editable words, then the
 same Qwen3-TTS Base renderer used for chapters clones the corrected audio/text reference. VoiceDesign,
@@ -141,7 +141,7 @@ text externally and may inspect any part of the book while resolving a difficult
 ## Run locally
 
 Requirements: macOS on Apple Silicon (`arm64`), about 18 GB unified memory, 30 GB free storage, and
-roughly 14 GB for the pinned local model assets.
+roughly 15 GB for the pinned local model assets.
 Install the standard development and media dependencies first:
 
 ```bash
@@ -237,6 +237,7 @@ the [contributor reference](docs/CONTRIBUTING.md), including the
 - [Demo: source to audio](docs/DEMO.md)
 - [Setup and model assets](docs/SETUP.md)
 - [Local models and configuration](docs/MODELS.md)
+- [Local TTS benchmarks and precision comparison](docs/LOCAL_TTS_BENCHMARKS.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Workflow guide](docs/wizard/README.md)
 - [Audiobook export](docs/M4B_EXPORT.md)

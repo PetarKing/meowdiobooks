@@ -9,6 +9,7 @@ change; proposed plans are clearly marked as unimplemented.
 - [Project overview and local setup](../README.md)
 - [Setup reference](SETUP.md)
 - [Local model setup](MODELS.md)
+- [Local TTS benchmarks and selected precision](LOCAL_TTS_BENCHMARKS.md)
 - [Demo: source to audio](DEMO.md)
 - [Current coverage and review boundaries](KNOWN_GENERALIZATION_RISKS.md)
 - [Voice quality and local sample cloning](QWEN_VOICE_QUALITY_REVIEW.md)

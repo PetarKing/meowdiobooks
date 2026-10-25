@@ -36,8 +36,8 @@ def test_default_registry_preserves_current_models_and_all_supported_languages()
     assert remote.max_concurrent_batches == 8
     assert remote.estimated_usd_per_target == 0.00085
     assert voice.audition_path == "models/qwen_1_7b_voice_design"
-    assert voice.renderer_path == "models/qwen_1_7b_base_4bit"
-    assert voice.recipe_version == "1"
+    assert voice.renderer_path == "models/qwen_1_7b_base_8bit"
+    assert voice.recipe_version == "2"
     assert registry.voice_candidate_policy.enabled is True
     assert registry.voice_candidate_policy.coverage_fraction == 0.8
     assert registry.voice_candidate_policy.min_voices == 2

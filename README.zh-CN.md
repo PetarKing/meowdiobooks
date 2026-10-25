@@ -115,7 +115,7 @@ PDF 文本提取、对话归属判定、角色统一、声音设计与克隆、�
 ## 模型
 
 [`models.toml`](models.toml) 是运行时的唯一配置依据；[模型指南](docs/MODELS.md)列出了固定版本、
-下载命令、预期路径和兼容规则。完整的默认本地模型约占 14 GB。
+下载命令、预期路径和兼容规则。完整的默认本地模型约占 15 GB。
 
 | 步骤 / 用途 | 路由 | 默认模型 | 兼容配置 |
 |---|---|---|---|
@@ -123,8 +123,8 @@ PDF 文本提取、对话归属判定、角色统一、声音设计与克隆、�
 | 大型“对话”审核（仅在明确选择时） | 可选远程 | 通过已配置 OpenAI Responses 配置运行的 `gpt-6-luna` (`service_tier = "fast"`) | 满足有限范围响应契约的 OpenAI 兼容 Chat Completions 或 Responses 配置；只有选中的“对话”片段会离开本机 |
 | 设计声音试听 | 本地 | [`mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16) | 与 Base 渲染器配对、并明确验证语言列表的兼容 MLX-Audio VoiceDesign 检查点 |
 | 声音样本文本草稿（STT） | 本地 | 支持自动语言检测的 [`mlx-community/Qwen3-ASR-0.6B-4bit`](https://huggingface.co/mlx-community/Qwen3-ASR-0.6B-4bit) | 实现相同可编辑文本/语言结果的兼容 MLX-Audio Qwen3-ASR 检查点；未来 Linux 适配器可保持此边界不变 |
-| 声音克隆试听 | 本地 | 使用上传参考 WAV 与修正文本的 [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit) | 支持 `ref_audio` + `ref_text` 文本条件克隆的兼容 Base 检查点 |
-| 章节生成 | 本地 | 同一个 Qwen3-TTS Base 1.7B 4-bit 渲染器 | 所选声音流水线中的 Base 模型，并支持全部已配置书籍语言 |
+| 声音克隆试听 | 本地 | 使用上传参考 WAV 与修正文本的 [`mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit`](https://huggingface.co/mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit) | 支持 `ref_audio` + `ref_text` 文本条件克隆的兼容 Base 检查点 |
+| 章节生成 | 本地 | 同一个 Qwen3-TTS Base 1.7B 8-bit 渲染器 | 所选声音流水线中的 Base 模型，并支持全部已配置书籍语言 |
 
 声音克隆不会使用额外的合成模型：Qwen3-ASR 先提供可编辑的文字建议，再由章节生成所使用的
 同一个 Qwen3-TTS Base 渲染器克隆修正后的音频/文本参考。VoiceDesign、Base TTS 和 STT
@@ -133,7 +133,7 @@ PDF 文本提取、对话归属判定、角色统一、声音设计与克隆、�
 ## 在本地运行
 
 要求：搭载 Apple Silicon（`arm64`）的 macOS，约 18 GB 统一内存、30 GB 可用存储空间，
-以及约 14 GB 的固定版本本地模型文件。
+以及约 15 GB 的固定版本本地模型文件。
 首先安装标准开发及媒体依赖：
 
 ```bash
@@ -222,6 +222,7 @@ npm --prefix frontend run build
 - [演示：从原文到音频](docs/DEMO.md)
 - [设置与模型文件](docs/SETUP.md)
 - [本地模型与配置](docs/MODELS.md)
+- [本地语音模型基准与精度比较](docs/LOCAL_TTS_BENCHMARKS.md)
 - [路线图](docs/ROADMAP.md)
 - [工作流程指南](docs/wizard/README.md)
 - [M4B 导出](docs/M4B_EXPORT.md)

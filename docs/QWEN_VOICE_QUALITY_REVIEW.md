@@ -1,6 +1,6 @@
 # Qwen voice quality and uploaded-reference review
 
-Reviewed: 2026-07-16
+Reviewed: 2026-07-16; default checkpoint decision updated 2026-10-25
 
 ## Outcome
 
@@ -35,13 +35,27 @@ Primary sources:
 
 ## Remaining quality work
 
-### 1. Benchmark the Base quantization
+### 1. Base quantization follow-up
 
-The audition model is bf16, but the chapter renderer is 4-bit. Qwen's published evaluation uses bf16.
-That does not prove the 4-bit conversion is the observed problem, but it makes quantization the first
-controlled A/B test: identical accepted references and text, 4-bit versus bf16 or 6-bit Base, rated for
-speaker similarity, intelligibility, pace drift and artifacts. Do not change the shipped model until a
-representative audiobook set shows a material win worth the larger download and memory footprint.
+The complete [local TTS benchmark report](LOCAL_TTS_BENCHMARKS.md) records all tested alternatives,
+both listening rounds, exact pins, timings and limitations.
+
+The default is now Base 1.7B eight-bit, pinned in `models.toml`; VoiceDesign remains BF16.
+A controlled English listening screen compared four-bit, eight-bit and BF16 Base with identical
+references, text and synthesis settings. The two-voice follow-up supported eight-bit as the practical
+quality/performance choice: similar elapsed generation time to four-bit, while BF16 took roughly
+twice as long. This small screen does not establish superiority for every voice, language or book.
+Keep longer-book and multilingual consistency in the evaluation backlog.
+
+Adoption verification (2026-10-25): 35 model-registry, audio, language and render-plan tests passed
+in the installed MLX environment (`mlx-audio==0.4.5`). The configured
+`generate_cloned_audition` and `render_plan_audio` paths both generated the synthetic sentence
+“The garden gate stood open when I arrived.” using the pinned eight-bit model. Qwen3-ASR returned
+those exact words for both outputs; the chapter was 2.48 seconds. The same checks passed against
+the installed local catalog. This is a short integration smoke check, not a full-book quality claim.
+Reproduce the unit checks with
+`pytest -q tests/backend/test_model_config.py tests/backend/test_audio.py tests/backend/test_languages.py tests/backend/test_render_plan.py`
+in the MLX runtime environment. Keep model and audio assets outside version control.
 
 ### 2. Judge settings on suitable audition text
 

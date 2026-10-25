@@ -70,13 +70,13 @@ estimated_usd_per_target = 0.00085
 label = "Qwen3-TTS 1.7B VoiceDesign"
 engine = "mlx_audio"
 # Bump whenever the complete audition recipe changes while this selectable model ID remains stable.
-recipe_version = "1"
+recipe_version = "2"
 audition_path = "models/qwen_1_7b_voice_design"
-renderer_path = "models/qwen_1_7b_base_4bit"
+renderer_path = "models/qwen_1_7b_base_8bit"
 audition_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
 audition_revision = "7d3824abff87e49756bb0f83fb5411de75d160c4"
-renderer_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit"
-renderer_revision = "37e955a1deb861c088ae5f3a67043185f3d1a60c"
+renderer_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
+renderer_revision = "e7dd0585652209fa0d7783659aad4e8a324de11c"
 languages = [
   "chinese",
   "english",
