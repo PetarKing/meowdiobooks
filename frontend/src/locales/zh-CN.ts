@@ -1,4 +1,12 @@
 const zhCN: Record<string, string> = {
+  "{{count}} bracketed passages kept spoken. No individual decisions needed.": "{{count}} 段括号内文字保持朗读，无需逐项决定。",
+  "Script directions": "剧本提示",
+  "AI checked": "AI 已检查",
+  "Apply suggested choices": "应用建议的选择",
+  "Suggested: leave this delivery cue unspoken.": "建议：不朗读此表达提示。",
+  "Leave {{count}} undecided delivery cues unspoken. Your existing choices are preserved.": "不朗读 {{count}} 项尚未决定的表达提示。已有选择保持不变。",
+  "No undecided delivery cues. Your existing choices are preserved.": "没有尚未决定的表达提示。已有选择保持不变。",
+  "AI checked these delivery cues in context. Suggested choices leave them unspoken. Uncertain text stays spoken and needs no decision.": "AI 已结合上下文检查这些表达提示。建议的选择会跳过朗读。无法确定的文字继续朗读，无需逐项决定。",
   "Not needed": "无需处理",
   "Default cover": "默认封面",
   "Use default cover": "使用默认封面",
