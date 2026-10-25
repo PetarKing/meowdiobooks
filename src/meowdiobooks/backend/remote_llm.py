@@ -246,6 +246,7 @@ def remote_chat_completion(
                     "model": model,
                     "attempts": attempt,
                     "serviceTier": response.get("service_tier"),
+                    "responseStatus": response.get("status"),
                 }
         time.sleep(delay)
     raise RemoteModelUnavailableError(

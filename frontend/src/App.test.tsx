@@ -1,3 +1,4 @@
+import { scriptDirectionsWarning } from "../design-kit/scriptDirectionsFixture";
 import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 import { act, fireEvent, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
@@ -2984,6 +2985,49 @@ describe('v2 wizard', () => {
 
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
     expect(screen.queryByText('Same decision for every heading?')).not.toBeInTheDocument()
+  })
+
+  it('keeps preserved bracketed prose outside the decision queue without blocking review', async () => {
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-preserved', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-preserved', warnings: [], boundaryCandidates: [], scriptDirectionsSummary: { candidates: 30, proposals: 0, kept: 30 } })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByText('30 bracketed passages kept spoken. No individual decisions needed.')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Script directions' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+  })
+
+  it('keeps script cue choices in the established order and preserves manual choices through bulk and acceptance', async () => {
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-cues', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-cues', warnings: [scriptDirectionsWarning], boundaryCandidates: [] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByRole('heading', { name: 'Script directions' })).toBeInTheDocument()
+    const apply = screen.getByRole('button', { name: /^Apply suggested choices/ })
+    expect([...apply.parentElement!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep', 'Leave', 'Apply suggested choices'])
+    expect(screen.getByText('AI checked')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /narrator|extraction again/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'AI suggestions' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep This highlighted/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Leave This highlighted/ }))
+    expect(screen.getByText('Example 3 of 3')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Apply suggested choices/ }))
+    expect(screen.getByRole('button', { name: /^Apply suggested choices/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
+    expect(screen.getByRole('button', { name: /^Leave This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
+    expect(screen.getByRole('button', { name: /^Keep This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-cues', 1, [], [
+      { occurrenceId: 'cue-soft', action: 'keep' }, { occurrenceId: 'cue-creepy', action: 'exclude' }, { occurrenceId: 'cue-loud', action: 'exclude' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-cues', [
+      { occurrenceIds: ['cue-soft'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['cue-creepy'], action: 'exclude', provenance: 'user' }, { occurrenceIds: ['cue-loud'], action: 'exclude', provenance: 'user' },
+    ]))
   })
 
   it('restores AI suggestions as a category with Keep, Leave and persistent bulk options', async () => {

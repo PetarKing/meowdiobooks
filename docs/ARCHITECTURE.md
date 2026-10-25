@@ -180,7 +180,10 @@ proposals. The shared implementation and source-linked acceptance contract live 
 credentials, request admission and separate Review usage observers. Every edition uses Luna for this
 pass. A provider failure fails the candidate explicitly without publishing partial or clean results.
 The `ai-cleanup` category records an individual keep/repair/source-review choice for each occurrence.
-Bulk acceptance expands to explicit individual choices rather than claiming different edits have
+Verified script-direction omissions use a separate occurrence-scoped category with Keep/Leave choices.
+Rules find bounded bracket candidates; Decisions and a Luna preservation check must agree before a
+suggestion is shown. Uncertain candidates remain spoken without individual review. Generic cleanup
+cannot delete overlapping balanced brackets. Bulk acceptance expands to explicit individual choices rather than claiming different edits have
 identical evidence. Accepted replacements change only rendered speech: source offsets, source text,
 and speaker assignments remain unchanged. Recording scripts verify replacements against the accepted
 Review snapshot before using them. See [cleanup review](CLEANUP-REVIEW.md) for limitations and setup.

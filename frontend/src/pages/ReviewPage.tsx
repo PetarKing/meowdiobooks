@@ -23,6 +23,8 @@ import {
   reviewWarningResolved,
   reviewProposalDecisions,
   reviewUsesOccurrenceDecisions,
+  reviewIsVerifiedScriptGroup,
+  reviewScriptCueDecisions,
 } from "../workflow/review";
 
 export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
@@ -30,10 +32,14 @@ export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBou
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const { acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
   const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
+  const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
+  const keptScriptCount = Number.isSafeInteger(scriptSummary?.kept) && Number(scriptSummary?.kept) > 0 ? Number(scriptSummary?.kept) : 0;
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
   const isAiCleanup = warning?.kind === "ai-cleanup";
+  const isScriptCue = warning && reviewIsVerifiedScriptGroup(warning);
+  const pendingCueCount = isScriptCue ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined && reviewOccurrenceActions(warning, row).includes("exclude")).length : 0;
   const perOccurrence = warning && reviewUsesOccurrenceDecisions(warning);
   const hasCleanupSuggestion = isAiCleanup || occurrence?.proposalStatus != null || typeof occurrence?.replacement === "string";
   const actionWarning = warning && occurrence ? { ...warning, kind: hasCleanupSuggestion ? "ai-cleanup" : warning.kind, readerState: occurrence.readerState ?? warning.readerState, occurrences: perOccurrence ? [occurrence] : warning.occurrences } : warning;
@@ -117,6 +123,11 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (unresolved >= 0) setActiveOccurrence(unresolved);
   }
 
+  function applyScriptSuggestions() {
+    if (!warning) return;
+    setReviewDecisions(reviewScriptCueDecisions(warning, reviewDecisions));
+  }
+
   async function acceptReview() {
     if (!book || !reviewCandidate?.revision) return;
     setReviewTransition(true);
@@ -182,6 +193,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   />;
   return <>
     <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Review your manuscript")} copy={t("Check the examples and choose what to keep or skip. Changes apply when you accept the review.")} />
+    {keptScriptCount > 0 && <p className="evidence-help" role="status">{t("{{count}} bracketed passages kept spoken. No individual decisions needed.", { count: keptScriptCount })}</p>}
     {totalGroups === 0 ? <WorkflowEmpty className="review-empty" symbol="✓" title={t("No warning groups")} copy={t("No chapter boundaries or source issues need a decision.")} /> : <>
 
       <div className="review-desk">
@@ -210,17 +222,18 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           </section>
         </> : warning && occurrence && actionWarning ? <>
           <section className="review-evidence">
-            <div className="review-group-heading"><span><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
+            <div className="review-group-heading"><span><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{t("Page {{page}}", { page: occurrence.page })}</span></div>
             <div className={hasCleanupSuggestion ? "source-window ai-cleanup-source" : "source-window"} aria-label={t("Manuscript context")}><div className="context-boundary">{t("Text immediately before")}</div>{occurrence.contextBefore ? <p className="context">{occurrence.contextBefore}</p> : <p className="context unavailable">{t("No preceding text in this extraction window.")}</p>}<p className="detected-span"><span>{t("Flagged text")}</span><mark>{occurrence.source || t("No text was extracted here")}</mark></p><div className="context-boundary">{t("Text immediately after")}</div>{occurrence.contextAfter ? <p className="context">{occurrence.contextAfter}</p> : <p className="context unavailable">{t("No following text in this extraction window.")}</p>}</div>
             {hasCleanupSuggestion && <div className="cleanup-proposal" aria-label={t("Proposed correction")}><b>{t("Proposed correction")}</b>{typeof occurrence.replacement === "string" ? occurrence.replacement === "" ? <p className="cleanup-deletion">{t("Remove the flagged text from the audiobook transcript.")}</p> : <p className="cleanup-replacement">{occurrence.replacement}</p> : <p>{t("No correction was proposed. Check the source before keeping or leaving out this text.")}</p>}{(occurrence.cleanupReason || occurrence.reason) && <p className="evidence-help">{occurrence.cleanupReason || occurrence.reason}</p>}</div>}
+            {isScriptCue && <p className="evidence-help">{t("Suggested: leave this delivery cue unspoken.")}{occurrence.reason && ` ${occurrence.reason}`}</p>}
             <p className="evidence-help">{t("Only the highlighted text changes. Surrounding text stays unchanged.")}</p>
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className="resolution-panel">
             <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>
             <h3>{t(hasCleanupSuggestion && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
-            <div className="resolution-options">{occurrenceActions.filter((action) => !isAiCleanup || action === "keep" || action === "exclude").map((action) => <button key={action} aria-pressed={selectedAction === action} className={selectedAction === action ? "selected" : ""} onClick={() => perOccurrence ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, actionWarning))}</b><small>{reviewConsequence(action, actionWarning, t)}</small></button>)}{isAiCleanup && proposals.length > 0 && <button className="cleanup-bulk-warning" disabled={pendingProposalCount === 0} onClick={applyAllProposals}><span className="cleanup-bulk-title"><b>{t("Apply all AI suggestions")}</b><span aria-hidden="true">⚠</span></span><small>{t(pendingProposalCount === 1 ? "Apply 1 undecided AI suggestion. Your existing choices are preserved." : pendingProposalCount ? "Apply {{count}} undecided AI suggestions. Your existing choices are preserved." : "No undecided AI suggestions. Your existing choices are preserved.", { count: pendingProposalCount })}</small></button>}</div>
+            <div className="resolution-options">{occurrenceActions.filter((action) => !isAiCleanup || action === "keep" || action === "exclude").map((action) => <button key={action} aria-pressed={selectedAction === action} className={selectedAction === action ? "selected" : ""} onClick={() => perOccurrence ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, actionWarning))}</b><small>{reviewConsequence(action, actionWarning, t)}</small></button>)}{isAiCleanup && proposals.length > 0 && <button className="cleanup-bulk-warning" disabled={pendingProposalCount === 0} onClick={applyAllProposals}><span className="cleanup-bulk-title"><b>{t("Apply all AI suggestions")}</b><span aria-hidden="true">⚠</span></span><small>{t(pendingProposalCount === 1 ? "Apply 1 undecided AI suggestion. Your existing choices are preserved." : pendingProposalCount ? "Apply {{count}} undecided AI suggestions. Your existing choices are preserved." : "No undecided AI suggestions. Your existing choices are preserved.", { count: pendingProposalCount })}</small></button>}{isScriptCue && <button className="cleanup-bulk-warning" disabled={pendingCueCount === 0} onClick={applyScriptSuggestions}><span className="cleanup-bulk-title"><b>{t("Apply suggested choices")}</b><span aria-hidden="true">⚠</span></span><small>{t(pendingCueCount ? "Leave {{count}} undecided delivery cues unspoken. Your existing choices are preserved." : "No undecided delivery cues. Your existing choices are preserved.", { count: pendingCueCount })}</small></button>}</div>
             {isAiCleanup && selectedAction === "repair" && <p className="cleanup-applied" role="status">{t("AI correction selected for this example. It will apply when you accept the review.")}</p>}
           </section>
         </> : null}

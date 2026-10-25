@@ -26,6 +26,59 @@ its exact source range and replacement. A deletion can remove real story content
 is exact, so users should inspect proposals before accepting them. The transcript preview includes
 selected repairs before publication.
 
+## Script directions
+
+A separate **Script directions** review group contains only verified delivery-cue suggestions.
+Its choices follow the existing order: **Keep**, **Leave**, **Apply suggested choices**. The warning
+belongs to the bulk button. Bulk application fills only undecided occurrences; manual choices survive,
+including overrides after applying. Identical cue words in different contexts are separate evidence.
+Uncertain or meaningful bracketed passages remain spoken and do not create individual review tasks.
+An undecided verified cue is also preserved by backend acceptance. Legacy saved reviews retain their
+original choices and behavior. Independently excluding a containing passage still excludes that
+passage under existing Review policies; cue bulk application does not modify other categories.
+
+Balanced parentheses and square brackets are candidate boundaries, not permission to omit text.
+Candidates must be leading, at most 240 characters, inside recognized label-colon script dialogue,
+with substantive same-line speech following. The existing bracket-dialogue convention is supported
+when the bracket wrapper exactly surrounds its accepted spoken range; following text supplies context
+only and retains its accepted speaker. This feature does not repair dialogue attribution. Trailing,
+standalone, malformed, oversized, or otherwise unsupported cues stay spoken. Speaker labels written
+as `NAME.` on a separate line are not automatically converted into colon labels.
+
+Decisions classifies context as pure delivery, story information, authored words, or uncertain.
+A complete four-way response with delivery probability at least 0.90 may proceed to Luna's separate
+low-reasoning preservation check. Only a completed, valid pure-delivery answer from both checks
+produces an omission suggestion. The two checks use the same model and are not independent safety
+proofs. Confidence is an internal filter, not a percentage of guaranteed correctness.
+
+Mixed cues such as `(whispering as she hands him the stolen key)` must retain the story information.
+Literal uses such as `[whispering] is the password` must retain the words. General AI cleanup proposals
+and source-review windows overlapping balanced brackets are suppressed so that generic deletion
+cannot bypass the script-direction checks. Deterministic warnings retain their established policies.
+
+No classifier changes source or speaker assignments. Acceptance and recording validate each exact
+source range against the review snapshot. Refusals, malformed classifications and disagreements
+produce no omission suggestion. Transport, cancellation, admission and settlement failures retain the
+existing atomic Review failure/retry behavior; no partial candidate is published and accepted work
+stays unchanged. Both model passes share the existing request admission and usage hooks, with at most
+four active calls and a 700-output-token verifier bound.
+
+### Script-cue verification
+
+A fresh 82-case evaluation used 58 independently labeled synthetic cases and 24 passages from Oscar
+Wilde's public-domain *The Importance of Being Earnest*. With the production default dialogue scan,
+18 of 26 labeled delivery cues became omission proposals; none of 56 protected passages did. The
+real-play model cases explicitly normalized `NAME.` plus newline to `NAME:`; this is not evidence of
+native-format detection. Native play formatting was checked separately and stays preserved. A probe
+using explicit accepted whole-turn spans proposed 21 of the same 26 cues; it is a correlated diagnostic,
+not another independent holdout. This small set establishes regression evidence, not a production
+error-rate guarantee. The earlier pilot produced confidently wrong omissions, motivating the second
+check and preservation defaults.
+
+Synthetic contract tests cover exact source preservation, default bracket dialogue, disagreement,
+malformed responses, failed Review/retry, preview, acceptance, recording and reopen. UI tests cover
+option order, 150-item bulk decisions, manual overrides and nonblocking preserved passages.
+
 ## Runtime contract
 
 The configured Luna profile supplies the endpoint and credential variable. Local operators configure

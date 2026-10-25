@@ -1,7 +1,8 @@
+import { scriptDirectionsWarning } from "../design-kit/scriptDirectionsFixture";
 import { describe, expect, it, vi } from "vitest";
 import type { ReviewWarning } from "./api/contracts";
 import { buildReviewPreviewPolicies, buildReviewWarningDecisions } from "./reviewDecisions";
-import { normalizeCandidateWarnings, reviewOccurrenceActions, reviewProposalDecisions, reviewWarningResolved, reviewActionTitle, reviewConsequence } from "./workflow/review";
+import { normalizeCandidateWarnings, reviewOccurrenceActions, reviewProposalDecisions, reviewWarningResolved, reviewActionTitle, reviewConsequence, reviewIsVerifiedScriptGroup, reviewScriptCueDecisions } from "./workflow/review";
 
 import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 
@@ -108,5 +109,35 @@ describe("AI cleanup decisions", () => {
       policies: [{ warningId: "footer-group", action: "exclude" }],
       occurrencePolicies: [{ occurrenceId: "join", action: "repair" }, { occurrenceId: "delete", action: "keep" }, { occurrenceId: "missing", action: "keep" }],
     });
+  });
+});
+
+
+describe("verified script direction decisions", () => {
+  it("restores a dedicated category and preserves 150 individual manual choices through repeat bulk application", () => {
+    const many = { ...scriptDirectionsWarning, occurrences: Array.from({ length: 150 }, (_, i) => ({ ...scriptDirectionsWarning.occurrences[0], id: `cue-${i}` })) };
+    const [restored] = normalizeCandidateWarnings(JSON.parse(JSON.stringify({ warnings: [many] })));
+    expect(restored.kind).toBe("stage-direction");
+    expect(reviewIsVerifiedScriptGroup(restored)).toBe(true);
+    const selected = { "cue-0": "keep", "cue-1": "exclude", unrelated: "narrate" } as const;
+    const applied = reviewScriptCueDecisions(restored, selected);
+    expect(Object.keys(applied)).toHaveLength(151);
+    expect(applied).toMatchObject(selected);
+    expect(applied["cue-149"]).toBe("exclude");
+    expect(reviewWarningResolved(restored, applied)).toBe(true);
+    expect(reviewScriptCueDecisions(restored, { ...applied, "cue-149": "keep" })).toEqual({ ...applied, "cue-149": "keep" });
+  });
+
+  it("does not bulk infer omissions for legacy or unverified candidates", () => {
+    for (const warning of [
+      { ...scriptDirectionsWarning, decisionScope: "warning-kind" as const },
+      { ...scriptDirectionsWarning, occurrences: [{ ...scriptDirectionsWarning.occurrences[0], cueVerification: undefined }] },
+      { ...scriptDirectionsWarning, occurrences: [{ ...scriptDirectionsWarning.occurrences[0], recommendedAction: undefined }] },
+    ]) {
+      expect(reviewIsVerifiedScriptGroup(warning)).toBe(false);
+      expect(reviewScriptCueDecisions(warning, {})).toEqual({});
+    }
+    const legacy: ReviewWarning = { ...scriptDirectionsWarning, decisionScope: "warning-kind", availableActions: ["keep", "narrate", "exclude"] };
+    expect(reviewOccurrenceActions(legacy, legacy.occurrences[0])).toEqual(["keep", "exclude", "narrate"]);
   });
 });

@@ -225,6 +225,8 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  recommendedAction?: "exclude";
+  cueVerification?: "verified";
   readerState?: "narrator" | "assigned-speaker" | "mixed";
   proposalStatus?: "proposed" | "source_review";
   cleanupReason?: string;
