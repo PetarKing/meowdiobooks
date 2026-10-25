@@ -122,3 +122,16 @@ loading or WebGL keeps the readable status, and completion or navigation removes
 - Update the owning canonical sheet; do not append ad hoc overrides to `product.css`. Some baseline declarations remain for legacy import compatibility; this is an explicit transition boundary, not a claim that all old CSS has been eliminated.
 - `studio.html` is a separate synthetic review entry. `npm run studio` starts it without an API proxy; its navigation stays on the fixture entry after refresh. Production `index.html` and its real gateway remain unchanged.
 - [Workflow interaction decisions](../docs/INTERACTION_DECISIONS.md) preserve acceptance, playback, candidate and export boundaries. A new component needs a useful isolated story; a new product state needs a realistic gateway-backed story. Regenerate visual evidence with the commands in [frontend development](README.md); store local captures outside tracked documentation.
+
+
+### Review evidence and suggested choices
+
+Review reuses `SourceExcerpt`: source-anchored evidence tagged `contextLayout: "continuous"`
+keeps the affected line and its surrounding passage together. Legacy saved evidence without that
+marker keeps separate, unlabeled chunks; never infer missing spaces or speaker names. Both layouts
+preserve source whitespace. Only the anchored target is highlighted.
+
+A suggested individual choice uses the success tint and sparkle; an explicit choice uses the action
+tint and checkmark. Bulk suggestions use a separated warning outline and an undecided-item count.
+Bulk application preserves manual choices. At zero, disable only the bulk button and explain that
+individual choices remain editable. Do not add a duplicate selection-status line below the choices.
