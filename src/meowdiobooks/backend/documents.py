@@ -79,12 +79,12 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
     return result
 
 
-def render_pdf_page(source: Path, cache_root: Path, page: int) -> Path:
+def render_pdf_page(source: Path, cache_root: Path, page: int, *, command_runner=None) -> Path:
     output = cache_root / "pages" / f"page-{page:04d}.png"
     if output.is_file():
         return output
     output.parent.mkdir(parents=True, exist_ok=True)
-    subprocess.run(
+    (command_runner if command_runner is not None else subprocess.run)(
         [
             "pdftoppm",
             "-f",
@@ -154,7 +154,9 @@ def _normalise_liteparse_page_text(page: Mapping[str, Any]) -> str:
     return "\n".join(output)
 
 
-def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> dict[str, Any]:
+def extract_pdf_page(
+    source: Path, cache_root: Path, page: int, method: str, *, command_runner=None,
+) -> dict[str, Any]:
     started = time.perf_counter()
     cache_method = _LITEPARSE_CACHE_KEY if method == "liteparse" else method
     cache = cache_root / "extraction" / cache_method / f"page-{page:04d}.json"
@@ -165,7 +167,7 @@ def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> 
     cache.parent.mkdir(parents=True, exist_ok=True)
     if method == "liteparse":
         raw = cache.with_suffix(".raw.json")
-        subprocess.run(
+        (command_runner if command_runner is not None else subprocess.run)(
             [
                 "liteparse",
                 "parse",
@@ -210,11 +212,13 @@ def extract_pdf_page(source: Path, cache_root: Path, page: int, method: str) -> 
     return result
 
 
-def extract_full_liteparse(source: Path, cache_root: Path) -> list[dict[str, Any]]:
+def extract_full_liteparse(
+    source: Path, cache_root: Path, *, command_runner=None,
+) -> list[dict[str, Any]]:
     cache = cache_root / "extraction" / _LITEPARSE_CACHE_KEY / "full.json"
     if not cache.is_file():
         cache.parent.mkdir(parents=True, exist_ok=True)
-        subprocess.run(
+        (command_runner if command_runner is not None else subprocess.run)(
             [
                 "liteparse",
                 "parse",
@@ -238,12 +242,14 @@ def extract_full_document(
     cache_root: Path,
     method: str,
     report: Callable[[float, str | None], None] | None = None,
+    *, command_runner=None,
 ) -> list[dict[str, Any]]:
     """Extract every PDF page with one user-accepted method."""
+    command_options = {"command_runner": command_runner} if command_runner is not None else {}
     notify = report or (lambda _progress, _message=None: None)
     if method == "liteparse":
         notify(10, "Running LiteParse over the complete document")
-        raw_pages = extract_full_liteparse(source, cache_root)
+        raw_pages = extract_full_liteparse(source, cache_root, **command_options)
         pages: list[dict[str, Any]] = []
         for index, page in enumerate(raw_pages, 1):
             text = _normalise_liteparse_page_text(page)
@@ -260,7 +266,7 @@ def extract_full_document(
     reader = PdfReader(source)
     pages: list[dict[str, Any]] = []
     for page_number in range(1, len(reader.pages) + 1):
-        result = extract_pdf_page(source, cache_root, page_number, method)
+        result = extract_pdf_page(source, cache_root, page_number, method, **command_options)
         pages.append(
             {
                 "page": page_number,

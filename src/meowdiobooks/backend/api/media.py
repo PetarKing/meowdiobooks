@@ -18,6 +18,8 @@ def create_media_router(
     root: Path,
     require_book: Callable[[str], Book],
     package_for: Callable[[str], Path],
+    *,
+    page_renderer: Callable[[Path, Path, int], Path] | None = None,
 ) -> APIRouter:
     router = APIRouter(prefix="/api")
 
@@ -27,7 +29,7 @@ def create_media_router(
             book = require_book(book_id)
             if not book.source_name or not book.page_count or not 1 <= page <= book.page_count:
                 raise ValueError("Page not found")
-            path = render_pdf_page(
+            path = (page_renderer if page_renderer is not None else render_pdf_page)(
                 source_path(root, book.id, book.source_name),
                 package_for(book.id) / "preview",
                 page,

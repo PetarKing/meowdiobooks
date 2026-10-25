@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .model_config import asset_path, load_model_registry
+from .native_runtime import NativeModelLoader, load_native_model
 
 
 @dataclass(frozen=True)
@@ -20,6 +21,8 @@ def transcribe_voice_sample(
     repo_root: Path,
     audio_path: Path,
     model_id: str | None = None,
+    *,
+    model_loader: NativeModelLoader | None = None,
 ) -> TranscriptionDraft:
     """Draft a transcript without forcing a language.
 
@@ -36,16 +39,13 @@ def transcribe_voice_sample(
     if configured.engine != "mlx_audio":
         raise RuntimeError(f"Unsupported speech-recognition engine: {configured.engine}")
 
-    import mlx.core as mx
-    from mlx_audio.stt.utils import load_model
-
-    model = load_model(model_path, strict=True)
+    model, release_model = load_native_model(model_path, "stt", model_loader)
     try:
         return _draft_from_model(model, audio_path)
     finally:
         del model
         gc.collect()
-        mx.clear_cache()
+        release_model()
 
 
 def _draft_from_model(model: object, audio_path: Path) -> TranscriptionDraft:

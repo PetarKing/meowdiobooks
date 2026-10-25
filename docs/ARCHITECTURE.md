@@ -117,6 +117,28 @@ implement the same function and HTTP/gateway response without changing Cast UI o
 
 ### Untrusted PDF parsing
 
+Hosts may supply a `file_processor` implementing `FileProcessor` to `create_app_v2`. Import inspection
+and metadata, page/full-document extraction, page rendering (including the media route and export
+cover), voice-sample normalization and audio packaging then run through that processor. The local
+default remains unchanged. The host owns process isolation, deadlines, resource limits and validation
+of untrusted worker results; this interface alone is not a sandbox. A metadata failure rejects a new
+import and removes its newly written source, just like inspection failure.
+
+The document rendering/LiteParse and audio packaging helpers also accept an optional keyword-only
+`command_runner`. Hosts can supply a callable compatible with `subprocess.run` to execute the
+existing command arguments, capture/check options and deadlines through a separate execution
+boundary. When omitted, helpers retain their original subprocess behavior. A supplied runner is
+always used, including callable objects with false truth values; failures propagate through the
+existing operation error handling without retrying an unrestricted subprocess. The host owns
+command authorization and process restrictions; this hook does not itself provide isolation.
+
+Native audition, clone, transcription and chapter rendering also accept an optional `model_loader`.
+It receives the exact registry-resolved model path and `tts`/`stt` kind, and returns a model plus a
+release callback. Each operation releases that lease on success or failure. A host can retain weights
+between operations, but owns exclusive access and must not assume mutable MLX models are safe to
+share between threads. Default acquisition still loads and releases per operation. Publication,
+source coverage, recipe choice and audio assembly contracts are unchanged.
+
 Hosts may supply `book_id_for_source` to `create_app_v2` when their store needs a different identity
 namespace. The resolver receives the verified full source SHA-256 and returns a stable ID containing
 only letters, digits, `_` and `-` (1–128 characters). Local content-derived IDs remain the default.
