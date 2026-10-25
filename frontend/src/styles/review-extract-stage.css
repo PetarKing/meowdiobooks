@@ -113,7 +113,9 @@
 
 .ai-cleanup-source mark { white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.cleanup-category-actions { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--color-border, var(--line)); }
-.cleanup-category-actions > b { display: block; font-size: .85rem; }
-.cleanup-category-actions > p { font-size: .8rem; line-height: 1.6; color: var(--color-muted, var(--muted)); }
-.cleanup-category-actions .review-bulk-button { width: 100%; white-space: normal; }
+
+.cleanup-applied { color: var(--color-muted, var(--muted)); font-size: .85rem; line-height: 1.6; }
+
+.resolution-options > button.cleanup-bulk-warning { border: 1px solid var(--warning-border); border-left-width: 3px; background: var(--warning-soft); }
+.resolution-options > button.cleanup-bulk-warning:hover:not(:disabled) { border-color: var(--warning-ink); background: var(--warning-soft); }
+.cleanup-bulk-title { display: flex; align-items: center; gap: .5rem; color: var(--warning-ink); }

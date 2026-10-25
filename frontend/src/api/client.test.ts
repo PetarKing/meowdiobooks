@@ -273,7 +273,7 @@ describe('HttpWizardApi', () => {
       availableActions: ['rerun-dialogue'],
     })
     expect(snapshot.warnings[0]).toMatchObject({ decisionScope: "occurrence", readerState: "mixed" })
-    expect(snapshot.warnings[0].occurrences[2]).toMatchObject({ replacement: "", availableActions: ["keep", "repair"], readerState: "narrator", proposalStatus: "proposed" })
+    expect(snapshot.warnings[0].occurrences[2]).toMatchObject({ replacement: "", availableActions: ["keep", "exclude", "repair"], readerState: "narrator", proposalStatus: "proposed" })
     expect(snapshot.chapters).toEqual([])
   })
 
