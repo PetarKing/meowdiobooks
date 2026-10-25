@@ -25,12 +25,12 @@ type GuideStage = Exclude<WizardStage, "import"> | "export";
 const guides: Record<GuideStage, PhaseGuide> = {
   extract: {
     number: "01", label: "Extract", title: "Check the reading order.",
-    intro: "Compare the PDF with the extracted text. Check for missing or out-of-order passages. Your accepted text is replaced only when the full extraction succeeds.",
-    route: ["Start with LiteParse", "Compare the sample pages", "Try another parser if needed"],
+    intro: "Compare the source with the extracted text. Check for missing or out-of-order passages. Your accepted text is replaced only when the full extraction succeeds.",
+    route: ["Start with the standard method", "Compare the sample pages", "Try another reading method if needed"],
     moves: [
       { cue: "A→B", title: "Follow the reading order", detail: "Columns, captions, headings, and footnotes should follow the reading order." },
       { cue: "≠", title: "Ignore cosmetic differences", detail: "Line wrapping does not matter. Missing, duplicated, or scrambled text does." },
-      { cue: "▦", title: "Try layout-aware for complex pages", detail: "Use it if other parsers scramble the text. It takes longer." },
+      { cue: "▦", title: "Try the complex layout option", detail: "Use it if the other methods put text in the wrong order. It takes longer." },
     ],
   },
   dialogue: {
@@ -45,11 +45,11 @@ const guides: Record<GuideStage, PhaseGuide> = {
   },
   review: {
     number: "03", label: "Review", title: "Review the text before recording.",
-    intro: "Similar issues are grouped together. Check the examples, then choose how each group should be read.",
+    intro: "Check highlighted text and chapter starts. Choose what listeners should hear, and review suggested corrections before applying them.",
     route: ["Approve real chapter starts", "Check the highlighted examples", "Choose an action for each group"],
     moves: [
       { cue: "▰", title: "Only the highlight changes", detail: "The surrounding text is context. It remains untouched." },
-      { cue: "1×N", title: "Choices apply as a group", detail: "Your choice applies to every highlighted occurrence in the group." },
+      { cue: "1×N", title: "Check what each choice affects", detail: "Some choices apply to a whole group. Suggested corrections are reviewed individually, or you can apply all remaining suggestions together." },
       { cue: "✓", title: "Nothing changes early", detail: "Changes take effect when you complete and accept the review." },
     ],
   },
@@ -65,12 +65,12 @@ const guides: Record<GuideStage, PhaseGuide> = {
   },
   generate: {
     number: "05", label: "Generate", title: "Generate and listen to your chapters.",
-    intro: "Generate uses your approved text and voices. Choose chapters, create their audio, and listen. If later edits affect a chapter, its audio is marked Stale.",
-    route: ["Select the chapters you want", "Generate chapter audio", "Listen; regenerate anything marked Stale"],
+    intro: "Generate uses your approved text and voices. Choose chapters, create their audio, and listen. If later edits affect a chapter, its audio is marked Needs update.",
+    route: ["Select the chapters you want", "Generate chapter audio", "Listen; update chapters marked Needs update"],
     moves: [
       { cue: "☑", title: "Generate selectively", detail: "Try one chapter before generating the whole book." },
       { cue: "🔒", title: "Uses approved choices", detail: "The recording script uses your approved transcript, cast, and voices." },
-      { cue: "↻", title: "Stale audio stays playable", detail: "Listen for comparison, then regenerate it before export so the chapter matches your current choices." },
+      { cue: "↻", title: "Older recordings stay playable", detail: "Listen for comparison, then regenerate it before export so the chapter matches your current choices." },
     ],
   },
   export: {

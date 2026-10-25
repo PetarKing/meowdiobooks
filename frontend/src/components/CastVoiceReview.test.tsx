@@ -547,7 +547,7 @@ describe("CastVoiceReview", () => {
       expect(dialog).toHaveTextContent("声音已批准");
       expect(dialog).toHaveTextContent("明亮 · 轻快 · 中性口音");
       expect(dialog).toHaveTextContent("温柔 · 自然 · Japanese");
-      expect(dialog).toHaveTextContent("最新候选声音");
+      expect(dialog).toHaveTextContent("最新试听");
       expect(dialog).toHaveTextContent("✓ 已应用");
     } finally {
       view.unmount();

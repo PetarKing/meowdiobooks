@@ -26,9 +26,9 @@ try {
     assert(overflow <= 1, `Document overflow: ${overflow}`);
     await page.screenshot({ path: `${out}/home-${width}-${appearance}.png`, fullPage: true });
     await page.locator('.quick-upload input').setInputFiles({ name: 'sanctuary-sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic control check') });
-    await page.getByRole('button', { name: 'Import PDF' }).waitFor();
+    await page.getByRole('button', { name: 'Import book' }).waitFor();
     assert.match(await page.locator('.file-receipt').innerText(), /sanctuary-sample.pdf/);
-    await page.getByLabel('Choose another PDF', { exact: true }).setInputFiles({ name: 'replacement-sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic replacement check') });
+    await page.getByLabel('Choose another file', { exact: true }).setInputFiles({ name: 'replacement-sample.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4 synthetic replacement check') });
     assert.match(await page.locator('.file-receipt').innerText(), /replacement-sample.pdf/);
     await page.reload();
     await page.getByText('Synthetic data · safe to explore', { exact: true }).waitFor();

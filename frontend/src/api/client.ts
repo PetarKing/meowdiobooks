@@ -113,6 +113,7 @@ export class HttpWizardApi implements WorkflowGateway {
         title: String(rawBook.title ?? "Untitled book"),
         author: String(rawBook.author ?? ""),
         filename: String(rawBook.source_name ?? ""),
+        sourceKind: String(rawBook.source_kind ?? "pdf"),
         pageCount: rawBook.page_count == null ? undefined : Number(rawBook.page_count),
         completedStages,
       },

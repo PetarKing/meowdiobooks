@@ -1,3 +1,4 @@
+import { DialogueRulesSection } from "./shared";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { fireEvent, render, screen, within } from "@testing-library/react";
@@ -6,7 +7,7 @@ import { snapshotFor } from "../../design-kit/fixtures";
 import type { DialogueAttributionTarget, DialogueStrategy } from "../api/contracts";
 import { DialoguePage, type DialoguePageModel } from "./DialoguePage";
 
-function Scopes({ unlabeled = 3, unknown = 2, request = vi.fn() }: { unlabeled?: number; unknown?: number; request?: DialoguePageModel["requestDialogueTranscript"] }) {
+function Scopes({ unlabeled = 3, unknown = 2, request = vi.fn(), advancedRules = true, rulesOpen = false }: { advancedRules?: boolean; rulesOpen?: boolean; unlabeled?: number; unknown?: number; request?: DialoguePageModel["requestDialogueTranscript"] }) {
   const { t } = useTranslation();
   const snapshot = snapshotFor("dialogue");
   const [dialogue, setDialogue] = useState({ ...snapshot.dialogue!, summary: { ...snapshot.dialogue!.summary, unlabeledCandidates: unlabeled, openSpeakerTurns: unknown } });
@@ -14,8 +15,8 @@ function Scopes({ unlabeled = 3, unknown = 2, request = vi.fn() }: { unlabeled?:
   const [attributionTargets, setAttributionTargets] = useState<DialogueAttributionTarget[]>(["unlabelled-candidates"]);
   return <DialoguePage model={{
     snapshot, dialogue, setDialogue, dialogueStrategy, setDialogueStrategy, attributionTargets, setAttributionTargets,
-    busy: false, capabilities: { localDialogueAttribution: true, showExecutionBadge: true, showProviderCostReceipts: false },
-    completed: [], revisingStages: [], dialogueCandidate: undefined, dialogueInitialDecisions: [], dialogueRulesOpen: false,
+    busy: false, capabilities: { localDialogueAttribution: true, showExecutionBadge: true, showProviderCostReceipts: false, showVoiceModelControls: true, advancedDialogueRules: advancedRules },
+    completed: [], revisingStages: [], dialogueCandidate: undefined, dialogueInitialDecisions: [], dialogueRulesOpen: rulesOpen,
     editingAcceptedDialogue: false, conflictChoices: {}, structuralChoices: {}, setDialogueRulesOpen: vi.fn(),
     acceptCandidate: vi.fn(), refreshDialogue: vi.fn(), reopenAcceptedDialogueReview: vi.fn(), requestDialogueTranscript: request,
     setConflictChoices: vi.fn(), setDialogueCandidate: vi.fn(), setDialogueInitialDecisions: vi.fn(), setEditingAcceptedDialogue: vi.fn(),
@@ -78,5 +79,41 @@ describe("Dialogue AI scope targets", () => {
     fireEvent.click(screen.getByRole("button", { name: /Use the narrator/ }));
     expect(screen.getByRole("button", { name: "Build transcript →" })).toBeEnabled();
     expect(screen.queryByRole("checkbox", { name: "Dialogue labelled as unknown" })).not.toBeInTheDocument();
+  });
+});
+
+describe("advanced dialogue controls", () => {
+  it("hides unknown-speaker pattern editing along with custom patterns", () => {
+    render(<Scopes advancedRules={false} rulesOpen />);
+    expect(screen.getByRole("button", { name: "Dialogue detection rules" })).toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Add unknown speaker pattern" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Add a custom detection rule")).not.toBeInTheDocument();
+  });
+  it("keeps visual rule choices available when expert pattern editing is hidden", () => {
+    const snapshot = snapshotFor("dialogue");
+    const onToggleRegex = vi.fn();
+    render(<DialogueRulesSection
+      advancedDialogueRules={false}
+      regexes={snapshot.dialogue!.regexes}
+      open
+      strategy="fill-gaps"
+      attributionTargets={["unlabelled-candidates"]}
+      onToggle={vi.fn()}
+      onToggleRegex={onToggleRegex}
+      onAddRegex={vi.fn()}
+      onError={vi.fn()}
+    />);
+    expect(screen.getByRole("button", { name: "Dialogue detection rules" })).toBeInTheDocument();
+    expect(screen.queryByText("Add a custom detection rule")).not.toBeInTheDocument();
+    expect(screen.queryByText("Use Python-style named captures:")).not.toBeInTheDocument();
+    const checkbox = screen.getAllByRole("checkbox")[0];
+    fireEvent.click(checkbox);
+    expect(onToggleRegex).toHaveBeenCalledOnce();
+  });
+
+  it("retains custom pattern editing for installations that enable it", () => {
+    render(<DialogueRulesSection regexes={[]} open strategy="narrate" attributionTargets={[]}
+      onToggle={vi.fn()} onToggleRegex={vi.fn()} onAddRegex={vi.fn()} onError={vi.fn()} />);
+    expect(screen.getByText("Add a custom detection rule")).toBeInTheDocument();
   });
 });

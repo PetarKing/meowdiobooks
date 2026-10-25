@@ -10,23 +10,23 @@ export function HomePage({ model }: { model: HomePageModel; }) {
   const totalAssetBytes = books.reduce((total, row) => total + (row.asset_size_bytes ?? 0), 0);
 
   return <>
-    <StudioHero compact={books.length > 0} eyebrow={t("Your audiobook studio")} title={<>{t("From page")}<br /><em>{t("to performance.")}</em></>} description={t("Turn a PDF into an audiobook, with control at every step.")}>
+    <StudioHero compact={books.length > 0} eyebrow={t("Your audiobook studio")} title={<>{t("From page")}<br /><em>{t("to performance.")}</em></>} description={t("Turn a book into an audiobook, with control at every step.")}>
       <section className={`quick-import ${file ? "has-file" : ""}`} aria-labelledby="quick-import-title">
         <h2 id="quick-import-title" className="visually-hidden">{t(file ? "Ready to begin" : "Start another book")}</h2>
         {file ? <div className="quick-import-ready">
           <div className="file-receipt">
-            <span className="import-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z" /><path d="M14 3v5h5M8 13h8M8 17h5" /></svg><small>PDF</small></span>
+            <span className="import-file-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8l-5-5Z" /><path d="M14 3v5h5M8 13h8M8 17h5" /></svg><small>{file.name.split(".").pop()?.toUpperCase()}</small></span>
             <span className="import-file-details"><strong title={file.name}>{file.name}</strong><small>{formatFileSize(file.size)}</small></span>
             <label className="import-file-replace" title={t("Choose another")}>
-              <input className="visually-hidden" type="file" accept=".pdf,application/pdf" aria-label={t("Choose another PDF")} disabled={busy} onChange={(event) => { const replacement = event.target.files?.[0]; if (replacement) setFile(replacement); }} />
+              <input className="visually-hidden" type="file" accept=".pdf,.epub,.txt,.md,application/pdf,application/epub+zip,text/plain,text/markdown" aria-label={t("Choose another file")} disabled={busy} onChange={(event) => { const replacement = event.target.files?.[0]; if (replacement) setFile(replacement); }} />
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 8h14m-4-4 4 4-4 4M19 16H5m4-4-4 4 4 4" /></svg>
             </label>
           </div>
-          <button className="primary" disabled={busy} onClick={() => void importBook()}>{t("Import PDF")} →</button>
+          <button className="primary" disabled={busy} onClick={() => void importBook()}>{t("Import book")} →</button>
         </div> : <label className="quick-upload">
-          <input type="file" accept=".pdf,application/pdf" onChange={(event) => setFile(event.target.files?.[0])} />
+          <input type="file" accept=".pdf,.epub,.txt,.md,application/pdf,application/epub+zip,text/plain,text/markdown" onChange={(event) => setFile(event.target.files?.[0])} />
           <span className="quick-upload-icon" aria-hidden="true">＋</span>
-          <span><strong>{t("Choose PDF")}</strong><small>{t("PDF · up to 500 MB")}</small></span>
+          <span><strong>{t("Choose book")}</strong><small>{t("PDF, EPUB, TXT, Markdown")}</small></span>
           <span className="upload-arrow" aria-hidden="true">↗</span>
         </label>}
         {file && <p className="import-storage-note">{t("books.importStorageNotice", { ns: "edition" })}</p>}

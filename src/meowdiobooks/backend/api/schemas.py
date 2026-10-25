@@ -16,7 +16,7 @@ class ApiRequest(BaseModel):
 
 class ExtractionPreviewRequest(ApiRequest):
     page: int = Field(ge=1)
-    method: Literal["liteparse", "native", "layout"] = "liteparse"
+    method: Literal["liteparse", "native", "layout", "text"] = "liteparse"
 
 
 class StageProcessRequest(ApiRequest):

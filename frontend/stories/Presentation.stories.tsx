@@ -42,7 +42,7 @@ export const ProductPalette: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, 'import')
     await userEvent.upload(canvasElement.querySelector('input[type="file"]')!, new File(['%PDF-1.4 synthetic preview'], 'preview.pdf', { type: 'application/pdf' }))
-    const action = await within(canvasElement).findByRole('button', { name: /Import PDF/ })
+    const action = await within(canvasElement).findByRole('button', { name: /Import book/ })
     await expect(getComputedStyle(action).backgroundColor).toBe('rgb(35, 85, 72)')
     await expect(canvasElement.querySelectorAll('[data-presentation-root]').length).toBe(1)
   },

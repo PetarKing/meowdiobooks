@@ -165,6 +165,22 @@ PDF extraction. Companion deployments must consume a new immutable release to ad
 The dependency rationale also includes pdfminer's
 [removal of unsafe pickle-based CMap loading](https://github.com/pdfminer/pdfminer.six/releases/tag/20251230).
 
+### EPUB and text imports
+
+EPUB, UTF-8 TXT, and Markdown retain the original source hash and bytes. Their deterministic
+`text-v1` reader publishes the normal Extraction artifact during import, before the import hook;
+the UI opens Dialogue and visibly disables Extract. Markdown stays literal. EPUB reads XHTML
+in spine order (including supplementary entries), retaining paragraph boundaries and image alt
+text. Long sections are split at newline/word boundaries up to 6,000 characters; section numbers
+occupy the existing page fields. Review returns inert `sourceText` instead of `imageUrl`, and
+export uses a generated cover or a supplied image. No source HTML is rendered or executed.
+
+All reads retain the optional FileProcessor boundary, including its legacy PDF-named methods.
+There is no host-to-local parsing fallback. ZIP members are never unpacked; paths, member count,
+per-member and cumulative expanded sizes, duplicate resources, XML entities, unsupported embedded
+content, invalid UTF-8 and empty text are validated. The new readers add no runtime dependencies.
+Import failure rolls back new extraction artifacts and restores pre-existing artifact pointers.
+
 ### Book-list fault isolation
 
 Book discovery validates each record and workspace independently. A malformed book is omitted from
@@ -223,6 +239,13 @@ removes, groups, or replaces stages and handlers. A replacement that preserves i
 artifact may keep public downstream consumers; an incompatible artifact requires an adapter or private
 replacement of those consumers. Account, billing, tenant, object-storage, and queue identifiers never
 belong in public artifact JSON.
+
+The `showVoiceModelControls` and `advancedDialogueRules` UI capabilities default to `true` for
+local installations, where users may configure the voice runtime and speaker-matching rules.
+A companion that manages those choices sets them to `false`: the workflow retains its current
+voice selection, language, auditions, reuse choices, and quote checks, while model names and
+advanced rule editors are omitted from the interface. These capabilities do not change provider
+selection or permission to run a command.
 
 Edition translations change presentation only. They must not be used to disguise an unavailable
 capability: filesystem actions, provider routes, and supplier-cost visibility remain explicit typed
