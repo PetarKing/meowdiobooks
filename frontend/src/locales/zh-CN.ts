@@ -1305,6 +1305,14 @@ const zhCN: Record<string, string> = {
   "Script direction": "剧本提示",
   "Should these script directions be spoken?": "这些剧本提示需要朗读吗？",
   "Delivery and sound cues usually stay unspoken. Choose the narrator for descriptive action, or keep text that is intended as dialogue.": "语气和音效提示通常不朗读。描述性动作可以交给旁白，属于对白的文字则可保留。",
+  "We couldn’t prepare the voice sample. Please try again.": "无法处理声音样本。请重试。",
+  "Audio export is temporarily unavailable. Please try again later.": "音频导出暂时不可用。请稍后重试。",
+  "We couldn’t create the audiobook download. Please try again.": "无法创建有声书下载。请重试。",
+  "We couldn’t transcribe the voice sample. Please try again.": "无法转录声音样本。请重试。",
+  "We couldn’t create the voice audition. Please try again.": "无法创建声音试听。请重试。",
+  "The voice draft changed. Refresh before adding or removing auditions.": "声音草稿已更改。请刷新后再添加或移除试听。",
+  "Import the source document again before continuing.": "请重新导入原文后再继续。",
+  "Review the dialogue rules and resolve conflicting matches before continuing.": "请检查对白规则并解决匹配冲突后再继续。",
 };
 
 export default zhCN;
