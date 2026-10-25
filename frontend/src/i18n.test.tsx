@@ -62,9 +62,9 @@ describe("interface localization", () => {
     expect(i18n.t("Review rules and examples")).toBe("查看规则与示例");
     expect(i18n.t("opening page")).toBe("开篇页");
     expect(i18n.t(
-      "This transcript contains an invalid text range on page {{page}}. No audio was generated or changed.",
+      "Part of the transcript on page {{page}} could not be matched to your PDF. No audio was generated or changed.",
       { page: 48 },
-    )).toBe("此对话稿在第 48 页包含无效的文本范围。没有生成或更改任何音频。");
+    )).toBe("朗读稿第 48 页的部分内容无法与 PDF 对应。没有生成或更改任何音频。");
     expect(reviewConsequence("exclude", pageNumberWarning, i18n.t)).toBe(
       "全部 2 处高亮文本不会被朗读。PDF 原文件保持不变。",
     );

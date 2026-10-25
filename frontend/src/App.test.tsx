@@ -387,26 +387,26 @@ describe('v2 wizard', () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
 
     expect(screen.getByRole('heading', { name: 'Check the extracted text' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /LiteParse Recommended Fast spatial parser/ })).toHaveClass('selected')
+    expect(screen.getByRole('button', { name: /Standard Recommended Works well for most books/ })).toHaveClass('selected')
     const comparison = screen.getByText('ORIGINAL PAGE').closest('.compare')
     expect(comparison).toHaveClass('extract-compare')
     expect(comparison).toHaveClass('page-comparison')
-    expect(within(comparison as HTMLElement).getByText('LITEPARSE TEXT')).toBeInTheDocument()
+    expect(within(comparison as HTMLElement).getByText('Standard TEXT')).toBeInTheDocument()
   })
 
   it('explains extraction methods without changing the selected parser', async () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
 
-    const liteparseInfo = screen.getByRole('button', { name: 'About LiteParse' })
-    const nativeInfo = screen.getByRole('button', { name: 'About Native PDF text' })
-    const layoutInfo = screen.getByRole('button', { name: 'About Layout-aware' })
+    const liteparseInfo = screen.getByRole('button', { name: 'About Standard' })
+    const nativeInfo = screen.getByRole('button', { name: 'About Embedded text' })
+    const layoutInfo = screen.getByRole('button', { name: 'About Complex layout' })
     const liteparseTooltip = document.getElementById(liteparseInfo.getAttribute('aria-describedby')!)
     const nativeTooltip = document.getElementById(nativeInfo.getAttribute('aria-describedby')!)
     const layoutTooltip = document.getElementById(layoutInfo.getAttribute('aria-describedby')!)
     const previewCalls = vi.mocked(wizardApi.previewExtraction).mock.calls.length
 
     expect(liteparseTooltip).toHaveTextContent('Fast and reliable for most books')
-    expect(nativeTooltip).toHaveTextContent('Reads embedded PDF text')
+    expect(nativeTooltip).toHaveTextContent('Try this if the standard method')
     expect(layoutTooltip).toHaveTextContent('Handles complex columns and spacing')
     expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'true')
 
@@ -433,12 +433,12 @@ describe('v2 wizard', () => {
     expect(nativeTooltip).toHaveAttribute('aria-hidden', 'false')
     fireEvent.click(nativeInfo)
     expect(nativeTooltip).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.getByRole('button', { name: /LiteParse Recommended Fast spatial parser/ })).toHaveClass('selected')
-    expect(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ })).not.toHaveClass('selected')
+    expect(screen.getByRole('button', { name: /Standard Recommended Works well for most books/ })).toHaveClass('selected')
+    expect(screen.getByRole('button', { name: /Embedded text Reads text saved in the PDF/ })).not.toHaveClass('selected')
     expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls)
 
-    fireEvent.click(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ }))
-    expect(screen.getByRole('button', { name: /Native PDF text Embedded text fallback/ })).toHaveClass('selected')
+    fireEvent.click(screen.getByRole('button', { name: /Embedded text Reads text saved in the PDF/ }))
+    expect(screen.getByRole('button', { name: /Embedded text Reads text saved in the PDF/ })).toHaveClass('selected')
     expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls + 1)
   })
 
@@ -516,7 +516,7 @@ describe('v2 wizard', () => {
     await open(recoverySnapshot)
 
     expect(screen.getByRole('heading', { name: 'Dialogue needs rebuilding' })).toBeInTheDocument()
-    expect(screen.getByText('This transcript contains an invalid text range on page 48. No audio was generated or changed.')).toBeInTheDocument()
+    expect(screen.getByText('Part of the transcript on page 48 could not be matched to your PDF. No audio was generated or changed.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Complete' })).toHaveClass('active')
     expect(screen.queryByRole('button', { name: /Generate .* selected/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cast & voices Complete' }))
@@ -649,13 +649,13 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
 
     const action = screen.getByRole('region', { name: 'Generation action' })
-    expect(await within(action).findByText('Synthesis interrupted; saved tracks are unchanged.')).toBeVisible()
+    expect(await within(action).findByText('Something went wrong while completing this step. Try again; your accepted work is unchanged.')).toBeVisible()
     expect(within(action).getByText('Generation needs attention')).toBeInTheDocument()
     expect(within(action).getByRole('button', { name: /^Generate 1 selected →$/ })).toBeEnabled()
     expect(screen.getByRole('checkbox', { name: 'Select The Pool of Tears' })).toBeChecked()
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Synthesis interrupted; saved tracks are unchanged.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
   })
 
   it.each(['immediate', 'polled'] as const)('selects the newly generated tracks and carries that selection to Export after %s completion', async (completion) => {
@@ -781,7 +781,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('tab', { name: /Generated/ }))
     expect(screen.getByRole('button', { name: 'Listen to Down the Rabbit-Hole' })).toBeEnabled()
     expect(screen.getByRole('button', { name: 'Listen to The Pool of Tears' })).toBeEnabled()
-    expect(screen.getByRole('alert')).toHaveTextContent('Stopped after saving Chapter 2.')
+    expect(screen.getByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
   })
 
   it('selects audio saved by a failed generation job for Export when no requested work remains', async () => {
@@ -1165,7 +1165,7 @@ describe('v2 wizard', () => {
       }
       if (label === 'Generate') {
         expect(dialog).toHaveTextContent('recording script uses your approved transcript')
-        expect(dialog).toHaveTextContent('Stale audio stays playable')
+        expect(dialog).toHaveTextContent('Older recordings stay playable')
         expect(dialog).toHaveTextContent('regenerate it before export')
       }
       fireEvent.click(screen.getByRole('button', { name: 'Close phase guide' }))
@@ -1277,7 +1277,7 @@ describe('v2 wizard', () => {
 
     expect(screen.getByText('Pre-labelled').closest('span')).toHaveTextContent('5')
     expect(screen.getByText('Corrected by you').closest('span')).toHaveTextContent('1')
-    expect(screen.getByText('Narrator fallback').closest('span')).toHaveTextContent('2')
+    expect(screen.getByText('Read by narrator').closest('span')).toHaveTextContent('2')
 
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
 
@@ -1476,7 +1476,7 @@ describe('v2 wizard', () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import', 'extract'] }, dialogue })
 
     expect(screen.getByText('1 overlapping dialogue match needs your choice')).toBeInTheDocument()
-    expect(screen.getByText('regex interpretations').closest('span')).toHaveTextContent('2')
+    expect(screen.getByText('detected matches').closest('span')).toHaveTextContent('2')
     expect(screen.getByText('issue to review').closest('span')).toHaveTextContent('1')
     expect(screen.getByText('Alice said,')).toBeInTheDocument()
     expect(screen.queryByText('Who reads the unresolved dialogue?')).not.toBeInTheDocument()
@@ -1488,7 +1488,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Dialogue detection rules' }))
     fireEvent.click(screen.getByRole('button', { name: 'Choose narration for all 1 overlap' }))
     expect(screen.getByRole('button', { name: 'Choose narration for all 1 overlap' })).toHaveAttribute('aria-pressed', 'true')
-    expect(screen.getByText('Neither regex interpretation becomes a dialogue turn.')).toBeInTheDocument()
+    expect(screen.getByText('The narrator will read this text.')).toBeInTheDocument()
     const apply = screen.getByRole('button', { name: 'Apply choices and continue →' })
     expect(apply).toBeEnabled()
 
@@ -1505,7 +1505,7 @@ describe('v2 wizard', () => {
     expect(screen.getAllByText('Alice')).toHaveLength(2)
     fireEvent.click(screen.getByRole('button', { name: 'Apply choices and continue →' }))
 
-    expect(await screen.findByText('Regex overlaps resolved')).toBeInTheDocument()
+    expect(await screen.findByText('Overlapping matches resolved')).toBeInTheDocument()
     expect(screen.getByText('Who reads the unresolved dialogue?')).toBeInTheDocument()
     expect(wizardApi.previewDialogue).toHaveBeenLastCalledWith('book-1', expect.objectContaining({
       conflictResolutions: [{ profileIds: ['inner', 'outer'], winnerProfileId: 'outer' }],
@@ -1626,7 +1626,7 @@ describe('v2 wizard', () => {
     })))
     fireEvent.click(screen.getByRole('button', { name: 'Dialogue detection rules' }))
     expect(screen.queryByText(/overlapping dialogue match needs your choice/)).not.toBeInTheDocument()
-    expect(screen.getByText('Regex overlaps resolved')).toBeInTheDocument()
+    expect(screen.getByText('Overlapping matches resolved')).toBeInTheDocument()
   })
 
   it('keeps the combined detection rules open while editing a custom regex', async () => {
@@ -2063,7 +2063,7 @@ describe('v2 wizard', () => {
     const narratorRow = screen.getByText('“Narrator line.”', { selector: 'mark' }).closest('article') as HTMLElement
     expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Not dialogue 1/ })).toBeInTheDocument()
-    expect(within(narratorRow).getByText('Needs review · no supported reader')).toBeInTheDocument()
+    expect(within(narratorRow).getByText('Needs review · no clear speaker')).toBeInTheDocument()
     expect(within(narratorRow).getByText('Narrator for now', { selector: 'b' })).toBeInTheDocument()
     expect(within(narratorRow).getByText('Choose a character if you know who spoke', { selector: '.dialogue-change-choices > small' })).toBeInTheDocument()
     expect(within(narratorRow).queryByRole('button', { name: 'Choose Narrator' })).not.toBeInTheDocument()
@@ -2073,7 +2073,7 @@ describe('v2 wizard', () => {
     expect(characterInput).toHaveValue('')
     expect(characterInput).toHaveAttribute('placeholder', 'Search or type a character name')
     fireEvent.change(characterInput, { target: { value: 'Alice' } })
-    expect(within(narratorRow).getByText('Needs review · no supported reader')).toBeInTheDocument()
+    expect(within(narratorRow).getByText('Needs review · no clear speaker')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Assigned 1/ })).toBeInTheDocument()
     fireEvent.click(within(narratorRow).getByRole('button', { name: 'Apply change' }))
@@ -2208,7 +2208,7 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     expect(screen.getByText('Line 2 of 2')).toBeInTheDocument()
-    expect(screen.getByText('No supported reader')).toBeInTheDocument()
+    expect(screen.getByText('No clear speaker')).toBeInTheDocument()
     expect(screen.getByText('“Wait here.”', { selector: 'mark' })).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
@@ -2253,7 +2253,7 @@ describe('v2 wizard', () => {
     fireEvent.change(characterInput, { target: { value: 'A' } })
     expect(within(target).getByRole('option', { name: 'Alice' })).toBeInTheDocument()
     fireEvent.change(characterInput, { target: { value: 'Guest speaker' } })
-    expect(within(target).getByText('Needs review · no supported reader')).toBeInTheDocument()
+    expect(within(target).getByText('Needs review · no clear speaker')).toBeInTheDocument()
     fireEvent.click(within(target).getByRole('button', { name: 'Apply change' }))
 
     expect(within(target).getByText('Your correction')).toBeInTheDocument()
@@ -2314,7 +2314,7 @@ describe('v2 wizard', () => {
     await open(noDialogue)
     fireEvent.click(screen.getByRole('button', { name: 'Dialogue detection rules' }))
     expect(screen.getByText('No likely dialogue was detected.')).toBeInTheDocument()
-    expect(screen.getByText(/narrator will read the source unless you add a matching regex/i)).toBeInTheDocument()
+    expect(screen.getByText(/narrator will read any text without a matching dialogue format/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Dialogue detection rules' }))
     expect(screen.getByText('No AI speaker matching will run.')).toBeInTheDocument()
   })
@@ -2746,7 +2746,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Generate required auditions →' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(publicError)
+    expect(await screen.findByRole('alert')).toHaveTextContent('Voice generation paused at Alice. 12 of 61 voices are saved. Choose Continue voice generation to resume.')
     expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
   })
 
@@ -2823,7 +2823,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
     fireEvent.click(screen.getByRole('button', { name: 'Change cast →' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('Could not prepare cast')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
     expect(screen.getByRole('heading', { name: 'Cast and voices ready' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Change settings →' })).toBeEnabled()
     expect(screen.queryByRole('region', { name: 'Cast voice auditions' })).not.toBeInTheDocument()
@@ -3100,7 +3100,7 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
     fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
-    await screen.findByText('No warning groups')
+    await screen.findByText('Nothing needs review')
 
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
 
@@ -3145,7 +3145,7 @@ describe('v2 wizard', () => {
     expect(screen.getByAltText('Original PDF page 9')).toHaveAttribute('src', '/page-9.png')
 
     fireEvent.click(screen.getByRole('button', { name: '← Back to decisions' }))
-    expect(screen.getByText('No warning groups')).toBeInTheDocument()
+    expect(screen.getByText('Nothing needs review')).toBeInTheDocument()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
 
@@ -3230,7 +3230,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('status', { name: 'Scanning for issues…' })).toBeInTheDocument()
     expect(screen.queryByRole('dialog', { name: 'Local processing' })).not.toBeInTheDocument()
     finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
-    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nothing needs review' })).toBeInTheDocument()
   })
 
   it('starts a fresh Review candidate from Change settings and keeps the accepted review until approval', async () => {
@@ -3248,7 +3248,7 @@ describe('v2 wizard', () => {
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
 
     finishScan({ id: 'review-job', status: 'succeeded', result: { revision: 'review-replacement' } })
-    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nothing needs review' })).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'review', 'review-replacement')
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
@@ -3262,9 +3262,9 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Review scan unavailable')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
     fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
-    expect(await screen.findByRole('heading', { name: 'No warning groups' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Nothing needs review' })).toBeInTheDocument()
     expect(wizardApi.processStage).toHaveBeenCalledTimes(2)
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
@@ -3347,7 +3347,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
 
     expect(await screen.findByRole('heading', { name: 'The transcript needs rebuilding before review.' })).toBeInTheDocument()
-    expect(screen.getByText(/Extraction completed successfully/)).toBeInTheDocument()
+    expect(screen.getByText(/transcript needs to be rebuilt to match/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Rebuild Dialogue/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Try another extraction/ })).not.toBeInTheDocument()
     expect(screen.queryByText('malformed coverage')).not.toBeInTheDocument()
@@ -3589,8 +3589,8 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
 
-    expect(screen.getByText('The voice recipe changed; regenerate the complete audition pack')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Regenerate audition pack →' })).toBeEnabled()
+    expect(screen.getByText('Your voices need refreshing before you continue.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Refresh auditions →' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Accept cast & voices →' })).not.toBeInTheDocument()
   })
 
@@ -3891,7 +3891,7 @@ describe('v2 wizard', () => {
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'cast', 'cast-proposal-1')
     expect(window.location.pathname).toBe('/')
     if (status === 'failed') {
-      expect(await screen.findByRole('alert')).toHaveTextContent('Provider interrupted; completed voices are saved.')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
       expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
     }
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
@@ -3946,7 +3946,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(snapshot)
     vi.mocked(wizardApi.getStageCandidate).mockRejectedValue(new Error('Saved candidate unavailable'))
     render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Saved candidate unavailable')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
     expect(wizardApi.getStageCandidate).toHaveBeenCalledTimes(2)
     expect(screen.queryByRole('heading', { name: 'Record your chapters' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Retry' })).toBeEnabled()
@@ -4206,7 +4206,7 @@ describe('v2 wizard', () => {
     persistWorkflowReturn('book-1', 'generate')
     vi.mocked(wizardApi.getBookSnapshot).mockRejectedValueOnce(Object.assign(new Error('Temporarily offline'), { status: 503 })).mockResolvedValue(base)
     render(<App />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Temporarily offline')
+    expect(await screen.findByRole('alert')).toHaveTextContent('The connection was interrupted. Check your connection and try again. Your accepted work is unchanged.')
     expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
     expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
@@ -4229,7 +4229,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getJob).mockRejectedValueOnce(Object.assign(new Error('Job not found'), { status: 404 }))
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Record your chapters' })).toBeInTheDocument()
-    expect(await screen.findByRole('alert')).toHaveTextContent('Job not found')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
     expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
     expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
@@ -4304,7 +4304,7 @@ describe('v2 wizard', () => {
     })
     vi.mocked(wizardApi.getStageCandidate).mockRejectedValueOnce(Object.assign(new Error('Candidate not found'), { status: 404 }))
     render(<App />)
-    expect(await screen.findByRole('alert')).toHaveTextContent('Candidate not found')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Something went wrong while completing this step. Try again; your accepted work is unchanged.')
     expect(localStorage.getItem('meowdiobooks.workflowLocation')).toContain('book-1')
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
   })

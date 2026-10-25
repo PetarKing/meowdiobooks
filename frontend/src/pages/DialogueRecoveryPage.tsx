@@ -8,8 +8,8 @@ export function DialogueRecoveryPage({ model }: { model: DialogueRecoveryPageMod
   const recovery = snapshot?.dialogueRecovery;
   if (!recovery) return null;
   const recoveryMessage = recovery.page === undefined
-    ? t("This transcript contains an invalid text range. No audio was generated or changed.")
-    : t("This transcript contains an invalid text range on page {{page}}. No audio was generated or changed.", { page: recovery.page });
+    ? t("Part of the transcript could not be matched to your PDF. No audio was generated or changed.")
+    : t("Part of the transcript on page {{page}} could not be matched to your PDF. No audio was generated or changed.", { page: recovery.page });
   return <>
     <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Dialogue needs rebuilding")} />
     <section className="panel panel-plain">

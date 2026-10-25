@@ -24,9 +24,9 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
   const selectedPlayable = playableChapters.filter((row) => exportChapterIds.includes(row.id));
   const selectedSeconds = selectedPlayable.reduce((total, row) => total + (generatedByChapter.get(row.id)?.audioSeconds ?? 0), 0);
   const exportChoices: Array<{ preset: AudioExportPreset; title: string; technical: string; description: string; }> = [
-    { preset: "m4b-high", title: t("High-quality M4B"), technical: t("128 kbps AAC · Chapters and cover"), description: t("Best listening quality. Recommended.") },
-    { preset: "m4b-compact", title: t("Smaller M4B"), technical: t("64 kbps AAC · Chapters and cover"), description: t("Half the size, still optimized for spoken audio.") },
-    { preset: "mp3-chapters", title: t("MP3 chapters"), technical: t("96 kbps MP3 · ZIP download"), description: t("One widely compatible MP3 per chapter.") },
+    { preset: "m4b-high", title: t("High-quality M4B"), technical: t("One file with chapters and cover"), description: t("Best listening quality. Recommended.") },
+    { preset: "m4b-compact", title: t("Smaller M4B"), technical: t("One file with chapters and cover"), description: t("Half the size, still optimized for spoken audio.") },
+    { preset: "mp3-chapters", title: t("MP3 chapters"), technical: t("One MP3 per chapter · ZIP download"), description: t("One widely compatible MP3 per chapter.") },
   ];
   const exportAction = exportPreset === "m4b-high" ? t("Create high-quality M4B") : exportPreset === "m4b-compact" ? t("Create smaller M4B") : t("Create MP3 ZIP");
   const compactExportAction = exportPreset === "mp3-chapters" ? t("Create ZIP") : t("Create M4B");
