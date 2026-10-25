@@ -217,6 +217,7 @@ export interface DialogueArtifact {
 }
 
 export type ReviewCapability =
+  | "repair"
   | "keep"
   | "exclude"
   | "narrate"
@@ -224,6 +225,11 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  readerState?: "narrator" | "assigned-speaker" | "mixed";
+  proposalStatus?: "proposed" | "source_review";
+  cleanupReason?: string;
+  replacement?: string;
+  availableActions?: ReviewCapability[];
   id: string;
   source: string;
   text: string;
@@ -234,6 +240,7 @@ export interface WarningOccurrence {
 }
 
 export interface ReviewWarning {
+  decisionScope?: "occurrence" | "identical-evidence" | "warning-kind";
   id: string;
   kind: string;
   detail: string;
@@ -498,6 +505,11 @@ export interface ReviewTranscriptPolicy {
   action: ReviewCapability;
 }
 
+export interface ReviewTranscriptOccurrencePolicy {
+  occurrenceId: string;
+  action: ReviewCapability;
+}
+
 export interface ReviewTranscriptSpan {
   id: string;
   kind: "narration" | "dialogue" | "excluded";
@@ -647,7 +659,7 @@ export interface WorkflowGateway {
   previewExtraction(bookId: string, page: number, method: ExtractionMethod): Promise<ExtractionPreview>;
   previewDialogue(bookId: string, settings: DialogueSettings): Promise<DialogueArtifact>;
   previewReviewBulk(bookId: string, revision: string, occurrenceId: string, action: ReviewCapability): Promise<Record<string, unknown>>;
-  previewReviewTranscript(bookId: string, revision: string, page: number, policies: ReviewTranscriptPolicy[]): Promise<ReviewTranscriptPreview>;
+  previewReviewTranscript(bookId: string, revision: string, page: number, policies: ReviewTranscriptPolicy[], occurrencePolicies?: ReviewTranscriptOccurrencePolicy[]): Promise<ReviewTranscriptPreview>;
   processStage<S extends ProcessableStage>(bookId: string, stage: S, settings: StageSettings[S]): Promise<Job>;
   previewCasting?(bookId: string, settings: CastProcessSettings): Promise<CastingPreview>;
   prepareRecordingScript(bookId: string): Promise<RecordingScriptArtifact>;

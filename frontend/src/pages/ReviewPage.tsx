@@ -19,6 +19,10 @@ import {
   reviewGuidance,
   reviewQuestion,
   reviewWarningLabel,
+  reviewOccurrenceActions,
+  reviewWarningResolved,
+  reviewProposalDecisions,
+  reviewUsesOccurrenceDecisions,
 } from "../workflow/review";
 
 export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
@@ -29,11 +33,18 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
+  const isAiCleanup = warning?.kind === "ai-cleanup";
+  const perOccurrence = warning && reviewUsesOccurrenceDecisions(warning);
+  const hasCleanupSuggestion = isAiCleanup || occurrence?.proposalStatus != null || typeof occurrence?.replacement === "string";
+  const actionWarning = warning && occurrence ? { ...warning, kind: hasCleanupSuggestion ? "ai-cleanup" : warning.kind, readerState: occurrence.readerState ?? warning.readerState, occurrences: perOccurrence ? [occurrence] : warning.occurrences } : warning;
+  const selectedAction = occurrence && perOccurrence ? reviewDecisions[occurrence.id] : warning && reviewDecisions[warning.id];
+  const occurrenceActions = warning && occurrence ? reviewOccurrenceActions(warning, occurrence) : [];
+  const proposals = candidateWarnings.filter(reviewUsesOccurrenceDecisions).flatMap((group) => group.occurrences.filter((row) => reviewOccurrenceActions(group, row).includes("repair")).map((row) => ({ warning: group, occurrence: row })));
   const boundary = boundaries[Math.min(activeBoundary, Math.max(0, boundaries.length - 1))];
   const showingBoundary = boundaries.length > 0 && (activeReviewGroup === "chapters" || candidateWarnings.length === 0);
-  const complete = candidateWarnings.every((row) => Boolean(reviewDecisions[row.id])) && boundaries.every((row) => Boolean(boundaryDecisions[row.id]));
+  const complete = candidateWarnings.every((row) => reviewWarningResolved(row, reviewDecisions)) && boundaries.every((row) => Boolean(boundaryDecisions[row.id]));
   const totalGroups = candidateWarnings.length + (boundaries.length ? 1 : 0);
-  const decidedGroups = candidateWarnings.filter((row) => Boolean(reviewDecisions[row.id])).length + (boundaries.length && boundaries.every((row) => Boolean(boundaryDecisions[row.id])) ? 1 : 0);
+  const decidedGroups = candidateWarnings.filter((row) => reviewWarningResolved(row, reviewDecisions)).length + (boundaries.length && boundaries.every((row) => Boolean(boundaryDecisions[row.id])) ? 1 : 0);
 
   function revealReviewGroup(group: string) {
     const target = reviewStripRef.current?.querySelector<HTMLElement>(`[data-review-group="${group}"]`);
@@ -60,13 +71,13 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     const indices = [...boundaries.keys()];
     const nextBoundary = [...indices.slice(activeBoundary + 1), ...indices.slice(0, activeBoundary + 1)].find((index) => !nextDecisions[boundaries[index].id]);
     if (nextBoundary !== undefined) return setActiveBoundary(nextBoundary);
-    const nextWarning = candidateWarnings.findIndex((row) => !reviewDecisions[row.id]);
+    const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
     if (nextWarning >= 0) openWarning(nextWarning);
   }
 
   function acceptAllBoundaries() {
     setBoundaryDecisions(Object.fromEntries(boundaries.map((row) => [row.id, "chapter-start"] as const)));
-    const nextWarning = candidateWarnings.findIndex((row) => !reviewDecisions[row.id]);
+    const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
     if (nextWarning >= 0) openWarning(nextWarning);
   }
 
@@ -80,10 +91,29 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     const nextWarning = [
       ...candidateWarnings.slice(currentIndex + 1),
       ...candidateWarnings.slice(0, currentIndex),
-    ].find((row) => !nextDecisions[row.id]);
+    ].find((row) => !reviewWarningResolved(row, nextDecisions));
     if (nextWarning) return openWarning(candidateWarnings.findIndex((row) => row.id === nextWarning.id));
     const nextBoundary = boundaries.findIndex((row) => !boundaryDecisions[row.id]);
     if (nextBoundary >= 0) openBoundary(nextBoundary);
+  }
+
+  function chooseOccurrenceAction(action: ReviewCapability) {
+    if (!warning || !occurrence) return;
+    const next = { ...reviewDecisions, [occurrence.id]: action };
+    setReviewDecisions(next);
+    if (reviewDecisions[occurrence.id]) return;
+    const nextIndex = [...warning.occurrences.keys()].find((index) => !next[warning.occurrences[index].id]);
+    if (nextIndex !== undefined) setActiveOccurrence(nextIndex);
+  }
+
+  function applyAllProposals() {
+    const next = candidateWarnings.reduce((choices, group) => reviewProposalDecisions(group, choices), reviewDecisions);
+    setReviewDecisions(next);
+    const target = candidateWarnings.find((group) => reviewUsesOccurrenceDecisions(group) && !reviewWarningResolved(group, next)) ?? proposals[0]?.warning;
+    if (!target) return;
+    openWarning(candidateWarnings.indexOf(target));
+    const unresolved = target.occurrences.findIndex((row) => !next[row.id]);
+    if (unresolved >= 0) setActiveOccurrence(unresolved);
   }
 
   async function acceptReview() {
@@ -129,6 +159,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   if (!reviewCandidate) return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("Check for issues")} copy={t("Scan extraction, layout, chapter boundaries and delivery before choosing what happens.")} />
     <section className="review-scan-scene" aria-label={t("Manuscript review")}>
       <div className="review-scan-copy">
+        <p>{t("This scan sends bounded passages to OpenAI Decisions and Luna to suggest cleanup corrections. You review every proposed change before it is applied.")}</p>
         {busy && <p>{t("Checking source words, chapter openings and reading order. Your accepted version remains available while we prepare a new review.")}</p>}
         {busy ? <div className="review-scan-progress" role="status" aria-label={t("Scanning for issues…")}><span className="review-scan-progress-track" aria-hidden="true"><i /></span>{t("Scanning for issues…")}</div>
           : <StageLaunch><button className="primary" onClick={() => void scanForIssues()}>{t("Scan for issues")} →</button></StageLaunch>}
@@ -157,8 +188,9 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
         <div className="review-queue-heading"><span className="eyebrow">{t("Decision queue")}</span><b>{t("{{decided}} / {{total}} decided", { decided: decidedGroups, total: totalGroups })}</b></div>
         <nav className="review-strip" aria-label={t("Review groups")} ref={reviewStripRef}>
           {boundaries.length > 0 && <button data-review-group="chapters" className={[showingBoundary ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
-          {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} className={[!showingBoundary && index === activeWarning ? "active" : "", reviewDecisions[row.id] ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewDecisions[row.id] ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t(row.occurrences.length === 1 ? "1 occurrence · {{severity}}" : "{{count}} occurrences · {{severity}}", { count: row.occurrences.length, severity: t(row.severity) })}</small></span></button>)}
+          {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} className={[!showingBoundary && index === activeWarning ? "active" : "", reviewWarningResolved(row, reviewDecisions) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewWarningResolved(row, reviewDecisions) ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t(row.occurrences.length === 1 ? "1 occurrence · {{severity}}" : "{{count}} occurrences · {{severity}}", { count: row.occurrences.length, severity: t(row.severity) })}</small></span></button>)}
         </nav>
+        {proposals.length > 0 && <section className="cleanup-category-actions" aria-label={t("Cleanup correction actions")}><b>{t("Cleanup corrections · {{count}}", { count: proposals.length })}</b><p>{t("Apply all corrections, including those you previously chose to keep. Source checks still need individual decisions.")}</p><button className="ghost review-bulk-button" disabled={proposals.every(({ occurrence: row }) => reviewDecisions[row.id] === "repair")} onClick={applyAllProposals}>{t("Apply all corrections")}</button></section>}
       </aside>
       <div className={["review-workspace", showingBoundary ? "chapter-workspace" : "warning-workspace"].join(" ")}>
         {showingBoundary && boundary ? <>
@@ -175,18 +207,19 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <div className="resolution-options" role="group" aria-label={t("Chapter decision for {{heading}}", { heading: boundary.source })}><button aria-pressed={boundaryDecisions[boundary.id] === "chapter-start"} className={boundaryDecisions[boundary.id] === "chapter-start" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "chapter-start")}><b>{t("Start a new chapter")}</b><small>{t("Audio before this heading stays in the previous chapter.")}</small></button><button aria-pressed={boundaryDecisions[boundary.id] === "not-a-boundary"} className={boundaryDecisions[boundary.id] === "not-a-boundary" ? "selected" : ""} onClick={() => chooseBoundaryAction(boundary.id, "not-a-boundary")}><b>{t("Keep inside the current chapter")}</b><small>{t("This heading will not create a chapter break.")}</small></button></div>
             {boundaries.length > 1 && !boundaries.every((row) => boundaryDecisions[row.id] === "chapter-start") && <div className="chapter-bulk-choice"><span><b>{t("Same decision for every heading?")}</b><small>{t("Mark all {{count}} detected headings as chapter starts. You can still change any one afterward.", { count: boundaries.length })}</small></span><button className="ghost review-bulk-button" onClick={acceptAllBoundaries}>{t("Mark all {{count}} as chapter starts", { count: boundaries.length })}</button></div>}
           </section>
-        </> : warning && occurrence ? <>
+        </> : warning && occurrence && actionWarning ? <>
           <section className="review-evidence">
             <div className="review-group-heading"><span><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span><Tag tone={warning.severity === "blocking" ? "rose" : "warn"}>{t(warning.severity)}</Tag></div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{t("Page {{page}}", { page: occurrence.page })}</span></div>
-            <div className="source-window" aria-label={t("Manuscript context")}><div className="context-boundary">{t("Text immediately before")}</div>{occurrence.contextBefore ? <p className="context">{occurrence.contextBefore}</p> : <p className="context unavailable">{t("No preceding text in this extraction window.")}</p>}<p className="detected-span"><span>{t("Flagged text")}</span><mark>{occurrence.source || t("No text was extracted here")}</mark></p><div className="context-boundary">{t("Text immediately after")}</div>{occurrence.contextAfter ? <p className="context">{occurrence.contextAfter}</p> : <p className="context unavailable">{t("No following text in this extraction window.")}</p>}</div>
+            <div className={hasCleanupSuggestion ? "source-window ai-cleanup-source" : "source-window"} aria-label={t("Manuscript context")}><div className="context-boundary">{t("Text immediately before")}</div>{occurrence.contextBefore ? <p className="context">{occurrence.contextBefore}</p> : <p className="context unavailable">{t("No preceding text in this extraction window.")}</p>}<p className="detected-span"><span>{t("Flagged text")}</span><mark>{occurrence.source || t("No text was extracted here")}</mark></p><div className="context-boundary">{t("Text immediately after")}</div>{occurrence.contextAfter ? <p className="context">{occurrence.contextAfter}</p> : <p className="context unavailable">{t("No following text in this extraction window.")}</p>}</div>
+            {hasCleanupSuggestion && <div className="cleanup-proposal" aria-label={t("Proposed correction")}><b>{t("Proposed correction")}</b>{typeof occurrence.replacement === "string" ? occurrence.replacement === "" ? <p className="cleanup-deletion">{t("Remove the flagged text from the audiobook transcript.")}</p> : <p className="cleanup-replacement">{occurrence.replacement}</p> : <p>{t("No correction was proposed. Check the source before keeping this text or trying extraction again.")}</p>}{(occurrence.cleanupReason || occurrence.reason) && <p className="evidence-help">{occurrence.cleanupReason || occurrence.reason}</p>}</div>}
             <p className="evidence-help">{t("Only the highlighted text changes. Surrounding text stays unchanged.")}</p>
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className="resolution-panel">
-            <div className="review-scope"><b>{t(warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t("Review each example on the left before choosing once.")}</small></div>
-            <h3>{t(reviewQuestion(warning.kind))}</h3>
-            <div className="resolution-options">{warning.availableActions.map((action) => <button key={action} aria-pressed={reviewDecisions[warning.id] === action} className={reviewDecisions[warning.id] === action ? "selected" : ""} onClick={() => chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, warning))}</b><small>{reviewConsequence(action, warning, t)}</small></button>)}</div>
+            <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>
+            <h3>{t(hasCleanupSuggestion && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
+            <div className="resolution-options">{occurrenceActions.map((action) => <button key={action} aria-pressed={selectedAction === action} className={selectedAction === action ? "selected" : ""} onClick={() => perOccurrence ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}><b>{t(reviewActionTitle(action, actionWarning))}</b><small>{reviewConsequence(action, actionWarning, t)}</small></button>)}</div>
           </section>
         </> : null}
       </div>

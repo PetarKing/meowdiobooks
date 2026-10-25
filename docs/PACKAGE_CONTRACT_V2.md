@@ -133,12 +133,20 @@ The accepted receipt contains:
 - remaining blockers;
 - a deterministic decision digest.
 
-The user-facing warning vocabulary is limited to empty page, suspicious extraction, reading order,
-repeated matter, page number, footnote and front/back matter. Lossless coverage failures cannot be
+The user-facing warning vocabulary includes empty page, suspicious extraction, reading order,
+repeated matter, page number, footnote, front/back matter and AI cleanup. Lossless coverage failures cannot be
 waived and are represented as a blocking recovery state rather than another content warning. The
 accepted Extraction is not marked failed: the user rebuilds Dialogue first, or creates a new Extraction
-only when the source itself is wrong. Review has no model-backed repair or character-guessing path and
-never mutates accepted evidence invisibly.
+only when the source itself is wrong. AI cleanup uses Luna Decisions and bounded Luna repair proposals.
+Each proposal stores exact source offsets, source text, replacement (including an explicit empty
+deletion), reason and model. Missing or uncertain source remains a source-review item, never invented
+text. `repair` is available only for a validated replacement. Individual and bulk acceptance both
+record explicit decisions; transcript previews accept `occurrencePolicies` for this category alongside
+the existing deterministic group policies. The accepted snapshot is the replacement authority.
+Rendering retains the original source and applies only accepted replacements to spoken text; it
+does not reassign speakers. Overlapping repairs or partial conflicts with another render policy are
+rejected. Explicit exclusion of an entire repair range takes precedence because that text is not
+spoken. Provider errors publish no candidate. No local decision model is used.
 
 ## Cast artifact
 

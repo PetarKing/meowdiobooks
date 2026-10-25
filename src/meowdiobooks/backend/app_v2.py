@@ -147,6 +147,7 @@ from .voice_profile_checkpoint import (
 )
 from .review import (
     ReviewContractError,
+    add_cleanup_proposals,
     accept_review_revision,
     apply_review_render_policies,
     build_review_workspace,
@@ -432,6 +433,9 @@ def create_app_v2(
     generate_voice_audition_lines: bool = False,
     remote_usage_observer: RemoteUsageObserver | None = None,
     remote_request_admission: RemoteRequestAdmission | None = None,
+    cleanup_reviewer: Callable[..., dict[str, Any]] | None = None,
+    cleanup_usage_observer: RemoteUsageObserver | None = None,
+    cleanup_request_admission: RemoteRequestAdmission | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
@@ -707,8 +711,17 @@ def create_app_v2(
         book = require_book(command.book_id)
         extraction = extraction_payload(book.id)
         dialogue = read_artifact(package_for(book.id), "dialogue")
-        report(20, "Checking the transcript for issues")
+        report(1, "Checking the transcript for issues")
         workspace = build_review_workspace(extraction, dialogue)
+        if workspace.get("recovery") is None:
+            from .cleanup_remote import run_cleanup_review
+
+            cleanup = (cleanup_reviewer or run_cleanup_review)(
+                repo_root, extraction, dialogue, report,
+                usage_observer=cleanup_usage_observer,
+                request_admission=cleanup_request_admission,
+            )
+            workspace = add_cleanup_proposals(workspace, extraction, dialogue, cleanup)
         revision = uuid4().hex
         path, artifact = write_artifact(
             package_for(book.id),
@@ -1297,12 +1310,13 @@ def create_app_v2(
         dialogue = read_artifact(package, "dialogue")
         review = read_artifact(package, "review")
         cast = read_artifact(package, "cast")
+        rendered_dialogue = _dialogue_with_chapters(dialogue, review)
         if "script" in active:
             cached = read_artifact(package, "script")
-            if recording_script_matches(cached, dialogue, review, cast):
+            if recording_script_matches(cached, rendered_dialogue, review, cast):
                 return cached
         script = build_recording_script(
-            _dialogue_with_chapters(dialogue, review),
+            rendered_dialogue,
             review,
             cast,
             revision=uuid4().hex,
@@ -2132,6 +2146,7 @@ def create_app_v2(
                 [policy.model_dump() for policy in body.policies],
                 page=body.page,
                 page_count=book.page_count,
+                occurrence_policies=[policy.model_dump() for policy in body.occurrencePolicies],
             )
             return {
                 **result,

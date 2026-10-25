@@ -191,10 +191,10 @@ export class HttpWizardApi implements WorkflowGateway {
     return this.request(`/books/${bookId}/review/bulk-preview`, { method: 'POST', body: JSON.stringify({ revision, occurrenceId, action }) });
   }
 
-  previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[]): Promise<import('./contracts').ReviewTranscriptPreview> {
+  previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[], occurrencePolicies?: import('./contracts').ReviewTranscriptOccurrencePolicy[]): Promise<import('./contracts').ReviewTranscriptPreview> {
     return this.request(`/books/${bookId}/review/transcript-preview`, {
       method: 'POST',
-      body: JSON.stringify({ revision, page, policies }),
+      body: JSON.stringify({ revision, page, policies, ...(occurrencePolicies?.length ? { occurrencePolicies } : {}) }),
     });
   }
 
@@ -639,6 +639,8 @@ function normalizeExamples(value: unknown): DialogueExample[] {
 function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warnings"][number] {
   const occurrences = Array.isArray(raw.occurrences) ? raw.occurrences as Array<Record<string, unknown>> : [];
   return {
+    decisionScope: raw.decisionScope as import("./contracts").ReviewWarning["decisionScope"],
+    readerState: raw.readerState as import("./contracts").ReviewWarning["readerState"],
     id: String(raw.id ?? raw.kind ?? "warning"),
     kind: String(raw.kind ?? "review-warning"),
     detail: String(raw.detail ?? raw.reason ?? "Inspect this anchored source issue."),
@@ -646,6 +648,9 @@ function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warning
       ? String(raw.severity)
       : "warning") as WizardSnapshot["warnings"][number]["severity"],
     occurrences: occurrences.map((row) => ({
+      readerState: row.readerState as import("./contracts").WarningOccurrence["readerState"],
+      proposalStatus: row.proposalStatus as import("./contracts").WarningOccurrence["proposalStatus"],
+      cleanupReason: row.cleanupReason == null ? undefined : String(row.cleanupReason),
       id: String(row.id ?? ""),
       source: String(row.source ?? row.text ?? ""),
       text: String(row.text ?? row.source ?? ""),
@@ -653,6 +658,8 @@ function normalizeWarning(raw: Record<string, unknown>): WizardSnapshot["warning
       contextBefore: row.contextBefore == null ? undefined : String(row.contextBefore),
       contextAfter: row.contextAfter == null ? undefined : String(row.contextAfter),
       reason: row.reason == null ? undefined : String(row.reason),
+      replacement: typeof row.replacement === "string" ? row.replacement : undefined,
+      availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String) as import("./contracts").ReviewCapability[] : undefined,
     })),
     availableActions: Array.isArray(raw.availableActions)
       ? raw.availableActions.map(String).filter((action) => action !== "defer") as WizardSnapshot["warnings"][number]["availableActions"]
