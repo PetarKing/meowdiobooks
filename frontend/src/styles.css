@@ -608,9 +608,12 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .chapter-filter-empty small { font-size:12px; }
 
 .chapter-player-backdrop { position:fixed; inset:0; z-index:60; display:grid; place-items:center; padding:20px; background:color-mix(in srgb, var(--inverse-surface) 48.0%, transparent); backdrop-filter:blur(7px); }
+/* Keep decorative ears outside the scrolling dialog, with room inside the scrim. */
+.chapter-player-frame { position:relative; isolation:isolate; display:grid; grid-template-rows:minmax(0,1fr); width:min(520px,100%); min-height:0; max-height:100%; padding-top:24px; }
+.chapter-player-frame > .chapter-player-modal { width:100%; max-height:100%; }
 .chapter-player-modal { position:relative; display:grid; grid-template-columns:74px minmax(0,1fr); align-items:center; gap:18px; width:min(520px,calc(100vw - 36px)); padding:25px; border:1px solid var(--line); border-radius:24px; background:radial-gradient(circle at 88% 12%,color-mix(in srgb, var(--honey) 22.0%, transparent),transparent 12rem),linear-gradient(145deg,var(--paper),var(--blush)); box-shadow:0 24px 70px rgb(var(--shadow-color) / 0.3); }
-.chapter-player-modal::before,.chapter-player-modal::after { content:""; position:absolute; z-index:-1; top:-20px; width:0; height:0; border-right:22px solid transparent; border-bottom:34px solid var(--line); border-left:22px solid transparent; }
-.chapter-player-modal::before { left:66px; transform:rotate(-12deg); }.chapter-player-modal::after { right:66px; transform:rotate(12deg); }
+.chapter-player-frame::before,.chapter-player-frame::after { content:""; position:absolute; z-index:-1; top:4px; width:0; height:0; border-right:22px solid transparent; border-bottom:34px solid var(--line); border-left:22px solid transparent; }
+.chapter-player-frame::before { left:66px; transform:rotate(-12deg); }.chapter-player-frame::after { right:66px; transform:rotate(12deg); }
 .chapter-player-close { position:absolute; top:12px; right:12px; display:grid; width:31px; height:31px; place-items:center; padding:0; border:1px solid var(--color-border, var(--line)); border-radius:50%; background:color-mix(in srgb, var(--paper) 80.0%, transparent); color:var(--color-muted, var(--muted)); font-size:18px; cursor:pointer; }
 .chapter-player-close:hover { border-color:var(--color-action, var(--poppy)); color:var(--color-action-hover, var(--poppy-dark)); }
 .chapter-player-book { position:relative; display:grid; width:70px; height:94px; place-content:center; justify-items:center; gap:2px; border:1px solid var(--line-strong); border-radius:8px 15px 15px 8px; background:linear-gradient(145deg,var(--inverse-surface),var(--inverse-surface)); color:var(--honey); box-shadow:inset 7px 0 rgb(var(--shadow-color) / 0.08),var(--shadow); }
