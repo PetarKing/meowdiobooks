@@ -1,0 +1,48 @@
+.reading-cat-companion { position: relative; min-width: 0; color: var(--ink); isolation: isolate; }
+.reading-cat-companion-art { width: 100%; aspect-ratio: 400 / 340; pointer-events: none; }
+.reading-cat-companion .guide-scene-art { display: block; width: 100%; height: auto; overflow: visible; }
+.reading-cat-companion .guide-scene-green { color: var(--folio-border-strong); }
+.reading-cat-companion .guide-scene-cherry,
+.reading-cat-companion .guide-scene-notes,
+.reading-cat-companion .guide-scene-orbit { color: var(--poppy); }
+.reading-cat-companion .guide-scene-orbit { opacity: .5; }
+.reading-cat-companion .guide-scene-pages { animation: companion-pages 10s ease-in-out infinite; transform-origin: 200px 180px; }
+.reading-cat-companion .guide-scene-cat { animation: companion-breathe 7s ease-in-out infinite; }
+.reading-cat-companion .guide-scene-tail { animation: companion-tail 6s ease-in-out infinite; transform-origin: 250px 230px; }
+.reading-cat-companion .guide-scene-awake { transform-origin: 195px 158px; animation: companion-blink 7s linear infinite; }
+.reading-cat-companion .guide-scene-sleep { opacity: 0; }
+.reading-cat-companion .guide-scene-notes { opacity: .65; animation: companion-float 8s ease-in-out infinite; }
+.reading-cat-companion[data-paused="true"] * { animation-play-state: paused !important; }
+.reading-cat-motion { position: absolute; bottom: 7%; right: 10%; display: grid; place-items: center; width: 34px; height: 34px; min-height: 34px; padding: 7px; border: 1px solid var(--line); border-radius: 50%; background: var(--canvas); color: var(--muted); cursor: pointer; }
+.reading-cat-motion svg { width: 16px; height: 16px; stroke: currentColor; stroke-width: 1.3; }
+.reading-cat-motion:hover { color: var(--poppy); border-color: var(--poppy); }
+.reading-cat-motion:focus-visible { outline: 2px solid var(--poppy); outline-offset: 4px; }
+.reading-cat-companion--home { align-self: stretch; display: grid; align-items: center; }
+.reading-cat-companion--home::before { content: ""; position: absolute; z-index: -1; inset: 12% -8% 5%; background: radial-gradient(ellipse, color-mix(in srgb, var(--matcha) 55%, transparent), transparent 68%); }
+.studio-hero--compact .reading-cat-companion--home { max-width: 520px; justify-self: center; width: 100%; }
+.library-head:has(.reading-cat-companion--library) { align-items: center; justify-content: flex-start; }
+.library-head:has(.reading-cat-companion--library) .library-head-copy { flex: 1; }
+.reading-cat-companion--library { width: 126px; flex: 0 0 126px; margin: -24px -2px -14px -18px; }
+.reading-cat-companion--library .guide-scene-orbit,
+.reading-cat-companion--library .guide-scene-pages,
+.reading-cat-companion--library .guide-scene-notes,
+.reading-cat-companion--library .guide-scene-cherry,
+.reading-cat-companion--library .guide-scene-green { opacity: .25; }
+.reading-cat-companion--library .guide-scene-awake { display: none; }
+.reading-cat-companion--library .guide-scene-sleep { opacity: 1; }
+.reading-cat-companion--empty { max-width: 500px; }
+@keyframes companion-pages { 0%, 100% { transform: translateY(5px) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
+@keyframes companion-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes companion-tail { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(8deg); } }
+@keyframes companion-blink { 0%, 42%, 46%, 100% { transform: scaleY(1); } 44% { transform: scaleY(.05); } }
+@keyframes companion-float { 0%, 100% { transform: translateY(5px); } 50% { transform: translateY(-10px); } }
+@media (min-width: 1101px) { .studio-hero--compact:has(.reading-cat-companion) { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,.85fr); gap: 36px; } .studio-hero--compact:has(.reading-cat-companion) .studio-hero-copy { width: auto; } }
+@media (max-width: 700px) {
+  .reading-cat-companion--home { width: min(100%, 400px); margin: -20px auto -14px; }
+  .reading-cat-companion--empty { width: min(100%, 360px); margin: auto; }
+  .reading-cat-companion--library { width: 90px; flex-basis: 90px; margin: -8px -2px -4px -12px; }
+  .library-head:has(.reading-cat-companion--library) { gap: 14px; flex-wrap: wrap; }
+  .library-head:has(.reading-cat-companion--library) .library-head-copy { min-width: 160px; }
+  .library-head:has(.reading-cat-companion--library) .library-count { margin-left: auto; }
+}
+@media (prefers-reduced-motion: reduce) { .reading-cat-companion * { animation: none !important; } .reading-cat-motion { display: none; } }

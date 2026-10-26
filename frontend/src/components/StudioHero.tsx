@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import sanctuary from "../assets/brand/matcha-kami-sanctuary.webp";
+import { ReadingCatCompanion } from "./ReadingCatCompanion";
 
 /** The sanctuary frames the real import action; workflow state stays in the page. */
 export function StudioHero({ eyebrow, title, description, children, compact = false }: { eyebrow: string; title: ReactNode; description: string; children?: ReactNode; compact?: boolean }) {
@@ -9,8 +9,6 @@ export function StudioHero({ eyebrow, title, description, children, compact = fa
       <h1>{title}</h1><p>{description}</p>
       {children}
     </div>
-    <div className="sanctuary-art" aria-hidden="true">
-      <img src={sanctuary} alt="" fetchPriority="high" />
-    </div>
+    <ReadingCatCompanion variant="home" />
   </section>;
 }

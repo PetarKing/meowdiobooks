@@ -1,5 +1,5 @@
 import { useState } from "react";
-import sanctuary from "../assets/brand/matcha-kami-sanctuary.webp";
+import { ReadingCatCompanion } from "../components/ReadingCatCompanion";
 import { libraryCoverImageUrl } from "../app/mediaUrls";
 import type { WorkflowModel } from "../app/useWorkflowModel";
 import {
@@ -27,6 +27,7 @@ export function LibraryPage({ model }: { model: LibraryPageModel; }) {
   const loadingFirstEditions = !libraryReady || (libraryLoading && !libraryExports.length);
   return <section className="library-page" aria-busy={libraryLoading}>
     <header className="library-head">
+      {libraryExports.length > 0 && <ReadingCatCompanion variant="library" />}
       <div className="library-head-copy"><h1>{t("Your audiobooks")}</h1><p>{t("library.storageDescription", { ns: "edition" })}</p></div>
 
       {(loadingFirstEditions || libraryExports.length > 0) && <span className="library-count" aria-live="polite">{libraryLoading ? t("Loading…") : libraryExports.length === 1 ? t("1 audiobook") : t("{{count}} audiobooks", { count: libraryExports.length })}</span>}
@@ -38,7 +39,7 @@ export function LibraryPage({ model }: { model: LibraryPageModel; }) {
         <div className="library-book-copy"><span className="library-format">{formatLibraryExport(item, t)}</span><h2>{item.title}</h2><p>{item.author}</p><div className="library-chapters"><b>{formatLibraryChapters(item, t)}</b></div><div className="library-meta"><span>{formatFileSize(item.sizeBytes)}</span><span>{formatLibraryDate(item.createdAt, uiLocale)}</span></div></div>
         <div className="library-actions">{renderLibraryActions ? renderLibraryActions(item) : <><button className="primary library-open-action" onClick={() => void openLibraryItem(item.id)}><span className="library-action-symbol" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none"><path d="M7 4.5 15 10l-8 5.5z" fill="currentColor" /></svg></span>{t("library.openAction", { ns: "edition" })}</button><button className="ghost library-reveal-action" onClick={() => void revealLibraryItem(item.id)}><svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M2.5 6.5V4.5h5l2 2h8v9h-15z" /><path d="M2.5 6.5h15" /></svg>{t("library.revealAction", { ns: "edition" })}</button></>}</div>
       </div>
-    </article>)}</div> : !libraryError && <div className="library-empty-composition"><WorkflowEmpty className="library-empty" symbol="♪" title={t("No audiobooks yet.")} copy={t("Create an audiobook in Export and it will appear here automatically.")}><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></WorkflowEmpty><div className="library-empty-art" aria-hidden="true"><img src={sanctuary} alt="" /></div></div>}
+    </article>)}</div> : !libraryError && <div className="library-empty-composition"><WorkflowEmpty className="library-empty" symbol="♪" title={t("No audiobooks yet.")} copy={t("Create an audiobook in Export and it will appear here automatically.")}><button className="primary" onClick={() => navigateProduct("create")}>{t("Back to creating")} →</button></WorkflowEmpty><ReadingCatCompanion variant="empty" /></div>}
   </section>;
 
 }
