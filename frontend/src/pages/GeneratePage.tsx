@@ -151,12 +151,14 @@ export function GeneratePage({ model, purchase, error }: { model: GeneratePageMo
     </DialogBackdrop>}
 
     {listeningChapter && listeningAudio && <DialogBackdrop className="chapter-player-backdrop" onMouseDown={(event) => { if (event.currentTarget === event.target) setListeningChapterId(undefined); }}>
-      <DialogSurface className="chapter-player-modal" aria-labelledby="chapter-player-title" onDismiss={() => setListeningChapterId(undefined)}>
-        <button type="button" className="chapter-player-close" aria-label={t("Close player")} onClick={() => setListeningChapterId(undefined)}>×</button>
-        <div className="chapter-player-book" aria-hidden="true"><span>{t("Chapter")}</span><b>{String(chapters.findIndex((chapter) => chapter.id === listeningChapter.id) + 1).padStart(2, "0")}</b><i>♪</i></div>
-        <div className="chapter-player-copy"><span className="eyebrow">{t(listeningAudio.current ? "Chapter audio" : "Older recording")}</span><h2 id="chapter-player-title">{listeningChapter.title || t("Untitled chapter")}</h2></div>
-        <ChapterAudioPlayer src={listeningAudio.audioUrl} />
-      </DialogSurface>
+      <div className="chapter-player-frame">
+        <DialogSurface className="chapter-player-modal" aria-labelledby="chapter-player-title" onDismiss={() => setListeningChapterId(undefined)}>
+          <button type="button" className="chapter-player-close" aria-label={t("Close player")} onClick={() => setListeningChapterId(undefined)}>×</button>
+          <div className="chapter-player-book" aria-hidden="true"><span>{t("Chapter")}</span><b>{String(chapters.findIndex((chapter) => chapter.id === listeningChapter.id) + 1).padStart(2, "0")}</b><i>♪</i></div>
+          <div className="chapter-player-copy"><span className="eyebrow">{t(listeningAudio.current ? "Chapter audio" : "Older recording")}</span><h2 id="chapter-player-title">{listeningChapter.title || t("Untitled chapter")}</h2></div>
+          <ChapterAudioPlayer src={listeningAudio.audioUrl} />
+        </DialogSurface>
+      </div>
     </DialogBackdrop>}
   </>;
 
