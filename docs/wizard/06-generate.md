@@ -94,6 +94,13 @@ After submit, the application:
 7. records narrator/group fallbacks explicitly;
 8. writes segment WAVs and metadata, assembles the chapter and atomically publishes success.
 
+Review owns spelling repairs. Render compilation does not join line-break hyphens based on
+other occurrences in the book. An uncertain decision or explicit Keep retains the accepted text;
+an approved repair reaches TTS unchanged. For chapters retaining line-break hyphens, current/export
+eligibility also compares the immutable audio receipt's segment text with the accepted render text.
+An older recording with a different spelling (or missing receipt text) needs regeneration, even when
+its input revision IDs match. Unaffected chapters retain normal recipe-based eligibility.
+
 Current TTS receives no emotion/state instruction. Optional state/ambience decorators remain metadata
 until an approved consumer exists.
 

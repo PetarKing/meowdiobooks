@@ -151,7 +151,7 @@ def test_review_render_policy_reopens_affected_chapter_only(tmp_path, action):
     assert _stale(tmp_path, pinned, current, "b") == []
 
 
-def test_other_chapter_text_can_change_this_chapters_hyphenation_recipe(tmp_path):
+def test_other_chapter_text_cannot_change_reviewed_hyphen_spelling(tmp_path):
     inputs = _inputs()
     span = inputs["dialogue"]["spans"][0]
     span["source"] = span["text"] = "Find your al-\nlies."
@@ -161,7 +161,31 @@ def test_other_chapter_text_can_change_this_chapters_hyphenation_recipe(tmp_path
     other["source"] = other["text"] = "Your allies await."
     other["sourceEnd"] = len(other["source"])
     current = _publish(tmp_path, inputs, "2")
-    assert _stale(tmp_path, pinned, current, "a")
+    receipt = {**_metadata(pinned), "segments": [{"text": "Find your al-\nlies."}]}
+    assert generation_status.chapter_audio_stale_reasons(tmp_path, receipt, current) == []
+    assert _stale(tmp_path, pinned, current, "b")
+
+
+@pytest.mark.parametrize("recorded,stale", [
+    ([{"text": "Find your allies."}], True),
+    ([{"text": "Find your al-\nlies."}], False),
+    ([{"text": "Find your al- lies."}], False),
+    (None, True),
+    ([], True),
+    ([{}], True),
+])
+def test_same_revision_legacy_audio_checks_actual_hyphen_spelling(tmp_path, recorded, stale):
+    inputs = _inputs()
+    span = inputs["dialogue"]["spans"][0]
+    span["source"] = span["text"] = "Find your al-\nlies."
+    span["sourceEnd"] = len(span["source"])
+    pinned = _publish(tmp_path, inputs, "1")
+    receipt = {**_metadata(pinned), "segments": recorded}
+    reasons = generation_status.chapter_audio_stale_reasons(tmp_path, receipt, pinned)
+    assert bool(reasons) is stale
+    if stale:
+        assert reasons == ["rendered-text:reviewed-hyphen-spelling"]
+    assert _stale(tmp_path, pinned, pinned, "b") == []
 
 
 def test_layered_member_voice_changes_reopen_every_chapter_using_the_group(tmp_path):
@@ -238,3 +262,22 @@ def test_snapshot_compiles_each_input_tuple_once_for_multiple_chapters(tmp_path,
         tmp_path, _metadata(pinned, "b"), current, comparison_cache=cache,
     ) == []
     assert len(calls) == 4
+
+
+@pytest.mark.parametrize("collapsed", [True, False])
+def test_hyphen_receipt_handles_native_and_hosted_layered_tracks(tmp_path, collapsed):
+    inputs = _inputs()
+    span = inputs["dialogue"]["spans"][0]
+    span["source"] = span["text"] = "A re-\ncreation."
+    span["sourceEnd"] = len(span["source"])
+    inputs["cast"]["identities"].append({
+        "characterId": "crowd", "category": "group", "name": "Crowd", "voiceAccepted": True,
+        "voiceRoute": {"kind": "layered", "characterIds": ["alice", "bob"]},
+    })
+    inputs["cast"]["labelToCharacterId"]["Alice"] = "crowd"
+    pinned = _publish(tmp_path, inputs, "1")
+    rows = [{"text": span["text"], "mixGroupId": "legacy-group"}]
+    receipt = {**_metadata(pinned), "segments": rows if collapsed else rows * 2}
+    assert generation_status.chapter_audio_stale_reasons(tmp_path, receipt, pinned) == []
+    receipt["segments"][0]["text"] = "A recreation."
+    assert generation_status.chapter_audio_stale_reasons(tmp_path, receipt, pinned)
