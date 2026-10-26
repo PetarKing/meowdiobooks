@@ -9,7 +9,7 @@ import './styles/product.css'
 const AgentGuide = lazy(() => import('./pages/AgentGuide').then(module => ({ default: module.AgentGuide })))
 function LocalStudio() {
   const { appearance, resolvedAppearance, setAppearance } = useAppearance()
-  return <><App appearance={appearance} onAppearanceChange={setAppearance} /><AgentGuideFooter appearance={resolvedAppearance} /></>
+  return <div className="local-studio"><App appearance={appearance} onAppearanceChange={setAppearance} /><AgentGuideFooter appearance={resolvedAppearance} /></div>
 }
 
 const showAgentGuide = window.location.pathname.replace(/\/$/, '') === '/for-agents'

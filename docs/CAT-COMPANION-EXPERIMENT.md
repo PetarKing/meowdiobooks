@@ -50,3 +50,38 @@ Validation: build, lint, 209 guide/App tests and Storybook/preview types passed.
 remain. Browser evidence in `assets/review/cat-companion/versions/` covers all three directions
 at 1920×1080 light/dark and 390×844 dark, plus Wide sky at 2560×1440. No horizontal overflow;
 the phone text begins above the cat; pause stops background stars and the cat's tail together.
+
+## Sanctuary hybrid and actual dithercn comparison
+
+Latest direction keeps the original sanctuary illustration, typography and import flow. The extra
+reading-cat SVG is absent. The image and text scale with the desktop, while compact Home brings
+the book shelf higher and includes the real standalone footer in the synthetic preview. One book
+fits with the footer at 1280×720 and 1920×1080; six books scroll naturally. Phones use normal
+vertical flow. The visible pause control was removed at the user's request; reduced-motion and
+hidden-tab behavior remain.
+
+- [dithercn](http://127.0.0.1:5213/studio.html?cat=hybrid-dithercn) uses the actual upstream
+  Waves component and DitherShader engine, installed as plain source from commit
+  `10d7af5ce9b044e82345ae89bf78631845810821`. MIT license and integration adjustments are documented
+  in `frontend/src/lib/dithercn/README.md`. One context, 3px cells, 20fps cap. The lazy engine adapter
+  is approximately 13 KB gzip, with no new npm runtime dependency. It has upstream WebGL fallback,
+  resize/offscreen management and motion handling. A measured mask clears the copy and controls.
+- [Custom SVG](http://127.0.0.1:5213/studio.html?cat=hybrid) uses continuous wind/water contours
+  animated by CSS. Its lazy atmosphere module is approximately 1.42 KB gzip.
+
+Both share a small SVG layer of sakura petals, flowers, musical notes and sparkles, with static
+blur on individual distant glyphs and sharper foreground elements. No full-viewport blur is used.
+The product visual contract and neutral preview live in core; no Cloud policy or credentials enter
+this experiment. Earlier cat directions remain available by their direct URLs and preserved commits.
+
+Validation: production build, ESLint, 209 guide/App tests and Storybook/preview types passed.
+An initial headless test run exposed missing browser observer/media APIs; the adapter now uses a
+static fallback when these APIs are absent. A full focused rerun passed. Existing lint warnings
+and large-chunk advisories remain. Browser review covers both alternatives in desktop/phone,
+light/dark, footer visibility, no horizontal overflow, and six-book flow. Chrome DevTools actual
+reduced-motion emulation produced `data-state="static"` and `animation-name: none` for particles;
+the emulation was restored afterward. Shader state normally reports `running`; there are no
+dither-engine console errors. Screenshots are under `assets/review/cat-companion/hybrid/`.
+
+This is a local visual comparison, not a release or deployment. Bundle size and the frame-rate cap
+are observations; no frame-time or power-use benchmark is claimed.

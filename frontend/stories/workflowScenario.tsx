@@ -1,9 +1,10 @@
 import { useMemo } from "react";
 import App from "../src/App";
 import { createFixtureGateway, type ScenarioId } from "../design-kit/fixtures";
-export function WorkflowScenario({ scenario }: { scenario: ScenarioId }) {
+import type { Appearance } from "../src/app/useAppearance";
+export function WorkflowScenario({ scenario, appearance: suppliedAppearance, onAppearanceChange }: { scenario: ScenarioId; appearance?: Appearance; onAppearanceChange?: (appearance: Appearance) => void }) {
   const queryAppearance = new URLSearchParams(window.location.search).get("appearance");
-  const appearance = queryAppearance === "light" || queryAppearance === "dark" ? queryAppearance : undefined;
+  const appearance = suppliedAppearance ?? (queryAppearance === "light" || queryAppearance === "dark" ? queryAppearance : undefined);
   const gateway = useMemo(() => {
     const fixture = createFixtureGateway(scenario);
     if (new URLSearchParams(window.location.search).has("legacyMedia")) {
@@ -24,5 +25,5 @@ export function WorkflowScenario({ scenario }: { scenario: ScenarioId }) {
     }
     return fixture;
   }, [scenario]);
-  return <App key={scenario} gateway={gateway} appearance={appearance} capabilities={new URLSearchParams(window.location.search).has("managedVoices") ? { showVoiceModelControls: false } : undefined} />;
+  return <App key={scenario} gateway={gateway} appearance={appearance} onAppearanceChange={onAppearanceChange} capabilities={new URLSearchParams(window.location.search).has("managedVoices") ? { showVoiceModelControls: false } : undefined} />;
 }
