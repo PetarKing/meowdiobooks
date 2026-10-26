@@ -3639,6 +3639,31 @@ describe('v2 wizard', () => {
         revision: 'cp', phase: 'identity-review' as const,
         dossiers: [
           { label: 'Alice', occurrenceCount: 4, examples: [{ source: 'Alice: Wait.' }] },
+          { label: 'Little adventurer', occurrenceCount: 2, examples: [{ source: 'Little adventurer: Look.' }] },
+        ],
+        proposals: [
+          { label: 'Alice', category: 'character', canonicalName: 'Alice', aliases: ['Little adventurer'], reviewRequired: true },
+          { label: 'Little adventurer', category: 'character', canonicalName: 'Alice', aliases: ['Alice'], reviewRequired: true },
+        ],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
+    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
+  })
+
+  it('allows nested character labels to proceed without grouping confirmation', async () => {
+    const snapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import','extract','dialogue','review'] as WizardStage[] },
+      cast: {
+        revision: 'cp', phase: 'identity-review' as const,
+        dossiers: [
+          { label: 'Alice', occurrenceCount: 4, examples: [{ source: 'Alice: Wait.' }] },
           { label: 'Alice Liddell', occurrenceCount: 2, examples: [{ source: 'Alice Liddell: Look.' }] },
         ],
         proposals: [
@@ -3650,9 +3675,9 @@ describe('v2 wizard', () => {
     }
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
+    expect(screen.queryByRole('button', { name: 'Confirm grouping' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
   })
 

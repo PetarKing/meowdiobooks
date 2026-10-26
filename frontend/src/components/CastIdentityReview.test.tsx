@@ -60,18 +60,18 @@ function ReviewSignalsHarness() {
     revision: "cast-signals",
     phase: "identity-review",
     dossiers: [
-      { label: "Cecilus", occurrenceCount: 8, examples: [] },
+      { label: "Blue Lightning", occurrenceCount: 8, examples: [] },
       { label: "Cecilus Segmunt", occurrenceCount: 3, examples: [] },
       { label: "fake Cecilus", occurrenceCount: 1, examples: [] },
     ],
     proposals: [
-      { label: "Cecilus", category: "character", canonicalName: "Cecilus Segmunt", aliases: ["Cecilus Segmunt"], reviewRequired: true },
-      { label: "Cecilus Segmunt", category: "character", canonicalName: "Cecilus Segmunt", aliases: ["Cecilus"], reviewRequired: true },
-      { label: "fake Cecilus", category: "character", canonicalName: "fake Cecilus", competingLabels: ["Cecilus"], reviewRequired: true },
+      { label: "Blue Lightning", category: "character", canonicalName: "Cecilus Segmunt", aliases: ["Cecilus Segmunt"], reviewRequired: true },
+      { label: "Cecilus Segmunt", category: "character", canonicalName: "Cecilus Segmunt", aliases: ["Blue Lightning"], reviewRequired: true },
+      { label: "fake Cecilus", category: "character", canonicalName: "fake Cecilus", competingLabels: ["Blue Lightning"], reviewRequired: true },
     ],
   };
   const [decisions, setDecisions] = useState<Record<string, IdentityDecision>>({
-    Cecilus: { label: "Cecilus", category: "character", canonicalName: "Cecilus Segmunt", aliases: [], primaryLabel: "Cecilus Segmunt" },
+    "Blue Lightning": { label: "Blue Lightning", category: "character", canonicalName: "Cecilus Segmunt", aliases: [], primaryLabel: "Cecilus Segmunt" },
     "Cecilus Segmunt": { label: "Cecilus Segmunt", category: "character", canonicalName: "Cecilus Segmunt", aliases: [], primaryLabel: "Cecilus Segmunt" },
     "fake Cecilus": { label: "fake Cecilus", category: "character", canonicalName: "fake Cecilus", aliases: [], primaryLabel: "fake Cecilus" },
   });
@@ -256,7 +256,8 @@ describe("CastIdentityReview", () => {
     fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
     expect(within(inspector).getByText("Queen", { selector: ".cast-alias-card b" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Inspect Queen" })).not.toBeInTheDocument();
-    expect(queen).not.toHaveClass("has-suggestions");
+    expect(queen).not.toHaveClass("needs-review");
+    expect(within(inspector).queryByRole("button", { name: "Confirm grouping" })).not.toBeInTheDocument();
   });
 
   it("keeps the current cast member open when a secondary label is detached", () => {
@@ -266,7 +267,7 @@ describe("CastIdentityReview", () => {
     fireEvent.click(within(suggestions).getByRole("button", { name: "Attach" }));
 
     const dialog = screen.getByRole("dialog", { name: "Inspect Cecilus" });
-    expect(dialog).toHaveTextContent("Ready");
+    expect(dialog).toHaveTextContent("Optional check");
     expect(screen.getByText("Cast structure is ready")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Accept suggestion" })).not.toBeInTheDocument();
     const primaryCard = within(dialog).getByText("Primary label").closest("article")!;
