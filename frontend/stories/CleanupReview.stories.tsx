@@ -44,13 +44,13 @@ export const KeptChoiceIsPreservedByBulk: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /^Keep Keep the original/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Keep original text Keep the original/ }));
     await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
-    await expect(canvas.getByRole("button", { name: /^Keep Keep the original/ })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(canvas.getByRole("button", { name: /^Leave(?: \(Suggested\))? This highlighted/ }));
+    await expect(canvas.getByRole("button", { name: /^Keep original text Keep the original/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(canvas.getByRole("button", { name: /^Leave out(?: \(Suggested\))? This highlighted/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
   },
 };
@@ -79,7 +79,7 @@ export const ManySuggestions: Story = {
     await expect(canvas.queryByText("Corrected fragment 149")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
-    await userEvent.click(canvas.getByRole("button", { name: /^Keep Keep the original/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Keep original text Keep the original/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
   },
 };

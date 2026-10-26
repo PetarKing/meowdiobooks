@@ -33,7 +33,7 @@ describe("AI cleanup decisions", () => {
     const warning = { ...cleanupWarning, readerState };
     expect(reviewOccurrenceActions(warning, warning.occurrences[0])).toEqual(["repair", "keep", "exclude"]);
     expect(reviewActionTitle("repair", warning)).toBe("Apply correction");
-    expect(reviewActionTitle("keep", warning)).toBe("Keep");
+    expect(reviewActionTitle("keep", warning)).toBe("Keep original text");
     expect(reviewConsequence("keep", warning)).toBe("Keep the original text for this suggestion.");
     expect(reviewConsequence("repair", warning)).not.toMatch(/narrator/i);
   });

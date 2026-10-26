@@ -26,14 +26,19 @@ from .remote_llm import (
     remote_decisions_completion,
 )
 from .workflow.runtime import ProgressReporter
-from .script_cues import bracket_ranges, review_script_directions
+from .script_cues import review_script_directions
 from .review import numbered_edge_candidates
+from .cleanup_candidates import editorial_candidates
+from .cleanup_editorial import (EDITORIAL_SCHEMA, EDITORIAL_SYSTEM, editorial_verdict, editorial_proposals)
+from .hyphen_review import review_hyphens
+from .chapter_semantic import confirm_chapter_candidates
 from .cleanup_patterns import (
-    PATTERN_VERIFY_SCHEMA, PATTERN_VERIFY_SYSTEM, pattern_prompt, pattern_verdict,
-    representative_windows, split_pattern_windows,
+    PATTERN_VERIFY_SCHEMA, PATTERN_VERIFY_SYSTEM, pattern_prompt,
+    representative_windows, split_pattern_windows, FAMILY_RULE_MODE, FAMILY_QUESTIONS,
+    numbered_family_manifest, family_screen, rule_group, rule_windows,
 )
 
-POLICY_ID = "decisions-luna-cleanup-v3"
+POLICY_ID = "focused-decisions-luna-cleanup-v1"
 MAX_WINDOW_CHARACTERS = 1200
 MAX_CONTEXT_CHARACTERS = 180
 MAX_WORKERS = MAX_DECISIONS_REQUESTS
@@ -296,13 +301,21 @@ def run_cleanup_review(
 ) -> dict[str, Any]:
     """Check all windows atomically; transport/schema failures never masquerade as clean.
 
-    Unsafe repair anchors become explicit source-review findings. Missing Decisions answers or
-    invalid repair JSON fail the whole job. Caller owns immutable candidate publication.
+    Only structurally selected complete units, numbered footers and hyphens incur inference.
+    Uncertain optional cleanup remains spoken. Caller owns immutable candidate publication.
     """
     decisions_config, repair_config = cleanup_model_configs(repo_root, models_path=models_path)
-    windows = cleanup_windows(extraction, dialogue)
-    protected = {str(block["id"]): bracket_ranges(str(block["text"]))
-                 for block in extraction.get("blocks", [])}
+    # Validate all source ownership locally; only selected candidates incur inference.
+    source_windows = cleanup_windows(extraction, dialogue)
+    footer_families = numbered_family_manifest(extraction, dialogue)
+    footer_windows = [row for family in footer_families for row in family["members"]]
+    manifest = editorial_candidates(extraction, dialogue)
+    editorial_windows = [row for row in manifest["candidates"] if not any(
+        row["blockId"] == footer["blockId"]
+        and max(row["sourceStart"], footer["sourceStart"]) < min(row["sourceEnd"], footer["sourceEnd"])
+        for footer in footer_windows)]
+    manifest["summary"]["footerOverlapUnits"] = len(manifest["candidates"]) - len(editorial_windows)
+    windows = editorial_windows
     report(5, f"Checking {len(windows)} text windows with Luna Decisions")
     stopped = Event()
     progress_lock = Lock()
@@ -329,58 +342,24 @@ def run_cleanup_review(
         return request_admission(config, metadata) if request_admission else None
 
     def process(window):
+        prompt = _prompt(window)
+        questions = _QUESTIONS
+        if window.get("editorialFamilyId"):
+            questions = [{**_QUESTIONS[0], "instructions": _QUESTIONS[0]["instructions"] + (
+                " For this complete-unit candidate, review ONLY if the ENTIRE TARGET is a self-contained "
+                "editorial block. Check both adjacent contexts: preserve a paragraph/line of a larger "
+                "notice, a continuation, or a unit whose removal strands attached text. Repeated exact "
+                "wording does not establish completeness in this occurrence. Any boundary doubt is uncertain."
+            )}, _QUESTIONS[1]]
         with request_slot("decisions", poll_cancelled):
             response = remote_decisions_completion(
-                repo_root, decisions_config, _prompt(window), _QUESTIONS,
+                repo_root, decisions_config, prompt, questions,
                 usage_observer=usage_observer, request_admission=admission,
             )
         answers = _answers(response)
-        if window.get("patternGroupId") and answers["word_damage"] == "clean":
-            return {"windowId": window["windowId"], "answers": answers, "occurrences": [],
-                    "patternStatus": "eligible" if answers["production"] == "review" else "vetoed"}
-        if all(value == "clean" for value in answers.values()):
-            return {"windowId": window["windowId"], "answers": answers, "occurrences": []}
-        # A mechanical defect follows the ordinary individually validated repair path.
-        window = {key: value for key, value in window.items() if key != "patternGroupId"}
-        with request_slot("repair", poll_cancelled):
-            result = remote_chat_completion(
-                repo_root, repair_config, _REPAIR_SYSTEM, _prompt(window),
-                max_completion_tokens=2048, response_schema=_REPAIR_SCHEMA,
-                usage_observer=usage_observer, request_admission=admission,
-            )
-        try:
-            proposal = json.loads(result["text"])
-        except (KeyError, ValueError, TypeError) as error:
-            raise CleanupReviewError("Luna returned unreadable cleanup proposals. Retry the check.") from error
-        try:
-            edits = validate_cleanup_edits(window["source"], proposal)
-        except CleanupReviewError as error:
-            # Retain a visible flagged window instead of silently treating rejected edits as clean.
-            edits, reason = [], str(error)
-        else:
-            if proposal["action"] == "keep":
-                return {"windowId": window["windowId"], "answers": answers, "occurrences": []}
-            reason = proposal["reason"] or "Luna flagged this passage for source review."
-        rows = []
-        for start, end, replacement in edits:
-            if any(max(window["sourceStart"] + start, left) < min(window["sourceStart"] + end, right)
-                   for left, right in protected.get(window["blockId"], [])):
-                continue  # Script/prose brackets belong to the guarded cue pass, never generic deletion.
-            rows.append({
-                **window, "sourceStart": window["sourceStart"] + start,
-                "sourceEnd": window["sourceStart"] + end, "source": window["source"][start:end],
-                "replacement": replacement, "reason": reason, "proposalStatus": "proposed",
-                "contextBefore": (window["contextBefore"] + window["source"][:start])[-180:],
-                "contextAfter": (window["source"][end:] + window["contextAfter"])[:180],
-                "model": repair_config.model, "policy": POLICY_ID,
-            })
-        protected_window = any(max(window["sourceStart"], left) < min(window["sourceEnd"], right)
-                               for left, right in protected.get(window["blockId"], []))
-        if not rows and not edits and not protected_window:
-            rows.append({**window, "replacement": None, "reason": reason,
-                         "proposalStatus": "source_review", "model": repair_config.model,
-                         "policy": POLICY_ID})
-        return {"windowId": window["windowId"], "answers": answers, "occurrences": rows}
+        result = {"windowId": window["windowId"], "answers": answers, "occurrences": []}
+        result["eligible"] = answers == {"production": "review", "word_damage": "clean"}
+        return result
 
     results = []
     pool = ThreadPoolExecutor(max_workers=MAX_WORKERS)
@@ -413,66 +392,135 @@ def run_cleanup_review(
         raise CleanupReviewError("The cleanup review did not process every source window.")
     ordered = [by_id[window["windowId"]] for window in windows]
     pattern_groups = []
-    families: dict[str, list[dict[str, Any]]] = {}
-    for window in windows:
-        if window.get("patternGroupId"):
-            families.setdefault(window["patternGroupId"], []).append(window)
-    for group_id, members in families.items():
-        eligible = [window for window in members if by_id[window["windowId"]].get("patternStatus") == "eligible"]
+    footer_evidence = []
+    footer_occurrences = []
+    for family in footer_families:
+        representatives = family["representatives"]
+        screen_response = None
+        verification_response = None
+        if len(family["eligible"]) >= 3:
+            with request_slot("decisions", poll_cancelled):
+                screen_response = remote_decisions_completion(
+                    repo_root, decisions_config, pattern_prompt(representatives), FAMILY_QUESTIONS,
+                    usage_observer=usage_observer, request_admission=admission)
+            if family_screen(screen_response) == "FOOTER":
+                with request_slot("repair", poll_cancelled):
+                    verification = remote_chat_completion(
+                        repo_root, repair_config, PATTERN_VERIFY_SYSTEM, pattern_prompt(representatives),
+                        max_completion_tokens=1400, response_schema=PATTERN_VERIFY_SCHEMA,
+                        usage_observer=usage_observer, request_admission=admission)
+                try:
+                    verification_response = json.loads(verification["text"])
+                except (KeyError, ValueError, TypeError):
+                    verification_response = None
+        group = rule_group(family, screen_response, verification_response)
+        pattern_groups.append(group)
+        footer_evidence.extend(rule_windows(family, group))
+        if group["verdict"] == "verified":
+            footer_occurrences.extend({**row, "replacement": "", "reason": group["reason"],
+                "proposalStatus": "proposed", "patternVerification": "verified",
+                "model": repair_config.model, "policy": POLICY_ID} for row in family["eligible"])
+    chapter_review = confirm_chapter_candidates(
+        repo_root, extraction, dialogue, repair_config,
+        usage_observer=usage_observer, request_admission=admission,
+        check_cancelled=check_cancelled, footer_evidence={"patternAssessmentMode": FAMILY_RULE_MODE,
+            "patternGroups": pattern_groups, "windows": footer_evidence})
+    from . import cleanup_headers as headers
+    header_families = headers.header_manifest(extraction, dialogue, chapter_review)
+    header_proofs, header_occurrences = [], []
+    for family in header_families:
+        screen, response = None, None
+        if len(family["eligible"]) >= 2:
+            with request_slot("decisions", poll_cancelled):
+                screen = remote_decisions_completion(
+                    repo_root, decisions_config, headers.prompt(family), headers.QUESTIONS,
+                    usage_observer=usage_observer, request_admission=admission)
+            if headers.screen_ok(screen):
+                with request_slot("repair", poll_cancelled):
+                    answer = remote_chat_completion(
+                        repo_root, repair_config, headers.SYSTEM, headers.prompt(family),
+                        max_completion_tokens=1400, response_schema=headers.SCHEMA,
+                        usage_observer=usage_observer, request_admission=admission)
+                try:
+                    response = json.loads(answer["text"])
+                except (KeyError, ValueError, TypeError):
+                    response = None
+        header_proofs.append({"id": family["id"], "screen": screen, "verification": response})
+        header_occurrences.extend(headers.proposals(family, screen, response))
+    header_review = {"policy": headers.POLICY, "families": header_families,
+                     "proofs": header_proofs, "occurrences": header_occurrences}
+    def verify_editorial_family(family_id):
+        eligible = [row for row in editorial_windows if row["editorialFamilyId"] == family_id
+                    and by_id[row["windowId"]]["eligible"]]
         representatives = representative_windows(eligible)
-        group = {"patternGroupId": group_id, "candidateCount": len(members),
-                 "eligibleCount": len(eligible),
+        group = {"editorialFamilyId": family_id,
                  "eligibleWindowIds": [row["windowId"] for row in eligible],
                  "representativeWindowIds": [row["windowId"] for row in representatives],
-                 "vetoes": [{"windowId": row["windowId"], "answers": by_id[row["windowId"]]["answers"]}
-                            for row in members if row not in eligible]}
-        if len(eligible) < 3:
-            group.update(verdict="insufficient", reason="Fewer than three contextually eligible footer instances.")
-        else:
-            checkpoint(96, "Checking repeated page matter in context")
+                 "verdict": "preserved"}
+        if eligible:
+            payload = json.dumps({"examples": [{"windowId": row["windowId"],
+                **json.loads(_prompt(row))} for row in representatives]}, ensure_ascii=False)
             with request_slot("repair", poll_cancelled):
                 verification = remote_chat_completion(
-                    repo_root, repair_config, PATTERN_VERIFY_SYSTEM, pattern_prompt(representatives),
-                    max_completion_tokens=1000, response_schema=PATTERN_VERIFY_SCHEMA,
-                    usage_observer=usage_observer, request_admission=admission,
-                )
+                    repo_root, repair_config, EDITORIAL_SYSTEM, payload,
+                    max_completion_tokens=1200, response_schema=EDITORIAL_SCHEMA,
+                    usage_observer=usage_observer, request_admission=admission)
             try:
                 response = json.loads(verification["text"])
             except (KeyError, ValueError, TypeError):
                 response = None
-            verdict, reason = pattern_verdict(response, representatives)
-            group.update(verdict=verdict, reason=reason, verification=response)
-            if verdict == "verified":
-                for window in eligible:
-                    by_id[window["windowId"]]["occurrences"] = [{
-                        **window, "replacement": "", "reason": reason,
-                        "proposalStatus": "proposed", "patternVerification": "verified",
-                        "model": repair_config.model, "policy": POLICY_ID,
-                    }]
-        for window in members:
-            by_id[window["windowId"]]["patternGroupId"] = group_id
-            by_id[window["windowId"]]["patternVerdict"] = group["verdict"]
-        pattern_groups.append(group)
-    occurrences = [row for result in ordered for row in result["occurrences"]]
+            group.update(verification=response, verdict=editorial_verdict(response, representatives))
+        return group
+
+    family_ids = list(dict.fromkeys(row["editorialFamilyId"] for row in editorial_windows))
+    with ThreadPoolExecutor(max_workers=MAX_REPAIR_REQUESTS) as verification_pool:
+        try:
+            editorial_groups = list(verification_pool.map(verify_editorial_family, family_ids))
+        except BaseException:
+            stopped.set()
+            raise
+    editorial_assessments = [{key: by_id[row["windowId"]][key]
+                             for key in ("windowId", "answers", "eligible")} for row in editorial_windows]
+    editorial_rows = editorial_proposals(editorial_windows, editorial_assessments, editorial_groups)
+    focused_review = {"candidates": editorial_windows, "assessments": editorial_assessments,
+                      "groups": editorial_groups, "summary": manifest["summary"]}
+    hyphen_review = review_hyphens(
+        repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
+        usage_observer=usage_observer, request_admission=admission)
+    occurrences = footer_occurrences + editorial_rows + header_occurrences
+    # Entire approved editorial units take ownership over any contained mechanical suggestion.
+    hyphen_rows = [row for row in hyphen_review["occurrences"] if not any(
+        row["blockId"] == other["blockId"] and
+        max(row["sourceStart"], other["sourceStart"]) < min(row["sourceEnd"], other["sourceEnd"])
+        for other in occurrences)]
+    occurrences += hyphen_rows
     script_directions = review_script_directions(
         repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
         usage_observer=usage_observer, request_admission=admission,
     )
     report(99, "Luna cleanup proposals are ready for review")
     return {
+        "chapterReview": chapter_review, "runningHeaderReview": header_review,
         "scriptDirections": script_directions,
-        "patternGroups": pattern_groups,
+        "hyphenReview": hyphen_review, "focusedReview": focused_review, "unifiedSuggestions": True,
+        "patternGroups": pattern_groups, "patternAssessmentMode": FAMILY_RULE_MODE,
         "occurrences": occurrences,
         "summary": {
             "model": repair_config.model, "policy": POLICY_ID, "inputWindows": len(windows),
-            "flaggedWindows": sum(bool(result["occurrences"]) for result in ordered),
+            "runningHeaderFamilies": len(header_families),
+            "runningHeaderProposals": len(header_occurrences),
+            "footerSourceCandidates": len(footer_windows),
+            "footerFamilyDecisions": sum(len(f["eligible"]) >= 3 for f in footer_families),
+            "flaggedWindows": len(occurrences),
+            "locallyValidatedWindows": len(source_windows),
+            "editorialCandidates": len(editorial_windows),
+            "hyphenCandidates": len(hyphen_review["windows"]),
             "proposals": sum(row["proposalStatus"] == "proposed" for row in occurrences),
             "sourceReview": sum(row["proposalStatus"] == "source_review" for row in occurrences),
             "patternGroups": len(pattern_groups),
             "patternVerifiedGroups": sum(group["verdict"] == "verified" for group in pattern_groups),
-            "patternPreservedWindows": sum(bool(row.get("patternGroupId")) and not row["occurrences"]
-                                           for row in ordered),
+            "patternPreservedWindows": sum(row["patternStatus"] != "eligible" for row in footer_evidence),
         },
         "windows": [{key: row[key] for key in ("windowId", "answers", "patternGroupId", "patternVerdict", "patternStatus")
-                     if key in row} for row in ordered],
+                     if key in row} for row in ordered] + footer_evidence,
     }

@@ -11,7 +11,7 @@ def _span(span_id, block_id, page, text):
     return {"id": span_id, "blockId": block_id, "page": page, "text": text, "source": text}
 
 
-def test_detects_explicit_headings_without_promoting_arbitrary_short_lines():
+def test_drafts_structural_titles_without_deciding_their_semantic_role():
     blocks = [
         {"id": "p1-b1", "page": 1, "text": "Preface\n\n"},
         {"id": "p2-b1", "page": 2, "text": "CHAPTER I\nThe Rabbit Sends in a Little Bill"},
@@ -24,6 +24,7 @@ def test_detects_explicit_headings_without_promoting_arbitrary_short_lines():
     assert [row["source"] for row in candidates] == [
         "Preface",
         "CHAPTER I",
+        "A SMALL DOOR",
         "Part 2: Down the Rabbit Hole",
     ]
 
@@ -78,7 +79,7 @@ def test_every_candidate_requires_an_explicit_review_decision():
         compile_reviewed_chapters(spans, candidates, [])
 
 
-def test_detects_arc_heading_but_ignores_a_table_of_contents_page():
+def test_drafts_arc_heading_and_leaves_contents_role_for_semantic_review():
     candidates = detect_chapter_candidates(
         [
             {

@@ -1,0 +1,126 @@
+{
+  "method": "Chrome computed styles on synthetic source fixtures; same ReviewPage component. Compare typography, colors, spacing, borders, radii, layout, shadow, and minimum height. No production data.",
+  "checks": [
+    {
+      "viewportWidth": 390,
+      "state": "default",
+      "comparison": "footer versus ai",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 390,
+      "state": "default",
+      "comparison": "footer versus ordinary",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 390,
+      "state": "selected",
+      "comparison": "footer versus ai",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 390,
+      "state": "selected",
+      "comparison": "footer versus ordinary",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 1440,
+      "state": "default",
+      "comparison": "footer versus ai",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 1440,
+      "state": "default",
+      "comparison": "footer versus ordinary",
+      "differences": {
+        "title": {
+          "minHeight": {
+            "family": "auto",
+            "ordinary": "0px"
+          }
+        },
+        "panel": {
+          "display": {
+            "family": "flex",
+            "ordinary": "block"
+          },
+          "minHeight": {
+            "family": "610px",
+            "ordinary": "auto"
+          }
+        },
+        "options": {
+          "display": {
+            "family": "flex",
+            "ordinary": "grid"
+          },
+          "minHeight": {
+            "family": "auto",
+            "ordinary": "0px"
+          }
+        }
+      },
+      "expected": true
+    },
+    {
+      "viewportWidth": 1440,
+      "state": "selected",
+      "comparison": "footer versus ai",
+      "differences": {},
+      "expected": true
+    },
+    {
+      "viewportWidth": 1440,
+      "state": "selected",
+      "comparison": "footer versus ordinary",
+      "differences": {
+        "title": {
+          "minHeight": {
+            "family": "auto",
+            "ordinary": "0px"
+          }
+        },
+        "panel": {
+          "display": {
+            "family": "flex",
+            "ordinary": "block"
+          },
+          "minHeight": {
+            "family": "610px",
+            "ordinary": "auto"
+          }
+        },
+        "options": {
+          "display": {
+            "family": "flex",
+            "ordinary": "grid"
+          },
+          "minHeight": {
+            "family": "auto",
+            "ordinary": "0px"
+          }
+        }
+      },
+      "expected": true
+    }
+  ],
+  "interpretation": "Footer and AI controls match in every compared computed style. Ordinary controls match card and typography styles; at desktop the existing shared bulk layout uses flex and minimum height to anchor its action, whereas ordinary review uses grid and automatic height.",
+  "completedState": "Footer now uses the same disabled checkmark and All suggestions decided label as AI.",
+  "validation": {
+    "appTestsPassed": 200,
+    "priorFullFrontendTestsPassed": 552,
+    "screenshotsWidths": [
+      390,
+      1440
+    ],
+    "cssChanges": false
+  }
+}
