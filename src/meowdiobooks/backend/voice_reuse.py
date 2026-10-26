@@ -11,7 +11,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol
 
+from .artifacts import artifact_history
 from .cast import CastContractError, label_comparison_key
+
+
+def latest_approved_cast(package: Path) -> dict[str, Any] | None:
+    """Return the newest approved immutable Cast, independent of active workflow pointers.
+
+    An unapproved newer draft or a reset to Review must not erase a user's chosen
+    voices. Consumers still validate selected revisions and their available assets.
+    """
+    return next((deepcopy(row) for row in reversed(artifact_history(package, "cast"))
+                 if row.get("status") == "accepted"
+                 and row.get("phase") in {None, "accepted"}), None)
+
+
+def inherited_voice(imported: dict[str, Any]) -> dict[str, Any]:
+    """One saved audition completes an inherited identity; new options are explicit."""
+    return prepend_previous_voice({**deepcopy(imported), "voiceCandidates": [],
+        "voiceCandidatePlan": {"automaticAlternatives": 0, "inheritedOnly": True}}, imported)
 
 
 class CastVoiceReuse(Protocol):

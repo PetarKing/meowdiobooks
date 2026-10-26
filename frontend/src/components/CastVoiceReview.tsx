@@ -138,7 +138,7 @@ function initials(name: string) {
 }
 
 function settingsFor(voice: CastVoice): VoiceSettings {
-  return voice.voiceSettings ?? {
+  return voice.voiceProfileSettings ?? voice.voiceSettings ?? {
     presentation: "unspecified",
     age: voice.characterId === "narrator" ? "adult" : "unspecified",
     tone: voice.characterId === "narrator" ? "warm" : "neutral",

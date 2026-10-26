@@ -2226,7 +2226,7 @@ def test_layered_voice_preview_mixes_exact_audition_revisions(tmp_path):
         np.testing.assert_allclose(mixed, np.array([0.4, 0.4, 0.1], dtype=np.float32))
 
 
-def test_cross_book_reuse_preview_is_read_only_and_import_keeps_fresh_generation(tmp_path):
+def test_cross_book_reuse_preview_is_read_only_and_import_skips_generation(tmp_path):
     from meowdiobooks.backend.cast_service import default_voice_settings
     calls = []
     recipe = ["1"]
@@ -2314,9 +2314,9 @@ def test_cross_book_reuse_preview_is_read_only_and_import_keeps_fresh_generation
         assert candidate['narrator']['voicePreviewRevision'] == 'imported-narrator'
         assert candidate['identities'][0]['voiceReuse'] == {'bookId': 'source'}
         assert candidate['identities'][0]['voiceAccepted'] is False
-        assert len(generated_calls) == 1
+        assert len(generated_calls) == 0
         for row in [candidate['narrator'], *candidate['identities']]:
-            assert [c['revision'].split('-')[0] for c in row['voiceCandidates']] == ['imported', 'fresh']
+            assert [c['revision'].split('-')[0] for c in row['voiceCandidates']] == ['imported']
         assert calls == [('preview', ['source']), ('apply', ['source'])]
         # Reopening the same selection uses only destination snapshots, even if the
         # source subsequently disappears. The provider is not called again.
@@ -2337,8 +2337,8 @@ def test_cross_book_reuse_preview_is_read_only_and_import_keeps_fresh_generation
         assert accepted['narrator']['voiceReuse'] == {'bookId': 'source'}
         assert accepted['identities'][0]['acceptedVoiceRevision'].startswith('imported-')
 
-        # A model/recipe change generates a compatible fresh pack and checks the
-        # latest source pool again; reuse is an additional first candidate.
+        # A model/recipe change checks compatible sources again. A match still
+        # needs no new provider audition.
         recipe[0] = "2"
         upgraded = _process(client, book_id, 'cast', {
             'proposalRevision': reopened['revision'], 'sourceBookIds': [],
@@ -2348,8 +2348,8 @@ def test_cross_book_reuse_preview_is_read_only_and_import_keeps_fresh_generation
         assert after['auditionPackRecipeVersion'] == '2'
         assert after['narrator']['voicePreviewRevision'] == recast['narrator']['voicePreviewRevision']
         assert after['identities'][0]['voicePreviewRevision'] == recast['identities'][0]['voicePreviewRevision']
-        assert len(generated_calls) == 2
+        assert len(generated_calls) == 0
         assert calls == [('preview', ['source']), ('apply', ['source']), ('apply', [])]
         for row in [after['narrator'], *after['identities']]:
             assert row['voiceCandidates'][0]['revision'].startswith('imported-')
-            assert row['voiceCandidates'][1]['revision'].startswith('fresh-2-')
+            assert len(row['voiceCandidates']) == 1

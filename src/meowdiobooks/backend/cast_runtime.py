@@ -79,7 +79,7 @@ def _has_complete_audition_pack(voice: dict[str, Any]) -> bool:
         if isinstance(plan, dict)
         else 0
     )
-    expected = 1 + (
+    expected = (0 if isinstance(plan, dict) and plan.get("inheritedOnly") is True else 1) + (
         alternatives
         if isinstance(alternatives, int)
         and not isinstance(alternatives, bool)
