@@ -195,3 +195,18 @@ outputs in the consuming application's ignored operator-data directory.
 
 API behavior and pricing references: [Decisions](https://developers.openai.com/api/docs/guides/decisions)
 and [GPT-6 Luna](https://developers.openai.com/api/docs/models/gpt-6-luna).
+
+## Explicit hyphen choices
+
+Line-wrapped words that fit inside a single spoken source span appear in **Check hyphens**.
+Each occurrence requires its own **Keep hyphen** or **Join word** decision, with the exact
+resulting spelling shown. Both remove the extraction line break; keeping a soft hyphen
+normalizes it to the visible `-`. Neither choice changes the source range or assigned reader.
+No choice is preselected, and omission/narration are not offered for this category.
+
+The `hyphenation` warning stores `hyphenChoices` for the `keep-hyphen` and `join-word`
+actions. Accepted choices use the same source-bound replacement and recording-script
+validation as cleanup repairs. Model proposals overlapping those ranges do not replace
+these explicit choices. Previously saved generic extraction/cleanup warnings retain
+their original actions and behavior. Words spanning multiple reader intervals are not
+converted to a single repair.

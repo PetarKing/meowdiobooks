@@ -308,8 +308,11 @@ def test_excluding_wrapped_footnote_removes_its_continuation_from_preview():
                 "warningId": warning["id"],
                 "action": "exclude" if warning["id"] == footnote["id"] else "keep",
             }
-            for warning in workspace["warnings"]
+            for warning in workspace["warnings"] if warning["kind"] != "hyphenation"
         ],
+        occurrence_policies=[{"occurrenceId": row["id"], "action": "keep-hyphen"}
+                             for w in workspace["warnings"] if w["kind"] == "hyphenation"
+                             for row in w["occurrences"]],
         page=1,
     )
 

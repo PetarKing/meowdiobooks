@@ -3301,6 +3301,32 @@ describe('v2 wizard', () => {
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
 
+  it('shows exact hyphen spellings and previews the explicit choice', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+    }
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-2', boundaryCandidates: [], warnings: [{
+      id: 'review:hyphenation', kind: 'hyphenation', severity: 'warning', decisionScope: 'occurrence',
+      availableActions: ['keep-hyphen', 'join-word'], occurrences: [{
+        id: 'hyphen-1', source: 'self-\nconfidence', page: 3,
+        availableActions: ['keep-hyphen', 'join-word'],
+        hyphenChoices: { 'keep-hyphen': 'self-confidence', 'join-word': 'selfconfidence' },
+      }],
+    }] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    const keep = await screen.findByRole('button', { name: 'Keep hyphen self-confidence' })
+    expect(screen.getByRole('heading', { name: 'Check hyphens' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Join word selfconfidence' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Leave out|Use narrator|Suggested/ })).not.toBeInTheDocument()
+    expect(keep).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(keep)
+    expect(keep).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('scrolls the next review group into view during automatic progression', async () => {
     const snapshot: WizardSnapshot = {
       ...base,

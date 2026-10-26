@@ -212,6 +212,11 @@ const zhCN: Record<string, string> = {
 
   "Apply all corrections": "应用全部修改",
   "Keep original text": "保留原文",
+  "Check hyphens": "检查连字符",
+  "Keep hyphen": "保留连字符",
+  "Join word": "合并单词",
+  "How should this word be written?": "这个词应如何书写？",
+  "Choose the spelling that matches the source. Both choices remove the line break; your source and reader stay unchanged.": "选择与原文一致的拼写。两种选择都会移除换行；原文和朗读者保持不变。",
   "Apply correction": "应用修改",
   "AI cleanup category actions": "AI 文本清理类别操作",
   "Apply only the remaining undecided corrections. Your existing choices stay unchanged. Source checks still need individual decisions.": "仅应用尚未决定的修改建议。现有选择保持不变。原文检查仍需逐项决定。",
