@@ -14,6 +14,8 @@ import {
 } from "../workflow/presentation";
 import {
   normalizeCandidateWarnings,
+  reviewDefaultDecisions,
+  reviewHasBoundaryEvidence,
   reviewActionTitle,
   reviewConsequence,
   reviewDecisionActions,
@@ -34,13 +36,15 @@ import {
 export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
 
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
-  const { acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const { acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
   const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
+  const reviewDecisions = reviewDefaultDecisions(candidateWarnings, selectedReviewDecisions);
   const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
   const keptScriptCount = Number.isSafeInteger(scriptSummary?.kept) && Number(scriptSummary?.kept) > 0 ? Number(scriptSummary?.kept) : 0;
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
+  const boundaryEvidence = occurrence && reviewHasBoundaryEvidence(occurrence);
   const isPatternGroup = warning && reviewIsPatternGroup(warning);
   const pendingPatternCount = isPatternGroup ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined).length : 0;
   const isAiCleanup = warning?.kind === "ai-cleanup";
@@ -237,8 +241,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
         </> : warning && occurrence && actionWarning ? <>
           <section className="review-evidence">
             <div className="review-group-heading"><span><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
-            <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{t("Page {{page}}", { page: occurrence.page })}</span></div>
-            <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={occurrence.source || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
+            <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{boundaryEvidence ? occurrence.boundaryAnchors!.map((anchor) => t("Page {{page}}", { page: anchor.page })).join(" → ") : t("Page {{page}}", { page: occurrence.page })}</span></div>
+            <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>

@@ -6,8 +6,9 @@ import math
 from collections.abc import Mapping
 from typing import Any
 
+from .boundary_render import BoundaryRenderError, validate_boundary_repairs
 from .dialogue import malformed_playable_spans
-from .review import ReviewContractError, review_source_validation_view
+from .review import ReviewContractError, accepted_boundary_repairs, review_source_validation_view
 from .voice_routing import is_narration_delimiter
 
 
@@ -85,6 +86,13 @@ def build_recording_script(
             }
         )
 
+    try:
+        boundary_repairs = validate_boundary_repairs(
+            accepted_boundary_repairs(review), spans, entries, capture_context=True,
+        )
+    except (ReviewContractError, BoundaryRenderError) as exc:
+        raise RecordingScriptContractError(str(exc)) from exc
+
     input_revisions = {
         "dialogue": dialogue_revision,
         "review": review_revision,
@@ -98,6 +106,7 @@ def build_recording_script(
         "status": "ready",
         "inputRevisions": input_revisions,
         "entries": entries,
+        "boundaryRepairs": boundary_repairs,
         "sourceCoverage": {
             "status": "exact",
             "sourceSpanIds": [str(span["id"]) for span in spans],
@@ -150,7 +159,12 @@ def split_recording_script_chapter(
         2,
         math.ceil(total_characters / (target_seconds * _CHARACTERS_PER_SECOND)),
     )
-    part_count = min(requested_parts, len(retained_entries))
+    protected_left_ids = {
+        str(repair["anchors"][0]["spanId"]) for repair in script.get("boundaryRepairs", [])
+    }
+    protected_edges = sum(bool(protected_left_ids.intersection(map(str, row.get("sourceSpanIds", []))))
+                          for row in retained_entries)
+    part_count = min(requested_parts, len(retained_entries) - protected_edges)
     if part_count < 2:
         raise RecordingScriptContractError(
             "This chapter does not contain enough safe text boundaries to split"
@@ -161,16 +175,17 @@ def split_recording_script_chapter(
     current_characters = 0
     remaining_characters = total_characters
     remaining_parts = part_count
-    retained_remaining = len(retained_entries)
+    retained_remaining = len(retained_entries) - protected_edges
     for index, entry in selected:
         characters = _entry_characters(entry)
         current.append((index, entry))
         current_characters += characters
-        if characters:
+        if characters and not protected_left_ids.intersection(map(str, entry.get("sourceSpanIds", []))):
             retained_remaining -= 1
         target = remaining_characters / remaining_parts
         if (
             remaining_parts > 1
+            and not protected_left_ids.intersection(map(str, entry.get("sourceSpanIds", [])))
             and current_characters >= target
             and retained_remaining >= remaining_parts - 1
         ):
@@ -241,10 +256,17 @@ def split_recording_script_chapter(
     partitioned_spans = [
         {**row, "chapterId": chapter_by_span[str(row["id"])]} for row in spans
     ]
+    try:
+        boundary_repairs = validate_boundary_repairs(
+            script.get("boundaryRepairs", []), partitioned_spans, entries, capture_context=True,
+        )
+    except BoundaryRenderError as exc:
+        raise RecordingScriptContractError(str(exc)) from exc
     return {
         **dict(script),
         "revision": _required_text(revision, "Recording script revision"),
         "entries": entries,
+        "boundaryRepairs": boundary_repairs,
         "chapters": chapter_rows,
         "summary": _summary(partitioned_spans, retained, cast),
     }
@@ -283,7 +305,12 @@ def recording_script_matches(
     }
     try:
         source_view = review_source_validation_view(dialogue, review)
-    except ReviewContractError:
+        accepted = accepted_boundary_repairs(review)
+        persisted = [{key: value for key, value in row.items() if key != "renderContext"}
+                     for row in script.get("boundaryRepairs", [])]
+        if persisted != accepted:
+            return False
+    except (ReviewContractError, TypeError, AttributeError):
         return False
     return (
         not malformed_playable_spans(source_view)

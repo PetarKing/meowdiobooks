@@ -1599,3 +1599,48 @@ def test_review_candidate_api_enriches_saved_extraction_chapter_context(tmp_path
         assert boundary['source'] == 'CHAPTER II'
         assert boundary['contextBefore'].strip() == 'The last visitor left.'
         assert boundary['contextAfter'].strip() == 'Morning came at last.'
+
+
+def test_review_boundary_repair_cannot_publish_across_selected_chapters(tmp_path, monkeypatch):
+    from meowdiobooks.backend import boundary_review as br, cleanup_remote
+    from test_boundary_review import mock_model
+
+    pages = [{"page": 1, "text": "She shut her", "warnings": []},
+             {"page": 2, "text": "eyes.", "warnings": []}]
+    monkeypatch.setattr("meowdiobooks.backend.app_v2.extract_full_document",
+                        lambda _source, _cache, _method, _report: pages)
+    mock_model(monkeypatch)
+    base_cleanup = cleanup_remote.run_cleanup_review
+
+    def cleanup_with_boundary(root, extraction, dialogue, *args, **kwargs):
+        result = base_cleanup(root, extraction, dialogue, *args, **kwargs)
+        evidence = br.review_boundaries(root, extraction, dialogue, [object()], lambda *_: None)
+        return {**result, "boundaryReview": evidence,
+                "occurrences": br.boundary_cleanup_rows(evidence["occurrences"]),
+                "unifiedSuggestions": True}
+
+    monkeypatch.setattr(cleanup_remote, "run_cleanup_review", cleanup_with_boundary)
+    with TestClient(create_app_v2(tmp_path)) as client:
+        book_id = client.post("/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}).json()["book"]["id"]
+        extraction = _process(client, book_id, "extract", {"method": "native"})
+        _accept(client, book_id, "extract", extraction["revision"])
+        dialogue = _process(client, book_id, "dialogue", {"strategy": "narrate"})
+        _accept(client, book_id, "dialogue", dialogue["revision"])
+        review = _process(client, book_id, "review", {})
+        candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{review['revision']}").json()
+        rows = [row for warning in candidate["warnings"] for row in warning["occurrences"]]
+        assert any(row.get("boundaryDecision") == "SPACE" for row in rows)
+        # Exercise publication preflight after chapter assignment, independently of heading detection.
+        monkeypatch.setattr("meowdiobooks.backend.app_v2.compile_reviewed_chapters", lambda spans, *_: {
+            "spanChapterIds": {row["id"]: f"chapter-{i}" for i, row in enumerate(spans)},
+            "chapters": [], "boundaryDecisions": [],
+        })
+        response = client.post(f"/api/books/{book_id}/stages/review/accept", json={
+            "revision": review["revision"], "decisions": [
+                {"occurrenceIds": [row["id"]], "action": "repair" if row.get("boundaryDecision") else "keep"}
+                for row in rows
+            ],
+        })
+        assert response.status_code == 409
+        assert "one chapter" in response.json()["detail"]
+        assert "review" not in client.get(f"/api/books/{book_id}/snapshot").json()["activeArtifacts"]

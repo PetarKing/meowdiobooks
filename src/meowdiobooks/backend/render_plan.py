@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 import re
-import unicodedata
 from typing import Any
 
+from .boundary_render import BoundaryRenderError, validate_boundary_repairs
 from .voice_routing import narrator_route, speaker_labels
 
 
@@ -41,6 +41,11 @@ def compile_render_plan(
     span_positions = {str(row["id"]): index for index, row in enumerate(spans)}
     entries = list(recording_script.get("entries", []))
     _validate_script_coverage(entries, spans, recording_script)
+    try:
+        boundary_repairs = validate_boundary_repairs(recording_script.get("boundaryRepairs", []), spans, entries)
+    except BoundaryRenderError as exc:
+        raise RenderPlanError(str(exc)) from exc
+    repair_by_pair = {(row["anchors"][0]["spanId"], row["anchors"][1]["spanId"]): row for row in boundary_repairs}
     intact_words = _intact_words(entries)
     available_chapters = {str(row.get("chapterId") or "chapter-1") for row in entries}
     unknown_chapters = sorted(set(selected) - available_chapters)
@@ -116,7 +121,7 @@ def compile_render_plan(
         compiled_chapters.append(
             {
                 "chapterId": chapter_id,
-                "segments": _coalesce_narration(raw_segments, span_positions, span_index),
+                "segments": _coalesce_narration(raw_segments, span_positions, repair_by_pair),
                 "omissions": [row for row in omissions if row["chapterId"] == chapter_id],
             }
         )
@@ -370,52 +375,37 @@ def _segment(
 
 
 def _coalesce_narration(
-    segments: Sequence[dict[str, Any]],
-    span_positions: Mapping[str, int],
-    span_index: Mapping[str, Mapping[str, Any]],
+    segments: Sequence[dict[str, Any]], span_positions: Mapping[str, int],
+    boundary_repairs: Mapping[tuple[str, str], Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
+    source_ids = {source_id for segment in segments for source_id in segment["sourceSpanIds"]}
+    required = {pair for pair in boundary_repairs if set(pair) <= source_ids}
+    applied = set()
     for raw in segments:
         segment = dict(raw)
         previous = result[-1] if result else None
+        repair = boundary_repairs.get((previous["sourceSpanIds"][-1], segment["sourceSpanIds"][0])) if previous else None
+        if repair is not None:
+            if not _safe_boundary_pair(previous, segment):
+                raise RenderPlanError("Accepted boundary repair has incompatible voice routing")
+            left, right = repair["anchors"]
+            applied.add((left["spanId"], right["spanId"]))
+            if not previous["text"].endswith(left["source"]) or not segment["text"].startswith(right["source"]):
+                raise RenderPlanError("Accepted boundary repair conflicts with rendered text normalization")
+            previous["text"] = previous["text"][:-len(left["source"])] + repair["replacement"] + segment["text"][len(right["source"]):]
+            previous["scriptEntryIds"].extend(segment["scriptEntryIds"])
+            previous["sourceSpanIds"].extend(segment["sourceSpanIds"])
+            continue
         if previous is not None and _safe_narration_pair(previous, segment, span_positions):
-            previous["text"] += _block_word_separator(previous, segment, span_index)
             previous["text"] += segment["text"]
             previous["scriptEntryIds"].extend(segment["scriptEntryIds"])
             previous["sourceSpanIds"].extend(segment["sourceSpanIds"])
             continue
         result.append(segment)
+    if applied != required:
+        raise RenderPlanError("Accepted boundary repairs could not be rendered with current voice routing")
     return result
-
-
-def _block_word_separator(
-    left: Mapping[str, Any],
-    right: Mapping[str, Any],
-    span_index: Mapping[str, Mapping[str, Any]],
-) -> str:
-    """Restore a missing word boundary between independently extracted source blocks.
-
-    Same-block fragments, whitespace, punctuation and hyphenation remain source-owned.
-    Restrict the repair to space-delimited alphabets rather than inserting spaces into
-    scripts such as Chinese, Japanese or Thai where adjoining letters can be intentional.
-    """
-
-    left_block = span_index[left["sourceSpanIds"][-1]].get("blockId")
-    right_block = span_index[right["sourceSpanIds"][0]].get("blockId")
-    if not left_block or not right_block or left_block == right_block:
-        return ""
-    left_text, right_text = str(left["text"]), str(right["text"])
-    if not left_text or not right_text:
-        return ""
-
-    def word_edge(character: str) -> bool:
-        return character.isdecimal() or (
-            character.isalpha()
-            and unicodedata.name(character, "").startswith(("LATIN ", "GREEK ", "CYRILLIC "))
-        )
-
-    left_edge = unicodedata.normalize("NFC", left_text)[-1]
-    return " " if word_edge(left_edge) and word_edge(right_text[0]) else ""
 
 
 def _safe_narration_pair(
@@ -445,3 +435,10 @@ def _revision(artifact: Mapping[str, Any], label: str) -> str:
     if not revision:
         raise RenderPlanError(f"{label} revision is required")
     return revision
+
+
+def _safe_boundary_pair(left, right):
+    return (left.get("mixGroupId") is None and right.get("mixGroupId") is None
+            and all(left.get(key) == right.get(key) for key in (
+                "chapterId", "renderRole", "effectiveCharacterId", "voiceRevision", "fallback",
+                "referenceAudio", "referenceText", "referenceMode", "voiceSettings")))

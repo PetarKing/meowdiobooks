@@ -6,17 +6,28 @@ import { createFixtureGateway } from "../design-kit/fixtures";
 import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 import { enterScenario } from "./enterScenario";
 
-function CleanupReview({ consolidated = false, many = false }: { consolidated?: boolean; many?: boolean }) {
+function CleanupReview({ consolidated = false, many = false, boundaries = false }: { consolidated?: boolean; many?: boolean; boundaries?: boolean }) {
   const gateway = useMemo(() => {
     const fixture = createFixtureGateway("review");
     const original = fixture.getStageCandidate.bind(fixture);
     fixture.getStageCandidate = async (book, stage, revision) => {
       const candidate = await original(book, stage, revision);
-      const warning = consolidated ? consolidatedCleanupWarning : many ? { ...cleanupWarning, occurrences: Array.from({ length: 150 }, (_, i) => ({ ...cleanupWarning.occurrences[0], id: `ai-${i}`, source: `Source fragment ${i}`, replacement: `Corrected fragment ${i}` })) } : cleanupWarning;
+      const boundaryRows = cleanupWarning.occurrences.map((row, i) => ({ ...row,
+        source: "her", text: "her", replacement: i === 2 ? undefined : "her eyes",
+        availableActions: i === 2 ? ["keep"] : ["keep", "repair"],
+        boundaryDecision: i === 2 ? "UNSURE" : "SPACE",
+        proposalStatus: i === 2 ? "source_review" : "proposed",
+        boundarySource: "hereyes",
+        boundaryAnchors: [
+          { blockId: `left-${i}`, spanId: `left-span-${i}`, sourceStart: 0, sourceEnd: 3, source: "her", page: 1 },
+          { blockId: `right-${i}`, spanId: `right-span-${i}`, sourceStart: 0, sourceEnd: 4, source: "eyes", page: 2 },
+        ],
+      }));
+      const warning = boundaries ? { ...cleanupWarning, occurrences: boundaryRows } : consolidated ? consolidatedCleanupWarning : many ? { ...cleanupWarning, occurrences: Array.from({ length: 150 }, (_, i) => ({ ...cleanupWarning.occurrences[0], id: `ai-${i}`, source: `Source fragment ${i}`, replacement: `Corrected fragment ${i}` })) } : cleanupWarning;
       return stage === "review" ? Object.assign(candidate, { warnings: [{ ...warning }, ...(consolidated ? [{ id: "front-matter", kind: "front-back-matter", severity: "warning", availableActions: ["keep", "exclude"], occurrences: [{ id: "author-note", source: "About the author", text: "About the author", page: 4 }] }] : [])], boundaryCandidates: [] }) : candidate;
     };
     return fixture;
-  }, [consolidated, many]);
+  }, [consolidated, many, boundaries]);
   return <App gateway={gateway} />;
 }
 
@@ -81,5 +92,24 @@ export const ManySuggestions: Story = {
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: /^Keep original text Keep the original/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
+  },
+};
+
+export const BoundarySuggestions: Story = {
+  args: { boundaries: true },
+  play: async ({ canvasElement }) => {
+    await enterScenario(canvasElement, "review");
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText("Page 1 → Page 2")).toBeVisible();
+    await expect(canvas.getByText("hereyes")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: /^Keep original text Keep the original/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
+    await userEvent.click(canvas.getByRole("button", { name: "Next example →" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Next example →" }));
+    await expect(canvas.getByRole("button", { name: /^Keep original text Keep the original/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.queryByRole("button", { name: /^Apply correction/ })).not.toBeInTheDocument();
+    await userEvent.click(canvas.getByRole("button", { name: "Review complete transcript →" }));
+    await expect(await canvas.findByRole("article", { name: "Audiobook transcript page 1" })).toBeVisible();
   },
 };

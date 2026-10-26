@@ -229,6 +229,10 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  /** Source-anchored page-boundary evidence; acceptance validates the saved candidate. */
+  boundaryDecision?: "SPACE" | "JOIN" | "HYPHEN" | "NO_CONTINUATION" | "UNSURE";
+  boundaryAnchors?: Array<{ blockId: string; spanId: string; sourceStart: number; sourceEnd: number; source: string; page: number }>;
+  boundarySource?: string;
   patternGroupId?: string;
   patternVerification?: "verified";
   /** Context preserves whitespace adjacent to the anchored source. */

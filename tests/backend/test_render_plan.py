@@ -384,7 +384,7 @@ def test_character_only_chapter_does_not_require_unused_narrator():
 @pytest.mark.parametrize(
     "left,right,expected",
     [
-        ("A shadow crossed her", "eyes.", "A shadow crossed her eyes."),
+        ("A shadow crossed her", "eyes.", "A shadow crossed hereyes."),
         ("her ", "eyes.", "her eyes."),
         ("her", "\neyes.", "her\neyes."),
         ("her\u00a0", "eyes.", "her\u00a0eyes."),
@@ -394,15 +394,15 @@ def test_character_only_chapter_does_not_require_unused_narrator():
         ("她的", "眼睛", "她的眼睛"),
         ("彼女の", "目", "彼女の目"),
         ("ภาษา", "ไทย", "ภาษาไทย"),
-        ("ses", "yeux", "ses yeux"),
-        ("её", "глаза", "её глаза"),
-        ("τα", "μάτια", "τα μάτια"),
+        ("ses", "yeux", "sesyeux"),
+        ("её", "глаза", "еёглаза"),
+        ("τα", "μάτια", "ταμάτια"),
         ("λέξη", "; next", "λέξη; next"),
-        ("cafe\u0301", "noir", "cafe\u0301 noir"),
-        ("room", "12", "room 12"),
+        ("cafe\u0301", "noir", "cafe\u0301noir"),
+        ("room", "12", "room12"),
     ],
 )
-def test_narration_preserves_word_boundaries_between_source_blocks(left, right, expected):
+def test_narration_without_approved_boundary_keeps_existing_source_join(left, right, expected):
     dialogue, cast, _script = _artifacts()
     dialogue["spans"] = [
         {**_span("s1", left, 0), "blockId": "page-1-block"},
@@ -421,7 +421,7 @@ def test_narration_preserves_word_boundaries_between_source_blocks(left, right, 
     assert [entry["text"] for entry in script["entries"]] == [left, right]
 
 
-def test_narration_uses_last_source_block_after_repeated_merges():
+def test_narration_without_approved_boundary_keeps_repeated_source_joins():
     dialogue, cast, _script = _artifacts()
     dialogue["spans"] = [
         _span("s1", "She saw her", 0),
@@ -437,5 +437,5 @@ def test_narration_uses_last_source_block_after_repeated_merges():
     )
     plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
     segment = plan["chapters"][0]["segments"][0]
-    assert segment["text"] == "She saw her eyes close."
+    assert segment["text"] == "She saw hereyesclose."
     assert segment["sourceSpanIds"] == ["s1", "s2", "s3", "s4"]
