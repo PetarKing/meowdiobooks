@@ -65,8 +65,8 @@ def test_unconfirmed_short_body_prose_does_not_create_heading_pause():
 
 def test_block_or_page_boundary_alone_is_not_a_paragraph():
     plan = _plan([
-        {"id": "left", "page": 1, "text": "She closed her"},
-        {"id": "middle", "page": 1, "text": "eyes and"},
+        {"id": "left", "page": 1, "text": "She closed her "},
+        {"id": "middle", "page": 1, "text": "eyes and "},
         {"id": "right", "page": 2, "text": "waited."},
     ])
     assert len(_segments(plan)) == 1
@@ -230,3 +230,19 @@ def test_source_pacing_rejects_noncontiguous_ranges_in_direct_use():
     with pytest.raises(ValueError, match="contiguous"):
         source_boundaries([{"id": "a", "blockId": "b", "sourceStart": 1,
                             "sourceEnd": 5, "source": "word"}], {})
+
+
+def test_multiple_confirmed_headings_in_one_source_block_keep_both_heading_gaps():
+    from meowdiobooks.backend.source_pacing import source_boundaries
+    text = "Chapter One\n\nFirst body.\n\nChapter Two\n\nSecond body."
+    second = text.index("Chapter Two")
+    spans = [{"id": "first", "blockId": "block", "sourceStart": 0,
+              "sourceEnd": second, "source": text[:second], "chapterId": "first"},
+             {"id": "second", "blockId": "block", "sourceStart": second,
+              "sourceEnd": len(text), "source": text[second:], "chapterId": "second"}]
+    cuts = source_boundaries(spans, {"chapters": [
+        {"title": "Chapter One", "boundaryId": "boundary:block:0-11"},
+        {"title": "Chapter Two", "boundaryId": f"boundary:block:{second}-{second + 11}"},
+    ]})
+    assert (13, "chapter-heading") in cuts["first"]
+    assert (13, "chapter-heading") in cuts["second"]

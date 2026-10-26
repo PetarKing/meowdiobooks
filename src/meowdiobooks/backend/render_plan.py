@@ -23,7 +23,7 @@ def compile_render_plan(
     recording_script: Mapping[str, Any],
     chapter_ids: Sequence[str],
 ) -> dict[str, Any]:
-    """Compile selected chapters without regexes, source reparsing, or model calls."""
+    """Compile accepted source-linked speech and pacing without model calls."""
 
     selected = list(chapter_ids)
     if not selected or len(selected) != len(set(selected)):
