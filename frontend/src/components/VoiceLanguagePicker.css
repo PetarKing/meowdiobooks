@@ -1,0 +1,14 @@
+.voice-language-picker { position: relative; margin-top: 16px; width: 100%; }
+.voice-language-trigger { display: flex; align-items: center; gap: 16px; width: 100%; min-height: 68px; padding: 14px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); color: var(--ink); text-align: left; font: 500 19px var(--font-sans); cursor: pointer; text-transform: capitalize; }
+.voice-language-trigger > svg { margin-left: auto; flex-shrink: 0; }
+.voice-language-trigger[aria-expanded=true] { border-color: var(--poppy); }
+.voice-language-trigger:focus-visible { outline: 2px solid var(--poppy); outline-offset: 3px; }
+.voice-language-trigger:disabled { cursor: default; opacity: .65; }
+.voice-language-flag { width: 26px; flex-shrink: 0; font-size: 23px; line-height: 1; }
+.voice-language-options { position: relative; z-index: 2; margin: 8px 0 0; padding: 6px; width: 100%; max-height: 286px; overflow-y: auto; overscroll-behavior: contain; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); box-shadow: 0 8px 24px #20132912; list-style: none; }
+.voice-language-options > li { display: flex; align-items: center; gap: 16px; min-height: 48px; padding: 10px 14px; border-radius: 7px; font: 400 16px var(--font-sans); text-transform: capitalize; cursor: pointer; }
+.voice-language-options > li.active { background: color-mix(in srgb, var(--poppy) 7%, var(--paper)); }
+.voice-language-options > li[aria-selected=true] { color: var(--poppy); font-weight: 600; }
+.voice-language-tick { margin-left: auto; }
+.voice-language-picker > small { display: block; margin-top: 8px; color: var(--muted); }
+@media (max-width: 600px) { .voice-language-options { max-height: 260px; } }

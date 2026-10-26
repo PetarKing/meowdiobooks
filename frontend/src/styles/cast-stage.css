@@ -126,3 +126,44 @@
 /* Provenance sits beneath the standard audition heading. */
 .voice-candidate-tile.previous-book-derived { background: color-mix(in srgb, var(--poppy) 3%, var(--paper)); }
 .previous-book-caption::before { content: "↶ "; }
+
+/* Shared voice setup: method rows appear only when there is a choice. */
+.voice-setup-modal { width: min(640px, calc(100vw - 64px)); max-height: calc(100dvh - 64px); overflow-y: auto; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); box-shadow: 0 28px 100px #20132933; color: var(--ink); }
+.voice-setup-heading { position: relative; padding: 40px 40px 20px; }
+.voice-setup-eyebrow { color: var(--muted); font: 600 11px/1.4 var(--font-sans); letter-spacing: .11em; text-transform: uppercase; }
+.voice-setup-heading > button { position: absolute; top: 19px; right: 20px; min-width: 44px; min-height: 44px; font-size: 26px; }
+.voice-setup-heading h2 { margin: 22px 0 12px; font-family: var(--font-serif); font-size: 38px; font-weight: 500; letter-spacing: -.035em; line-height: 1.12; }
+.voice-setup-heading p, .voice-setup-content p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+.voice-setup-content { display: grid; align-content: start; gap: 28px; padding: 24px 40px 32px; }
+.voice-setup-content h3 { margin: 0 0 8px; font-size: 14px; font-weight: 600; }
+.voice-setup-language .narration-language-picker { margin-top: 16px; width: 100%; max-width: none; }
+.voice-setup-language .narration-language-control select:not([multiple]) { min-height: 68px; padding-left: 58px; font-size: 19px; border-radius: 12px; background: var(--paper); }
+.voice-setup-language .narration-language-flag { left: 20px; font-size: 25px; }
+.voice-setup-model { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 16px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--ink); text-align: left; }
+.voice-setup-check { display: grid; flex: 0 0 23px; width: 23px; height: 23px; place-items: center; border: 1px solid var(--line-strong); border-radius: 50%; font: 600 13px var(--font-sans); }
+.voice-setup-model.selected .voice-setup-check { color: var(--paper); border-color: var(--poppy); background: var(--poppy); }
+.voice-setup-models { display: grid; margin-top: 8px; }
+.voice-setup-model { width: 100%; min-height: 62px; cursor: pointer; font-size: 15px; }
+.voice-setup-model:hover { color: var(--poppy); }
+.voice-setup-model:focus-visible { outline: 2px solid var(--poppy); outline-offset: 3px; }
+.voice-setup-footer { padding: 0 40px 32px; }
+.voice-setup-footer > div { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.voice-setup-footer button { min-height: 50px; }
+.voice-setup-method .casting-choice { margin-top: 8px; }
+.voice-setup-method .casting-options { grid-template-columns: 1fr; gap: 0; }
+.voice-setup-method .casting-option { position: relative; min-height: 62px; gap: 4px; padding: 16px 38px 16px 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.voice-setup-method .casting-option::after { content: ""; position: absolute; right: 0; top: 20px; display: grid; place-items: center; width: 23px; height: 23px; border: 1px solid var(--line-strong); border-radius: 50%; }
+.voice-setup-method .casting-option.selected::after { content: "✓"; background: var(--poppy); color: var(--paper); border-color: var(--poppy); }
+.voice-setup-method .casting-option b { font-size: 15px; font-weight: 500; }
+.voice-setup-method .casting-option-description { font-size: 12px; }
+@media (max-width: 600px) {
+  .process-overlay.voice-setup-overlay { padding: 0; }
+  .voice-setup-modal { display: flex; flex-direction: column; width: 100vw; height: 100dvh; max-height: 100dvh; border: 0; border-radius: 0; }
+  .voice-setup-heading { padding: 48px 24px 18px; }
+  .voice-setup-heading > button { top: 22px; right: 14px; }
+  .voice-setup-heading h2 { max-width: 290px; margin-top: 32px; font-size: 42px; }
+  .voice-setup-content { padding: 24px; gap: 34px; flex: 1; }
+  .voice-setup-footer { padding: 24px 24px max(24px, env(safe-area-inset-bottom)); }
+  .voice-setup-footer > div { flex-direction: column-reverse; align-items: stretch; gap: 10px; }
+  .voice-setup-footer button { min-height: 54px; }
+}

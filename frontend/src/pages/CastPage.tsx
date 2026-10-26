@@ -12,7 +12,7 @@ import { strongConfirmationLabelsForCast } from "../castIdentity";
 import { CastIdentityReview } from "../components/CastIdentityReview";
 import { CastingChoice } from "../components/CastingChoice";
 import { CastVoiceReview } from "../components/CastVoiceReview";
-import { NarrationLanguagePicker } from "../components/LanguagePicker";
+import { VoiceLanguagePicker } from "../components/VoiceLanguagePicker";
 import { draftVoiceSelection } from "../workflow/voiceSelection";
 import { AcceptedSummary, PageTitle, StageLaunch } from "../pages/shared";
 import { confirmedVoiceRoutesForCast, voiceRoutesForCast } from "../voiceRoutes";
@@ -36,6 +36,7 @@ export type CastPageModel = Pick<WorkflowModel, "capabilities" | "castingPreview
 
 export function CastPage({ model }: { model: CastPageModel; }) {
   const { capabilities, castingPreviewFingerprint, acceptCandidate, book, busy, castCandidate, castGenerationPaused, castingPreviewReady, completed, confirmDefaultVoices, confirmedVoiceRoutes, designingVoices, editingCast, gateway, identityDecisions, language, narrationLanguageConfirmed, narratorDirection, processCandidate, regeneratingCharacterId, resolvedLabels, revisingStages, setCastCandidate, setCastGenerationPaused, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setDesigningVoices, setEditingCast, setError, setIdentityDecisions, setLanguage, setNarrationLanguageConfirmed, setNarratorDirection, setRegeneratingCharacterId, setResolvedLabels, setRevisingStages, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, snapshot, t, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections } = model;
+  const [languagePickerOpen, setLanguagePickerOpen] = useState(false);
   const revising = revisingStages.includes("cast");
   const current = castCandidate ?? (revising ? undefined : snapshot?.cast);
   const [priorMatches, setPriorMatches] = useState<{
@@ -178,10 +179,11 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     const enhancedCasting = snapshot?.castingPreviewAvailable === true && Boolean(gateway.previewCasting);
     const sourceBookIds: string[] = [];
     const castEditsDirty = identityDecisionSignature(identityDecisions) !== identityDecisionSignature(decisionsForCast(current))
-      || voiceModel !== (current.voiceModel ?? voiceModel)
-      || language !== (current.language ?? language)
+      || voiceModel !== (current.voiceModel ?? snapshot?.voiceSelection.modelId ?? voiceModel)
+      || language !== (current.language ?? snapshot?.voiceSelection.language ?? language)
       || current.auditionPackRefreshRequired === true;
-    const generateVoices = () => void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, ...(enhancedCasting ? { sourceBookIds, castingPreviewFingerprint } : {}) }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); setDesigningVoices(false); }).catch((reason) => setError(message(reason)));
+    const keepExistingVoices = editingCast && !castEditsDirty && current.phase !== "identity-review" && !castGenerationPaused;
+    const generateVoices = () => { setLanguagePickerOpen(false); setDesigningVoices(false); void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, ...(enhancedCasting ? { sourceBookIds, castingPreviewFingerprint } : {}) }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); setDesigningVoices(false); }).catch((reason) => { setLanguagePickerOpen(false); setDesigningVoices(false); updateCastingPreview(false); setError(message(reason)); }); };
     const changeCastingModel = (id: string) => {
       setCastGenerationPaused(false);
       setVoiceModel(id);
@@ -191,8 +193,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         setNarrationLanguageConfirmed(false);
       }
     };
-    const voiceOptionsUnavailable = !capabilities.showVoiceModelControls
-      && !snapshot?.voiceModels.some((row) => row.id === voiceModel);
+    const voiceOptionsUnavailable = !snapshot?.voiceModels.some((row) => row.id === voiceModel && row.supportedLanguages.length > 0);
     const availableVoiceModels = snapshot?.voiceModels.filter((row) => row.supportedLanguages.length > 0) ?? [];
     const replacementVoiceModel = availableVoiceModels.find((row) => row.id === snapshot?.voiceSelection.modelId)
       ?? availableVoiceModels[0];
@@ -205,30 +206,42 @@ export function CastPage({ model }: { model: CastPageModel; }) {
         setNarrationLanguageConfirmed(false);
       }}>{t("Refresh voice options")}</button>
     </div>;
-    if (enhancedCasting && designingVoices && book) {
-      const languages = snapshot?.voiceModels.find((row) => row.id === voiceModel)?.supportedLanguages ?? [];
-      return <section className="voice-design-screen" aria-label={t("Design the voices")}>
-        <button className="ghost voice-design-back" onClick={() => { updateCastingPreview(false); setDesigningVoices(false); }}>← {t("Back to cast")}</button>
-        <PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t("Design the voices")} />
-        {refreshVoiceOptions}
-        <div className="voice-design-language">
-          <div><label>{t("Narration language")}</label></div>
-          <NarrationLanguagePicker languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => {
-            // Confirming the default keeps its quote valid; only changed settings need a new one.
-            if (id !== language) updateCastingPreview(false);
-            setCastGenerationPaused(false);
-            setLanguage(id);
-            setNarrationLanguageConfirmed(Boolean(id));
-          }} />
+    // Confirmation is shared UI; only quote/reuse checks depend on the optional adapter.
+    const languages = snapshot?.voiceModels.find((row) => row.id === voiceModel)?.supportedLanguages ?? [];
+    const showMethodRows = capabilities.showVoiceModelControls && availableVoiceModels.length > 1;
+    const closeVoiceSetup = () => { setLanguagePickerOpen(false); updateCastingPreview(false); setDesigningVoices(false); };
+    const generateAction = <button type="button" className="primary" disabled={busy || pendingConfirmations.length > 0 || (!keepExistingVoices && (voiceOptionsUnavailable || (enhancedCasting && !castingPreviewReady) || !voiceModel || !languages.includes(language) || !narrationLanguageConfirmed))} onClick={keepExistingVoices ? () => { closeVoiceSetup(); setEditingCast(false); } : generateVoices}>{t(keepExistingVoices ? "Continue" : castGenerationPaused ? "Continue voice generation" : "Generate voices")} →</button>;
+    const voiceSetupDialog = designingVoices && <DialogBackdrop className="process-overlay voice-setup-overlay">
+      <DialogSurface className="voice-setup-modal" aria-labelledby="voice-setup-title" onDismiss={busy ? undefined : languagePickerOpen ? () => setLanguagePickerOpen(false) : closeVoiceSetup}>
+        <header className="voice-setup-heading">
+          <span className="voice-setup-eyebrow">{t("Cast & voices")}</span>
+          <button type="button" className="ghost" aria-label={t("Cancel voice setup")} disabled={busy} onClick={closeVoiceSetup}>×</button>
+          <h2 id="voice-setup-title">{t("Ready for their voices?")}</h2>
+        </header>
+        <div className="voice-setup-content">
+          {refreshVoiceOptions}
+          <section className="voice-setup-language" aria-labelledby="voice-setup-language-title">
+            <h3 id="voice-setup-language-title">{t("Narration language")}</h3>
+            <VoiceLanguagePicker expanded={languagePickerOpen} onExpandedChange={setLanguagePickerOpen} languages={languages} language={narrationLanguageConfirmed ? language : ""} onChange={(id) => {
+              if (id !== language) updateCastingPreview(false);
+              setCastGenerationPaused(false);
+              setLanguage(id);
+              setNarrationLanguageConfirmed(Boolean(id));
+            }} />
+          </section>
+          <section hidden={!showMethodRows && !enhancedCasting} className="voice-setup-method" aria-labelledby={showMethodRows ? "voice-setup-method-title" : undefined}>
+            {showMethodRows && <h3 id="voice-setup-method-title">{t("Generation method")}</h3>}
+            {enhancedCasting && book ? <CastingChoice showVoiceModelControls={capabilities.showVoiceModelControls && showMethodRows} models={snapshot?.voiceModels} gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onModelChange={changeCastingModel} />
+              : showMethodRows && capabilities.showVoiceModelControls && <div className="voice-setup-models">{availableVoiceModels.map((option) => <button type="button" className={`voice-setup-model${voiceModel === option.id ? " selected" : ""}`} key={option.id} aria-pressed={voiceModel === option.id} onClick={() => changeCastingModel(option.id)}><span>{option.label}</span><span className="voice-setup-check" aria-hidden="true">{voiceModel === option.id ? "✓" : ""}</span></button>)}</div>}
+          </section>
         </div>
-        <CastingChoice showVoiceModelControls={capabilities.showVoiceModelControls} models={snapshot?.voiceModels} gateway={gateway} bookId={book.id} settings={{ proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, sourceBookIds }} onReadyChange={updateCastingPreview} onModelChange={changeCastingModel} action={<button className="primary" disabled={voiceOptionsUnavailable || !castingPreviewReady || pendingConfirmations.length > 0 || !voiceModel || !language || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Refresh auditions" : editingCast ? "Apply cast edits" : "Continue")} →</button>} />
-        {confirmationDialog}
-      </section>;
-    }
+        <footer className="voice-setup-footer"><div><button type="button" className="ghost" disabled={busy} onClick={closeVoiceSetup}>← {t("Back to cast")}</button>{generateAction}</div></footer>
+      </DialogSurface>
+    </DialogBackdrop>;
     return <><PageTitle stage="cast" step={t("Step 4 · Cast & voices")} title={t(editingCast ? "Review the cast." : "Build the cast.")} copy={t("Open a cast member to check its names and source labels.")} />
-      <CastIdentityReview hideVoiceSettings={enhancedCasting} hideVoiceModel={enhancedCasting || !capabilities.showVoiceModelControls} cast={castWithMatches!} decisions={identityDecisions} setDecisions={setIdentityDecisions} resolvedLabels={resolvedLabels} setResolvedLabels={setResolvedLabels} voiceModels={snapshot?.voiceModels ?? []} voiceModel={voiceModel} language={language} onVoiceModelChange={(id) => { setCastGenerationPaused(false); setVoiceModel(id); const supported = snapshot?.voiceModels.find((row) => row.id === id)?.supportedLanguages ?? []; if (!supported.includes(language)) setLanguage(supported.includes("english") ? "english" : supported[0] ?? ""); }} onLanguageChange={(id) => { setCastGenerationPaused(false); setLanguage(id); }} onReclassify={editingCast ? reclassifyCast : undefined} />
-      {!enhancedCasting && refreshVoiceOptions}
-      <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t(pendingConfirmations.length === 1 ? "1 cast label still needs confirmation" : "{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(castGenerationPaused ? "Completed voices are saved; continue from the interrupted voice" : current.auditionPackRefreshRequired ? "Your voices need refreshing before you continue." : editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); updateCastingPreview(false); setDesigningVoices(false); setEditingCast(false); }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={pendingConfirmations.length > 0 || (!enhancedCasting && (voiceOptionsUnavailable || !voiceModel || !language || (editingCast && !castEditsDirty)))} onClick={enhancedCasting ? () => { updateCastingPreview(false); setDesigningVoices(true); } : generateVoices}>{t(pendingConfirmations.length ? "Confirm cast identities" : enhancedCasting ? "Design the voices" : castGenerationPaused ? "Continue voice generation" : current.auditionPackRefreshRequired ? "Refresh auditions" : editingCast ? "Apply cast edits" : enhancedCasting ? "Continue" : "Generate required auditions")} →</button></div></div>{confirmationDialog}</>;
+      <CastIdentityReview hideVoiceSettings={true} hideVoiceModel={enhancedCasting || !capabilities.showVoiceModelControls} cast={castWithMatches!} decisions={identityDecisions} setDecisions={setIdentityDecisions} resolvedLabels={resolvedLabels} setResolvedLabels={setResolvedLabels} voiceModels={snapshot?.voiceModels ?? []} voiceModel={voiceModel} language={language} onVoiceModelChange={(id) => { setCastGenerationPaused(false); setVoiceModel(id); const supported = snapshot?.voiceModels.find((row) => row.id === id)?.supportedLanguages ?? []; if (!supported.includes(language)) setLanguage(supported.includes("english") ? "english" : supported[0] ?? ""); }} onLanguageChange={(id) => { setCastGenerationPaused(false); setLanguage(id); }} onReclassify={editingCast ? reclassifyCast : undefined} />
+
+      <div className="phase-action cast-final-action"><span>{pendingConfirmations.length ? t(pendingConfirmations.length === 1 ? "1 cast label still needs confirmation" : "{{count}} cast labels still need confirmation", { count: pendingConfirmations.length }) : t(castGenerationPaused ? "Completed voices are saved; continue from the interrupted voice" : current.auditionPackRefreshRequired ? "Your voices need refreshing before you continue." : editingCast ? castEditsDirty ? "Unchanged auditions will be kept" : "No cast changes to apply" : "")}</span><div className="phase-action-buttons" role="group" aria-label={t("Cast edit actions")}>{editingCast && <button className="ghost" onClick={() => { setIdentityDecisions(decisionsForCast(current)); setResolvedLabels(resolvedLabelsForCast(current)); setVoiceModel(current.voiceModel ?? voiceModel); setLanguage(current.language ?? language); setNarratorDirection(current.narrator?.voiceDirection ?? narratorDirection); updateCastingPreview(false); setDesigningVoices(false); setEditingCast(false); }}>{t("Cancel cast edits")}</button>}<button className="primary" disabled={busy || pendingConfirmations.length > 0} onClick={() => { updateCastingPreview(false); setDesigningVoices(true); }}>{t(pendingConfirmations.length ? "Confirm cast identities" : "Next")} →</button></div></div>{voiceSetupDialog}{confirmationDialog}</>;
   }
   const voices = [current.narrator, ...(current.identities ?? [])].filter(Boolean) as CastVoice[];
   const voiceById = Object.fromEntries(voices.map((voice) => [voice.characterId, voice]));

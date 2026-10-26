@@ -1,4 +1,9 @@
 const zhCN: Record<string, string> = {
+  "Ready for their voices?": "准备好生成声音了吗？",
+  "Generation method": "生成方式",
+  "Cancel voice setup": "取消声音设置",
+  "Narration languages": "旁白语言选项",
+
   "Must review": "必须检查",
   "Should review": "建议检查",
   "From prior book": "来自先前书籍",

@@ -57,7 +57,7 @@ try {
     assertOpenInset(metrics);
     if (width === 390) { assert.equal(metrics.secondaryBorder, '0px'); assert(metrics.secondaryHeight >= 44); }
     assert(await footer.getByRole('button', { name: 'Cancel cast edits' }).isVisible());
-    assert(await footer.getByRole('button', { name: 'Apply cast edits →' }).isVisible());
+    assert(await footer.getByRole('button', { name: 'Next →' }).isVisible());
     assert(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
     assert.deepEqual(errors, []);
     await page.screenshot({ path: `${out}/editing-cast-${width}-${appearance}.png`, fullPage: true });
