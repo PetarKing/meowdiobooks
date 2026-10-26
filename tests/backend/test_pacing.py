@@ -1,5 +1,6 @@
 """Synthetic source/routing and measured audio evidence for the shared pacing recipe."""
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import numpy as np
@@ -166,6 +167,9 @@ def test_actual_boundary_quiet_matches_requested_target_and_has_no_noise(tmp_pat
 
 def test_renderer_folds_terminal_ellipsis_into_paragraph_gap_and_keeps_legacy_audio(tmp_path, monkeypatch):
     import meowdiobooks.backend.tts_v2 as tts
+    (tmp_path / 'models.toml').write_bytes(
+        (Path(__file__).resolve().parents[2] / 'models.toml').read_bytes()
+    )
     sample_rate = 1000
     class Model:
         def __init__(self):
