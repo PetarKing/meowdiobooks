@@ -1,0 +1,71 @@
+.agent-guide { position: relative; isolation: isolate; min-height: 100dvh; font-family: var(--font-sans); overflow: clip; }
+.agent-guide a { color: var(--poppy); text-underline-offset: .25em; }
+.agent-guide a:focus-visible, .agent-guide summary:focus-visible, .agent-guide button:focus-visible { outline: 2px solid var(--poppy); outline-offset: 4px; box-shadow: none; }
+.agent-guide-header { position: relative; z-index: 1; max-width: 1204px; margin: auto; padding: 22px 32px; display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.agent-guide .agent-guide-brand { display: flex; align-items: center; gap: 10px; font: 25px var(--font-display); letter-spacing: -.04em; text-decoration: none; color: var(--ink); }
+.agent-guide-brand img { width: 42px; height: 42px; object-fit: contain; }
+.agent-guide-preferences { display: flex; align-items: center; gap: 8px; }
+.agent-guide-main { position: relative; z-index: 1; width: min(100% - 48px, 720px); max-width: none; margin: 26px 24px 80px max(24px, calc((100% - 1140px) / 2)); padding: 20px 32px 30px; border: 1px solid color-mix(in srgb, var(--line) 75%, transparent); border-radius: 16px; background: color-mix(in srgb, var(--canvas) 94%, transparent); }
+.agent-guide-back { display: inline-flex; min-height: 44px; align-items: center; font-size: 12px; }
+.agent-guide-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 20px; padding: 14px 0 28px; }
+.agent-guide h1 { margin: 0; font: 400 clamp(30px, 4vw, 40px)/1.2 var(--font-display); letter-spacing: -.025em; }
+.agent-guide-tools { display: flex; gap: 16px; }
+.agent-guide-tools button { min-height: 44px; padding: 4px 0; border: 0; background: none; color: var(--poppy); font-size: 12px; cursor: pointer; text-decoration: underline; text-underline-offset: .25em; }
+.agent-guide-topics details { border-top: 1px solid var(--line); scroll-margin-top: 24px; }
+.agent-guide-topics details:last-child { border-bottom: 1px solid var(--line); }
+.agent-guide-topics summary { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 20px 0; cursor: pointer; list-style: none; }
+.agent-guide-topics summary::-webkit-details-marker { display: none; }
+.agent-guide-topics h2 { margin: 0; font: 650 16px/1.5 var(--font-sans); }
+.agent-guide-plus { position: relative; flex: 0 0 16px; width: 16px; height: 16px; color: var(--poppy); }
+.agent-guide-plus::before, .agent-guide-plus::after { content: ""; position: absolute; background: currentColor; }
+.agent-guide-plus::before { width: 14px; height: 1px; top: 7px; }
+.agent-guide-plus::after { width: 1px; height: 14px; left: 7px; }
+.agent-guide-topics details[open] .agent-guide-plus::after { display: none; }
+.agent-guide-body { padding: 0 0 24px; }
+.agent-guide-body p { margin: 0 0 16px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+.agent-guide-body p:last-child { margin-bottom: 0; }
+.agent-guide-examples { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 20px 0 12px; }
+.agent-guide-examples figure { min-width: 0; margin: 0; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.agent-guide-examples figcaption { padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--ink); font-size: 11px; font-weight: 650; }
+.agent-guide-examples pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; padding: 12px; margin: 0; color: var(--ink); }
+.agent-guide-body .agent-guide-caption { font-size: 12px; }
+.agent-guide > .hosted-footer { position: relative; z-index: 1; background: color-mix(in srgb, var(--canvas) 94%, transparent); }
+/* The scenery remains outside layout and the accessibility tree. Only compositor properties move. */
+.guide-scene { position: fixed; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; color: var(--ink); }
+.guide-scene-sky { position: absolute; width: 100%; height: 100%; inset: 0; }
+.guide-scene-art { position: absolute; width: min(60vw, 850px); height: auto; right: -8vw; top: 9vh; overflow: visible; }
+.guide-scene-green { color: var(--folio-border-strong); }
+.guide-scene-cherry, .guide-scene-notes, .guide-scene-orbit { color: var(--poppy); }
+.guide-scene-orbit { opacity: .6; }
+.guide-sky-halo { color: var(--poppy); opacity: .12; }
+.guide-sky-ribbons { color: var(--folio-border-strong); opacity: .28; animation: guide-ribbons 24s ease-in-out infinite; }
+.guide-sky-stars { color: var(--poppy); opacity: .5; animation: guide-stars 8s ease-in-out infinite; }
+.guide-sky-sheets { opacity: .45; animation: guide-float 12s ease-in-out infinite; }
+.guide-scene-pages { animation: guide-pages 8s ease-in-out infinite; transform-origin: 200px 180px; }
+.guide-scene-cat { animation: guide-breathe 6s ease-in-out infinite; }
+.guide-scene-tail { animation: guide-tail 5s ease-in-out infinite; transform-origin: 250px 230px; }
+.guide-scene-awake { transform-origin: 195px 158px; animation: guide-blink 7s linear infinite; }
+.guide-scene-sleep { opacity: 0; }
+.guide-scene-notes { opacity: .7; animation: guide-float 7s ease-in-out infinite; }
+.guide-scene[data-paused="true"] * { animation-play-state: paused !important; }
+@keyframes guide-ribbons { 0%, 100% { transform: translate(-24px, 24px); } 50% { transform: translate(30px, -24px); } }
+@keyframes guide-stars { 0%, 100% { opacity: .3; } 50% { opacity: .75; } }
+@keyframes guide-float { 0%, 100% { transform: translateY(8px); } 50% { transform: translateY(-18px); } }
+@keyframes guide-pages { 0%, 100% { transform: translateY(8px) rotate(-3deg); } 50% { transform: translateY(-18px) rotate(5deg); } }
+@keyframes guide-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes guide-tail { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(10deg); } }
+@keyframes guide-blink { 0%, 42%, 46%, 100% { transform: scaleY(1); } 44% { transform: scaleY(.05); } }
+@media (max-width: 1000px) { .guide-scene-art { width: 650px; right: -240px; top: 17vh; opacity: .65; } }
+@media (max-width: 700px) {
+  .agent-guide-header { padding: 16px; gap: 8px; flex-wrap: wrap; }
+  .agent-guide .agent-guide-brand { font-size: 21px; gap: 4px; }
+  .agent-guide-brand img { width: 32px; height: 32px; }
+  .agent-guide-preferences { gap: 0; }
+  .agent-guide-main { width: calc(100% - 32px); margin: 14px 16px 60px; padding: 16px 20px 24px; background: color-mix(in srgb, var(--canvas) 92%, transparent); }
+  .agent-guide-heading { padding-bottom: 20px; }
+  .agent-guide-examples { grid-template-columns: 1fr; }
+  .guide-scene-art { width: 650px; right: -300px; top: 18vh; opacity: .5; }
+}
+@media (max-width: 380px) { .agent-guide .agent-guide-brand { font-size: 19px; } }
+@media (prefers-reduced-motion: reduce) { .guide-scene * { animation: none !important; } }
+@media print { .guide-scene, .agent-guide-header, .agent-guide-tools, .agent-guide-back { display: none; } .agent-guide-main { width: 100%; margin: 0; padding: 0; border: 0; } }
