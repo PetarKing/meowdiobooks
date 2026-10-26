@@ -88,7 +88,6 @@ def test_detects_groups_with_exact_source_context_and_not_dialogue_identity_revi
         "repeated-matter",
         "page-number",
         "footnote",
-        "front-back-matter",
     } <= kinds
     assert not kinds & {"unknown-speaker", "alias", "dialogue", "attribution"}
     occurrence = _warning(workspace, "suspicious-extraction")["occurrences"][0]
@@ -101,11 +100,11 @@ def test_detects_groups_with_exact_source_context_and_not_dialogue_identity_revi
 
 
 def test_narrator_override_is_only_offered_when_it_changes_the_reader():
-    blocks = [{"id": "p1", "page": 1, "text": "Copyright 1865"}]
+    blocks = [{"id": "p1", "page": 1, "text": "[1] A historical garment."}]
     extraction, narration = _artifacts(blocks)
 
     narrator_warning = _warning(
-        build_review_workspace(extraction, narration), "front-back-matter"
+        build_review_workspace(extraction, narration), "footnote"
     )
 
     assert narrator_warning["readerState"] == "narrator"
@@ -118,14 +117,14 @@ def test_narrator_override_is_only_offered_when_it_changes_the_reader():
     dialogue_span = {
         **_span("p1", 0, len(blocks[0]["text"]), blocks[0]["text"]),
         "renderRole": "dialogue",
-        "sourceSpeakerLabel": "Copyright",
-        "resolvedSpeakerLabel": "Copyright",
+        "sourceSpeakerLabel": "Ada",
+        "resolvedSpeakerLabel": "Ada",
         "speakerStatus": "resolved",
     }
     _, dialogue = _artifacts(blocks, spans=[dialogue_span])
 
     assigned_warning = _warning(
-        build_review_workspace(extraction, dialogue), "front-back-matter"
+        build_review_workspace(extraction, dialogue), "footnote"
     )
 
     assert assigned_warning["readerState"] == "assigned-speaker"
@@ -142,7 +141,7 @@ def test_narrator_override_is_only_offered_when_it_changes_the_reader():
     _, mixed = _artifacts(blocks, spans=[mixed_dialogue, mixed_narration])
 
     mixed_warning = _warning(
-        build_review_workspace(extraction, mixed), "front-back-matter"
+        build_review_workspace(extraction, mixed), "footnote"
     )
 
     assert mixed_warning["readerState"] == "mixed"

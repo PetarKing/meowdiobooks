@@ -14,18 +14,14 @@
           "id": "b2",
           "page": 2,
           "text": "2\nThe story continues.\nFernMTLs 2"
-        }
-      ],
-      "expected": [
-        {
-          "kind": "page-number",
-          "source": "FernMTLs 1"
         },
         {
-          "kind": "page-number",
-          "source": "FernMTLs 2"
+          "id": "b3",
+          "page": 3,
+          "text": "2\nThe story continues.\nFernMTLs 3"
         }
-      ]
+      ],
+      "expected": []
     },
     {
       "id": "numbered-edition-offset",
@@ -39,18 +35,14 @@
           "id": "b2",
           "page": 2,
           "text": "More story.\nNorth Lantern Editions 20"
-        }
-      ],
-      "expected": [
-        {
-          "kind": "page-number",
-          "source": "North Lantern Editions 19"
         },
         {
-          "kind": "page-number",
-          "source": "North Lantern Editions 20"
+          "id": "b3",
+          "page": 3,
+          "text": "More story.\nNorth Lantern Editions 21"
         }
-      ]
+      ],
+      "expected": []
     },
     {
       "id": "attached-brand-digits",
@@ -64,18 +56,14 @@
           "id": "b2",
           "page": 2,
           "text": "More story.\nFernMTLs2"
-        }
-      ],
-      "expected": [
-        {
-          "kind": "page-number",
-          "source": "FernMTLs1"
         },
         {
-          "kind": "page-number",
-          "source": "FernMTLs2"
+          "id": "b3",
+          "page": 3,
+          "text": "More story.\nFernMTLs3"
         }
-      ]
+      ],
+      "expected": []
     },
     {
       "id": "publisher-inconsistent-offset",
@@ -250,12 +238,7 @@
           "text": "Machine Translated By:\nAda Reed\nBlueComet\n\nThe door opened."
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Machine Translated By:\nAda Reed\nBlueComet"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-stops-at-prose",
@@ -266,12 +249,7 @@
           "text": "Proofread By:\nAda Reed\nShe opened the door."
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Proofread By:\nAda Reed"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-stops-at-chapter",
@@ -282,12 +260,7 @@
           "text": "Proofread By:\nAda Reed\nChapter 2\nThe Garden"
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Proofread By:\nAda Reed"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-stops-at-scene",
@@ -298,12 +271,7 @@
           "text": "Art Sources:\nBlueComet\n※ ※ ※\nAda waited."
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Art Sources:\nBlueComet"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-multiple-headings",
@@ -314,16 +282,7 @@
           "text": "Translated By:\nAda Reed\nProofread By:\nBen Stone"
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Translated By:\nAda Reed"
-        },
-        {
-          "kind": "front-back-matter",
-          "source": "Proofread By:\nBen Stone"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "quoted-credit-is-story",
@@ -555,12 +514,7 @@
           "text": "The Garden"
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Proofread By:"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-stops-at-title",
@@ -571,12 +525,7 @@
           "text": "Proofread By:\nRiver\nThe Long Journey\nIt began that day."
         }
       ],
-      "expected": [
-        {
-          "kind": "front-back-matter",
-          "source": "Proofread By:\nRiver"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "press-is-prose",

@@ -89,6 +89,25 @@ Synthetic contract tests cover exact source preservation, default bracket dialog
 malformed responses, failed Review/retry, preview, acceptance, recording and reopen. UI tests cover
 option order, 150-item bulk decisions, manual overrides and nonblocking preserved passages.
 
+## Semantic text roles
+
+English words alone no longer create front/back-matter or production-credit warnings. A narrative
+sentence starting with “contents” stays spoken without a local editorial warning. Credits remain
+eligible for the existing contextual Decisions and Luna cleanup pass; missing optional credit
+suggestions is preferable to treating ordinary prose as removable metadata. Explicitly validated
+Luna `keep` results clear the preliminary Decisions flag. Uncertain results and invalid edits still
+produce source-review evidence; malformed transport responses retain the atomic failure behavior.
+
+Repeated numbered last lines use structural evidence: the same short label and a consistent offset
+between its folio and source page on at least three distinct pages. Label spelling and capitalization
+are not language gates. This evidence is passed to the existing model checks, with numeric target-relative ranges and
+page-count/offset metadata only; it never creates a deterministic warning. Narrative room numbers
+can have the same structure. A valid contextual repair proposal still requires user acceptance. The pure
+`review.numbered_edge_candidates` helper exposes exact ranges for candidate-recall evaluation.
+
+Chapter names and explicit note-section rules still contain language-specific vocabulary; this
+change does not claim to remove every English heuristic in the workflow.
+
 ## Runtime contract
 
 The configured Luna profile supplies the endpoint and credential variable. Local operators configure
