@@ -270,6 +270,27 @@ only be reused for an identical retry, and publication still remains atomic.
 
 The detailed artifact rules remain canonical in [PACKAGE_CONTRACT_V2.md](PACKAGE_CONTRACT_V2.md).
 
+
+The additive `render-plan.v2` timing recipe uses `timing.policy = semantic-boundaries-v1`
+and `segments[].boundaryBefore` (`kind`, `seconds`). It chooses one boundary per timeline slot:
+1.2 seconds after a chapter heading, 0.55 seconds at a paragraph, or the existing 0.24-second
+speaker/passage transition. Layered voices share that slot. Paragraph cuts come from accepted
+source ranges before narration coalescing: a blank run counts once; a sentence-complete line with
+an indent beyond the block's baseline can mark a paragraph; ordinary wraps and same-paragraph
+quote-attribution fragments do not. Confirmed chapter anchors identify headings. Legacy artifacts
+can also use a strict opening run of standalone short uppercase or labelled heading candidates for
+timing only; this fallback never creates a chapter or changes source text. Layout-ambiguous prose
+keeps the shorter timing. Consumers include the recipe and boundaries in generation fingerprints.
+
+Timed native rendering retains every sample above the recipe's 16/32768 edge threshold, plus
+10 ms margins, then applies 15 ms sine-squared fade-in and 40 ms fade-out, each capped at half a
+short clip. Inserted zero samples complete the requested gap after accounting for retained quiet;
+interior quiet and above-threshold tail bursts are preserved. An all-silent clip fails before audio
+publication. Internal ellipsis pauses retain 0.25 seconds; a terminal ellipsis and following semantic
+boundary use their maximum rather than adding two pauses. Existing receipts stay immutable and
+playable; legacy plans without timing retain their previous assembly. No background noise is added.
+
+
 ## Public extension boundary
 
 A separately maintained companion may depend on verified artifacts from an exact immutable GitHub

@@ -8,6 +8,8 @@ import re
 from typing import Any
 
 from .boundary_render import BoundaryRenderError, validate_boundary_repairs
+from .pacing import boundary_before, timing_policy
+from .source_pacing import entry_parts, source_boundaries
 from .voice_routing import narrator_route, speaker_labels
 
 
@@ -21,7 +23,7 @@ def compile_render_plan(
     recording_script: Mapping[str, Any],
     chapter_ids: Sequence[str],
 ) -> dict[str, Any]:
-    """Compile selected chapters without regexes, source reparsing, or model calls."""
+    """Compile accepted source-linked speech and pacing without model calls."""
 
     selected = list(chapter_ids)
     if not selected or len(selected) != len(set(selected)):
@@ -61,6 +63,8 @@ def compile_render_plan(
     omissions: list[dict[str, Any]] = []
     repaired_line_hyphenations = 0
     segment_number = 0
+    boundaries = source_boundaries(spans, recording_script)
+    pending_boundaries: dict[str, str] = {}
     for entry in entries:
         chapter_id = str(entry.get("chapterId") or "chapter-1")
         if chapter_id not in segments_by_chapter:
@@ -68,6 +72,10 @@ def compile_render_plan(
         kind = str(entry.get("kind", "source"))
         source_ids = [str(value) for value in entry.get("sourceSpanIds", [])]
         if kind == "omission":
+            for source_id in source_ids:
+                for _offset, boundary in boundaries.get(source_id, []):
+                    if pending_boundaries.get(chapter_id) != "chapter-heading":
+                        pending_boundaries[chapter_id] = boundary
             omissions.append(
                 {
                     "entryId": str(entry.get("id")),
@@ -78,11 +86,7 @@ def compile_render_plan(
             continue
         if kind != "source":
             raise RenderPlanError(f"Unsupported recording-script entry kind: {kind}")
-        text, line_hyphenations = _repair_line_break_hyphenation(
-            str(entry.get("text", "")), intact_words
-        )
-        repaired_line_hyphenations += line_hyphenations
-        if not text:
+        if not str(entry.get("text", "")):
             raise RenderPlanError(
                 f"Playable recording-script entry {entry.get('id')} has empty text"
             )
@@ -95,21 +99,30 @@ def compile_render_plan(
             )
         effective = _effective_voices(anchor, label_mapping, voices, cast)
         mix_group = f"mix:{entry.get('id')}" if len(effective) > 1 else None
-        for voice, fallback in effective:
-            segment_number += 1
-            segments_by_chapter[chapter_id].append(
-                _segment(
-                    segment_number,
-                    chapter_id,
-                    entry,
-                    text,
-                    render_role,
-                    voice,
-                    source_ids,
+        for part_index, (part, boundary) in enumerate(entry_parts(entry, source_spans, boundaries)):
+            if boundary is not None:
+                previous_boundary = pending_boundaries.get(chapter_id)
+                if previous_boundary != "chapter-heading":
+                    pending_boundaries[chapter_id] = boundary
+            if not part:
+                continue
+            text, line_hyphenations = _repair_line_break_hyphenation(part, intact_words)
+            repaired_line_hyphenations += line_hyphenations
+            speakable = any(character.isalnum() for character in text)
+            kind = pending_boundaries.get(chapter_id, "turn")
+            if not segments_by_chapter[chapter_id]:
+                kind = "start"
+            for voice, fallback in effective:
+                segment_number += 1
+                segment = _segment(
+                    segment_number, chapter_id, entry, text, render_role, voice, source_ids,
                     fallback=fallback,
-                    mix_group=mix_group,
+                    mix_group=f"{mix_group}:{part_index}" if mix_group else None,
                 )
-            )
+                segment["boundaryBefore"] = boundary_before(kind)
+                segments_by_chapter[chapter_id].append(segment)
+            if speakable:
+                pending_boundaries.pop(chapter_id, None)
 
     compiled_chapters = []
     omitted_chapter_ids = []
@@ -129,6 +142,7 @@ def compile_render_plan(
         raise RenderPlanError("Selected chapters contain no playable text in the recording script")
     return {
         "contract": "meowdiobooks.render-plan.v2",
+        "timing": timing_policy(),
         "inputRevisions": {
             "dialogue": dialogue_revision,
             "review": inputs.get("review"),
@@ -421,6 +435,7 @@ def _safe_narration_pair(
     )
     return (
         source_contiguous
+        and right.get("boundaryBefore", {}).get("kind") not in {"paragraph", "chapter-heading"}
         and left.get("renderRole") == right.get("renderRole") == "narration"
         and left.get("effectiveCharacterId") == right.get("effectiveCharacterId")
         and left.get("voiceRevision") == right.get("voiceRevision")

@@ -155,6 +155,7 @@ def _chapter_recipes(
             str(chapter["chapterId"]): {
                 "voiceModel": cast.get("voiceModel"),
                 "language": cast.get("language"),
+                "timing": plan.get("timing"),
                 "segments": _segment_recipe(chapter["segments"]),
             }
             for chapter in plan["chapters"]
@@ -185,6 +186,7 @@ def _segment_recipe(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         "referenceText",
                         "referenceMode",
                         "voiceSettings",
+                        "boundaryBefore",
                     )
                 },
                 "mixGroup": group,

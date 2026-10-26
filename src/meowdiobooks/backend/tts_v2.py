@@ -21,6 +21,7 @@ from meowdiobooks.util import write_json
 from .audio import QWEN_GENERATION_ATTEMPTS, mix_audio_tracks
 from .model_config import asset_path, load_model_registry
 from .native_runtime import NativeModelLoader, load_native_model
+from .pacing import boundary_before_seconds, prepare_speech_audio
 
 
 class TTSContractError(ValueError):
@@ -93,6 +94,9 @@ def render_plan_audio(
             (staging / "segments").mkdir(parents=True)
             piece_paths: list[Path] = []
             metadata: list[dict[str, Any]] = []
+            piece_boundaries: list[float] = []
+            previous_ellipsis_pause = 0.0
+            previous_tail = 0.0
             try:
                 for index, unit in enumerate(render_units, 1):
                     segment = dict(unit[0])
@@ -120,17 +124,28 @@ def render_plan_audio(
                     recoveries: list[dict[str, Any]] = []
                     rendered = [
                         _synthesize(model, text, member, package, language, recoveries=recoveries,
-                                    target_characters=target_characters)
+                                    target_characters=target_characters,
+                                    terminal_pause=plan.get("timing") is None)
                         for member in unit
                     ]
                     audio = mix_audio_tracks(rendered) if len(rendered) > 1 else rendered[0]
+                    lead = tail = 0.0
+                    if plan.get("timing") is not None:
+                        audio, lead, tail = prepare_speech_audio(audio, sample_rate, plan["timing"])
                     path = staging / "segments" / f"{index:05d}.wav"
                     wavfile.write(path, sample_rate, audio)
                     piece_paths.append(path)
+                    target_gap = max(boundary_before_seconds(segment), previous_ellipsis_pause)
+                    piece_boundaries.append(max(0.0, target_gap - previous_tail - lead))
+                    previous_tail = tail
+                    previous_ellipsis_pause = _pause_after(text) if plan.get("timing") else 0.0
                     metadata_row = {
                         **segment,
                         "index": index,
                         "file": str(path.relative_to(staging)),
+                        **({"edgeQuietSeconds": {"leading": lead, "trailing": tail},
+                            "insertedGapBeforeSeconds": piece_boundaries[-1] if len(piece_paths) > 1 else 0.0}
+                           if plan.get("timing") else {}),
                         "synthesisUnits": [
                             {"text": unit, "pauseAfterSeconds": _pause_after(unit)}
                             for unit in _synthesis_units(text, target_characters=target_characters)
@@ -162,6 +177,7 @@ def render_plan_audio(
                     staging / "chapter.wav",
                     piece_paths,
                     sample_rate,
+                    boundary_gaps=piece_boundaries[1:],
                 )
                 receipt = {
                     "contract": "meowdiobooks.chapter-audio.v2",
@@ -169,6 +185,7 @@ def render_plan_audio(
                     "chapterId": chapter_id,
                     "revision": revision,
                     "inputRevisions": dict(plan.get("inputRevisions", {})),
+                    **({"timing": dict(plan["timing"])} if plan.get("timing") else {}),
                     "sampleRate": sample_rate,
                     "audioSeconds": assembled_samples / sample_rate,
                     "segments": metadata,
@@ -217,6 +234,7 @@ def _assemble_chapter_wav(
     sample_rate: int,
     *,
     gap_seconds: float = _CHAPTER_GAP_SECONDS,
+    boundary_gaps: Sequence[float] | None = None,
 ) -> int:
     """Assemble float32 mono segments without retaining chapter audio in memory."""
 
@@ -226,10 +244,16 @@ def _assemble_chapter_wav(
     if gap_samples < 0:
         raise TTSContractError("Chapter audio gap cannot be negative")
 
-    lengths = [_segment_length(path, sample_rate) for path in segment_paths]
-    total_samples = (
-        sum(lengths) + gap_samples * (len(lengths) - 1) if lengths else gap_samples
+    gaps = list(boundary_gaps) if boundary_gaps is not None else [gap_seconds] * max(
+        len(segment_paths) - 1, 0,
     )
+    if len(gaps) != max(len(segment_paths) - 1, 0):
+        raise TTSContractError("Chapter boundaries must match adjacent segment pairs")
+    gap_lengths = [round(sample_rate * boundary_before_seconds(
+        {"boundaryBefore": {"kind": "turn", "seconds": gap}}
+    )) for gap in gaps]
+    lengths = [_segment_length(path, sample_rate) for path in segment_paths]
+    total_samples = sum(lengths) + sum(gap_lengths) if lengths else gap_samples
     silence = b"\0" * (gap_samples * np.dtype("<f4").itemsize)
 
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -240,7 +264,7 @@ def _assemble_chapter_wav(
         for index, path in enumerate(segment_paths):
             _copy_segment_samples(handle, path, sample_rate, lengths[index])
             if index + 1 < len(segment_paths):
-                handle.write(silence)
+                handle.write(b"\0" * (gap_lengths[index] * np.dtype("<f4").itemsize))
     return total_samples
 
 
@@ -366,6 +390,7 @@ def _synthesize(
     *,
     recoveries: list[dict[str, Any]] | None = None,
     target_characters: int = _SYNTHESIS_TARGET_CHARACTERS,
+    terminal_pause: bool = True,
 ) -> np.ndarray:
     reference = Path(str(segment.get("referenceAudio", "")))
     if not reference.is_absolute():
@@ -454,7 +479,8 @@ def _synthesize(
                     f"No audio for segment {segment.get('id')} unit {unit_index}: "
                     + "; ".join(errors)
                 )
-        if pause := _pause_after(unit):
+        pause = _pause_after(unit) if terminal_pause or unit_index < len(units) else 0.0
+        if pause:
             rendered.append(np.zeros(int(model.sample_rate * pause), dtype=np.float32))
     if not rendered:
         raise TTSContractError(f"Render segment {segment.get('id')} produced no audio")
