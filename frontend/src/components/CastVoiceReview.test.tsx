@@ -99,7 +99,7 @@ describe("CastVoiceReview", () => {
   it("uses the current-book profile for a new audition after accepting a prior-book voice", () => {
     const regenerate = vi.fn();
     const voice = cast.identities![1];
-    const currentProfile = { ...voice.voiceSettings!, tone: "gentle", description: "Current book profile." };
+    const currentProfile = { ...voice.voiceSettings!, tone: "gentle" as const, description: "Current book profile." };
     const inherited: CastArtifact = { ...cast, identities: [{ ...voice,
       voiceProfileSettings: currentProfile, voiceAccepted: true, acceptedVoiceRevision: "prior",
       voicePreviewRevision: "prior", voiceCandidates: [{ ...voice.voiceCandidates![0],
