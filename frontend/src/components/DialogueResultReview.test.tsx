@@ -231,9 +231,9 @@ describe('required dialogue review', () => {
     expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Hatter']);
     fireEvent.change(screen.getByRole('combobox'), { target: { value: 'Hat' } });
     expect(screen.getAllByRole('option').map(option => option.textContent)).toEqual(['Hatter', 'Hat']);
-    fireEvent.click(screen.getByRole('option', { name: 'Hat', exact: true }));
+    fireEvent.click(screen.getByRole('option', { name: 'Hat' }));
     fireEvent.click(screen.getByRole('button', { name: 'Previous' }));
-    expect(screen.getByRole('button', { name: 'Choose Hat', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Choose Hat' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
   });
 
