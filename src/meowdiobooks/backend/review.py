@@ -175,6 +175,53 @@ def preview_bulk_decision(
     }
 
 
+def _validate_pattern_groups(result, candidates, spans):
+    """Bind family verdicts and individual vetoes to their exact source window identities."""
+    from .cleanup_patterns import pattern_verdict, representative_windows
+
+    grouped = result.get("patternGroups", [])
+    evidence = [row for row in result.get("windows", []) if row.get("patternGroupId")]
+    by_window = {f"{row['blockId']}:{row['sourceStart']}-{row['sourceEnd']}": row
+                 for row in candidates.values()}
+    if (len({row.get("patternGroupId") for row in grouped}) != len(grouped)
+            or len({row.get("windowId") for row in evidence}) != len(evidence)
+            or {row.get("patternGroupId") for row in evidence} != {row.get("patternGroupId") for row in grouped}):
+        raise ReviewContractError("Pattern evidence must have unique complete group and window identities")
+    for group in grouped:
+        members = [row for row in evidence if row["patternGroupId"] == group["patternGroupId"]]
+        eligible = []
+        for member in members:
+            candidate = by_window.get(member.get("windowId"))
+            answers = member.get("answers", {})
+            if (candidate is None or candidate["patternGroupId"] != group["patternGroupId"]
+                    or member.get("patternVerdict") != group.get("verdict")
+                    or set(answers) != {"production", "word_damage"}
+                    or any(value not in {"clean", "review", "uncertain"} for value in answers.values())
+                    or not any(str(span.get("blockId")) == candidate["blockId"]
+                               and span.get("renderRole") == "narration"
+                               and span.get("spokenStart", span.get("sourceStart", 0)) <= candidate["sourceStart"]
+                               and candidate["sourceEnd"] <= span.get("spokenEnd", span.get("sourceEnd", 0))
+                               for span in spans)):
+                raise ReviewContractError("Pattern evidence must match exact narrator source windows")
+            expected_status = ("eligible" if answers["production"] == "review" else "vetoed") if answers["word_damage"] == "clean" else None
+            if member.get("patternStatus") != expected_status:
+                raise ReviewContractError("Pattern eligibility disagrees with its contextual assessment")
+            if expected_status == "eligible":
+                eligible.append(member)
+        representatives = representative_windows(eligible)
+        if (type(group.get("candidateCount")) is not int or group["candidateCount"] != len(members)
+                or type(group.get("eligibleCount")) is not int or group["eligibleCount"] != len(eligible)
+                or group.get("eligibleWindowIds") != [row["windowId"] for row in eligible]
+                or group.get("representativeWindowIds") != [row["windowId"] for row in representatives]
+                or group.get("vetoes") != [{"windowId": row["windowId"], "answers": row["answers"]}
+                                          for row in members if row not in eligible]):
+            raise ReviewContractError("Pattern counts and representatives must match individual assessments")
+        verdict = "insufficient" if len(eligible) < 3 else pattern_verdict(group.get("verification"), representatives)[0]
+        if group.get("verdict") != verdict:
+            raise ReviewContractError("Pattern verdict must match its complete representative verification")
+    return {"groups": deepcopy(grouped), "windows": deepcopy(evidence)}
+
+
 def add_cleanup_proposals(
     workspace: Mapping[str, Any], extraction: Mapping[str, Any],
     dialogue: Mapping[str, Any], result: Mapping[str, Any],
@@ -186,6 +233,7 @@ def add_cleanup_proposals(
     rows = []
     pattern_candidates = {(row["blockId"], row["sourceStart"], row["sourceEnd"]): row
                           for row in numbered_edge_candidates(blocks)}
+    pattern_evidence = _validate_pattern_groups(result, pattern_candidates, dialogue.get("spans", []))
     for proposal in result.get("occurrences", []):
         block = index.get(str(proposal.get("blockId", "")))
         start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
@@ -226,6 +274,9 @@ def add_cleanup_proposals(
             evidence = next((window for window in result.get("windows", [])
                              if window.get("windowId") == proposal.get("windowId")), None)
             if (candidate is None or group is None or evidence is None
+                    or proposal.get("windowId") != f"{block['id']}:{start}-{end}"
+                    or evidence.get("patternGroupId") != candidate["patternGroupId"]
+                    or evidence.get("patternVerdict") != "verified"
                     or group.get("verdict") != "verified"
                     or proposal.get("windowId") not in group.get("eligibleWindowIds", [])
                     or evidence.get("patternStatus") != "eligible"
@@ -305,6 +356,7 @@ def add_cleanup_proposals(
     warnings.extend(_group_occurrences([*cue_rows, *novel], dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
             "cleanupSummary": dict(result.get("summary", {})),
+            "cleanupPatternEvidence": pattern_evidence,
             "scriptDirectionsSummary": dict(result.get("scriptDirections", {}).get("summary", {})),
             "summary": {**workspace["summary"], "groups": len(warnings),
                         "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
@@ -516,6 +568,7 @@ def accept_review_revision(
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
         "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
+        "cleanupPatternEvidence": deepcopy(workspace.get("cleanupPatternEvidence", {"groups": [], "windows": []})),
         "scriptDirectionsSummary": dict(workspace.get("scriptDirectionsSummary", {})),
         "decisions": ordered,
         "consequencePreview": _aggregate_consequences(ordered),

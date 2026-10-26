@@ -82,6 +82,11 @@ def test_large_family_needs_one_verifier_and_keeps_distinct_source_choices(monke
     assert all("青空文庫" not in r["text"] for i, r in enumerate(rendered["spans"]) if i != 2)
     assert "".join(r["source"] for r in rendered["spans"]) == "".join(b["text"] for b in extraction["blocks"])
     assert (extraction, dialogue) == original
+    evidence = accepted["cleanupPatternEvidence"]
+    assert evidence == workspace["cleanupPatternEvidence"]
+    assert evidence["groups"] == result["patternGroups"]
+    assert len(evidence["windows"]) == 30  # Unrelated body scan is not duplicated.
+    assert all(row.get("patternGroupId") for row in evidence["windows"])
     preview = preview_review_transcript_page(extraction, dialogue, workspace, [], page=1,
         occurrence_policies=[{"occurrenceId": r["occurrenceIds"][0], "action": r["action"]} for r in decisions])
     assert preview["spans"][0]["text"] == rendered["spans"][0]["text"].strip()
@@ -140,5 +145,52 @@ def test_invalid_group_authority_cannot_be_attached_to_proposals(monkeypatch):
     extraction, dialogue = artifacts()
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
     result["occurrences"][0]["patternGroupId"] = "forged"
-    with pytest.raises(ReviewContractError, match="exact verified"):
+    with pytest.raises(ReviewContractError, match="Pattern"):
+        add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+
+
+def test_vetoed_anchor_cannot_borrow_a_neighbors_eligible_window_evidence(monkeypatch):
+    mocks(monkeypatch, veto="青空文庫 9")
+    extraction, dialogue = artifacts()
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    borrowed = dict(result["occurrences"][0])
+    target = next(row for row in numbered_edge_candidates(extraction["blocks"]) if row["source"] == "青空文庫 9")
+    borrowed.update({key: target[key] for key in ("blockId", "sourceStart", "sourceEnd", "source")})
+    result["occurrences"] = [borrowed]
+    with pytest.raises(ReviewContractError, match="Pattern"):
+        add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+
+
+@pytest.mark.parametrize("field,value", [("patternGroupId", "other"), ("patternVerdict", "uncertain")])
+def test_occurrence_evidence_must_agree_with_its_verified_group(monkeypatch, field, value):
+    mocks(monkeypatch)
+    extraction, dialogue = artifacts()
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    proposal = result["occurrences"][0]
+    evidence = next(row for row in result["windows"] if row["windowId"] == proposal["windowId"])
+    evidence[field] = value
+    with pytest.raises(ReviewContractError, match="Pattern"):
+        add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+
+
+@pytest.mark.parametrize("mutation", ["count", "members", "representatives", "verdict", "partial_verification", "duplicate_window"])
+def test_group_evidence_counts_representatives_and_verdict_are_revalidated(monkeypatch, mutation):
+    mocks(monkeypatch)
+    extraction, dialogue = artifacts()
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    group = result["patternGroups"][0]
+    if mutation == "count":
+        group["eligibleCount"] += 1
+    elif mutation == "members":
+        group["eligibleWindowIds"] = group["eligibleWindowIds"][:-1]
+    elif mutation == "representatives":
+        group["representativeWindowIds"][1] = group["representativeWindowIds"][0]
+    elif mutation == "verdict":
+        group["verification"]["assessments"][0]["role"] = "PRESERVE"
+    elif mutation == "partial_verification":
+        group["verification"]["assessments"].pop()
+    else:
+        row = next(row for row in result["windows"] if row.get("patternGroupId"))
+        result["windows"].append(deepcopy(row))
+    with pytest.raises(ReviewContractError, match="Pattern"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
