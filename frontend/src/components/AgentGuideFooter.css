@@ -1,0 +1,2 @@
+.agent-guide-footer { padding: 20px; text-align: center; background: var(--canvas); }
+.agent-guide-footer a { display: inline-flex; min-height: 44px; align-items: center; color: var(--muted); font-size: 12px; text-underline-offset: .25em; }

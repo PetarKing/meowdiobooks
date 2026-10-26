@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "index-BBJsuqp5.css": {
+      "bytes": 382497,
+      "gzip": 62128
+    },
+    "index-yZGyhZWc.js": {
+      "bytes": 649256,
+      "gzip": 199719
+    }
+  },
+  "guide": {
+    "index-DV3qLD01.js": {
+      "bytes": 649959,
+      "gzip": 199961
+    },
+    "index-LcbM2LW7.css": {
+      "bytes": 382712,
+      "gzip": 62179
+    },
+    "AgentGuide-OKzu9M2I.js": {
+      "bytes": 16976,
+      "gzip": 6859
+    },
+    "AgentGuide-CXinVkSg.css": {
+      "bytes": 6176,
+      "gzip": 1891
+    }
+  }
+}

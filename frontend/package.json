@@ -1,7 +1,7 @@
 {
   "name": "meowdiobooks-workflow-ui",
   "private": true,
-  "version": "0.1.74",
+  "version": "0.1.75",
   "type": "module",
   "files": [
     "src",
@@ -18,7 +18,8 @@
     "./styles.css": "./src/styles.css",
     "./media.css": "./src/media.css",
     "./product.css": "./src/styles/product.css",
-    "./ui": "./src/ui.ts"
+    "./ui": "./src/ui.ts",
+    "./agent-guide": "./src/agent-guide.ts"
   },
   "scripts": {
     "dev": "vite",
