@@ -85,3 +85,32 @@ dither-engine console errors. Screenshots are under `assets/review/cat-companion
 
 This is a local visual comparison, not a release or deployment. Bundle size and the frame-rate cap
 are observations; no frame-time or power-use benchmark is claimed.
+
+## Custom atmosphere refinement and empty Library
+
+The user selected the custom SVG direction; it is now the default. The dithercn comparison remains
+available at its explicit URL. Upper contours have tapered spacing, a fading green-to-pink stroke,
+and a broader, gently rotating 22-second drift. The dark book shelf uses a 72% canvas wash; the
+light shelf uses a 32% soft-surface wash. Light Choose book is a modest paper/soft-surface blend.
+The light book cards retain their existing opaque paper background.
+
+The empty Library now uses the Home proportions: a small Your audiobooks label, one heading,
+one existing explanatory sentence, and the existing create action beside the larger reading cat.
+There is no additional top heading or pause control. The shared SVG atmosphere supplies wind/water,
+petals, notes and sparkles across the viewport. Its styles load with the lazy SVG, so direct Library
+entry also animates correctly. Populated Library keeps the small, still cat and no ambient layer.
+The reusable core UI owns these changes; no hosted policy or Cloud-only overrides are involved.
+
+Direct review: [Home](http://127.0.0.1:5213/studio.html?cat=hybrid) and
+[empty Library](http://127.0.0.1:5213/studio.html?cat=hybrid&scenario=library-empty).
+The synthetic preview now accepts a validated scenario query for these review links.
+
+Validation: production build, lint (two existing Fast Refresh warnings), 209 guide/App tests, and
+Storybook/preview types passed. Three existing empty-Library navigation assertions and the preview
+scenario now target its single empty-state heading. Browser review covered 1280×720 and 1920×1080,
+light/dark, 390px phone flow with no horizontal overflow, and the quiet populated Library. Empty
+Library and one-book Home fit the desktop footer. Sampled wind transforms changed during review;
+no browser console errors were captured. Hidden-tab and reduced-motion CSS handling remain.
+The shared lazy atmosphere is 1.54 KB gzip plus 0.67 KB CSS in this build; no new runtime dependency.
+Screenshots are retained in `assets/review/cat-companion/refinement/`. This remains a local,
+unmerged visual experiment.

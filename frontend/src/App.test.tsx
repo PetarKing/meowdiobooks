@@ -1152,7 +1152,7 @@ describe('v2 wizard', () => {
     ], { title: 'Alice — Audiobook', author: 'Lewis Carroll', description: 'A personal recording of Alice.', cover: undefined, coverPage: 1, preset: 'm4b-compact' }))
     expect(wizardApi.createM4bExport).not.toHaveBeenCalled()
     expect(wizardApi.exportM4b).not.toHaveBeenCalled()
-    expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No audiobooks yet.' })).toBeInTheDocument()
   })
 
   it('keeps single-page, single-chapter Export concise while retaining selection', async () => {
@@ -4492,7 +4492,7 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Wizard stages' })).not.toBeInTheDocument())
     expect(wizardApi.getJob).not.toHaveBeenCalled()
     expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
-    if (destination === 'library') expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
+    if (destination === 'library') expect(await screen.findByRole('heading', { name: 'No audiobooks yet.' })).toBeInTheDocument()
     else expect(await screen.findByRole('button', { name: /Alice.*Continue/ })).toBeInTheDocument()
   })
 
@@ -4616,7 +4616,7 @@ describe('v2 wizard', () => {
     persistWorkflowReturn('book-1', 'generate', { activeJobId: 'saved-job' })
     window.history.replaceState({}, '', '/library')
     render(<App />)
-    expect(await screen.findByRole('heading', { name: 'Your audiobooks' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'No audiobooks yet.' })).toBeInTheDocument()
     expect(wizardApi.getBookSnapshot).not.toHaveBeenCalled()
     expect(wizardApi.getJob).not.toHaveBeenCalled()
     expect(window.location.pathname).toBe('/library')

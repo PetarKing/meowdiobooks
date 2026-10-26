@@ -27,13 +27,34 @@
 .reading-cat-companion--library .guide-scene-green { opacity: .25; }
 .reading-cat-companion--library .guide-scene-awake { display: none; }
 .reading-cat-companion--library .guide-scene-sleep { opacity: 1; }
-.reading-cat-companion--empty { max-width: 500px; }
+.reading-cat-companion--empty { width: 100%; max-width: 720px; isolation: auto; }
+.reading-cat-companion--empty .reading-cat-companion-art { position: relative; }
+.app-shell:has(.library-atmosphere) { position: relative; isolation: isolate; overflow: clip; }
+.app-shell:has(.library-atmosphere) .topbar { background: color-mix(in srgb, var(--canvas) 88%, transparent); }
+.library-atmosphere { position: fixed; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; }
+.app-shell .workspace main:has(.library-page--empty) { max-width: 1920px; padding: 0; }
+.app-shell .workspace .library-page--empty { max-width: 1920px; padding: 24px clamp(28px,5vw,112px); }
+.library-page--empty .library-empty-composition { grid-template-columns: minmax(0,.85fr) minmax(0,1.2fr); gap: clamp(28px,4vw,80px); min-height: min(68vh,780px); margin: 0; }
+.library-page--empty .library-empty-copy { display: flex; flex-direction: column; align-items: flex-start; padding: 28px 0; }
+.library-page--empty .library-empty-copy h1 { font-size: clamp(54px,4.7vw,88px); font-family: var(--font-display); font-weight: 500; line-height: 1.06; letter-spacing: -.045em; margin: 22px 0; max-width: 650px; }
+.library-page--empty .library-empty-copy p { font-size: 16px; line-height: 1.7; max-width: 350px; margin: 0 0 28px; color: var(--muted); }
+.local-studio:has(.library-page--empty) { min-height: 100dvh; display: flex; flex-direction: column; }
+.local-studio > .app-shell:has(.library-page--empty) { min-height: 0; flex: 1; }
+:is(.local-studio,.preview-product):has(.library-page--empty) > .agent-guide-footer { padding: 6px 20px; }
+@media (min-width: 701px) and (max-height: 850px) { .library-page--empty .library-empty-composition { min-height: min(62vh,600px); }.reading-cat-companion--empty { max-width: 520px; margin: auto; } }
+@media (max-width: 1000px) and (min-width: 701px) { .library-page--empty .library-empty-copy h1 { font-size: 52px; } }
+
 @keyframes companion-pages { 0%, 100% { transform: translateY(5px) rotate(-2deg); } 50% { transform: translateY(-10px) rotate(3deg); } }
 @keyframes companion-breathe { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes companion-tail { 0%, 100% { transform: rotate(-4deg); } 50% { transform: rotate(8deg); } }
 @keyframes companion-blink { 0%, 42%, 46%, 100% { transform: scaleY(1); } 44% { transform: scaleY(.05); } }
 @keyframes companion-float { 0%, 100% { transform: translateY(5px); } 50% { transform: translateY(-10px); } }
 @media (max-width: 700px) {
+  .app-shell .workspace .library-page--empty { padding: 28px 20px; }
+  .library-page--empty .library-empty-composition { grid-template-columns: minmax(0,1fr); gap: 16px; min-height: 0; }
+  .library-page--empty .library-empty-copy { padding: 0; }
+  .library-page--empty .library-empty-copy h1 { font-size: clamp(39px,10vw,49px); margin: 18px 0; }
+  .library-page--empty .library-empty-copy p { font-size: 14px; margin-bottom: 20px; }
   .reading-cat-companion--empty { width: min(100%, 360px); margin: auto; }
   .reading-cat-companion--library { width: 90px; flex-basis: 90px; margin: -8px -2px -4px -12px; }
   .library-head:has(.reading-cat-companion--library) { gap: 14px; flex-wrap: wrap; }

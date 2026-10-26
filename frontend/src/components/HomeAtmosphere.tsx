@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import './HomeAtmosphere.css';
 
 /** Bounded SVG layers: distant haze, wind contours, then a few nearby petals and notes. */
 export function HomeAtmosphere({ waves = true }: { waves?: boolean }) {
@@ -6,6 +7,7 @@ export function HomeAtmosphere({ waves = true }: { waves?: boolean }) {
   return <svg className="home-atmosphere" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" fill="none" focusable="false">
     <defs>
       <linearGradient id={`${id}-wind`} x1="0" y1="500" x2="1920" y2="800" gradientUnits="userSpaceOnUse"><stop stopColor="var(--folio-border-strong)" stopOpacity=".15" /><stop offset=".42" stopColor="var(--folio-border-strong)" stopOpacity=".7" /><stop offset="1" stopColor="var(--poppy)" stopOpacity=".45" /></linearGradient>
+      <linearGradient id={`${id}-breeze`} x1="0" y1="300" x2="1920" y2="300" gradientUnits="userSpaceOnUse"><stop stopColor="var(--folio-border-strong)" stopOpacity="0" /><stop offset=".22" stopColor="var(--folio-border-strong)" stopOpacity=".55" /><stop offset=".56" stopColor="var(--folio-border-strong)" stopOpacity=".85" /><stop offset=".83" stopColor="var(--poppy)" stopOpacity=".42" /><stop offset="1" stopColor="var(--poppy)" stopOpacity="0" /></linearGradient>
       <path id={`${id}-petal`} d="M0 0C-9-15-20-3-13 7c3 5 9 7 13 8C8 7 11-6 0 0Z" />
       <g id={`${id}-flower`}>{[0,72,144,216,288].map(angle=><path key={angle} transform={`rotate(${angle})`} d="M0 0C-10-7-13-18-6-22l6 4 6-4C13-18 10-7 0 0Z" />)}<circle r="3" fill="var(--paper)" /></g>
       <g id={`${id}-note`} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 22V2l19-4v20M4 7l19-4" /><ellipse cx="0" cy="23" rx="5" ry="3.5" fill="currentColor" stroke="none" /><ellipse cx="19" cy="19" rx="5" ry="3.5" fill="currentColor" stroke="none" /></g>
@@ -17,8 +19,8 @@ export function HomeAtmosphere({ waves = true }: { waves?: boolean }) {
       <g transform="translate(1120 910) scale(1.6)"><use href={`#${id}-note`} className="hybrid-float-slow" /></g>
     </g>
     {waves && <><g className="hybrid-water-wash"><path d="M-200 920Q160 690 640 910T1400 850T2100 750V1180H-200Z" fill="var(--matcha-soft)" /></g>
-    <g className="hybrid-wind hybrid-wind-far" stroke={`url(#${id}-wind)`} strokeWidth="1.1">
-      {Array.from({length:12},(_,i)=><path key={i} d={`M-160 ${400+i*11}C150 ${130+i*13} 440 ${740+i*4} 840 ${500+i*10}S1460 ${50+i*20} 2080 ${340+i*9}`} />)}
+    <g className="hybrid-wind hybrid-wind-far" stroke={`url(#${id}-breeze)`} strokeWidth="1.05" strokeLinecap="round">
+      {[0,6,14,23,33,44,57,71,86,104,124].map((offset,i)=><path key={offset} opacity={.3+.65*Math.sin(Math.PI*i/10)} d={`M-180 ${340+offset*.35}C150 ${110+offset*.8} 450 ${650+offset*.3} 860 ${420+offset*.7}S1460 ${90+offset*.8} 2080 ${270+offset*.3}`} />)}
     </g>
     <g className="hybrid-wind hybrid-wind-near" stroke={`url(#${id}-wind)`} strokeWidth="1.2">
       {Array.from({length:14},(_,i)=><path key={i} d={`M-150 ${970+i*9}C300 ${610+i*13} 610 ${1140+i*4} 1050 ${880+i*10}S1550 ${690+i*9} 2100 ${780+i*13}`} />)}

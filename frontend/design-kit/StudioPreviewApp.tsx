@@ -8,8 +8,8 @@ import { useAppearance } from "../src/app/useAppearance";
 import { AgentGuideFooter } from "../src/components/AgentGuideFooter";
 
 const directions = [
-  { id: 'hybrid-dithercn', label: 'dithercn' },
   { id: 'hybrid', label: 'Custom SVG' },
+  { id: 'hybrid-dithercn', label: 'dithercn' },
 ] as const;
 const previousDirections = [
   { id: 'wide-sky', label: '01 · Wide sky' },
@@ -26,12 +26,12 @@ export function StudioPreviewApp() {
   const { appearance, resolvedAppearance, setAppearance } = useAppearance();
   const queryAppearance = new URLSearchParams(window.location.search).get('appearance');
   const forcedAppearance = queryAppearance === 'light' || queryAppearance === 'dark' ? queryAppearance : undefined;
-  const [scenario, setScenario] = useState<ScenarioId>(() => { resetPreviewLocation(); return "home"; });
+  const [scenario, setScenario] = useState<ScenarioId>(() => { resetPreviewLocation(); const selected = new URLSearchParams(window.location.search).get("scenario"); return scenarios.find(item => item.id === selected)?.id ?? "home"; });
   const [ready, setReady] = useState(false);
   const [failure, setFailure] = useState("");
   const [direction, setDirection] = useState<HomeSceneDirection>(() => {
     const selected = new URLSearchParams(window.location.search).get('cat');
-    return [...directions, ...previousDirections].find(item => item.id === selected)?.id ?? 'hybrid-dithercn';
+    return [...directions, ...previousDirections].find(item => item.id === selected)?.id ?? 'hybrid';
   });
   const frame = useRef<HTMLDivElement>(null);
   useEffect(() => {

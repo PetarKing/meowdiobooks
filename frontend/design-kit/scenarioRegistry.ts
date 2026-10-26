@@ -361,7 +361,7 @@ const baselineScenarioMetadata = {
     dialogueFixture: "standard",
     castingPreviewAvailable: false,
     gatewayVariant: "default",
-    story: { surface: "library", actions: [], heading: "Your audiobooks" },
+    story: { surface: "library", actions: [], heading: "No audiobooks yet." },
   },
   "library-loading": {
     label: "Library · loading",
