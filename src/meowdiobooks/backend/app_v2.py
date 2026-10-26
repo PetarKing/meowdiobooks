@@ -60,7 +60,8 @@ from .cast import (
 from .voice_reuse import (
     CastVoiceReuse,
     validated_imported_voices,
-    prepend_previous_voice,
+    inherited_voice,
+    latest_approved_cast,
     validate_source_book_ids,
     validate_cast_proposal_inputs,
 )
@@ -583,6 +584,7 @@ def create_app_v2(
         path, artifact = write_artifact(package, "cast", payload, publish=False)
         keep = set(cast_voice_revisions(artifact))
         keep.update(cast_voice_revisions(previous))
+        keep.update(cast_voice_revisions(latest_approved_cast(package) or {}))
         try:
             keep.update(cast_voice_revisions(read_artifact(package, "cast")))
         except ValueError:
@@ -784,6 +786,7 @@ def create_app_v2(
         package = package_for(command.book_id)
         history = artifact_history(package, "cast")
         keep = set(cast_voice_revisions(history[-1] if history else {}))
+        keep.update(cast_voice_revisions(latest_approved_cast(package) or {}))
         try:
             keep.update(cast_voice_revisions(read_artifact(package, "cast")))
         except ValueError:
@@ -951,6 +954,7 @@ def create_app_v2(
                     "voiceCandidates": _voice_candidates_for(target),
                     "voiceSettings": validate_voice_settings(
                         settings.get("voiceSettings")
+                        or target.get("voiceProfileSettings")
                         or target.get("voiceSettings")
                         or {
                             **default_voice_settings(str(target.get("category", "character"))),
@@ -992,6 +996,8 @@ def create_app_v2(
                 updated = _append_voice_auditions(
                     target, _audition_identity(generated, package, base=target)
                 )
+                if "voiceProfileSettings" in target:
+                    updated["voiceProfileSettings"] = deepcopy(character["voiceSettings"])
                 known = {row["revision"] for row in _voice_candidates_for(target)}
                 added = [row for row in _voice_candidates_for(updated) if row["revision"] not in known]
                 if not added or updated.get("voicePreviewRevision") not in {row["revision"] for row in added}:
@@ -1096,6 +1102,11 @@ def create_app_v2(
                 )
             elif source_book_ids and cast_voice_reuse is None:
                 raise CastContractError("Voice reuse is unavailable")
+            # An inherited choice completes the audio pack. Keep current-book
+            # profiling for every new identity, but generate audio only for unmatched ones.
+            for character_id, row in imported.items():
+                if character_id != "narrator" and character_id not in reused:
+                    reused[character_id] = inherited_voice(row)
             affected = [
                 row
                 for row in finalized["identities"]
@@ -1204,10 +1215,24 @@ def create_app_v2(
             }
             desired_settings_by_id.update(
                 {
-                    character_id: row.get("voiceSettings", {})
+                    character_id: row.get("voiceProfileSettings") or row.get("voiceSettings", {})
                     for character_id, row in matched.items()
                 }
             )
+            for row in finalized["identities"]:
+                character_id = str(row["characterId"])
+                if character_id in imported and character_id in reused:
+                    current_settings = validate_voice_settings(
+                        desired_settings_by_id[character_id],
+                        fallback_category=str(row.get("category", "character")),
+                    )
+                    reused[character_id].update(
+                        voiceSettings=deepcopy(current_settings),
+                        voiceProfileSettings=deepcopy(current_settings),
+                        voiceDirection=compile_voice_direction(current_settings, language=language),
+                    )
+                    if row.get("auditionLine"):
+                        reused[character_id]["auditionLine"] = row["auditionLine"]
             selected_sharing_policy = _voice_sharing_policy_for_model(
                 model_id,
                 voice_sharing_policy,
@@ -1260,6 +1285,25 @@ def create_app_v2(
                 and (same_selection and recipe_is_current)
                 and _has_complete_audition_pack(previous_narrator)
             )
+            if "narrator" in imported and not reusable_narrator:
+                current_profile = (
+                    (previous_narrator.get("voiceProfileSettings") or previous_narrator.get("voiceSettings"))
+                    if same_language and isinstance(previous_narrator, dict)
+                    else profiles.get("narrator", default_voice_settings("narrator"))
+                )
+                current_settings = validate_voice_settings(current_profile, fallback_category="narrator")
+                previous_narrator = inherited_voice(imported["narrator"])
+                previous_narrator.update(
+                    voiceSettings=deepcopy(current_settings),
+                    voiceProfileSettings=deepcopy(current_settings),
+                    voiceDirection=compile_voice_direction(current_settings, language=language),
+                )
+                if generate_voice_audition_lines and isinstance(current_profile, dict):
+                    try:
+                        previous_narrator["auditionLine"] = validate_audition_line(current_profile.get("auditionLine"))
+                    except CastContractError:
+                        previous_narrator.pop("auditionLine", None)
+                reusable_narrator = True
             if narrator_line_count and not reusable_narrator:
                 narrator_profile = (
                     deepcopy(previous_narrator.get("voiceSettings"))
@@ -1365,13 +1409,6 @@ def create_app_v2(
                 "identityDecisions": raw_decisions,
                 "sourceBookIds": source_book_ids,
             }
-            if narrator is not None and "narrator" in imported and not reusable_narrator:
-                body["narrator"] = prepend_previous_voice(narrator, imported["narrator"])
-            body["identities"] = [
-                prepend_previous_voice(row, imported[str(row["characterId"])])
-                if str(row["characterId"]) in imported and str(row["characterId"]) not in reused
-                else row for row in body["identities"]
-            ]
         return finish(body, "Cast candidate ready for review")
 
     def ensure_recording_script(book_id: str) -> dict[str, Any]:
@@ -2716,6 +2753,7 @@ def create_app_v2(
             if isinstance(plan, dict):
                 plan = {**plan}
                 plan.pop("priorBookCandidates", None)
+                plan.pop("inheritedOnly", None)
                 updated["voiceCandidatePlan"] = plan
         if str(target.get("voicePreviewRevision")) == voice_revision:
             fallback = remaining[-1]

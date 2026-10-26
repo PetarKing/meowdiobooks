@@ -96,6 +96,26 @@ describe("CastVoiceReview", () => {
     expect(approve).not.toHaveBeenCalled();
   });
 
+  it("uses the current-book profile for a new audition after accepting a prior-book voice", () => {
+    const regenerate = vi.fn();
+    const voice = cast.identities![1];
+    const currentProfile = { ...voice.voiceSettings!, tone: "gentle" as const, description: "Current book profile." };
+    const inherited: CastArtifact = { ...cast, identities: [{ ...voice,
+      voiceProfileSettings: currentProfile, voiceAccepted: true, acceptedVoiceRevision: "prior",
+      voicePreviewRevision: "prior", voiceCandidates: [{ ...voice.voiceCandidates![0],
+        revision: "prior", source: "previous-book", previousBookTitle: "First book",
+      }],
+    }] };
+    render(<CastVoiceReview bookId="book" cast={inherited} selections={{ many: "prior" }} routes={{}}
+      onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={regenerate} />);
+    fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
+    const dialog = screen.getByRole("dialog", { name: "Many voice" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Create a new audition" }));
+    expect(within(dialog).getByDisplayValue("Current book profile.")).toBeInTheDocument();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Generate new audition →" }));
+    expect(regenerate).toHaveBeenCalledWith("many", currentProfile);
+  });
+
   it("plays an audition with one toggle without applying it", () => {
     const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockImplementation(() => Promise.resolve());
     const pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);

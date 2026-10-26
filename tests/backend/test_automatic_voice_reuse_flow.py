@@ -13,7 +13,8 @@ from fastapi.testclient import TestClient
 from reportlab.pdfgen.canvas import Canvas
 
 from meowdiobooks.backend.app_v2 import create_app_v2
-from meowdiobooks.backend.artifacts import read_artifact, write_artifact
+from meowdiobooks.backend.artifacts import read_artifact, write_artifact, artifact_path
+from meowdiobooks.backend.workspace import BookWorkspace
 from tests.backend.test_app_v2_finish import _accept, _process
 
 
@@ -218,7 +219,14 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
         if source_pdf
         else ("Subaru", "Subaro", "Louis", "Emilia")
     )
-    audition_calls, render_plans = [], []
+    audition_calls, render_plans, profile_calls = [], [], []
+
+    def profile(*args, **kwargs):
+        profile_calls.append([row["name"] for row in args[1]])
+        result = _profile(*args, **kwargs)
+        for settings in result.values():
+            settings['description'] = f"Current book profile {len(profile_calls)}"
+        return result
 
     def audition(_repo, package, book, characters, report, _language, _model):
         audition_calls.append((book, [r["name"] for r in characters]))
@@ -258,7 +266,7 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
     app = create_app_v2(
         tmp_path,
         cast_proposer=_propose,
-        voice_profiler=_profile,
+        voice_profiler=profile,
         voice_auditioner=audition,
         chapter_renderer=render,
         default_voice_model="test",
@@ -281,11 +289,28 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
         newer, newer_package = _book(client, tmp_path, f"{lead} second", [lead, companion])
         _, newer_cast = _generate(client, newer)
         subaru = next(r for r in newer_cast["identities"] if r["name"] == lead)
-        # Choose the newly generated alternative, rather than the inherited voice.
-        assert len(subaru["voiceCandidates"]) == 2
+        # All identities match: current-book profiling remains, but TTS is skipped.
+        assert len(subaru["voiceCandidates"]) == 1
+        assert not any(book == newer for book, _ in audition_calls)
+        assert len(profile_calls) == 2
+        assert subaru['voiceProfileSettings']['description'] == 'Current book profile 2'
+        assert subaru['voiceCandidates'][0]['voiceSettings']['description'] == 'Current book profile 1'
+        # A user can still explicitly request a fresh alternative.
+        newer_cast = _candidate(client, newer, _process(client, newer, 'cast', {
+            'proposalRevision': newer_cast['revision'], 'characterId': subaru['characterId'],
+        }))
+        subaru = next(r for r in newer_cast['identities'] if r['name'] == lead)
+        assert len(subaru['voiceCandidates']) == 2
         chosen = subaru["voiceCandidates"][-1]
+        assert chosen['voiceSettings']['description'] == 'Current book profile 2'
         _approve(client, newer, newer_cast, {lead: chosen["revision"]})
         selected_bytes = (newer_package / chosen["referenceAudio"]).read_bytes()
+        # Reset the source to Review and create two unapproved identity drafts.
+        # Neither missing active Cast nor later drafts may erase approved choices/audio.
+        BookWorkspace.under(tmp_path, newer).publish('review', artifact_path(newer_package, 'review'))
+        _process(client, newer, 'cast', {})
+        _process(client, newer, 'cast', {})
+        assert (newer_package / chosen['referenceAudio']).read_bytes() == selected_bytes
         destination, package = _book(client, tmp_path, f"{lead} third", [lead, near, new_label])
         identity, cast = _generate(client, destination)
         assert lead in identity["previousVoiceMatches"]
@@ -294,19 +319,33 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
         rows = {r["name"]: r for r in cast["identities"]}
         assert set(rows) == {lead, near, new_label}
         assert len(set(cast["labelToCharacterId"].values())) == 3
-        prior, generated = rows[lead]["voiceCandidates"]
+        prior, = rows[lead]["voiceCandidates"]
+        generated = None
         assert prior["source"] == "previous-book"
         assert prior["previousBookTitle"] == f"{lead} second"
         assert (package / prior["referenceAudio"]).read_bytes() == selected_bytes
-        assert generated["source"] == "generated"
         assert all(
             c.get("source") != "previous-book"
             for name in (near, new_label)
             for c in rows[name]["voiceCandidates"]
         )
-        assert {lead, near, new_label}.issubset(
-            {name for book, names in audition_calls if book == destination for name in names}
-        )
+        assert {near, new_label} == {
+            name for book, names in audition_calls if book == destination for name in names}
+        assert set(profile_calls[-1]) == {lead, near, new_label}
+        assert rows[lead]['voiceProfileSettings']['description'] != prior['voiceSettings']['description']
+        # A single inherited choice cannot be deleted until a replacement exists.
+        cannot_delete = client.delete(
+            f"/api/books/{destination}/stages/cast/candidates/{cast['revision']}"
+            f"/voices/{rows[lead]['characterId']}/{prior['revision']}")
+        assert cannot_delete.status_code == 409
+        if override or delete_prior:
+            cast = _candidate(client, destination, _process(client, destination, 'cast', {
+                'proposalRevision': cast['revision'], 'characterId': rows[lead]['characterId'],
+            }))
+            rows = {r['name']: r for r in cast['identities']}
+            prior, generated = rows[lead]['voiceCandidates']
+            assert generated['source'] == 'generated'
+            assert audition_calls[-1] == (destination, [lead])
         if evidence_dir is not None:
             import json
             import shutil
@@ -342,11 +381,11 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
             assert {
                 k: v
                 for k, v in deleted_row["voiceCandidatePlan"].items()
-                if k != "priorBookCandidates"
+                if k not in {"priorBookCandidates", "inheritedOnly"}
             } == {
                 k: v
                 for k, v in rows[lead]["voiceCandidatePlan"].items()
-                if k != "priorBookCandidates"
+                if k not in {"priorBookCandidates", "inheritedOnly"}
             }
             calls_before = len(audition_calls)
             cast = _candidate(
@@ -402,6 +441,18 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, del
             package / selected["referenceAudio"]
         ).read_bytes()
         assert len({s["effectiveSpeaker"] for s in segments}) == 3
+        if not override:
+            # Acceptance stores acoustic settings from the chosen prior candidate,
+            # while later manual creation still uses the destination's saved profile.
+            assert accepted_subaru['voiceSettings'] == prior['voiceSettings']
+            current_profile = accepted_subaru['voiceProfileSettings']
+            assert current_profile['description'] != prior['voiceSettings']['description']
+            reopened = _candidate(client, destination, _process(client, destination, 'cast', {}))
+            manual = _candidate(client, destination, _process(client, destination, 'cast', {
+                'proposalRevision': reopened['revision'], 'characterId': accepted_subaru['characterId'],
+            }))
+            latest = next(row for row in manual['identities'] if row['name'] == lead)
+            assert latest['voiceCandidates'][-1]['voiceSettings'] == current_profile
 
 
 @pytest.mark.parametrize(

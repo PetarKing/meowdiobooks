@@ -140,3 +140,34 @@ def test_prepend_previous_voice_retains_generated_alternatives_and_prunable_refs
     prune_voice_files(tmp_path, cast_voice_revisions({'identities': [result]}))
     assert sorted(path.name for path in voices.iterdir()) == ['fresh1.wav', 'fresh2.wav', 'prior.reference.wav', 'prior.wav']
     assert generated['voiceAccepted'] is True  # No mutation of existing input artifacts.
+
+
+def test_latest_approved_cast_ignores_active_pointer_and_newer_drafts(tmp_path):
+    from meowdiobooks.backend.artifacts import write_artifact
+    from meowdiobooks.backend.voice_reuse import latest_approved_cast
+    assert latest_approved_cast(tmp_path) is None
+    write_artifact(tmp_path, 'cast', {'revision': 'legacy', 'status': 'accepted'}, publish=False)
+    assert latest_approved_cast(tmp_path)['revision'] == 'legacy'
+    write_artifact(tmp_path, 'cast', {'revision': 'approved', 'status': 'accepted', 'phase': 'accepted'}, publish=False)
+    write_artifact(tmp_path, 'cast', {'revision': 'draft', 'status': 'needs-voice-review', 'phase': 'audition-review'})
+    assert latest_approved_cast(tmp_path)['revision'] == 'approved'
+    (tmp_path/'artifacts'/'latest.json').unlink()
+    assert latest_approved_cast(tmp_path)['revision'] == 'approved'
+    write_artifact(tmp_path, 'cast', {'revision': 'newest', 'status': 'accepted', 'phase': 'accepted', 'identities': []}, publish=False)
+    # A missing/invalid selection in the latest approval must not resurrect an older one.
+    assert latest_approved_cast(tmp_path)['revision'] == 'newest'
+    assert latest_approved_cast(tmp_path)['identities'] == []
+
+
+def test_inherited_only_pack_is_complete_and_preserves_manual_options():
+    from meowdiobooks.backend.voice_reuse import inherited_voice
+    from meowdiobooks.backend.cast_runtime import has_complete_audition_pack
+    voice = inherited_voice({'characterId': 'subaru', 'voiceCandidates': [
+        {'revision': 'prior', 'referenceAudio': 'voices/subaru/prior.wav'}]})
+    assert len(voice['voiceCandidates']) == 1
+    assert has_complete_audition_pack(voice)
+    voice['voiceCandidates'].append({'revision': 'manual'})
+    assert has_complete_audition_pack(voice)
+    voice['voiceCandidates'] = []
+    voice.pop('voicePreviewRevision')
+    assert not has_complete_audition_pack(voice)

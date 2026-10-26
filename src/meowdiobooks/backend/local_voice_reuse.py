@@ -14,10 +14,9 @@ import re
 import tempfile
 from typing import Any, Callable
 
-from .artifacts import read_artifact
 from .models import Book
 from .storage import ModelStore
-from .voice_reuse import match_latest_voices, validate_source_book_ids
+from .voice_reuse import latest_approved_cast, match_latest_voices, validate_source_book_ids
 
 
 def _component(value: object) -> str:
@@ -47,10 +46,10 @@ class LocalVoiceReuse:
     requires_quote = False
 
     def __init__(self, *, books: ModelStore[Book], package_for_book: Callable[[str], Path],
-                 cast_for_book: Callable[[str], dict[str, Any]] | None = None) -> None:
+                 cast_for_book: Callable[[str], dict[str, Any] | None] | None = None) -> None:
         self.books = books
         self.package_for_book = package_for_book
-        self.cast_for_book = cast_for_book or (lambda key: read_artifact(package_for_book(key), "cast"))
+        self.cast_for_book = cast_for_book or (lambda key: latest_approved_cast(package_for_book(key)))
 
     def _audio(self, book_id: str, voice: dict[str, Any]) -> tuple[bytes, bytes]:
         package = self.package_for_book(book_id).resolve()
@@ -83,7 +82,7 @@ class LocalVoiceReuse:
                 continue
             try:
                 _component(source_id)
-                cast = self.cast_for_book(source_id)
+                cast = self.cast_for_book(source_id) or {}
                 if (cast.get("status") != "accepted" or cast.get("language") != language
                         or cast.get("voiceModel") != model_id):
                     continue
@@ -147,7 +146,7 @@ class LocalVoiceReuse:
         matches = match_latest_voices(targets, sources)
         titles = {b["bookId"]: b["title"] for b in sources}
         return {"sources": [], "options": [], "exactMatchCount": len(matches),
-                "remainingVoiceCount": len(targets), "totalVoiceCount": len(targets),
+                "remainingVoiceCount": len(targets) - len(matches), "totalVoiceCount": len(targets),
                 "fingerprint": self._fingerprint(targets, sources, language, model_id),
                 "previousVoiceMatches": {label: {"bookTitle": titles[matches[t["characterId"]]["bookId"]]}
                     for t in targets if t["characterId"] in matches for label in t.get("literalLabels", [])}}

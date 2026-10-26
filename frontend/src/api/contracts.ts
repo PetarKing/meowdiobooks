@@ -340,6 +340,7 @@ export interface CastVoice {
   auditionLine?: string;
   voiceDirection?: string;
   voiceSettings?: VoiceSettings;
+  voiceProfileSettings?: VoiceSettings;
   voiceCandidates?: VoiceCandidate[];
   voiceAccepted?: boolean;
   acceptedVoiceRevision?: string;

@@ -344,16 +344,24 @@ guessed. It never merges destination characters, uses fuzzy similarity, or calls
 
 Standalone Core uses `LocalVoiceReuse` over its book store. Compositions supply an adapter over
 their authorized store and provider-compatible receipts. Only accepted selected voices with valid
-compatible audio are eligible. Local matches require the same language and model. Imports copy
+compatible audio are eligible. `latest_approved_cast(package)` reads the newest accepted immutable
+Cast, even if a reset removed the active Cast pointer or newer unapproved drafts exist. Draft writes
+and failure cleanup retain that approved Cast's audio until a newer Cast is accepted; they do not
+restore approval to a draft. Local matches require the same language and model. Imports copy
 complete audio references into destination-owned files, so deleting the source cannot break them.
 
-Each match is offered first with `source: "previous-book"` and `previousBookTitle`, followed by
-normally generated alternatives. An explicit choice overrides the first-playable default. The
-whole pack is retained across unchanged retries; model/recipe changes regenerate alternatives.
+Each match starts with only the inherited audition, marked `source: "previous-book"` and
+`previousBookTitle`. Matched identities retain ordinary current-book voice profiling but skip
+automatic audio generation. The row saves `voiceProfileSettings` for later manual auditions;
+the inherited candidate retains its original acoustic settings for acceptance and rendering. Users can
+explicitly request another audition through the ordinary add/regenerate control, then select or
+delete choices normally. An explicit choice overrides the first-playable default. The inherited
+pack and manually added options remain complete across unchanged retries. Model/recipe changes
+recheck source compatibility and generate only where no compatible inherited choice remains.
 Required identity review remains blocking and takes visual priority; suggested review stays optional.
 The Voices grid derives provenance from the chosen candidate. Bulk acceptance retains its existing
 confirmation, and selected references/settings flow through to render planning.
 
 The adapter retains explicit source-ID/import APIs for compatible clients, but the default UI has
 no manual source-book or voice picker. Supplied preview fingerprints are revalidated before import.
-Provider pricing counts generated alternatives for all targets, even when a prior voice is offered.
+Provider pricing counts only unmatched targets; explicit new auditions use normal generation pricing.

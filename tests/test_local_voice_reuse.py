@@ -152,3 +152,19 @@ def test_destination_must_be_in_supplied_store(scene):
     with pytest.raises(ValueError, match='Destination book'):
         adapter.apply('unknown', root/'unknown', [target], [], 'english', 'local-qwen')
     assert not (root/'unknown').exists()
+
+
+def test_default_adapter_reads_latest_approved_history_not_unapproved_active_cast(scene):
+    from meowdiobooks.backend.artifacts import write_artifact
+    adapter, casts, target, root = scene
+    for book_id, cast in casts.items():
+        write_artifact(root/book_id, 'cast', {**cast, 'revision': 'approved', 'phase': 'accepted'}, publish=False)
+        write_artifact(root/book_id, 'cast', {**cast, 'revision': 'draft', 'status': 'needs-voice-review', 'phase': 'audition-review'})
+    local = LocalVoiceReuse(books=adapter.books, package_for_book=adapter.package_for_book)
+    result = local.apply('destination', root/'destination', [target], [], 'english', 'local-qwen')
+    assert result['new-subaru']['previousBookTitle'] == 'Subaru two'
+    # New approval with no selected voices supersedes that book's previous approved cast.
+    write_artifact(root/'newer', 'cast', {**casts['newer'], 'revision': 'approved-empty',
+        'phase': 'accepted', 'identities': []}, publish=False)
+    result = local.apply('destination', root/'destination', [target], [], 'english', 'local-qwen')
+    assert result['new-subaru']['previousBookTitle'] == 'Subaru one'
