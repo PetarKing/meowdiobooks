@@ -13,7 +13,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 10
+DIALOGUE_SCAN_VERSION = 11
 
 
 class DialogueContractError(ValueError):
@@ -253,11 +253,28 @@ def _raw_scan(
 
     by_profile: dict[str, list[dict[str, Any]]] = {profile.id: [] for profile in profiles}
     candidates: list[dict[str, Any]] = []
+    last_content_block = next((block for block in reversed(blocks) if block["text"].strip()), None)
     for profile in sorted(profiles, key=lambda item: (item.priority, item.id)):
         compiled = _compile(profile)
         for block in blocks:
             source = block["text"]
-            for match in compiled.finditer(source):
+            matches = list(compiled.finditer(source))
+            if block is last_content_block and not profile.custom:
+                # An excerpt can end inside its final quotation. Keep the exact
+                # available text eligible for speaker review; never invent a closer.
+                pair = _CROSS_BOUNDARY_QUOTES.get(profile.id)
+                if pair:
+                    opener, closer = pair
+                    pairs = [pair, ("『", "』")] if opener == "「" else [pair]
+                    for opener, closer in pairs:
+                        trailing = re.search(
+                            rf"^[ \t]*{re.escape(opener)}(?P<text>[^\s{re.escape(opener + closer)}]"
+                            rf"[^{re.escape(opener + closer)}]*?)\s*\Z",
+                            source,
+                        )
+                        if trailing:
+                            matches.append(trailing)
+            for match in matches:
                 text_start, text_end = match.span("text")
                 if match.start() == match.end() or text_start == text_end:
                     raise DialogueContractError(

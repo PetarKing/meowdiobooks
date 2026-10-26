@@ -569,6 +569,7 @@ function categoryClass(category: DialogueCategory) {
 }
 
 function reviewPriority(row: DialogueExample) {
+  if (row.speakerStatus === "ai") return 3;
   const suggestions = row.suggestedSpeakers?.length ?? 0;
   return suggestions >= 2 ? 0 : suggestions === 1 ? 1 : 2;
 }

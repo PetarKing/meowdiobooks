@@ -11,6 +11,39 @@ from meowdiobooks.backend.dialogue import (
 )
 
 
+@pytest.mark.parametrize("opener,closer", [("“", "”"), ('"', '"'), ("«", "»"), ("「", "」"), ("『", "』")])
+def test_final_unclosed_quotation_is_a_source_exact_dialogue_candidate(opener, closer):
+    source = f"Alice looked up.\n\n{opener}We can still reach the"
+    result = scan_dialogue([{"page": 1, "text": source}])
+    turns = [row for row in result["partition"] if row["renderRole"] == "dialogue"]
+    assert len(turns) == 1
+    assert turns[0]["text"] == "We can still reach the"
+    assert turns[0]["speakerStatus"] == "unlabelled"
+    assert reconstruct_partition(result) == {1: source}
+    assert turns[0]["source"] == f"{opener}We can still reach the"
+
+
+@pytest.mark.parametrize("source", ["A measurement of 6\"", "“”, she said.", "“An unfinished quotation\n\nOrdinary final paragraph.", "“First “second"])
+def test_trailing_quote_recovery_does_not_claim_other_narration(source):
+    result = scan_dialogue([{"page": 1, "text": source}])
+    assert not [row for row in result["partition"] if row["renderRole"] == "dialogue"]
+
+
+def test_trailing_quote_recovery_respects_disabled_profile():
+    result = scan_dialogue([{"page": 1, "text": "“An unfinished line"}], enabled_profile_ids=[])
+    assert not [row for row in result["partition"] if row["renderRole"] == "dialogue"]
+
+
+@pytest.mark.parametrize("tail", ["", "\n\n\n", "\n\n \t\n"])
+def test_trailing_quote_recovery_ignores_empty_final_blocks_and_pages(tail):
+    source = "“We can still reach the" + tail
+    result = scan_dialogue([{"page": 1, "text": source}, {"page": 2, "text": ""}])
+    turns = [row for row in result["partition"] if row["renderRole"] == "dialogue"]
+    assert len(turns) == 1
+    assert turns[0]["text"] == "We can still reach the"
+    assert reconstruct_partition(result)[1] == source
+
+
 def test_builtin_profiles_find_labelled_and_multilingual_formats():
     pages = [
         {

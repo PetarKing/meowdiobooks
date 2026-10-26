@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import FileResponse, Response
 
 from ..audio import layered_preview_wav
-from ..documents import render_pdf_page, source_path
+from ..documents import render_default_cover, render_pdf_page, source_path
 from ..models import Book
 
 
@@ -27,6 +27,8 @@ def create_media_router(
     def page_image(book_id: str, page: int) -> FileResponse:
         try:
             book = require_book(book_id)
+            if page == 0:
+                return FileResponse(render_default_cover(package_for(book.id) / "preview"), media_type="image/png")
             if not book.source_name or not book.page_count or not 1 <= page <= book.page_count:
                 raise ValueError("Page not found")
             path = (page_renderer if page_renderer is not None else render_pdf_page)(

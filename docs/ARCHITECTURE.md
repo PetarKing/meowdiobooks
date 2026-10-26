@@ -160,7 +160,9 @@ proxy limit. The UI check is a convenience, not an authorization or resource bou
 
 Hosts may supply a `file_processor` implementing `FileProcessor` to `create_app_v2`. Import inspection
 and metadata, page/full-document extraction, page rendering (including the media route and export
-cover), voice-sample normalization and audio packaging then run through that processor. The local
+cover), voice-sample normalization and audio packaging then run through that processor. The built-in
+cover (`coverPage: 0`) is trusted, deterministic artwork generated directly without opening a source
+document; it is not a fallback for rejected hosted parsing. The local
 default remains unchanged. The host owns process isolation, deadlines, resource limits and validation
 of untrusted worker results; this interface alone is not a sandbox. A metadata failure rejects a new
 import and removes its newly written source, just like inspection failure.

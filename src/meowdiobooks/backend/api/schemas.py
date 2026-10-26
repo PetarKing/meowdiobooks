@@ -38,7 +38,7 @@ class AudioExportRequest(ApiRequest):
     title: str | None = Field(default=None, max_length=500)
     author: str | None = Field(default=None, max_length=500)
     description: str | None = Field(default=None, max_length=2000)
-    coverPage: int = Field(default=1, ge=1)
+    coverPage: int = Field(default=1, ge=0)  # Zero selects the built-in audiobook cover.
     preset: AudioExportPreset = AudioExportPreset.M4B_HIGH
 
 

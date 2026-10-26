@@ -263,3 +263,15 @@ this artifact directly; no later phase reparses source text.
 - transactional retries and unresolved semantic results;
 - exact source partition/reconstruction;
 - Public-domain explicit-format and mixed-prose fixtures.
+
+## Final excerpt quotations and review order
+
+An unclosed quotation at the start of the final non-empty source block is included as an
+unlabelled candidate, including when blank blocks or empty pages follow it. The scanner preserves
+the exact available text and never invents the missing ending. This narrow recovery does not guess
+at arbitrary unmatched punctuation inside prose. Disabled quotation rules remain disabled.
+
+Required review presents multiple speaker suggestions first, then single suggestions, then narrator
+fallbacks without a guess, followed by confident AI assignments. A fallback cannot be buried among
+confident assignments just because both have an empty suggestion list. Existing accepted books are
+not silently reclassified; rebuilding Dialogue applies the current scanner.

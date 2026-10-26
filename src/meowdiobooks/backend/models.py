@@ -23,6 +23,7 @@ class WizardStage(StrEnum):
 class AudioExportPreset(StrEnum):
     M4B_HIGH = "m4b-high"
     M4B_COMPACT = "m4b-compact"
+    MP3 = "mp3"
     MP3_CHAPTERS = "mp3-chapters"
 
 
