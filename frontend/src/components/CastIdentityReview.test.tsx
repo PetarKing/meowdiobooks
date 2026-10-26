@@ -233,7 +233,7 @@ describe("CastIdentityReview", () => {
     expect(within(board).getAllByRole("button")).toHaveLength(4);
     const narrator = screen.getByRole("button", { name: "Inspect Narrator" });
     expect(narrator).not.toHaveAttribute("draggable", "true");
-    expect(narrator).toHaveTextContent("Normal book prose");
+    expect(narrator).not.toHaveTextContent("Normal book prose");
     expect(narrator).not.toHaveTextContent("reassigned labels");
 
     fireEvent.click(narrator);
@@ -330,6 +330,28 @@ describe("CastIdentityReview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getByRole("button", { name: "Inspect Cecilus" })).toBeInTheDocument();
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Cecilus");
+  });
+
+  it("keeps the drop cue when moving between a card's children, then clears it on exit or cancellation", () => {
+    render(<Harness />);
+    const source = screen.getByRole("button", { name: "Inspect Cecilus" });
+    const target = screen.getByRole("button", { name: "Inspect Emilia" });
+    const dataTransfer = transfer();
+    fireEvent.dragStart(source, { dataTransfer });
+    fireEvent.dragOver(target, { dataTransfer });
+    const portrait = target.querySelector(".cast-roster-portrait")!;
+    const name = target.querySelector(".cast-roster-name")!;
+    const moveWithin = new Event("dragleave", { bubbles: true });
+    Object.defineProperties(moveWithin, { relatedTarget: { value: name }, dataTransfer: { value: dataTransfer } });
+    fireEvent(portrait, moveWithin);
+    expect(target).toHaveClass("drop-target");
+    fireEvent.dragLeave(target, { dataTransfer, relatedTarget: document.body });
+    expect(target).not.toHaveClass("drop-target");
+    fireEvent.dragOver(target, { dataTransfer });
+    fireEvent.dragEnd(source, { dataTransfer });
+    expect(target).not.toHaveClass("drop-target");
+    expect(source).not.toHaveClass("dragging");
+    expect(screen.getByRole("button", { name: "Inspect Cecilus" })).toBeInTheDocument();
   });
 
   it("scrolls progressively near the viewport edge and stops when the drag leaves it", () => {

@@ -1,6 +1,7 @@
 import { userFacingDetail } from "../workflow/presentation";
 import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
+import { setCastDragImage } from "./castDragImage";
 import { DismissibleDetails } from "./DismissibleDetails";
 import { collectionMatches } from "./collectionSearch";
 import { InspectorDialog as InspectorShell } from "./Ui";
@@ -462,9 +463,29 @@ export function CastIdentityReview({
     closeInspectorAfterDecision();
   }
 
+  const removeDragImage = useRef<(() => void) | undefined>(undefined);
+  useEffect(() => () => removeDragImage.current?.(), []);
+
+  function endDrag() {
+    removeDragImage.current?.();
+    removeDragImage.current = undefined;
+    setDraggedGroupKey(undefined);
+    setDropTargetKey(undefined);
+    dragAutoScroll.stop();
+  }
+
+  function dragLeave(event: DragEvent<HTMLButtonElement>) {
+    if (event.relatedTarget instanceof Node && event.currentTarget.contains(event.relatedTarget)) return;
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (event.clientX > bounds.left && event.clientX < bounds.right && event.clientY > bounds.top && event.clientY < bounds.bottom) return;
+    setDropTargetKey(undefined);
+  }
+
   function startDrag(event: DragEvent<HTMLButtonElement>, group: CastGroup) {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData("text/plain", group.key);
+    removeDragImage.current?.();
+    removeDragImage.current = setCastDragImage(event.dataTransfer, event.currentTarget, group.name);
     setDraggedGroupKey(group.key);
     dragAutoScroll.updatePointer(event.clientY);
   }
@@ -485,9 +506,7 @@ export function CastIdentityReview({
       if (target) mergeGroup(source, target);
       else assignGroupToNarrator(source);
     }
-    setDraggedGroupKey(undefined);
-    setDropTargetKey(undefined);
-    dragAutoScroll.stop();
+    endDrag();
   }
 
   const outsideLabels = active
@@ -528,11 +547,11 @@ export function CastIdentityReview({
     <section className="cast-board" aria-label={t("Cast members")}>
       <CastRosterCard
         name={t("Narrator")} symbol="♬"
-        detail={t("Normal book prose")}
+        portraitContent={<svg className="cast-narrator-symbol" aria-hidden="true" viewBox="0 0 32 32"><path fill="currentColor" d="M12 7v17.3a5.5 4 0 1 1-3-3.6V6l18-4v19.3a5.5 4 0 1 1-3-3.6V8.8L12 11.5V7Z" /></svg>}
         portraitClassName="cast-narrator-tile"
         cardClassName={`cast-narrator-tile ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[NARRATOR_KEY] = element; }}
-        inspectProps={{ "aria-label": t("Inspect Narrator"), onClick: () => openInspector(NARRATOR_KEY), onDragOver: (event) => dragOver(event, NARRATOR_KEY), onDragLeave: () => setDropTargetKey(undefined), onDrop: (event) => dropOn(event) }}
+        inspectProps={{ "aria-label": t("Inspect Narrator"), onClick: () => openInspector(NARRATOR_KEY), onDragOver: (event) => dragOver(event, NARRATOR_KEY), onDragLeave: dragLeave, onDrop: (event) => dropOn(event) }}
       />
       {visibleGroups.map((group) => { const suspicious = group.needsReview && group.labels.length > 3; return <CastRosterCard
         key={group.key}
@@ -542,7 +561,7 @@ export function CastIdentityReview({
         badge={<>{group.needsReview ? <span className="cast-review-badge required">{t("Must review")}</span> : group.advisoryReview ? <span className="cast-review-badge advisory">{t("Should review")}</span> : null}{group.labels.some((label) => cast.previousVoiceMatches?.[label]) && <span className="previous-book-badge">{t("From prior book")}</span>}</>}
         cardClassName={`${group.labels.some((label) => cast.previousVoiceMatches?.[label]) ? "previous-book-match" : ""} ${group.needsReview ? "needs-review" : group.advisoryReview ? "has-suggestions" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[group.primaryLabel] = element; }}
-        inspectProps={{ draggable: true, "aria-label": t("Inspect {{name}}", { name: group.name }), onClick: () => openInspector(group.primaryLabel), onDragStart: (event) => startDrag(event, group), onDragEnd: () => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }, onDragOver: (event) => dragOver(event, group.key), onDragLeave: () => setDropTargetKey(undefined), onDrop: (event) => dropOn(event, group) }}
+        inspectProps={{ draggable: true, "aria-label": t("Inspect {{name}}", { name: group.name }), onClick: () => openInspector(group.primaryLabel), onDragStart: (event) => startDrag(event, group), onDragEnd: endDrag, onDragOver: (event) => dragOver(event, group.key), onDragLeave: dragLeave, onDrop: (event) => dropOn(event, group) }}
       />; })}
     </section>
 
