@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
 import re
+import unicodedata
 from typing import Any
 
 from .voice_routing import narrator_route, speaker_labels
@@ -115,7 +116,7 @@ def compile_render_plan(
         compiled_chapters.append(
             {
                 "chapterId": chapter_id,
-                "segments": _coalesce_narration(raw_segments, span_positions),
+                "segments": _coalesce_narration(raw_segments, span_positions, span_index),
                 "omissions": [row for row in omissions if row["chapterId"] == chapter_id],
             }
         )
@@ -369,19 +370,52 @@ def _segment(
 
 
 def _coalesce_narration(
-    segments: Sequence[dict[str, Any]], span_positions: Mapping[str, int]
+    segments: Sequence[dict[str, Any]],
+    span_positions: Mapping[str, int],
+    span_index: Mapping[str, Mapping[str, Any]],
 ) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for raw in segments:
         segment = dict(raw)
         previous = result[-1] if result else None
         if previous is not None and _safe_narration_pair(previous, segment, span_positions):
+            previous["text"] += _block_word_separator(previous, segment, span_index)
             previous["text"] += segment["text"]
             previous["scriptEntryIds"].extend(segment["scriptEntryIds"])
             previous["sourceSpanIds"].extend(segment["sourceSpanIds"])
             continue
         result.append(segment)
     return result
+
+
+def _block_word_separator(
+    left: Mapping[str, Any],
+    right: Mapping[str, Any],
+    span_index: Mapping[str, Mapping[str, Any]],
+) -> str:
+    """Restore a missing word boundary between independently extracted source blocks.
+
+    Same-block fragments, whitespace, punctuation and hyphenation remain source-owned.
+    Restrict the repair to space-delimited alphabets rather than inserting spaces into
+    scripts such as Chinese, Japanese or Thai where adjoining letters can be intentional.
+    """
+
+    left_block = span_index[left["sourceSpanIds"][-1]].get("blockId")
+    right_block = span_index[right["sourceSpanIds"][0]].get("blockId")
+    if not left_block or not right_block or left_block == right_block:
+        return ""
+    left_text, right_text = str(left["text"]), str(right["text"])
+    if not left_text or not right_text:
+        return ""
+
+    def word_edge(character: str) -> bool:
+        return character.isdecimal() or (
+            character.isalpha()
+            and unicodedata.name(character, "").startswith(("LATIN ", "GREEK ", "CYRILLIC "))
+        )
+
+    left_edge = unicodedata.normalize("NFC", left_text)[-1]
+    return " " if word_edge(left_edge) and word_edge(right_text[0]) else ""
 
 
 def _safe_narration_pair(
