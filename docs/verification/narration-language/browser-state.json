@@ -1,0 +1,46 @@
+[
+  {
+    "width": 1440,
+    "appearance": "light",
+    "actualAppearance": "light",
+    "options": [
+      "🇫🇷french",
+      "🇬🇧english✓"
+    ],
+    "selected": "🇬🇧english✓",
+    "errors": []
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "actualAppearance": "dark",
+    "options": [
+      "🇫🇷french",
+      "🇬🇧english✓"
+    ],
+    "selected": "🇬🇧english✓",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "appearance": "light",
+    "actualAppearance": "light",
+    "options": [
+      "🇫🇷french",
+      "🇬🇧english✓"
+    ],
+    "selected": "🇬🇧english✓",
+    "errors": []
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "actualAppearance": "dark",
+    "options": [
+      "🇫🇷french",
+      "🇬🇧english✓"
+    ],
+    "selected": "🇬🇧english✓",
+    "errors": []
+  }
+]
