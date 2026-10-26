@@ -126,12 +126,25 @@ loading or WebGL keeps the readable status, and completion or navigation removes
 
 ### Review evidence and suggested choices
 
-Review reuses `SourceExcerpt`: source-anchored evidence tagged `contextLayout: "continuous"`
-keeps the affected line and its surrounding passage together. Legacy saved evidence without that
-marker keeps separate, unlabeled chunks; never infer missing spaces or speaker names. Both layouts
-preserve source whitespace. Only the anchored target is highlighted.
+Review reuses `SourceExcerpt` as one compact passage surface. Source-anchored evidence tagged
+`contextLayout: "continuous"` shows the paragraph containing the target, with no unrelated outer
+paragraphs. A short standalone target also gets the nearest brief paragraph on either side, bounded
+to 140 characters each. Legacy evidence without that marker keeps separate, unlabeled snippets
+inside the same surface; never infer missing spaces or speaker names. Single line breaks and verse
+remain visible; excess empty lines collapse for display only. Source evidence, offsets and review
+actions are unchanged. Only the anchored target is highlighted.
 
-A suggested individual choice uses the success tint and sparkle; an explicit choice uses the action
-tint and checkmark. Bulk suggestions use a separated warning outline and an undecided-item count.
+Do not repeat an AI proposal in a separate correction panel or explanatory paragraphs below the passage.
+Deletion proposals mark Leave as suggested; word repairs show the exact replacement inside Apply correction,
+after Keep and Leave and before the separate bulk action.
+
+A suggested individual choice remains visually neutral and adds “(Suggested)” to its title; only an
+explicit choice uses the action tint and checkmark. Do not preselect suggestions or count them as
+decisions. Show bulk suggestions only when the action covers more than one suggestion in total;
+a larger review keeps its bulk action even when just one undecided suggestion remains.
+Use a full-width warning-tinted block with a nearby icon and left-aligned title, no extra help paragraph.
+On wide layouts, push this block to the bottom of the decision sidebar with flexible space above;
+keep it in normal flow after the options on smaller screens or when the options fill the sidebar.
+Explain preservation in the accessible description and tooltip. At zero, show “All suggestions decided”.
 Bulk application preserves manual choices. At zero, disable only the bulk button and explain that
 individual choices remain editable. Do not add a duplicate selection-status line below the choices.

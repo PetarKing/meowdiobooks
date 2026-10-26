@@ -9,6 +9,7 @@ from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from typing import Any
 from threading import Event
 
+from .cleanup_concurrency import cancellation_poll, request_slot
 from .remote_llm import remote_chat_completion, remote_decisions_completion
 
 POLICY_ID = "decisions-luna-script-directions-v1"
@@ -185,26 +186,37 @@ def review_script_directions(repo_root, extraction, dialogue, configs, report, *
     decisions, verifier = configs
     stopped = Event()
 
-    def admission(config, metadata):
+    def check_stopped():
         if stopped.is_set():
             raise RuntimeError("Script cue review stopped before completion.")
+
+    def check_cancelled():
+        check_stopped()
+        report(95, "Checking script cues with Luna")
+
+    poll_cancelled = cancellation_poll(check_stopped, check_cancelled)
+
+    def admission(config, metadata):
+        check_stopped()
         return request_admission(config, metadata) if request_admission else None
 
     def check(candidate):
         prompt = json.dumps({"context_before": candidate["contextBefore"],
                              "TARGET": candidate["source"],
                              "context_after": candidate["contextAfter"]}, ensure_ascii=False)
-        answer = remote_decisions_completion(
-            repo_root, decisions, RUBRIC + "\nACTUAL TARGET:\n" + prompt, QUESTIONS,
-            usage_observer=usage_observer, request_admission=admission,
-        )
+        with request_slot("decisions", poll_cancelled):
+            answer = remote_decisions_completion(
+                repo_root, decisions, RUBRIC + "\nACTUAL TARGET:\n" + prompt, QUESTIONS,
+                usage_observer=usage_observer, request_admission=admission,
+            )
         if not delivery_answer(answer):
             return None
-        result = remote_chat_completion(
-            repo_root, verifier, VERIFY_SYSTEM, prompt,
-            max_completion_tokens=700, response_schema=VERIFY_SCHEMA,
-            usage_observer=usage_observer, request_admission=admission,
-        )
+        with request_slot("repair", poll_cancelled):
+            result = remote_chat_completion(
+                repo_root, verifier, VERIFY_SYSTEM, prompt,
+                max_completion_tokens=700, response_schema=VERIFY_SCHEMA,
+                usage_observer=usage_observer, request_admission=admission,
+            )
         if not verified_delivery(result):
             return None
         return {**candidate, "recommendedAction": "exclude", "cueVerification": "verified",
