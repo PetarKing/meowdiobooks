@@ -386,7 +386,13 @@ def _validate_verified_cue_sources(dialogue, review, *, rendered=False):
                             and row.get("blockId") == cue["blockId"]
                             and row["sourceStart"] <= left < right <= row["sourceEnd"]]
                 expected = min(policies)[1] if policies else "keep"
-                if span.get("reviewAction", "keep") != expected:
+                actual = span.get("reviewAction", "keep")
+                # A spelling repair marks its whole owning span, including retained
+                # cues outside the edited range. The repair IDs and exact resulting
+                # text are independently checked by review_source_validation_view.
+                if actual == "repair" and expected == "keep" and span.get("reviewRepairs"):
+                    actual = "keep"
+                if actual != expected:
                     raise ReviewContractError("Rendered script direction differs from its accepted choice")
         if cursor != end or "".join(pieces) != cue.get("source"):
             raise ReviewContractError("Script direction no longer matches its exact source")

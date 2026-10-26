@@ -78,3 +78,31 @@ def test_cross_speaker_word_is_not_offered_as_one_repair():
                           'source': text[left:right], 'text': text[left:right]}
                          for i, (left, right) in enumerate(((0, cut), (cut, len(text))))]
     assert not build_review_workspace(extraction, dialogue)['warnings']
+
+
+@pytest.mark.parametrize('action,spelling', [('keep-hyphen', 'self-confidence'), ('join-word', 'selfconfidence')])
+@pytest.mark.parametrize('cue_action', ['keep', 'exclude'])
+def test_hyphen_repair_and_verified_cue_share_a_span(action, spelling, cue_action):
+    from tests.backend.test_script_direction_review import fixture
+    extraction, dialogue, workspace, _ = fixture(('MARA: (softly) I have self-\nconfidence.',))
+    choices = [{'occurrenceIds': [row['id']],
+                'action': action if group['kind'] == 'hyphenation' else cue_action}
+               for group in workspace['warnings'] for row in group['occurrences']]
+    review = accept_review_revision(workspace, choices, revision='r1')
+    preview = preview_review_transcript_page(extraction, dialogue, workspace, [], page=1,
+        occurrence_policies=[{'occurrenceId': choice['occurrenceIds'][0], 'action': choice['action']}
+                             for choice in choices])
+    rendered = apply_review_render_policies(dialogue, review)
+    script = build_recording_script(rendered, review, {'revision': 'c1'}, revision='s1')
+    spoken = ''.join(entry['text'] for entry in script['entries'])
+    assert spelling in spoken
+    assert ('(softly)' in spoken) == (cue_action == 'keep')
+    assert any(spelling in span['text'] and span['kind'] != 'excluded' for span in preview['spans'])
+    tampered = deepcopy(rendered)
+    repaired = next(span for span in tampered['spans'] if span.get('reviewRepairs'))
+    repaired['text'] += ' invented'
+    with pytest.raises(ReviewContractError):
+        build_recording_script(tampered, review, {'revision': 'c1'}, revision='s2')
+    repaired.pop('reviewRepairs')
+    with pytest.raises(ReviewContractError):
+        build_recording_script(tampered, review, {'revision': 'c1'}, revision='s3')
