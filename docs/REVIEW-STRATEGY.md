@@ -14,7 +14,7 @@ experiments, credentials and book corpora remain in the composition repository.
    Do not ask it to invent replacement prose or executable matching rules.
 4. Validate every proposal against its exact immutable source range and its decision evidence.
 5. Present word/editorial suggestions together, with apply-all and individual exceptions. Keep
-   each verified numbered-footer family as a separate group decision. Preserve
+   each verified page-text family as a separate group decision. Preserve
    uncertain text without creating a mandatory task merely because a model abstained.
 
 ## Responsibilities
@@ -24,6 +24,7 @@ experiments, credentials and book corpora remain in the composition repository.
 | Chapters | Standalone heading shape, multilingual hints and nearby layout/text | A proposed chapter boundary; never an omission |
 | Hyphens | Unicode letters split across a physical line break | Exact keep-hyphen or join-word spelling; otherwise unchanged |
 | Numbered page text | Repeated page-edge label with consistent changing folios and supported geometry | One verified family of optional omissions, matched locally with individual exceptions |
+| Running headers | Exact repeated first lines on physical PDF pages, with chapter/contents and ownership protection | One verified family of optional omissions; first occurrence and uncertain cases retained |
 | Credits and publishing text | Complete paragraphs/blocks, recurrence or bounded book-edge context | Omit only a verified whole unit; preserve mixed or incomplete units |
 | Script delivery cues | Existing targeted bracket/context check | Existing preserve/narrate/delivery behavior |
 | Footnotes, links, page numbers, obvious corruption | Existing local structural checks | Explicit review choices; no broad rewriting |
@@ -36,7 +37,9 @@ an intentional coverage tradeoff, not a claim that the remaining text was semant
 ## Boundaries and preservation
 
 A chapter heading must map to an exact source position. Never move a mid-page heading to the start
-of its page. New Dialogue processing may refine source-identical narration partitions at structural
+of its page. Adjacent chapter-positive title lines on the same page share the first boundary
+when only whitespace separates them; independently labelled or numbered headings stay separate.
+Every title character remains spoken. New Dialogue processing may refine source-identical narration partitions at structural
 heading drafts before publication; existing accepted Dialogue artifacts are not rewritten.
 
 A repeated credits opening and the next chapter can suggest a region, but neither proves that all
@@ -57,6 +60,10 @@ Numbered footers use a constrained rule discovered locally, not model-generated 
 Decisions and Luna inspect varied representatives once per family; eligible matching occurrences
 are found locally. Unrepresented layouts and unsupported owners stay unchanged. This bounds model
 work by the number of families, but a falsely verified family can still suggest repeated mistakes.
+
+Running headers use the same bounded family approach for exact page-top lines. The first occurrence,
+chapter starts, contents entries, incomplete credits and uncertain ownership stay intact. Only
+representative-confirmed eligible members receive suggestions; no model-generated matching code runs.
 
 Provider failures remain retryable failures and must not publish a partial candidate as complete.
 Cancellation and request admission apply to every paid call. Saved evidence binds proposals to the

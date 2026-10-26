@@ -6,6 +6,7 @@ remain explicit reader decisions, never automatic chapter changes or deletions.
 from __future__ import annotations
 
 import json
+import re
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from threading import Event
 
@@ -83,6 +84,26 @@ def _local_role(candidate, text, page_tail):
     return None
 
 
+def _adjacent_title_pairs(blocks, candidates):
+    """Possible wrapped-title lines; only two positive chapter verdicts may coalesce."""
+    positions = {str(block["id"]): i for i, block in enumerate(blocks)}
+    pairs = {}
+    for previous, current in zip(candidates, candidates[1:]):
+        if (previous["page"] != current["page"] or is_chapter_heading_hint(current["source"])
+                or re.match(r"(?i)^(?:[0-9０-９]+|[IVXLCDM]+)(?:[.):]\s*|\s+|$)", current["source"])):
+            continue
+        left, right = positions[previous["blockId"]], positions[current["blockId"]]
+        if left == right:
+            between = blocks[left]["text"][previous["sourceEnd"]:current["sourceStart"]]
+        else:
+            between = (blocks[left]["text"][previous["sourceEnd"]:]
+                       + "".join(block["text"] for block in blocks[left + 1:right])
+                       + blocks[right]["text"][:current["sourceStart"]])
+        if not between.strip():
+            pairs[current["id"]] = previous["id"]
+    return pairs
+
+
 def chapter_review_plan(extraction, dialogue, *, footer_evidence=None):
     """Deterministically build bounded packets and preserve all local abstentions."""
     blocks = extraction.get("blocks", [])
@@ -123,7 +144,8 @@ def chapter_review_plan(extraction, dialogue, *, footer_evidence=None):
             "currentBlockAfter": text[candidate["sourceEnd"]:candidate["sourceEnd"] + 1200],
             "previousBlock": neighbor(i - 1, True), "nextBlock": neighbor(i + 1, False),
             "layout": candidate["structuralEvidence"]})
-    return {"candidates": candidates, "localAssessments": local_assessments,
+    return {"candidates": candidates, "adjacentTitlePairs": _adjacent_title_pairs(blocks, candidates),
+            "localAssessments": local_assessments,
             "footerExclusions": exclusions,
             "packets": [targets[i:i + MAX_BATCH_CANDIDATES] for i in range(0, len(targets), MAX_BATCH_CANDIDATES)]}
 
@@ -139,7 +161,13 @@ def assemble_chapter_review(plan, batches):
         for row in _batch_answers(batch["response"], targets):
             assessments[row["boundaryId"]] = row
     ordered = [assessments[row["id"]] for row in plan["candidates"]]
-    return {"policy": POLICY, "boundaryCandidates": [row for row in plan["candidates"] if assessments[row["id"]]["role"] == "chapter"],
+    continuations = {}
+    for current, previous in plan["adjacentTitlePairs"].items():
+        if assessments[current]["role"] == assessments[previous]["role"] == "chapter":
+            continuations[current] = continuations.get(previous, previous)
+    return {"policy": POLICY, "titleContinuations": continuations,
+            "boundaryCandidates": [row for row in plan["candidates"]
+                                   if assessments[row["id"]]["role"] == "chapter" and row["id"] not in continuations],
             "assessments": ordered, "footerExclusions": plan["footerExclusions"], "batches": batches}
 
 

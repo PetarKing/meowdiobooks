@@ -257,6 +257,18 @@ def add_cleanup_proposals(
             raise ReviewContractError(str(exc)) from exc
         add_source_context(boundaries, _normalise_blocks(extraction))
         workspace = {**workspace, "boundaryCandidates": boundaries}
+    header_evidence = result.get("runningHeaderReview")
+    header_proposals = []
+    if header_evidence is not None:
+        from .cleanup_headers import validate_headers
+        if chapter_evidence is None:
+            raise ReviewContractError("Running headers require verified chapter evidence")
+        try:
+            header_proposals = validate_headers(extraction, dialogue, chapter_evidence, header_evidence)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+    if [p for p in result.get("occurrences", []) if p.get("runningHeaderGroupId") is not None] != header_proposals:
+        raise ReviewContractError("Running-header proposals differ from their verified evidence")
     hyphen_evidence = result.get("hyphenReview")
     if hyphen_evidence is not None:
         from .hyphen_review import validated_hyphen_proposals
@@ -331,7 +343,9 @@ def add_cleanup_proposals(
         if proposal.get("hyphenDecision") is not None:
             row.update(hyphenDecision=proposal["hyphenDecision"], availableActions=["keep", "repair"],
                        model="decisions", recommendedAction="repair")
-        if proposal.get("patternGroupId") is not None:
+        if proposal.get("runningHeaderGroupId") is not None:
+            row.update(patternGroupId=proposal["patternGroupId"], patternVerification="verified")
+        elif proposal.get("patternGroupId") is not None:
             candidate = pattern_candidates.get((str(block["id"]), start, end))
             group = next((group for group in result.get("patternGroups", [])
                           if group.get("patternGroupId") == proposal["patternGroupId"]), None)
@@ -370,6 +384,18 @@ def add_cleanup_proposals(
     # Preserve deterministic IDs and evidence. Repairable findings move into the AI
     # category, so the same defect never asks for two decisions.
     warnings = deepcopy(list(workspace.get("warnings", [])))
+    if header_evidence is not None:
+        header_members = [r for family in header_evidence["families"] for r in family["members"]]
+        for warning in warnings:
+            if warning.get("kind") == "repeated-matter":
+                # Legacy whole-line anchors include indentation; ownership also covers that
+                # whitespace wrapper, but never a prefix/suffix containing authored text.
+                warning["occurrences"] = [r for r in warning["occurrences"] if not any(
+                    r["blockId"] == member["blockId"]
+                    and r["sourceStart"] <= member["sourceStart"] < member["sourceEnd"] <= r["sourceEnd"]
+                    and not r["source"][:member["sourceStart"] - r["sourceStart"]].strip()
+                    and not r["source"][member["sourceEnd"] - r["sourceStart"]:].strip()
+                    for member in header_members)]
     existing = [(warning, occurrence) for warning in warnings
                 for occurrence in warning.get("occurrences", [])
                 if occurrence.get("kind") != "ai-cleanup"]
@@ -423,6 +449,7 @@ def add_cleanup_proposals(
             "unifiedSuggestions": result.get("unifiedSuggestions") is True,
             "hyphenReviewEvidence": deepcopy(hyphen_evidence),
             "focusedReviewEvidence": deepcopy(editorial_evidence),
+            "runningHeaderReviewEvidence": deepcopy(header_evidence),
             "chapterReviewEvidence": deepcopy(chapter_evidence),
             "cleanupSummary": dict(result.get("summary", {})),
             "cleanupPatternEvidence": pattern_evidence,
@@ -646,6 +673,7 @@ def accept_review_revision(
         "unifiedSuggestions": workspace.get("unifiedSuggestions") is True,
         "hyphenReviewEvidence": deepcopy(workspace.get("hyphenReviewEvidence")),
         "focusedReviewEvidence": deepcopy(workspace.get("focusedReviewEvidence")),
+        "runningHeaderReviewEvidence": deepcopy(workspace.get("runningHeaderReviewEvidence")),
         "chapterReviewEvidence": deepcopy(workspace.get("chapterReviewEvidence")),
         "cleanupPatternEvidence": deepcopy(workspace.get("cleanupPatternEvidence", {"groups": [], "windows": []})),
         "scriptDirectionsSummary": dict(workspace.get("scriptDirectionsSummary", {})),

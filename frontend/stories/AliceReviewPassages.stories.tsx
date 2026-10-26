@@ -79,7 +79,7 @@ export const CreditsAiSuggestion: Story = {
     await expect(passage).toHaveTextContent("*** START OF THE PROJECT GUTENBERG EBOOK ALICE'S ADVENTURES IN WONDERLAND ***");
     await expect(within(passage).queryByText("Language: English")).not.toBeInTheDocument();
     await expect(canvas.queryByRole("button", { name: /^Apply all suggested choices/ })).not.toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: /^Leave(?: \(Suggested\))? This highlighted/ })).toHaveClass("review-recommended");
+    await expect(canvas.getByRole("button", { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveClass("review-recommended");
     await expect(canvas.queryByLabelText("Proposed correction")).not.toBeInTheDocument();
   },
 };

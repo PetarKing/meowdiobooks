@@ -425,6 +425,30 @@ def run_cleanup_review(
         usage_observer=usage_observer, request_admission=admission,
         check_cancelled=check_cancelled, footer_evidence={"patternAssessmentMode": FAMILY_RULE_MODE,
             "patternGroups": pattern_groups, "windows": footer_evidence})
+    from . import cleanup_headers as headers
+    header_families = headers.header_manifest(extraction, dialogue, chapter_review)
+    header_proofs, header_occurrences = [], []
+    for family in header_families:
+        screen, response = None, None
+        if len(family["eligible"]) >= 2:
+            with request_slot("decisions", poll_cancelled):
+                screen = remote_decisions_completion(
+                    repo_root, decisions_config, headers.prompt(family), headers.QUESTIONS,
+                    usage_observer=usage_observer, request_admission=admission)
+            if headers.screen_ok(screen):
+                with request_slot("repair", poll_cancelled):
+                    answer = remote_chat_completion(
+                        repo_root, repair_config, headers.SYSTEM, headers.prompt(family),
+                        max_completion_tokens=1400, response_schema=headers.SCHEMA,
+                        usage_observer=usage_observer, request_admission=admission)
+                try:
+                    response = json.loads(answer["text"])
+                except (KeyError, ValueError, TypeError):
+                    response = None
+        header_proofs.append({"id": family["id"], "screen": screen, "verification": response})
+        header_occurrences.extend(headers.proposals(family, screen, response))
+    header_review = {"policy": headers.POLICY, "families": header_families,
+                     "proofs": header_proofs, "occurrences": header_occurrences}
     def verify_editorial_family(family_id):
         eligible = [row for row in editorial_windows if row["editorialFamilyId"] == family_id
                     and by_id[row["windowId"]]["eligible"]]
@@ -463,7 +487,7 @@ def run_cleanup_review(
     hyphen_review = review_hyphens(
         repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
         usage_observer=usage_observer, request_admission=admission)
-    occurrences = footer_occurrences + editorial_rows
+    occurrences = footer_occurrences + editorial_rows + header_occurrences
     # Entire approved editorial units take ownership over any contained mechanical suggestion.
     hyphen_rows = [row for row in hyphen_review["occurrences"] if not any(
         row["blockId"] == other["blockId"] and
@@ -476,13 +500,15 @@ def run_cleanup_review(
     )
     report(99, "Luna cleanup proposals are ready for review")
     return {
-        "chapterReview": chapter_review,
+        "chapterReview": chapter_review, "runningHeaderReview": header_review,
         "scriptDirections": script_directions,
         "hyphenReview": hyphen_review, "focusedReview": focused_review, "unifiedSuggestions": True,
         "patternGroups": pattern_groups, "patternAssessmentMode": FAMILY_RULE_MODE,
         "occurrences": occurrences,
         "summary": {
             "model": repair_config.model, "policy": POLICY_ID, "inputWindows": len(windows),
+            "runningHeaderFamilies": len(header_families),
+            "runningHeaderProposals": len(header_occurrences),
             "footerSourceCandidates": len(footer_windows),
             "footerFamilyDecisions": sum(len(f["eligible"]) >= 3 for f in footer_families),
             "flaggedWindows": len(occurrences),

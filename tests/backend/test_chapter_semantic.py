@@ -295,3 +295,48 @@ def test_batches_are_bounded_and_complete():
     scan = scan_dialogue(blocks)
     plan = chapter_semantic.chapter_review_plan(scan, {"spans": scan["partition"]})
     assert [len(packet) for packet in plan["packets"]] == [24, 24, 3]
+
+
+def _all_chapters_evidence(blocks, role="chapter"):
+    scan = scan_dialogue(blocks)
+    dialogue = {"spans": scan["partition"]}
+    plan = chapter_semantic.chapter_review_plan(scan, dialogue)
+    batches = [{"targets": packet, "response": {"assessments": [
+        {"boundaryId": row["boundaryId"], "role": role, "reason": "Synthetic classification."}
+        for row in packet]}} for packet in plan["packets"]]
+    return scan, dialogue, chapter_semantic.assemble_chapter_review(plan, batches)
+
+
+def test_wrapped_title_keeps_first_anchor_and_all_source_text():
+    blocks = [{"id": "a", "page": 3, "text": "THE OPEN\n\n"},
+              {"id": "b", "page": 3, "text": "   WINDOW\n\n"},
+              {"id": "c", "page": 3, "text": "The story begins beside the window."}]
+    scan, dialogue, evidence = _all_chapters_evidence(blocks)
+    assert [row["source"] for row in evidence["boundaryCandidates"]] == ["THE OPEN"]
+    assert evidence["titleContinuations"] == {"boundary:b:3-9": "boundary:a:0-8"}
+    assert chapter_semantic.validate_chapter_review(scan, dialogue, evidence) == evidence["boundaryCandidates"]
+    assert [row["text"] for row in scan["blocks"]] == [row["text"] for row in blocks]
+    assert "".join(row["source"] for row in dialogue["spans"]) == "".join(row["text"] for row in blocks)
+    evidence["titleContinuations"] = {}
+    with pytest.raises(ChapterContractError):
+        chapter_semantic.validate_chapter_review(scan, dialogue, evidence)
+
+
+@pytest.mark.parametrize("second,page,between", [
+    ("Chapter 2", 3, ""), ("II", 3, ""), ("OTHER TITLE", 4, ""),
+    ("OTHER TITLE", 3, "Narrative belongs between these two headings.\n\n"),
+])
+def test_distinct_heading_boundaries_do_not_coalesce(second, page, between):
+    blocks = [{"id": "a", "page": 3, "text": "THE OPEN WINDOW\n\n" + between},
+              {"id": "b", "page": page, "text": second + "\n\nA new narrative begins."}]
+    _, _, evidence = _all_chapters_evidence(blocks)
+    assert len(evidence["boundaryCandidates"]) == 2
+    assert evidence["titleContinuations"] == {}
+
+
+def test_contents_roles_do_not_become_wrapped_chapter_boundaries():
+    blocks = [{"id": "a", "page": 3, "text": "THE OPEN WINDOW\n\n"},
+              {"id": "b", "page": 3, "text": "THE CLOSED DOOR\n\n"}]
+    _, _, evidence = _all_chapters_evidence(blocks, "contents")
+    assert evidence["boundaryCandidates"] == []
+    assert evidence["titleContinuations"] == {}
