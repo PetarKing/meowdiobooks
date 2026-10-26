@@ -3333,7 +3333,7 @@ describe('v2 wizard', () => {
     expect(screen.queryByText(/Each suggestion keeps its own decision/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Apply all AI suggestions' }))
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
-    expect(screen.getByRole('button', { name: 'Apply all AI suggestions' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'All suggestions decided' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
     expect(screen.getByRole('button', { name: /^Keep(?: |$)/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: /Apply all suggested choices/ })).not.toBeInTheDocument()

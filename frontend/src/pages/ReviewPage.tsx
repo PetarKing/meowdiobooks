@@ -257,7 +257,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
               {showBulkSuggestions && <div className="review-bulk-area">
                 <button className="cleanup-bulk-warning" title={bulkHelp} aria-description={bulkHelp} disabled={pendingSuggestionCount === 0} onClick={isPatternGroup ? () => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "exclude")) : isScriptCue ? applyScriptSuggestions : applyAllProposals}>
                   <span aria-hidden="true">{pendingSuggestionCount > 0 ? "⚠" : "✓"}</span>
-                  <b>{isPatternGroup ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("All suggestions decided")}</b>
+                  <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("All suggestions decided")}</b>
                 </button>
               </div>}
             </div>
