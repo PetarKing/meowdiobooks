@@ -3,6 +3,7 @@ import type {
   CastArtifact,
   CastProcessSettings,
   LibraryExport,
+  LocalBook,
   StageCandidate,
   WorkflowGateway,
 } from "../src/api/contracts";
@@ -36,18 +37,28 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const { gatewayVariant } = metadata;
   const snapshot = snapshotFor(id);
   let libraryRequests = 0;
-  const books = gatewayVariant === "empty-books" ? [] : gatewayVariant === "home-shelf" ? [
+  const shelf: LocalBook[] = [
     fixtureBook,
     { ...fixtureBook, id: "kit-book-2", title: "The Moonlit Temple", source_name: "moonlit-temple.pdf", page_count: 296, asset_size_bytes: 11_800_000 },
     { ...fixtureBook, id: "kit-book-3", title: "The Little Prince", source_name: "little-prince.pdf", page_count: 96, asset_size_bytes: 3_800_000 },
     { ...fixtureBook, id: "kit-book-4", title: "A Very Long Book Title That Takes More Than One Line", source_name: "long-title.pdf", page_count: 433, asset_size_bytes: 18_400_000 },
     { ...fixtureBook, id: "kit-book-5", title: "夜の猫", source_name: "night-cat.pdf", page_count: 184, asset_size_bytes: 6_100_000 },
     { ...fixtureBook, id: "kit-book-6", title: "The Secret Garden", source_name: "secret-garden.pdf", page_count: 256, asset_size_bytes: 8_400_000 },
-  ] : [fixtureBook];
+  ];
+  const collectionSize = gatewayVariant === "collection-empty" ? 0 : gatewayVariant === "collection-few" ? 2 : gatewayVariant === "collection-many" ? 12 : undefined;
+  const collectionBooks = [...shelf, ...[
+    "A Small Atlas of Rain", "Letters from the Floating City", "The House at the Edge of the Sea",
+    "Quiet Mornings", "星を読む猫", "A Field Guide to Impossible Things",
+  ].map((title, i) => ({ ...fixtureBook, id: `kit-book-${i + 7}`, title, source_name: `book-${i + 7}.pdf`, page_count: 140 + i * 37, asset_size_bytes: 4_000_000 + i * 750_000 }))];
+  const books = collectionSize !== undefined ? collectionBooks.slice(0, collectionSize) : gatewayVariant === "empty-books" ? [] : gatewayVariant === "home-shelf" ? shelf : [fixtureBook];
   const canceledJobs = new Set<string>();
   let castCandidate: CastArtifact | undefined;
   let auditionSequence = 0;
-  const exports = [
+  const exports = collectionSize !== undefined ? collectionBooks.slice(0, collectionSize).map((book, i): LibraryExport => ({
+    ...library[i % library.length], id: `collection-export-${i}`, bookId: book.id, title: book.title,
+    author: ["Lewis Carroll", "Hana Mori", "Antoine de Saint-Exupéry", "M. A. Rivers", "夏野 みどり", "Frances Hodgson Burnett"][i % 6],
+    sizeBytes: (12 + i * 3) * 1024 * 1024,
+  })) : [
     "library-populated",
     "library-missing-cover",
     "library-refresh-error",
@@ -65,10 +76,10 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
     ...actions,
     sourcePageImageUrl: () => sourceImage,
     layeredVoicePreviewUrl: () => silentWav,
-    libraryCoverImageUrl: () =>
+    libraryCoverImageUrl: (itemId) =>
       gatewayVariant === "library-missing-cover"
         ? "data:image/png;base64,broken"
-        : libraryCoverImage,
+        : collectionSize !== undefined ? libraryCoverImage.replaceAll("214b52", ["214b52", "4c4730", "53415b", "30534b", "5a3948", "3e475c"][Math.max(0, exports.findIndex(item => item.id === itemId)) % 6]) : libraryCoverImage,
     ...(gatewayVariant === "sample-upload-pending"
       ? {
           transcribeVoiceSample: async () => ({
@@ -231,7 +242,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       if (gatewayVariant === "home-error")
         throw new Error("This book could not be opened. Try again.");
       const selectedBook = books.find((book) => book.id === bookId);
-      if (!selectedBook || gatewayVariant !== "home-shelf") return structuredClone(snapshot);
+      if (!selectedBook || (gatewayVariant !== "home-shelf" && collectionSize === undefined)) return structuredClone(snapshot);
       return { ...structuredClone(snapshot), book: { ...snapshot.book, id: selectedBook.id, title: selectedBook.title, filename: selectedBook.source_name ?? snapshot.book.filename } };
     },
     getRepresentativePages: async () => [

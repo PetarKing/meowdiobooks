@@ -52,7 +52,7 @@ export async function enterScenario(
     return;
   }
 
-  if (metadata.gatewayVariant === "empty-books") {
+  if (metadata.gatewayVariant === "empty-books" || metadata.gatewayVariant === "collection-empty") {
     await expect(await canvas.findByText(t("Choose book"))).toBeVisible();
     return;
   }

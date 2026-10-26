@@ -1,0 +1,14 @@
+/* The atmosphere fills the viewport without participating in content layout. */
+.app-shell:has(.home-scene) { position: relative; isolation: isolate; overflow: clip; }
+.app-shell:has(.home-scene) .topbar { background: color-mix(in srgb, var(--canvas) 88%, transparent); }
+.home-scene.reading-cat-companion { position: fixed; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; isolation: auto; }
+.studio-hero--hybrid .studio-hero-copy { position: relative; z-index: 1; }
+.studio-hero--hybrid h1 { margin: 22px 0; }
+.studio-hero--hybrid .studio-hero-copy > p { font-size: 16px; max-width: 390px; margin-bottom: 28px; }
+.studio-hero--hybrid .quick-import { max-width: 440px; }
+.home-main:has(.home-scene) .home-flow:has(.wip-shelf) { position: relative; z-index: 1; margin-inline: -24px; border: 1px solid transparent; }
+@media (max-width: 750px) {
+  .studio-hero--hybrid .studio-hero-copy > p { font-size: 14px; margin-bottom: 20px; }
+  .studio-hero--hybrid .home-mobile-library { align-self: flex-start; padding: 8px 12px; background: color-mix(in srgb, var(--canvas) 92%, transparent); border-radius: 8px; }
+}
+@media (prefers-reduced-motion: reduce) { .home-scene * { animation: none !important; } }

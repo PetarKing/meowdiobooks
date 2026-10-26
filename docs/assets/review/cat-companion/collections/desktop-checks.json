@@ -1,0 +1,74 @@
+[
+  {
+    "label": "Home · empty (0)",
+    "footer": 900,
+    "homeCards": 0,
+    "libraryCards": 0,
+    "pageHeight": 900,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Home · few (2)",
+    "footer": 900,
+    "homeCards": 2,
+    "libraryCards": 0,
+    "pageHeight": 900,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Home · many (12)",
+    "footer": 1294.34375,
+    "homeCards": 12,
+    "libraryCards": 0,
+    "pageHeight": 1294,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Library · empty (0)",
+    "footer": 900,
+    "homeCards": 0,
+    "libraryCards": 0,
+    "pageHeight": 900,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Library · few (2)",
+    "footer": 900,
+    "homeCards": 0,
+    "libraryCards": 2,
+    "pageHeight": 900,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Library · many (12)",
+    "footer": 1747.65625,
+    "homeCards": 0,
+    "libraryCards": 12,
+    "pageHeight": 1748,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  }
+]
