@@ -362,6 +362,8 @@ export interface CastArtifact {
   language?: string;
   voiceModel?: string;
   detectedLanguage?: string;
+  /** Uncalibrated model scores used only to rank the offered narration languages. */
+  languageProbabilities?: Record<string, number>;
   identityDecisions?: Array<{
     label: string;
     category: string;

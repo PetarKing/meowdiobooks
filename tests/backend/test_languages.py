@@ -53,6 +53,9 @@ def test_language_normalization_and_sample_are_deterministic():
     assert representative_language_sample(pages) == "0\n\n2\n\n4"
     assert infer_language([{"text": "This is plainly an English novel."}]) == "english"
     assert infer_language([{"text": "这是一本中文小说，里面有很多人物和对话。"}]) == "chinese"
+    sample = representative_language_sample([{"text": "a" * 8000}, {"text": "b" * 8000}, {"text": "c" * 8000}])
+    assert len(sample) <= 4000
+    assert all(letter in sample for letter in "abc")
 
 
 def test_every_known_voice_language_has_a_native_audition_template():

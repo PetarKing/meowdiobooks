@@ -33,7 +33,7 @@ async function openVoiceDesign(fetchPreview: NonNullable<WorkflowGateway["previe
   const navigation = await screen.findByRole("navigation", { name: "Wizard stages" });
   fireEvent.click(within(navigation).getByText("Cast & voices"));
   fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
-  expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("");
+  expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("english");
   return { processStage, getJob: gateway.getJob };
 }
 
@@ -42,6 +42,30 @@ describe("Voice design language confirmation", () => {
     localStorage.clear();
     sessionStorage.clear();
     window.history.replaceState({}, "", "/");
+  });
+
+  it("preselects and ranks detection, then preserves an explicit change across modal opens", async () => {
+    const base = snapshotFor("cast-identities");
+    const snapshot: WizardSnapshot = { ...base,
+      cast: { ...base.cast!, proposals: base.cast!.proposals.map((row) => ({ ...row, reviewRequired: false })),
+        language: undefined, detectedLanguage: "french", languageProbabilities: { french: 0.9, english: 0.08, spanish: 0.02, dutch: 0.99 } },
+      voiceModels: [{ id: "qwen", label: "Local", supportedLanguages: ["english", "spanish", "french"] }],
+      voiceSelection: { modelId: "qwen", language: "english" }, castingPreviewAvailable: false,
+    };
+    const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot) };
+    render(<App gateway={gateway} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
+    const picker = screen.getByRole("combobox", { name: "Narration language" });
+    expect(picker).toHaveValue("french");
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled();
+    fireEvent.click(picker);
+    expect(screen.getAllByRole("option").map((row) => row.textContent?.replace("✓", "")))
+      .toEqual([expect.stringContaining("french"), expect.stringContaining("english"), expect.stringContaining("spanish")]);
+    fireEvent.click(screen.getByRole("option", { name: "english" }));
+    fireEvent.click(screen.getByRole("button", { name: "← Back to cast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+    expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("english");
+    expect(gateway.getBookSnapshot).toHaveBeenCalledTimes(1);
   });
 
   it("loads automatic prior-book matches on the cast and clears them when language changes", async () => {
@@ -276,7 +300,7 @@ describe("Voice design language confirmation", () => {
     const fetchPreview = vi.fn().mockResolvedValue(quote);
     const { processStage } = await openVoiceDesign(fetchPreview);
     await screen.findByText("≈ €2.94");
-    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled();
     fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     expect(fetchPreview).toHaveBeenCalledTimes(1);

@@ -145,6 +145,17 @@ the selected local adapter returns editable text plus an optional detected langu
 is published as an artifact. The current adapter is MLX-Audio on Apple Silicon. A Linux adapter may
 implement the same function and HTTP/gateway response without changing Cast UI or accepted voice data.
 
+New Cast identity proposals make one bounded language classification from up to 4,000 characters of
+the accepted spoken transcript, sampled across opening, middle and closing pages. The proposal stores
+`detectedLanguage` and optional `languageProbabilities`; opening its voice confirmation performs no
+inference. Scores rank offered languages and are not displayed as calibrated confidence. Saved audition
+languages and explicit choices take precedence. Unsupported/indeterminate results require a choice;
+unconfigured, unavailable or malformed model results retain the existing script-based suggestion.
+Hosts may supply `language_detector` to select their model catalog and must bind
+`language_usage_observer` / `language_request_admission` for their Cast accounting and admission policy.
+These use the existing per-request lifecycle; admission/accounting failures retain host semantics.
+Older immutable proposals retain their existing suggestion until a new identity proposal is created.
+
 ### Import limits
 
 Hosts can supply `maxImportBytes` to the workflow App and `max_import_bytes` to

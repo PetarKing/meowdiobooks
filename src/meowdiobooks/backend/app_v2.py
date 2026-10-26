@@ -134,12 +134,12 @@ from .m4b import (
     package_audio_export,
 )
 from .languages import (
-    infer_language,
     normalize_language,
     shared_audition_line,
     supported_voice_languages,
     voice_model_capabilities,
 )
+from .narration_language import suggest_narration_language
 from .queue import JobFailureReporter, JobQueue
 from .errors import WorkflowInputError, public_error_message
 from .resources import SleepInhibitor, require_free_disk
@@ -444,6 +444,9 @@ def create_app_v2(
     cleanup_reviewer: Callable[..., dict[str, Any]] | None = None,
     cleanup_usage_observer: RemoteUsageObserver | None = None,
     cleanup_request_admission: RemoteRequestAdmission | None = None,
+    language_detector: Callable[..., dict[str, Any]] | None = None,
+    language_usage_observer: RemoteUsageObserver | None = None,
+    language_request_admission: RemoteRequestAdmission | None = None,
     voice_languages: Callable[[Path, str], list[str]] | None = None,
     voice_models: Callable[[Path], list[dict[str, Any]]] | None = None,
     default_voice_model: str | None = None,
@@ -851,7 +854,19 @@ def create_app_v2(
                     return finish(reusable, "Existing cast and auditions ready for review")
             report(2, "Building contextual identity dossiers")
             spans = list(dialogue.get("spans", []))
-            extraction = read_artifact(package, "extraction")
+            transcript_pages: dict[int, list[str]] = {}
+            for span in apply_review_render_policies(dialogue, review).get("spans", []):
+                text = str(span.get("text", "")).strip()
+                if text and span.get("renderRole") != "exclude":
+                    transcript_pages.setdefault(int(span.get("page", 1)), []).append(text)
+            language_suggestion = (language_detector or suggest_narration_language)(
+                repo_root,
+                [{"text": "\n".join(texts)} for texts in transcript_pages.values()],
+                [language for model in voice_models(repo_root)
+                 for language in voice_languages(repo_root, model["id"])],
+                usage_observer=language_usage_observer,
+                request_admission=language_request_admission,
+            )
             proposal = (
                 cast_proposer(repo_root, spans, report)
                 if any(
@@ -870,7 +885,7 @@ def create_app_v2(
             )
             body = {
                 **proposal,
-                "detectedLanguage": infer_language(list(extraction.get("pages", []))),
+                **language_suggestion,
                 "revision": revision,
                 "phase": "identity-review",
                 "dialogueRevision": dialogue["revision"],
