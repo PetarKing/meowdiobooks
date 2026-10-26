@@ -3678,8 +3678,10 @@ describe('v2 wizard', () => {
     ])
     const applyEdits = within(editActions).getByRole('button', { name: 'Next →' })
     fireEvent.click(applyEdits)
-    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    expect(screen.getByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
+    expect(screen.queryByRole('progressbar')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
     expect(screen.getByText('No cast changes to apply')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
@@ -3687,7 +3689,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }))
     expect(screen.queryByRole('button', { name: 'Accept suggestion' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
-    expect(applyEdits).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeEnabled()
   })
 
   it('starts a new audition directly without a replacement warning', async () => {

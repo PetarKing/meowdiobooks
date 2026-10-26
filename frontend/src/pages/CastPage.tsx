@@ -155,9 +155,10 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     const enhancedCasting = snapshot?.castingPreviewAvailable === true && Boolean(gateway.previewCasting);
     const sourceBookIds: string[] = [];
     const castEditsDirty = identityDecisionSignature(identityDecisions) !== identityDecisionSignature(decisionsForCast(current))
-      || voiceModel !== (current.voiceModel ?? voiceModel)
-      || language !== (current.language ?? language)
+      || voiceModel !== (current.voiceModel ?? snapshot?.voiceSelection.modelId ?? voiceModel)
+      || language !== (current.language ?? snapshot?.voiceSelection.language ?? language)
       || current.auditionPackRefreshRequired === true;
+    const keepExistingVoices = editingCast && !castEditsDirty && current.phase !== "identity-review" && !castGenerationPaused;
     const generateVoices = () => { setLanguagePickerOpen(false); setDesigningVoices(false); void processCandidate("cast", { proposalRevision: current.revision, identityDecisions: Object.values(identityDecisions), voiceModel, language, ...(enhancedCasting ? { sourceBookIds, castingPreviewFingerprint } : {}) }).then((candidate) => { const cast = candidate as unknown as CastArtifact; const castVoices = [cast.narrator, ...(cast.identities ?? [])].filter(Boolean) as CastVoice[]; setCastCandidate(cast); setVoiceSelections((selected) => ({ ...automaticSharedVoiceSelections(cast), ...acceptedVoiceSelections(cast), ...Object.fromEntries(castVoices.flatMap((voice) => voiceHasRevision(voice, selected[voice.characterId]) ? [[voice.characterId, selected[voice.characterId]]] : [])) })); setVoiceRoutes(voiceRoutesForCast(cast)); setConfirmedVoiceRoutes(confirmedVoiceRoutesForCast(cast)); setResolvedLabels(resolvedLabelsForCast(cast)); setNarratorDirection(cast.narrator?.voiceDirection ?? narratorDirection); setEditingCast(false); setDesigningVoices(false); }).catch((reason) => { setLanguagePickerOpen(false); setDesigningVoices(false); updateCastingPreview(false); setError(message(reason)); }); };
     const changeCastingModel = (id: string) => {
       setCastGenerationPaused(false);
@@ -185,7 +186,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
     const languages = snapshot?.voiceModels.find((row) => row.id === voiceModel)?.supportedLanguages ?? [];
     const showMethodRows = capabilities.showVoiceModelControls && availableVoiceModels.length > 1;
     const closeVoiceSetup = () => { setLanguagePickerOpen(false); updateCastingPreview(false); setDesigningVoices(false); };
-    const generateAction = <button type="button" className="primary" disabled={busy || voiceOptionsUnavailable || (enhancedCasting && !castingPreviewReady) || pendingConfirmations.length > 0 || !voiceModel || !languages.includes(language) || !narrationLanguageConfirmed || (editingCast && !castEditsDirty)} onClick={generateVoices}>{t(castGenerationPaused ? "Continue voice generation" : "Generate voices")} →</button>;
+    const generateAction = <button type="button" className="primary" disabled={busy || pendingConfirmations.length > 0 || (!keepExistingVoices && (voiceOptionsUnavailable || (enhancedCasting && !castingPreviewReady) || !voiceModel || !languages.includes(language) || !narrationLanguageConfirmed))} onClick={keepExistingVoices ? () => { closeVoiceSetup(); setEditingCast(false); } : generateVoices}>{t(keepExistingVoices ? "Continue" : castGenerationPaused ? "Continue voice generation" : "Generate voices")} →</button>;
     const voiceSetupDialog = designingVoices && <DialogBackdrop className="process-overlay voice-setup-overlay">
       <DialogSurface className="voice-setup-modal" aria-labelledby="voice-setup-title" onDismiss={busy ? undefined : languagePickerOpen ? () => setLanguagePickerOpen(false) : closeVoiceSetup}>
         <header className="voice-setup-heading">

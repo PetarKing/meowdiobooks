@@ -78,6 +78,37 @@ describe("Voice design language confirmation", () => {
     expect(screen.getAllByRole("dialog")).toHaveLength(1);
   });
 
+  it.each(["language", "method"])("keeps unchanged auditions and regenerates after changing %s", async (setting) => {
+    const base = snapshotFor("cast-identities");
+    const snapshot: WizardSnapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ["import", "extract", "dialogue", "review"] },
+      cast: { revision: "voices-1", phase: "audition-review", dossiers: [], proposals: [], voiceModel: "first", language: "english", narrator: { characterId: "narrator", name: "Narrator", voicePreviewRevision: "v1", previewUrl: "/voice.wav" }, identities: [] },
+      voiceModels: [{ id: "first", label: "First method", supportedLanguages: ["english", "french"] }, { id: "second", label: "Second method", supportedLanguages: ["english", "french"] }],
+      voiceSelection: { modelId: "first", language: "english" },
+      castingPreviewAvailable: false,
+    };
+    const processStage = vi.fn().mockImplementation(() => new Promise(() => {}));
+    render(<App gateway={{ ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), processStage }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "← Edit cast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    expect(processStage).not.toHaveBeenCalled();
+    expect(screen.getByRole("region", { name: "Cast voice auditions" })).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "← Edit cast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+    if (setting === "language") {
+      fireEvent.click(screen.getByRole("combobox", { name: "Narration language" }));
+      fireEvent.click(screen.getByRole("option", { name: "french" }));
+    } else fireEvent.click(screen.getByRole("button", { name: "Second method" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate voices →" }));
+    expect(processStage).toHaveBeenCalledExactlyOnceWith(fixtureBook.id, "cast", expect.objectContaining({ voiceModel: setting === "method" ? "second" : "first", language: setting === "language" ? "french" : "english" }));
+    // The loader starts during submission, before the server returns a job.
+    expect(screen.getByRole("progressbar", { name: "Processing progress" })).toBeVisible();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
+    expect(screen.queryByRole("dialog", { name: "Ready for their voices?" })).not.toBeInTheDocument();
+  });
+
   it.each([true, false])("lets a user refresh unavailable voice options without revealing providers (enhanced: %s)", async (enhanced) => {
     const snapshot: WizardSnapshot = {
       ...snapshotFor("cast-identities"),
