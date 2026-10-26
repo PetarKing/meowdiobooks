@@ -802,10 +802,8 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .transcript-span b small { font:inherit; letter-spacing:inherit; }
 .transcript-span span { white-space:pre-wrap; overflow-wrap:anywhere; }
 .transcript-span.narration { border-left-color:var(--line); }
-.transcript-span.dialogue { border-left-color:var(--line-strong); background:var(--paper); }
-.transcript-span.dialogue b { color:var(--muted); }
-.transcript-span.dialogue:nth-child(even) { border-left-color:var(--line-strong); background:var(--paper); }
-.transcript-span.dialogue:nth-child(even) b { color:var(--poppy-dark); }
+.transcript-span.dialogue { border-left-color:var(--speaker-accent, var(--poppy-dark)); background:var(--paper); }
+.transcript-span.dialogue b { color:var(--speaker-accent, var(--poppy-dark)); }
 .transcript-span.excluded { border-left-color:var(--warning-border); background:repeating-linear-gradient(-45deg,var(--paper),var(--paper) 7px,var(--warning-soft) 7px,var(--warning-soft) 14px); color:var(--muted); }
 .transcript-span.excluded span { text-decoration:line-through; text-decoration-color:color-mix(in srgb, var(--line-strong) 45.0%, transparent); }
 .transcript-loading,.transcript-empty { flex:1; display:grid; place-content:center; justify-items:center; gap:7px; min-height:0; color:var(--color-muted, var(--muted)); text-align:center; font-family:"Avenir Next",sans-serif; }
