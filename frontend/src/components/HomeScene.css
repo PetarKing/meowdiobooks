@@ -1,61 +1,14 @@
-/* Three isolated visual directions. The scene fills the viewport, outside content layout. */
+/* The atmosphere fills the viewport without participating in content layout. */
 .app-shell:has(.home-scene) { position: relative; isolation: isolate; overflow: clip; }
 .app-shell:has(.home-scene) .topbar { background: color-mix(in srgb, var(--canvas) 88%, transparent); }
 .home-scene.reading-cat-companion { position: fixed; z-index: -1; inset: 0; overflow: hidden; pointer-events: none; isolation: auto; }
-.home-sky { position: absolute; inset: 0; width: 100%; height: 100%; }
-.home-sky-halo { color: var(--poppy); opacity: .18; }
-.home-sky-waves { color: var(--folio-border-strong); opacity: .4; animation: home-waves 28s ease-in-out infinite; }
-.home-sky-stars { color: var(--poppy); opacity: .5; animation: home-stars 9s ease-in-out infinite; }
-.home-sky-sheets { opacity: .3; animation: home-sheets 12s ease-in-out infinite; }
-.home-sky-moon { color: var(--poppy); opacity: .32; }
-.home-sky-orbits { color: var(--poppy); opacity: .2; animation: home-waves 32s ease-in-out infinite; }
-.home-sky-book { color: var(--folio-border-strong); opacity: .5; animation: home-sheets 24s ease-in-out infinite; }
-.home-scene-cat { position: absolute; width: min(76vw, 1350px); right: -10vw; top: calc(48vh - min(32vw, 550px)); }
-.home-scene .guide-scene-art { position: static; width: 100%; opacity: 1; }
-.home-scene-motion.reading-cat-motion { position: fixed; z-index: 11; right: 24px; bottom: 24px; width: 44px; height: 44px; min-height: 44px; }
-.studio-hero:has(.home-scene) { position: static; isolation: auto; display: flex; align-items: center; min-height: clamp(500px, 57vh, 780px); margin-bottom: 24px; }
-.studio-hero:has(.home-scene) .studio-hero-copy { position: relative; z-index: 1; width: min(48%, 600px); padding: 40px 0; }
-.studio-hero:has(.home-scene) h1 { font-size: clamp(58px, 5vw, 92px); margin: 22px 0; }
-.studio-hero:has(.home-scene) .studio-hero-copy > p { font-size: 16px; max-width: 390px; margin-bottom: 28px; }
-.studio-hero:has(.home-scene) .quick-import { max-width: 440px; }
-.app-shell:has(.home-scene) .workspace .home-main { max-width: none; padding: 26px clamp(28px, 7vw, 160px) 64px; }
-.home-main:has(.home-scene) .home-flow:has(.wip-shelf) { position: relative; z-index: 1; padding: 24px; margin-inline: -24px; background: color-mix(in srgb, var(--canvas) 94%, transparent); border: 1px solid color-mix(in srgb, var(--line) 60%, transparent); border-radius: 16px; }
-/* Moonrise: closer portrait against an oversized, slowly drifting lunar orbit. */
-.home-scene--moonrise .home-scene-cat { width: min(90vw, 1650px); right: -21vw; top: calc(45vh - 500px); }
-.home-scene--moonrise .guide-scene-green,
-.home-scene--moonrise .guide-scene-cherry,
-.home-scene--moonrise .guide-scene-orbit { opacity: 0; }
-.studio-hero.studio-hero--moonrise .studio-hero-copy { padding: 36px; border: 1px solid color-mix(in srgb, var(--poppy) 16%, transparent); border-radius: 18px; background: color-mix(in srgb, var(--canvas) 93%, transparent); }
-.studio-hero--moonrise .studio-kicker { color: var(--poppy); }
-/* Storybook: an open-book landscape with the cat on the left and the studio on the right. */
-.home-scene--storybook .home-scene-cat { width: min(82vw, 1480px); right: auto; left: -20vw; top: calc(49vh - 480px); }
-.home-scene--storybook .guide-scene-green { opacity: .4; }
-.studio-hero.studio-hero--storybook { justify-content: flex-end; }
-.studio-hero.studio-hero--storybook .studio-hero-copy { width: min(45%, 640px); }
-.studio-hero--storybook h1 em { font-style: normal; }
-@keyframes home-waves { 0%,100% { transform: translate(-22px,18px); } 50% { transform: translate(26px,-20px); } }
-@keyframes home-stars { 0%,100% { opacity: .25; } 50% { opacity: .65; } }
-@keyframes home-sheets { 0%,100% { transform: translateY(8px); } 50% { transform: translateY(-15px); } }
-@media (min-width: 1800px) { .studio-hero:has(.home-scene) { min-height: min(60vh, 900px); } }
-@media (max-width: 1000px) and (min-width: 701px) {
-  .studio-hero:has(.home-scene) h1 { font-size: 54px; }
-  .home-scene-cat { width: 950px; right: -280px; top: 40px; }
-  .home-scene--moonrise .home-scene-cat { width: 1150px; right: -400px; top: -20px; }
-  .home-scene--storybook .home-scene-cat { width: 1000px; left: -320px; top: 0; }
+.studio-hero--hybrid .studio-hero-copy { position: relative; z-index: 1; }
+.studio-hero--hybrid h1 { margin: 22px 0; }
+.studio-hero--hybrid .studio-hero-copy > p { font-size: 16px; max-width: 390px; margin-bottom: 28px; }
+.studio-hero--hybrid .quick-import { max-width: 440px; }
+.home-main:has(.home-scene) .home-flow:has(.wip-shelf) { position: relative; z-index: 1; margin-inline: -24px; border: 1px solid transparent; }
+@media (max-width: 750px) {
+  .studio-hero--hybrid .studio-hero-copy > p { font-size: 14px; margin-bottom: 20px; }
+  .studio-hero--hybrid .home-mobile-library { align-self: flex-start; padding: 8px 12px; background: color-mix(in srgb, var(--canvas) 92%, transparent); border-radius: 8px; }
 }
-@media (max-width: 700px) {
-  .app-shell:has(.home-scene) .workspace .home-main { padding: 20px 20px 48px; }
-  .studio-hero:has(.home-scene) { flex-direction: column; align-items: stretch; justify-content: flex-start; min-height: 670px; }
-  .studio-hero:has(.home-scene) .studio-hero-copy { width: 100%; padding: 10px 0; }
-  .studio-hero:has(.home-scene) h1 { font-size: 48px; margin: 16px 0; }
-  .studio-hero:has(.home-scene) .studio-hero-copy > p { font-size: 14px; margin-bottom: 20px; }
-  .home-sky { opacity: .35; }
-  .studio-hero:has(.home-scene) .home-mobile-library { align-self: flex-start; padding: 8px 12px; background: color-mix(in srgb, var(--canvas) 92%, transparent); border-radius: 8px; }
-  .home-scene-cat, .home-scene--moonrise .home-scene-cat, .home-scene--storybook .home-scene-cat { width: 620px; right: calc(50% - 310px); left: auto; top: 330px; }
-  .home-scene--moonrise .home-scene-cat { top: 360px; }
-  .home-scene--storybook .home-scene-cat { top: 340px; }
-  .studio-hero.studio-hero--moonrise .studio-hero-copy { padding: 20px; }
-  .home-scene-motion.reading-cat-motion { right: 14px; bottom: 14px; }
-  .home-main:has(.home-scene) .home-flow:has(.wip-shelf) { margin-inline: 0; padding: 18px; }
-}
-@media (prefers-reduced-motion: reduce) { .home-scene * { animation: none !important; } .home-scene-motion { display: none !important; } }
+@media (prefers-reduced-motion: reduce) { .home-scene * { animation: none !important; } }

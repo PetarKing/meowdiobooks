@@ -188,3 +188,12 @@ unchanged. Browser checks cover 2 and 12 books in both themes at 320, 375, 390 a
 is vertically centered beside the heading, with no horizontal overflow. Production build passed.
 Evidence is under `assets/review/cat-companion/shelf-spacing/`. The owner approved this version
 and authorized shipping followed by preservation-safe task worktree cleanup.
+
+## Production selection
+
+The custom SVG direction is the production design. The alternate cat Home layouts, optional
+WebGL/dithercn engine and comparison controls are removed from current source; the experiment
+commits and screenshots preserve the comparison. The original sanctuary art remains on Home,
+while Library uses the shared reading cat. The six collection presets remain available in the
+synthetic preview, with a smaller single-row toolbar. No new runtime dependency is shipped.
+Core Python/UI versions advance together to 0.1.76 for immutable Cloud adoption.
