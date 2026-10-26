@@ -106,31 +106,38 @@
   .review-scan-progress-track i { animation: none; width: 100%; }
 }
 
-.cleanup-proposal { margin-block: 1rem; padding: 1rem; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-paper); }
-.cleanup-proposal > b { display: block; color: var(--color-ink); }
 .cleanup-replacement { white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--font-display, Georgia, serif); }
-.cleanup-deletion { color: var(--color-muted); }
 
 .ai-cleanup-source mark { white-space: pre-wrap; overflow-wrap: anywhere; }
 
 
 /* Suggestions, user selections, and bulk actions have separate visual meanings. */
-.review-choice-title, .cleanup-proposal > b { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
-.resolution-options button.review-recommended:not(.selected) { background: var(--green-soft); border-left-color: var(--color-success, var(--green)); }
-.review-choice-suggestion { color: var(--color-success, var(--green)); }
+.review-choice-title { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
+.resolution-options .cleanup-replacement { font-size: 16px; color: var(--color-ink, var(--ink)); }
 .review-choice-check { color: var(--color-action, var(--poppy)); }
-.cleanup-proposal.selected { background: var(--blush); border-color: var(--color-action, var(--poppy)); }
-.review-bulk-area { grid-column: 1 / -1; margin-top: .5rem; padding-top: 1rem; border-top: 1px solid var(--color-border, var(--line)); }
-.resolution-options .cleanup-bulk-warning { width: 100%; border: 1px solid var(--warning-border); background: transparent; }
-.resolution-options .cleanup-bulk-warning:hover:not(:disabled) { border-color: var(--warning-ink); background: var(--warning-soft); }
-.cleanup-bulk-title { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; color: var(--warning-ink); }
-.resolution-options .cleanup-bulk-warning:disabled { opacity: 1; border-color: var(--color-border, var(--line)); }
-.cleanup-bulk-warning:disabled .cleanup-bulk-title { color: var(--color-muted, var(--muted)); }
+.review-bulk-area { grid-column: 1 / -1; padding-top: 14px; }
+.resolution-options .cleanup-bulk-warning { display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 64px; padding: 16px; border: 1px solid var(--warning-border); border-left: 3px solid var(--warning-ink); border-radius: 4px; background: var(--warning-soft); box-shadow: none; text-align: left; color: var(--warning-ink); }
+.resolution-options .cleanup-bulk-warning b { font-size: 12px; font-weight: 600; line-height: 1.5; }
+.resolution-options .cleanup-bulk-warning > span { flex: 0 0 auto; font-size: 18px; }
+.resolution-options .cleanup-bulk-warning:hover:not(:disabled) { border-color: var(--warning-ink); filter: brightness(1.06); }
+.resolution-options .cleanup-bulk-warning:focus-visible { outline: 2px solid var(--warning-ink); outline-offset: 3px; }
+.resolution-options .cleanup-bulk-warning:disabled { opacity: 1; background: var(--color-paper, var(--paper)); border-color: var(--color-border, var(--line)); color: var(--color-muted, var(--muted)); }
+@media (min-width: 1200px) {
+  .resolution-panel.has-bulk-choice { display: flex; flex-direction: column; min-height: max(420px, calc(100dvh - 390px)); }
+  .resolution-panel.has-bulk-choice .resolution-options { display: flex; flex-direction: column; flex: 1; }
+  .resolution-panel.has-bulk-choice .resolution-options > button { flex-shrink: 0; }
+  .resolution-panel.has-bulk-choice .review-bulk-area { margin-top: auto; padding-top: 24px; }
+}
 
 .review-source-excerpt { margin-block: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-/* Keep the cue and nearby sentence inline, preserving every source character and newline. */
-.source-passage { margin-block: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; font: 16px/1.8 var(--font-display); color: var(--color-ink, var(--ink)); }
-.source-passage .source-passage-context { color: var(--color-muted, var(--muted)); }
-.source-passage .source-focus { display: inline-block; vertical-align: top; width: 100%; box-sizing: border-box; border-left: 2px solid var(--color-action, var(--poppy)); padding-left: 15px; }
+/* One readable passage: context belongs inside its surface, never floating around it. */
+.source-passage { margin-block: 1rem; padding: 4px 0 4px 14px; border-left: 2px solid var(--color-action, var(--poppy)); white-space: pre-wrap; overflow-wrap: anywhere; font: 16px/1.65 var(--font-display); color: var(--color-ink, var(--ink)); }
+.source-passage p { margin: 0; }
+.source-passage p + p { margin-top: .65em; }
+.source-passage .source-nearby { color: var(--color-muted, var(--muted)); }
+.source-passage .source-extra-whitespace { display: none; }
 .source-passage mark { padding: 2px 3px; color: var(--color-ink, var(--ink)); background: var(--highlight); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+@media (max-width: 700px) {
+  .source-passage { padding-left: 12px; font-size: 16px; line-height: 1.55; }
+}

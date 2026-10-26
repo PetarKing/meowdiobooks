@@ -78,6 +78,8 @@ const zhCN: Record<string, string> = {
   "Apply all suggested choices ({{count}})": "应用全部建议的选择（{{count}}）",
   "Your manual choices are preserved.": "保留您手动做出的选择。",
   "No undecided suggestions remain. You can still change individual choices.": "没有尚未决定的建议。您仍可更改单项选择。",
+  "All suggestions decided": "所有建议均已决定",
+  "{{choice}} (Suggested)": "{{choice}}（建议）",
   "Suggested choice for this passage": "此段落的建议选择",
   "No book selected": "尚未选择书籍",
   "Generate could not be prepared. Your approved work is unchanged.": "无法准备生成音频。已批准的内容保持不变。",
