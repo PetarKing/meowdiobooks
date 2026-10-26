@@ -379,3 +379,63 @@ def test_character_only_chapter_does_not_require_unused_narrator():
     assert [row["effectiveCharacterId"] for row in plan["chapters"][0]["segments"]] == ["alice"]
     with pytest.raises(RenderPlanError, match="accepted narrator voice"):
         compile_render_plan(dialogue, cast, script, ["other"])
+
+
+@pytest.mark.parametrize(
+    "left,right,expected",
+    [
+        ("A shadow crossed her", "eyes.", "A shadow crossed hereyes."),
+        ("her ", "eyes.", "her eyes."),
+        ("her", "\neyes.", "her\neyes."),
+        ("her\u00a0", "eyes.", "her\u00a0eyes."),
+        ("said (", "word)", "said (word)"),
+        ("word", ", then", "word, then"),
+        ("inter-", "national", "inter-national"),
+        ("她的", "眼睛", "她的眼睛"),
+        ("彼女の", "目", "彼女の目"),
+        ("ภาษา", "ไทย", "ภาษาไทย"),
+        ("ses", "yeux", "sesyeux"),
+        ("её", "глаза", "еёглаза"),
+        ("τα", "μάτια", "ταμάτια"),
+        ("λέξη", "; next", "λέξη; next"),
+        ("cafe\u0301", "noir", "cafe\u0301noir"),
+        ("room", "12", "room12"),
+    ],
+)
+def test_narration_without_approved_boundary_keeps_existing_source_join(left, right, expected):
+    dialogue, cast, _script = _artifacts()
+    dialogue["spans"] = [
+        {**_span("s1", left, 0), "blockId": "page-1-block"},
+        {**_span("s2", right, 0), "blockId": "page-2-block"},
+    ]
+    script = build_recording_script(
+        dialogue,
+        {"revision": "review-1", "dialogueRevision": "dialogue-1",
+         "canStartCast": True, "blockers": []},
+        cast, revision="script-boundaries",
+    )
+    plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
+    segment = plan["chapters"][0]["segments"][0]
+    assert segment["text"] == expected
+    assert segment["sourceSpanIds"] == ["s1", "s2"]
+    assert [entry["text"] for entry in script["entries"]] == [left, right]
+
+
+def test_narration_without_approved_boundary_keeps_repeated_source_joins():
+    dialogue, cast, _script = _artifacts()
+    dialogue["spans"] = [
+        _span("s1", "She saw her", 0),
+        {**_span("s2", "eye", 0), "blockId": "b2"},
+        {**_span("s3", "s", 3), "blockId": "b2"},
+        {**_span("s4", "close.", 0), "blockId": "b3"},
+    ]
+    script = build_recording_script(
+        dialogue,
+        {"revision": "review-1", "dialogueRevision": "dialogue-1",
+         "canStartCast": True, "blockers": []},
+        cast, revision="script-boundaries",
+    )
+    plan = compile_render_plan(dialogue, cast, script, ["chapter-1"])
+    segment = plan["chapters"][0]["segments"][0]
+    assert segment["text"] == "She saw hereyesclose."
+    assert segment["sourceSpanIds"] == ["s1", "s2", "s3", "s4"]
