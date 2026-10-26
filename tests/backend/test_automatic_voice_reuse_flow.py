@@ -212,7 +212,7 @@ def _approve(client, book, cast, choices=None):
     assert response.status_code == 200, response.text
 
 
-def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None):
+def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None, delete_prior=False):
     lead, near, companion, new_label = (
         ("Alice", "Alicee", "Caterpillar", "Rabbit")
         if source_pdf
@@ -330,8 +330,58 @@ def run_sample(tmp_path, override=False, evidence_dir=None, source_pdf=None):
                     indent=2,
                 )
             )
+        if delete_prior:
+            deleted = client.delete(
+                f"/api/books/{destination}/stages/cast/candidates/{cast['revision']}"
+                f"/voices/{rows[lead]['characterId']}/{prior['revision']}"
+            )
+            assert deleted.status_code == 200, deleted.text
+            deleted_cast = deleted.json()
+            deleted_row = next(r for r in deleted_cast["identities"] if r["name"] == lead)
+            assert deleted_row["voiceCandidatePlan"].get("priorBookCandidates", 0) == 0
+            assert {
+                k: v
+                for k, v in deleted_row["voiceCandidatePlan"].items()
+                if k != "priorBookCandidates"
+            } == {
+                k: v
+                for k, v in rows[lead]["voiceCandidatePlan"].items()
+                if k != "priorBookCandidates"
+            }
+            calls_before = len(audition_calls)
+            cast = _candidate(
+                client,
+                destination,
+                _process(
+                    client,
+                    destination,
+                    "cast",
+                    {
+                        "proposalRevision": deleted_cast["revision"],
+                        "language": "english",
+                        "voiceModel": "test",
+                        "identityDecisions": [
+                            {
+                                "label": new_label,
+                                "category": "character",
+                                "canonicalName": f"{new_label} revised",
+                                "aliases": [],
+                                "primaryLabel": new_label,
+                            }
+                        ],
+                    },
+                ),
+            )
+            retained = next(r for r in cast["identities"] if r["name"] == lead)
+            assert retained["voiceCandidates"] == [generated]
+            assert all(lead not in names for _, names in audition_calls[calls_before:])
+            assert client.get(generated["previewUrl"]).status_code == 200
+            override = True
         assert client.delete(f"/api/books/{newer}").status_code == 204
-        assert client.get(prior["previewUrl"]).content == selected_bytes
+        if delete_prior:
+            assert client.get(prior["previewUrl"]).status_code == 404
+        else:
+            assert client.get(prior["previewUrl"]).content == selected_bytes
         selected = generated if override else prior
         _approve(client, destination, cast, {lead: selected["revision"]})
         accepted = read_artifact(package, "cast")
@@ -371,3 +421,7 @@ def test_public_domain_alice_extraction_then_exact_voice_reuse(tmp_path):
         / "SampleBooks/public-domain-evaluation/01-alice-explicit-dialogue.pdf"
     )
     run_sample(tmp_path, source_pdf=source)
+
+
+def test_deleting_prior_audition_keeps_generated_voice_on_unrelated_cast_edit(tmp_path):
+    run_sample(tmp_path, delete_prior=True)
