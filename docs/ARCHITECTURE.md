@@ -321,15 +321,22 @@ gateway behavior suite as the local adapters before either package is released.
 
 ### Optional cross-book casting
 
-Compositions can supply `cast_voice_reuse` to expose the shared compact Cast chooser. Its `preview`
-method is read-only and returns eligible source books, exact-match counts, casting choices and
-currency-aware estimates. `apply` runs inside Cast generation only after the user continues; the
-composition may use AI for identities not matched exactly. Source book IDs form a canonical set. Exact matches must be unique
-across the selected pool; conflicting source candidates are never resolved by selection order. The preview fingerprint binds the reviewed selection to application.
-An optional `import_voice` method supports explicit source-voice correction during audition review.
+The default Cast UI does not offer manual source-book selection or an existing-voice picker.
+The optional `cast_voice_reuse` backend extension still exposes read-only preview/quote data,
+`apply`, and `import_voice` for compatible compositions. Its legacy source-ID, unique-match,
+and fingerprint validation contracts remain unchanged; removing the UI is not a migration of
+persisted backend artifacts. The shared UI requests quotes with an empty source selection.
 
-The composition must authorize sources, validate compatibility and copy complete immutable voice
-assets into the destination before returning. Core preserves destination character identity and
-requires normal audition acceptance. Reopening the same selection uses destination snapshots without
-reading the source. The source book is provenance, never an ongoing dependency. AI uncertainty should
-leave a character for ordinary generation rather than introduce a required manual matching phase.
+Compositions can supply optional `previousVoiceMatches` on a Cast artifact, keyed by exact
+source label with a source `bookTitle`, to display prior-book provenance during identity review.
+Required review remains blocking and takes visual priority; suggested review remains optional.
+An audition with `source: "previous-book"` displays that provenance. The Voices roster derives
+its label and color from the currently chosen candidate, not merely from the existence of a match.
+An explicit choice overrides the normal first-playable-candidate default. Bulk acceptance retains
+the existing confirmation for choices that have not been individually approved.
+
+These are presentation contracts. Automatic account-scoped discovery, latest-book tie-breaking,
+asset import, and generation of additional candidates are not implemented by this UI change.
+The composition remains responsible for source authorization, compatibility, and copying complete
+immutable voice assets into the destination. The source book is provenance, never an ongoing
+dependency. Core preserves destination identity and requires normal audition acceptance.
