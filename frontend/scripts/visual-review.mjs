@@ -47,6 +47,9 @@ try {
           await page.goto(`http://127.0.0.1:${port}/iframe.html?id=product-accepted-baseline--${id}&viewMode=story&appearance=${appearance}`);
           await page.waitForSelector(`[data-scenario-ready="${id}"]`, { timeout: 30000 });
           await page.evaluate(async () => { await document.fonts.ready; await Promise.all([...document.images].map(image => image.decode().catch(() => {}))); });
+          // React's ready marker and decoded assets can precede the browser's next
+          // layout/paint. Audit the same settled frame that the screenshot captures.
+          await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
           const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
           await page.addScriptTag({ path: path.join(root, 'node_modules/axe-core/axe.min.js') });
           const violations = await page.evaluate(async () => {
