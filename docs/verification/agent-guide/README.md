@@ -25,8 +25,10 @@ then open `/for-agents`. No model execution is needed to read the guide.
 
 - `npm --prefix frontend run build`: passed. Existing large-chunk advisory remains.
 - `npm --prefix frontend run lint`: no errors; pre-existing LanguagePicker fast-refresh warning.
-- `npm --prefix frontend test -- src/pages/AgentGuide.test.tsx src/i18n.test.tsx src/App.test.tsx`:
-  Full frontend suite: 576 tests passed, including 5 guide tests for disclosures, edition policy, locale, pause and hidden-tab suspension.
+- `npm --prefix frontend test`: 576 tests passed, including 5 guide tests for disclosures, edition
+  policy, locale, pause and hidden-tab suspension.
+- `npm --prefix frontend test -- src/pages/AgentGuide.test.tsx src/App.test.tsx src/app/useAppearance.test.tsx`:
+  229 tests passed after the shared App/footer appearance integration.
 - Chrome browser reuse: studio upload and navigation controls exposed by name; followed the actual
   studio footer to the guide; expanded all six topics, collapsed an individual topic with Enter,
   switched language and theme. In the revision, verified automatic movement from changing computed
