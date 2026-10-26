@@ -27,3 +27,26 @@ Browser review covers desktop light/dark Home, empty and populated Library, and 
 Home/Library layouts with no horizontal overflow. The pause button changes motion state, the
 tail transform advances during playback, and populated Library motion stays paused. Reduced
 motion is handled in CSS. Screenshots in `assets/review/cat-companion/` use synthetic data.
+
+## Three immersive Home directions
+
+Requested follow-up: increase the desktop scale and add the guide's background-wide effects.
+All three now fill the viewport with SVG scenery, rather than putting a small illustration in
+the hero grid. The neutral visual context is confined to this experiment; it carries no commands.
+The design-preview buttons change only presentation, preserving the active workflow state.
+
+- [01 · Wide sky](http://127.0.0.1:5213/studio.html?cat=wide-sky): large cat on the right,
+  sweeping dither ribbons, stars and floating sheets across the page.
+- [02 · Moonrise](http://127.0.0.1:5213/studio.html?cat=moonrise): closer cat portrait,
+  oversized cherry moon, orbital lines and a quiet surface around the import controls.
+- [03 · Storybook](http://127.0.0.1:5213/studio.html?cat=storybook): scene on the left,
+  import on the right, and an open-book landscape spanning the bottom of the page.
+
+The book shelf uses a readable surface over the background. Library retains the earlier treatment.
+All motion shares the pause control, hidden-tab pause and reduced-motion behavior. No new runtime
+dependency, canvas, WebGL or frame loop is used. The scene and shared illustration load lazily.
+
+Validation: build, lint, 209 guide/App tests and Storybook/preview types passed. Existing warnings
+remain. Browser evidence in `assets/review/cat-companion/versions/` covers all three directions
+at 1920×1080 light/dark and 390×844 dark, plus Wide sky at 2560×1440. No horizontal overflow;
+the phone text begins above the cat; pause stops background stars and the cat's tail together.

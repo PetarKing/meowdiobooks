@@ -5,7 +5,7 @@ import './ReadingCatCompanion.css';
 const ReadingCat = lazy(() => import('./ReadingCatIllustration').then(module => ({ default: module.ReadingCatIllustration })));
 
 /** Decorative only: never delays navigation, import, or Library controls. */
-export function ReadingCatCompanion({ variant }: { variant: 'home' | 'library' | 'empty' }) {
+export function ReadingCatCompanion({ variant }: { variant: 'library' | 'empty' }) {
   const { i18n } = useTranslation();
   const quiet = variant === 'library';
   const [paused, setPaused] = useState(quiet);
