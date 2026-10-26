@@ -3308,6 +3308,37 @@ describe('v2 wizard', () => {
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
 
+  it('decides a repeated footer family once while preserving a kept exception', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+    }
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-2', boundaryCandidates: [], warnings: [{
+      id: 'family', kind: 'ai-cleanup', severity: 'warning', decisionScope: 'occurrence',
+      availableActions: ['keep', 'exclude', 'repair'], occurrences: Array.from({ length: 400 }, (_, i) => ({
+        id: `footer-${i}`, source: `Publisher ${i + 1}`, page: i + 1,
+        availableActions: ['keep', 'exclude', 'repair'], replacement: '', proposalStatus: 'proposed',
+        patternGroupId: 'publisher-numbered', patternVerification: 'verified',
+      })),
+    }] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    await screen.findByRole('heading', { name: 'Repeated page text' })
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    fireEvent.click(screen.getByText('Adjust this occurrence'))
+    fireEvent.click(screen.getByRole('button', { name: /^Keep this occurrence/ }))
+    expect(screen.getByText('Example 2 of 400')).toBeInTheDocument()
+    expect(screen.getByText('Applies to 399 undecided occurrences. Your individual choices are preserved.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Omit repeated text' }))
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Omit repeated text' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
+    expect(screen.getByRole('button', { name: /^Keep this occurrence/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /Apply all suggested choices/ })).not.toBeInTheDocument()
+  })
+
   it('shows exact hyphen spellings and previews the explicit choice', async () => {
     const snapshot: WizardSnapshot = {
       ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },

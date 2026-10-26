@@ -179,6 +179,53 @@ def preview_bulk_decision(
     }
 
 
+def _validate_pattern_groups(result, candidates, spans):
+    """Bind family verdicts and individual vetoes to their exact source window identities."""
+    from .cleanup_patterns import pattern_verdict, representative_windows
+
+    grouped = result.get("patternGroups", [])
+    evidence = [row for row in result.get("windows", []) if row.get("patternGroupId")]
+    by_window = {f"{row['blockId']}:{row['sourceStart']}-{row['sourceEnd']}": row
+                 for row in candidates.values()}
+    if (len({row.get("patternGroupId") for row in grouped}) != len(grouped)
+            or len({row.get("windowId") for row in evidence}) != len(evidence)
+            or {row.get("patternGroupId") for row in evidence} != {row.get("patternGroupId") for row in grouped}):
+        raise ReviewContractError("Pattern evidence must have unique complete group and window identities")
+    for group in grouped:
+        members = [row for row in evidence if row["patternGroupId"] == group["patternGroupId"]]
+        eligible = []
+        for member in members:
+            candidate = by_window.get(member.get("windowId"))
+            answers = member.get("answers", {})
+            if (candidate is None or candidate["patternGroupId"] != group["patternGroupId"]
+                    or member.get("patternVerdict") != group.get("verdict")
+                    or set(answers) != {"production", "word_damage"}
+                    or any(value not in {"clean", "review", "uncertain"} for value in answers.values())
+                    or not any(str(span.get("blockId")) == candidate["blockId"]
+                               and span.get("renderRole") == "narration"
+                               and span.get("spokenStart", span.get("sourceStart", 0)) <= candidate["sourceStart"]
+                               and candidate["sourceEnd"] <= span.get("spokenEnd", span.get("sourceEnd", 0))
+                               for span in spans)):
+                raise ReviewContractError("Pattern evidence must match exact narrator source windows")
+            expected_status = ("eligible" if answers["production"] == "review" else "vetoed") if answers["word_damage"] == "clean" else None
+            if member.get("patternStatus") != expected_status:
+                raise ReviewContractError("Pattern eligibility disagrees with its contextual assessment")
+            if expected_status == "eligible":
+                eligible.append(member)
+        representatives = representative_windows(eligible)
+        if (type(group.get("candidateCount")) is not int or group["candidateCount"] != len(members)
+                or type(group.get("eligibleCount")) is not int or group["eligibleCount"] != len(eligible)
+                or group.get("eligibleWindowIds") != [row["windowId"] for row in eligible]
+                or group.get("representativeWindowIds") != [row["windowId"] for row in representatives]
+                or group.get("vetoes") != [{"windowId": row["windowId"], "answers": row["answers"]}
+                                          for row in members if row not in eligible]):
+            raise ReviewContractError("Pattern counts and representatives must match individual assessments")
+        verdict = "insufficient" if len(eligible) < 3 else pattern_verdict(group.get("verification"), representatives)[0]
+        if group.get("verdict") != verdict:
+            raise ReviewContractError("Pattern verdict must match its complete representative verification")
+    return {"groups": deepcopy(grouped), "windows": deepcopy(evidence)}
+
+
 def add_cleanup_proposals(
     workspace: Mapping[str, Any], extraction: Mapping[str, Any],
     dialogue: Mapping[str, Any], result: Mapping[str, Any],
@@ -188,6 +235,9 @@ def add_cleanup_proposals(
     index = {str(block["id"]): block for block in blocks}
     cue_rows = _verified_script_occurrences(blocks, dialogue, result.get("scriptDirections", {}))
     rows = []
+    pattern_candidates = {(row["blockId"], row["sourceStart"], row["sourceEnd"]): row
+                          for row in numbered_edge_candidates(blocks)}
+    pattern_evidence = _validate_pattern_groups(result, pattern_candidates, dialogue.get("spans", []))
     for proposal in result.get("occurrences", []):
         block = index.get(str(proposal.get("blockId", "")))
         start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
@@ -227,6 +277,29 @@ def add_cleanup_proposals(
                     "model": "gpt-6-luna",
                     "availableActions": ["keep", "exclude", "repair"] if replacement is not None
                     else ["keep", "exclude"]})
+        if proposal.get("patternGroupId") is not None:
+            candidate = pattern_candidates.get((str(block["id"]), start, end))
+            group = next((group for group in result.get("patternGroups", [])
+                          if group.get("patternGroupId") == proposal["patternGroupId"]), None)
+            evidence = next((window for window in result.get("windows", [])
+                             if window.get("windowId") == proposal.get("windowId")), None)
+            if (candidate is None or group is None or evidence is None
+                    or proposal.get("windowId") != f"{block['id']}:{start}-{end}"
+                    or evidence.get("patternGroupId") != candidate["patternGroupId"]
+                    or evidence.get("patternVerdict") != "verified"
+                    or group.get("verdict") != "verified"
+                    or proposal.get("windowId") not in group.get("eligibleWindowIds", [])
+                    or evidence.get("patternStatus") != "eligible"
+                    or evidence.get("answers") != {"production": "review", "word_damage": "clean"}
+                    or replacement != "" or proposal.get("patternVerification") != "verified"
+                    or proposal["patternGroupId"] != candidate["patternGroupId"]
+                    or not any(str(span.get("blockId")) == str(block["id"])
+                               and span.get("renderRole") == "narration"
+                               and span.get("spokenStart", span.get("sourceStart", 0)) <= start
+                               and end <= span.get("spokenEnd", span.get("sourceEnd", 0))
+                               for span in dialogue.get("spans", []))):
+                raise ReviewContractError("Pattern proposal requires exact verified narrator footer evidence")
+            row.update(patternGroupId=candidate["patternGroupId"], patternVerification="verified")
         # Even identical source strings can have different suggested replacements.
         row["matchKey"] = _digest([row["source"], replacement])
         rows.append(row)
@@ -266,6 +339,8 @@ def add_cleanup_proposals(
             "model": row["model"], "cleanupReason": cleanup_reason,
             "matchKey": _digest([occurrence["source"], replacement]),
         })
+        if row.get("patternGroupId"):
+            occurrence.update(patternGroupId=row["patternGroupId"], patternVerification="verified")
         if replacement is not None:
             warning["occurrences"].remove(occurrence)
             occurrence.update(kind="ai-cleanup", availableActions=["keep", "exclude", "repair"])
@@ -291,6 +366,7 @@ def add_cleanup_proposals(
     warnings.extend(_group_occurrences([*cue_rows, *novel], dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
             "cleanupSummary": dict(result.get("summary", {})),
+            "cleanupPatternEvidence": pattern_evidence,
             "scriptDirectionsSummary": dict(result.get("scriptDirections", {}).get("summary", {})),
             "summary": {**workspace["summary"], "groups": len(warnings),
                         "occurrences": sum(len(row["occurrences"]) for row in warnings)}}
@@ -508,6 +584,7 @@ def accept_review_revision(
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
         "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
+        "cleanupPatternEvidence": deepcopy(workspace.get("cleanupPatternEvidence", {"groups": [], "windows": []})),
         "scriptDirectionsSummary": dict(workspace.get("scriptDirectionsSummary", {})),
         "decisions": ordered,
         "consequencePreview": _aggregate_consequences(ordered),
@@ -1153,7 +1230,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
         key = (" ".join(name.casefold().split()), int(label["number"]) - page)
         candidates[key].append((block, match))
     result = []
-    for (_, folio_offset), rows in candidates.items():
+    for (label_key, folio_offset), rows in candidates.items():
         repeated_pages = sorted({int(block["page"]) for block, _ in rows})
         if len(repeated_pages) < 3:
             continue
@@ -1163,6 +1240,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
                 "Last-line label repeats on at least three pages with a consistent folio offset; verify its role.",
             )
             occurrence["detectionRule"] = "repeated-numbered-edge"
+            occurrence["patternGroupId"] = "numbered-edge:" + _digest([label_key, folio_offset])
             occurrence["patternEvidence"] = {
                 "distinctPageCount": len(repeated_pages), "folioOffset": folio_offset,
                 "firstPage": repeated_pages[0], "lastPage": repeated_pages[-1],
@@ -1472,6 +1550,11 @@ def _group_occurrences(
             for occurrence in occurrences:
                 by_match[str(occurrence["matchKey"])].append(occurrence)
             evidence_groups = list(by_match.values())
+        elif kind == "ai-cleanup":
+            by_pattern: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for occurrence in occurrences:
+                by_pattern[str(occurrence.get("patternGroupId", ""))].append(occurrence)
+            evidence_groups = list(by_pattern.values())
         else:
             evidence_groups = [occurrences]
         for evidence_group in evidence_groups:
@@ -1491,6 +1574,8 @@ def _group_occurrences(
             suffix = (
                 f":{evidence_group[0]['matchKey']}"
                 if kind == "repeated-matter"
+                else f":{evidence_group[0]['patternGroupId']}"
+                if kind == "ai-cleanup" and evidence_group[0].get("patternGroupId")
                 else ""
             )
             warning_id = f"review:{kind}{suffix}"
@@ -1512,6 +1597,9 @@ def _group_occurrences(
                     "availableActions": available_actions,
                     "readerState": reader_state,
                     "occurrences": evidence_group,
+                    **({"patternGroupId": evidence_group[0]["patternGroupId"],
+                        "patternVerification": "verified"}
+                       if kind == "ai-cleanup" and evidence_group[0].get("patternGroupId") else {}),
                 }
             )
     return result

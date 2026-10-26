@@ -123,6 +123,7 @@ def test_full_check_routes_flagged_only_preserves_source_and_emits_exact_edits(m
     assert result["summary"] == {
         "model": "gpt-6-luna", "policy": cleanup.POLICY_ID,
         "inputWindows": 2, "flaggedWindows": 1, "proposals": 1, "sourceReview": 0,
+        "patternGroups": 0, "patternVerifiedGroups": 0, "patternPreservedWindows": 0,
     }
     assert calls == ["Un-\nbroken."]
     assert result["occurrences"][0]["sourceStart"] == 0
@@ -499,6 +500,8 @@ def test_repeated_numbered_story_is_only_model_evidence_and_keep_retains_it(monk
 
     def decide(_root, _config, prompt, *_args, **_kwargs):
         payload = json.loads(prompt)
+        if "structural_evidence" not in payload:
+            return answers()
         evidence = payload["structural_evidence"][0]
         assert payload["TARGET"][evidence["targetStart"]:evidence["targetEnd"]].startswith("Room ")
         assert evidence["distinctPageCount"] == 3
@@ -520,6 +523,8 @@ def test_pattern_context_does_not_add_other_page_text_or_cross_spoken_boundaries
     extraction, dialogue = _numbered_pages("青空文庫")
     windows = cleanup.cleanup_windows(extraction, dialogue)
     for window in windows:
+        if "structuralEvidence" not in window:
+            continue
         evidence = window["structuralEvidence"][0]
         assert all(isinstance(v, int) for k, v in evidence.items() if k != "kind")
         assert len(window["source"][evidence["targetStart"]:evidence["targetEnd"]]) > 0

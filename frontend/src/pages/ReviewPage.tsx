@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type {
   AcceptanceDecision,
   ReviewCapability,
@@ -26,6 +27,8 @@ import {
   reviewUsesOccurrenceDecisions,
   reviewIsVerifiedScriptGroup,
   reviewScriptCueDecisions,
+  reviewIsPatternGroup,
+  reviewPatternDecisions,
 } from "../workflow/review";
 
 export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
@@ -38,16 +41,18 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
+  const isPatternGroup = warning && reviewIsPatternGroup(warning);
+  const pendingPatternCount = isPatternGroup ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined).length : 0;
   const isAiCleanup = warning?.kind === "ai-cleanup";
   const isScriptCue = warning && reviewIsVerifiedScriptGroup(warning);
   const pendingCueCount = isScriptCue ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined && reviewOccurrenceActions(warning, row).includes("exclude")).length : 0;
   const perOccurrence = warning && reviewUsesOccurrenceDecisions(warning);
   const hasCleanupSuggestion = isAiCleanup || occurrence?.proposalStatus != null || typeof occurrence?.replacement === "string";
-  const actionWarning = warning && occurrence ? { ...warning, kind: hasCleanupSuggestion ? "ai-cleanup" : warning.kind, readerState: occurrence.readerState ?? warning.readerState, occurrences: perOccurrence ? [occurrence] : warning.occurrences } : warning;
+  const actionWarning = warning && occurrence ? { ...warning, kind: hasCleanupSuggestion && !isPatternGroup ? "ai-cleanup" : warning.kind, readerState: occurrence.readerState ?? warning.readerState, occurrences: perOccurrence ? [occurrence] : warning.occurrences } : warning;
   const selectedAction = occurrence && perOccurrence ? reviewDecisions[occurrence.id] : warning && reviewDecisions[warning.id];
   const occurrenceActions = warning && occurrence ? reviewOccurrenceActions(warning, occurrence) : [];
   const deletionSuggestion = hasCleanupSuggestion && occurrence?.replacement === "" && occurrenceActions.includes("repair");
-  const visibleActions = isAiCleanup
+  const visibleActions = isAiCleanup || isPatternGroup
     ? (["keep", "exclude", "repair"] as ReviewCapability[]).filter((action) => occurrenceActions.includes(action) && (action !== "repair" || !deletionSuggestion))
     : occurrenceActions;
   const proposals = candidateWarnings.filter((group) => group.kind === "ai-cleanup").flatMap((group) => group.occurrences.filter((row) => reviewOccurrenceActions(group, row).includes("repair")).map((row) => ({ warning: group, occurrence: row })));
@@ -237,6 +242,12 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => setActiveOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => setActiveOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
+            {isPatternGroup && <div className="resolution-options" role="group" aria-label={t("Choose for repeated text")}>
+              <p>{t("Applies to {{count}} undecided occurrences. Your individual choices are preserved.", { count: pendingPatternCount })}</p>
+              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "exclude"))}><b>{t("Omit repeated text")}</b></button>
+              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "keep"))}><b>{t("Keep repeated text")}</b></button>
+            </div>}
+            <OccurrenceChoices grouped={Boolean(isPatternGroup)} label={t("Adjust this occurrence")}>
             <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>
             <h3>{t(hasCleanupSuggestion && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
             <div className="resolution-options">
@@ -256,6 +267,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
                 </button>
               </div>}
             </div>
+            </OccurrenceChoices>
           </section>
         </> : null}
       </div>
@@ -264,4 +276,9 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     <div className="phase-action"><button className="primary" disabled={!complete || busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button></div>
   </>;
 
+}
+
+
+function OccurrenceChoices({ grouped, label, children }: { grouped: boolean; label: string; children: ReactNode }) {
+  return grouped ? <details className="review-pattern-exceptions"><summary>{label}</summary>{children}</details> : <>{children}</>;
 }

@@ -141,3 +141,7 @@
 @media (max-width: 700px) {
   .source-passage { padding-left: 12px; font-size: 16px; line-height: 1.55; }
 }
+
+.review-pattern-exceptions { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.review-pattern-exceptions > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.review-pattern-exceptions[open] > summary { margin-bottom: 16px; }
