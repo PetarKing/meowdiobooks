@@ -29,7 +29,7 @@ try {
     assert.equal(await readyIdentity.locator('.cast-review-badge').count(), 0);
     await page.getByText('1 required · blocks continue').waitFor({ state: 'visible' });
     await page.getByText('1 suggested · optional').waitFor({ state: 'visible' });
-    const castContinue = page.getByRole('button', { name: 'Generate required auditions →' });
+    const castContinue = page.getByRole('button', { name: 'Next →' });
     assert(await castContinue.isDisabled(), 'Required identity blocks proceeding to auditions');
     assert(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth) <= 1);
     await page.screenshot({ path: `${out}/cast-${width}-${appearance}.png` });

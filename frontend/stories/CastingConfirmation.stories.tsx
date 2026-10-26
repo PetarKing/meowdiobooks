@@ -33,12 +33,24 @@ export const ConfirmSettledDefault: StoryObj<typeof meta> = {
     await userEvent.click(await canvas.findByRole("button", { name: /Alice.*Continue/ }));
     const navigation = await canvas.findByRole("navigation", { name: "Wizard stages" });
     await userEvent.click(within(navigation).getByText("Cast & voices"));
-    await userEvent.click(await canvas.findByRole("button", { name: "Design the voices →" }));
-    await canvas.findByText("≈ €2.94");
-    const selector = canvas.getByRole("combobox", { name: "Narration language" });
+    await userEvent.click(await canvas.findByRole("button", { name: "Next →" }));
+    const dialog = within(await within(document.body).findByRole("dialog", { name: "Ready for their voices?" }));
+    await dialog.findByText("≈ €2.94");
+    const selector = dialog.getByRole("combobox", { name: "Narration language" });
     await expect(selector).toHaveValue("");
-    await expect(canvas.getByRole("button", { name: "Continue →" })).toBeDisabled();
-    await userEvent.selectOptions(selector, "english");
-    await waitFor(() => expect(canvas.getByRole("button", { name: "Continue →" })).toBeEnabled());
+    await expect(dialog.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
+    await userEvent.click(selector);
+    await userEvent.click(dialog.getByRole("option", { name: "english" }));
+    await waitFor(() => expect(dialog.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
+  },
+};
+
+export const ExpandedLanguage: StoryObj<typeof meta> = {
+  play: async (context) => {
+    await ConfirmSettledDefault.play?.(context);
+    const dialog = within(within(document.body).getByRole("dialog", { name: "Ready for their voices?" }));
+    await userEvent.click(dialog.getByRole("combobox", { name: "Narration language" }));
+    await expect(dialog.getByRole("listbox")).toBeVisible();
+    await expect(dialog.getByRole("option", { name: "english" })).toHaveAttribute("aria-selected", "true");
   },
 };

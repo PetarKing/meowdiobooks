@@ -122,7 +122,7 @@ export async function enterScenario(
         await expect(await page.findByText("Alice was beginning to get very tired of sitting by her sister on the bank.")).toBeVisible();
         return;
       case "design-voices":
-        await click(prefix("Design the voices"));
+        await click(prefix("Next"));
         return;
       case "open-alice-voice":
         await click(prefix("Open {{name}} voice", { name: "Alice" }));

@@ -14,7 +14,7 @@ try {
       await page.waitForSelector('[data-scenario-ready]');
       const search=page.getByRole('searchbox',{name:'Search cast'});
       const filter=page.getByRole('combobox',{name:'Show cast'});
-      const gate=page.getByRole('button',{name:voice?'Accept cast & voices →':'Generate required auditions →'});
+      const gate=page.getByRole('button',{name:voice?'Accept cast & voices →':'Next →'});
       assert.equal(await gate.isDisabled(),true,'Required group must block continuation');
       await search.fill(voice?'A. Liddell':'Hearts');
       await page.waitForFunction(() => document.querySelectorAll('.cast-board .cast-tile:not(.cast-narrator-tile)').length===1);

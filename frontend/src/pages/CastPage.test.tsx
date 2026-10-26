@@ -26,14 +26,15 @@ async function openVoiceDesign(fetchPreview: NonNullable<WorkflowGateway["previe
     getBookSnapshot: vi.fn().mockResolvedValue(snapshot),
     previewCasting: fetchPreview,
     processStage,
+    getJob: vi.fn(createFixtureGateway("cast-identities").getJob),
   };
   render(<App gateway={gateway} capabilities={{ showVoiceModelControls }} />);
   fireEvent.click(await screen.findByRole("button", { name: /Alice.*Continue/ }));
   const navigation = await screen.findByRole("navigation", { name: "Wizard stages" });
   fireEvent.click(within(navigation).getByText("Cast & voices"));
-  fireEvent.click(await screen.findByRole("button", { name: "Design the voices →" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
   expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("");
-  return { processStage };
+  return { processStage, getJob: gateway.getJob };
 }
 
 describe("Voice design language confirmation", () => {
@@ -50,15 +51,31 @@ describe("Voice design language confirmation", () => {
     ] });
     const { processStage } = await openVoiceDesign(fetchPreview, false);
     await screen.findByText("≈ €2.94");
-    expect(screen.queryByRole("button", { name: /Create new voices|Reuse voices/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Automatic voice design")).not.toBeInTheDocument();
     expect(screen.queryByText(/Studio|Other provider|Technical provider details|Designed voices/)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Voice model" })).not.toBeInTheDocument();
-    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Generate voices →" }));
     await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({
       voiceModel: "qwen", language: "english", castingPreviewFingerprint: "english-quote",
     })));
+  });
+
+  it("dismisses confirmation as soon as generation is submitted", async () => {
+    const { processStage, getJob } = await openVoiceDesign(vi.fn().mockResolvedValue(quote));
+    processStage.mockResolvedValue({ id: "cast-job", status: "running", progress: 10, message: "Generating voices" });
+    getJob.mockImplementation(() => new Promise(() => {}));
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" }));
+    fireEvent.click(screen.getByRole("option", { name: "english" }));
+    const generate = screen.getByRole("button", { name: "Generate voices →" });
+    await waitFor(() => expect(generate).toBeEnabled());
+    fireEvent.click(generate);
+    expect(processStage).toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Ready for their voices?" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "Narration language" })).not.toBeInTheDocument();
+    expect(await screen.findByRole("progressbar", { name: "Processing progress" })).toBeVisible();
+    expect(screen.getAllByRole("dialog")).toHaveLength(1);
   });
 
   it.each([true, false])("lets a user refresh unavailable voice options without revealing providers (enhanced: %s)", async (enhanced) => {
@@ -82,6 +99,7 @@ describe("Voice design language confirmation", () => {
     ] });
     const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), previewCasting, processStage };
     render(<App gateway={gateway} capabilities={{ showVoiceModelControls: false }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    if (!enhanced) fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
     const refresh = await screen.findByRole("button", { name: "Refresh voice options" });
     expect(processStage).not.toHaveBeenCalled();
     if (enhanced) {
@@ -92,12 +110,13 @@ describe("Voice design language confirmation", () => {
     expect(screen.queryByText(/First provider|Preferred provider|Provider details|Other provider details|retired-provider/)).not.toBeInTheDocument();
     fireEvent.click(refresh);
     expect(screen.queryByRole("button", { name: "Refresh voice options" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
     if (enhanced) {
-      fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
-      await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+      fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
       expect(previewCasting).toHaveBeenLastCalledWith(fixtureBook.id, expect.objectContaining({ voiceModel: "host-default" }));
     }
-    const continueButton = screen.getByRole("button", { name: enhanced ? "Continue →" : "Generate required auditions →" });
+    const continueButton = screen.getByRole("button", { name: "Generate voices →" });
     expect(continueButton).toBeEnabled();
     expect(screen.queryByText(/First provider|Preferred provider|Provider details|Other provider details/)).not.toBeInTheDocument();
     fireEvent.click(continueButton);
@@ -135,6 +154,7 @@ describe("Voice design language confirmation", () => {
     const processStage = vi.fn().mockResolvedValue({ id: "cast-job", status: "failed", error: "Synthetic stop after submission" });
     const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), processStage };
     render(<App gateway={gateway} capabilities={{ showVoiceModelControls: false }} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
     const continueButton = await screen.findByRole("button", { name: "Continue voice generation →" });
     expect(screen.queryByRole("combobox", { name: "Voice model" })).not.toBeInTheDocument();
     expect(screen.queryByText(/First provider|Saved provider/)).not.toBeInTheDocument();
@@ -143,15 +163,70 @@ describe("Voice design language confirmation", () => {
     await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({ voiceModel: "saved", language: "english" })));
   });
 
+  it("keeps local model and language choices on Back and Cancel without a reuse adapter", async () => {
+    const snapshot: WizardSnapshot = {
+      ...snapshotFor("cast-identities"),
+      book: { ...snapshotFor("cast-identities").book, completedStages: ["import", "extract", "dialogue", "review"] },
+      activeArtifacts: { extraction: "e1", dialogue: "d1", review: "r1" },
+      cast: { revision: "draft", phase: "identity-review", dossiers: [], proposals: [] },
+      voiceModels: [{ id: "first", label: "First local method", supportedLanguages: ["english", "french"] }, { id: "second", label: "Second local method", supportedLanguages: ["english", "french"] }],
+      voiceSelection: { modelId: "first", language: "english" },
+      castingPreviewAvailable: false,
+    };
+    const processStage = vi.fn();
+    const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), previewCasting: undefined, processStage };
+    render(<App gateway={gateway} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: /Second local method/ }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "french" }));
+    for (const close of ["← Back to cast", "Cancel voice setup"]) {
+      fireEvent.click(screen.getByRole("button", { name: close }));
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+      expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("french");
+      expect(screen.getByRole("button", { name: /Second local method/ })).toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled();
+    }
+    expect(processStage).not.toHaveBeenCalled();
+  });
+
+  it.each([true, false])("recovers a saved local method when the only usable choice is a replacement (empty catalog entry: %s)", async (emptyEntry) => {
+    const snapshot: WizardSnapshot = {
+      ...snapshotFor("cast-identities"),
+      book: { ...snapshotFor("cast-identities").book, completedStages: ["import", "extract", "dialogue", "review"] },
+      activeArtifacts: { extraction: "e1", dialogue: "d1", review: "r1" },
+      cast: { revision: "draft", phase: "identity-review", dossiers: [], proposals: [] },
+      voiceModels: [...(emptyEntry ? [{ id: "saved", label: "Unavailable", supportedLanguages: [] }] : []), { id: "replacement", label: "Replacement", supportedLanguages: ["english"] }],
+      voiceSelection: { modelId: "replacement", language: "english" },
+      recoverableStages: { cast: { attempt: 1, message: "Saved", proposalRevision: "draft", modelId: "saved", language: "english" } },
+      castingPreviewAvailable: false,
+    };
+    const processStage = vi.fn().mockResolvedValue({ id: "cast-job", status: "failed", error: "Synthetic generation failure" });
+    const gateway = { ...createFixtureGateway("cast-identities"), getBookSnapshot: vi.fn().mockResolvedValue(snapshot), processStage };
+    render(<App gateway={gateway} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Next →" }));
+    fireEvent.click(screen.getByRole("button", { name: "Refresh voice options" }));
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" }));
+    fireEvent.click(screen.getByRole("option", { name: "english" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate voices →" }));
+    await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({ voiceModel: "replacement", language: "english" })));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Ready for their voices?" })).not.toBeInTheDocument());
+    expect(screen.getByRole("alert")).toHaveTextContent("Something went wrong while completing this step.");
+    fireEvent.click(screen.getByRole("button", { name: "Next →" }));
+    expect(screen.getByRole("combobox", { name: "Narration language" })).toHaveValue("english");
+    expect(screen.getByRole("button", { name: "Continue voice generation →" })).toBeEnabled();
+  });
+
   it("keeps the settled quote valid when the user confirms its default language", async () => {
     const fetchPreview = vi.fn().mockResolvedValue(quote);
     const { processStage } = await openVoiceDesign(fetchPreview);
     await screen.findByText("≈ €2.94");
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
-    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     expect(fetchPreview).toHaveBeenCalledTimes(1);
-    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    fireEvent.click(screen.getByRole("button", { name: "Generate voices →" }));
     await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({
       language: "english", castingPreviewFingerprint: "english-quote",
     })));
@@ -161,11 +236,11 @@ describe("Voice design language confirmation", () => {
     let finish!: (preview: CastingPreview) => void;
     const fetchPreview = vi.fn(() => new Promise<CastingPreview>((resolve) => { finish = resolve; }));
     await openVoiceDesign(fetchPreview);
-    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
     await waitFor(() => expect(fetchPreview).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
     finish(quote);
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
   });
 
   it("requires a fresh matching quote after changing the language", async () => {
@@ -174,14 +249,14 @@ describe("Voice design language confirmation", () => {
       .mockImplementationOnce(() => new Promise<CastingPreview>((resolve) => { finish = resolve; }));
     const { processStage } = await openVoiceDesign(fetchPreview);
     await screen.findByText("≈ €2.94");
-    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "french" } });
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "french" }));
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
     await waitFor(() => expect(fetchPreview).toHaveBeenLastCalledWith(fixtureBook.id, expect.objectContaining({ language: "french" })));
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
     expect(processStage).not.toHaveBeenCalled();
     finish({ ...quote, fingerprint: "french-quote" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
-    fireEvent.click(screen.getByRole("button", { name: "Continue →" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Generate voices →" }));
     await waitFor(() => expect(processStage).toHaveBeenCalledWith(fixtureBook.id, "cast", expect.objectContaining({
       language: "french", castingPreviewFingerprint: "french-quote",
     })));
@@ -191,11 +266,11 @@ describe("Voice design language confirmation", () => {
     const fetchPreview = vi.fn().mockRejectedValueOnce(new Error("Quote unavailable")).mockResolvedValue(quote);
     const { processStage } = await openVoiceDesign(fetchPreview);
     await screen.findByRole("alert");
-    fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
-    expect(screen.getByRole("button", { name: "Continue →" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
+    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
     expect(processStage).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "Continue →" })).toBeEnabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     expect(fetchPreview).toHaveBeenCalledTimes(2);
   });
 });

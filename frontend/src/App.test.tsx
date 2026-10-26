@@ -2594,21 +2594,21 @@ describe('v2 wizard', () => {
     })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'french' } })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "french" }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled())
     expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ voiceModel: 'studio', language: 'french' }))
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
 
     let finishQuote!: (preview: Awaited<ReturnType<NonNullable<typeof wizardApi.previewCasting>>>) => void
     vi.mocked(wizardApi.previewCasting!).mockImplementation(() => new Promise((resolve) => { finishQuote = resolve }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'english' } })
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "english" }))
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
     await waitFor(() => expect(finishQuote).toBeDefined())
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
     finishQuote({ sources: [], fingerprint: 'quote-english', exactMatchCount: 0, totalVoiceCount: 1, remainingVoiceCount: 1, currency: 'EUR', options: [{ modelId: 'studio', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 100 }] })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled())
   })
 
   it('retains casting choices when the initial cost request fails', async () => {
@@ -2624,12 +2624,12 @@ describe('v2 wizard', () => {
     })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t calculate casting cost.')
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: /Native/ }))
-    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'japanese' } })
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "japanese" }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled())
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ voiceModel: 'native', language: 'japanese' }))
   })
@@ -2673,17 +2673,17 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'cast-job', status: 'failed', error: 'test stop' })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     await screen.findByText('≈ €1.50')
     expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
     expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ language: 'english' }))
 
-    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'english' } })
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "english" }))
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled()
     expect(wizardApi.previewCasting).toHaveBeenCalledTimes(1)
     expect(wizardApi.processStage).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate voices →' }))
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast',
       expect.objectContaining({ language: 'english', castingPreviewFingerprint: 'initial-english-quote' })))
   })
@@ -2704,27 +2704,27 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
     expect(screen.queryByLabelText('Voice model')).not.toBeInTheDocument()
     expect(wizardApi.previewCasting).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
-    expect(screen.getByRole('heading', { name: 'Design the voices' })).toBeInTheDocument()
-    expect(screen.queryByRole('region', { name: 'Cast members' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByRole('heading', { name: 'Ready for their voices?' })).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Ready for their voices?' })).toBeInTheDocument()
     expect(screen.queryByText('Cast structure is ready')).not.toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('')
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
-    fireEvent.change(screen.getByRole('combobox', { name: 'Narration language' }), { target: { value: 'english' } })
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "english" }))
     fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
     expect(screen.getByRole('region', { name: 'Cast members' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('english')
     await screen.findByText('≈ €0.00')
     expect(screen.queryByRole('button', { name: /Reuse voices/ })).not.toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
-    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
     expect(screen.queryByRole('checkbox', { name: /Earlier book/ })).not.toBeInTheDocument()
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeEnabled())
     expect(wizardApi.processStage).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate voices →' }))
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({ sourceBookIds: [], castingPreviewFingerprint: 'preview-bound' })))
   })
 
@@ -2742,7 +2742,7 @@ describe('v2 wizard', () => {
     })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('heading', { name: 'Design the voices' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Ready for their voices?' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('french')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeEnabled())
     expect(wizardApi.previewCasting).toHaveBeenCalledWith('book-1', expect.objectContaining({ language: 'french' }))
@@ -2779,7 +2779,8 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
 
-    expect(screen.getByLabelText('Voice model')).toHaveValue('qwen-audio')
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByRole('button', { name: 'Qwen Audio' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Completed voices are saved; continue from the interrupted voice')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
   })
@@ -2806,9 +2807,13 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate required auditions →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "english" }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate voices →' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Voice generation paused at Alice. 12 of 61 voices are saved. Choose Continue voice generation to resume.')
+    expect(screen.queryByRole('dialog', { name: 'Ready for their voices?' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     expect(screen.getByRole('button', { name: 'Continue voice generation →' })).toBeInTheDocument()
   })
 
@@ -2837,7 +2842,9 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: 'Generate required auditions →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    fireEvent.click(screen.getByRole('combobox', { name: 'Narration language' })); fireEvent.click(screen.getByRole("option", { name: "english" }))
+    fireEvent.click(screen.getByRole('button', { name: 'Generate voices →' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Local processing' })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel voice generation' }))
@@ -2918,7 +2925,7 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review cast & voices →' }))
 
     expect(await screen.findByRole('region', { name: 'Cast voice auditions' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Generate required auditions →' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Next →' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'cast', 'cast-rebased', [
       { characterId: 'narrator', voiceRevision: 'nv1' },
@@ -3593,7 +3600,7 @@ describe('v2 wizard', () => {
     const snapshot = { ...base, book: { ...base.book, completedStages: ['import','extract','dialogue','review'] as WizardStage[] }, cast: { revision: 'cp', phase: 'identity-review' as const, dossiers: [{ label: 'Alice?', occurrenceCount: 4, examples: [{ source: 'Alice? [Wait.]' }] }], proposals: [{ label: 'Alice?', category: 'character', canonicalName: 'Alice', reviewRequired: true }] }, generatedChapters: [] }
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     const identityDialog = screen.getByRole('dialog', { name: 'Inspect Alice' })
     expect(identityDialog).toHaveTextContent('Should review')
@@ -3624,7 +3631,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
-    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeEnabled()
   })
 
   it('keeps exact per-voice approvals and cast editing available', async () => {
@@ -3667,10 +3674,12 @@ describe('v2 wizard', () => {
     const editActions = screen.getByRole('group', { name: 'Cast edit actions' })
     expect(within(editActions).getAllByRole('button').map((button) => button.textContent)).toEqual([
       'Cancel cast edits',
-      'Apply cast edits →',
+      'Next →',
     ])
-    const applyEdits = within(editActions).getByRole('button', { name: 'Apply cast edits →' })
-    expect(applyEdits).toBeDisabled()
+    const applyEdits = within(editActions).getByRole('button', { name: 'Next →' })
+    fireEvent.click(applyEdits)
+    expect(screen.getByRole('button', { name: 'Generate voices →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
     expect(screen.getByText('No cast changes to apply')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
@@ -3746,11 +3755,11 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
 
     expect(screen.getByText('Your voices need refreshing before you continue.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Refresh auditions →' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeEnabled()
     expect(screen.queryByRole('button', { name: 'Accept cast & voices →' })).not.toBeInTheDocument()
   })
 
-  it('warns before defaulting only unapproved prior-book voices and preserves an approved earlier revision', async () => {
+  it('warns before defaulting only unapproved voices and preserves an approved earlier revision', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import','extract','dialogue','review'] },
@@ -3766,7 +3775,7 @@ describe('v2 wizard', () => {
         identities: [{
           characterId: 'alice', name: 'Alice', voicePreviewRevision: 'av2', previewUrl: '/a2.wav', referenceText: 'Newest Alice.',
           voiceCandidates: [
-            { revision: 'av1', previewUrl: '/a1.wav', referenceText: 'Earlier Alice.', direction: 'Gentle.', source: 'previous-book' },
+            { revision: 'av1', previewUrl: '/a1.wav', referenceText: 'Earlier Alice.', direction: 'Gentle.' },
             { revision: 'av2', previewUrl: '/a2.wav', referenceText: 'Newest Alice.', direction: 'Bright.' },
           ],
         }],
@@ -3782,7 +3791,6 @@ describe('v2 wizard', () => {
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
-    expect(screen.getByRole('button', { name: 'Open Alice voice' })).toHaveTextContent('From prior book')
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
     const warning = screen.getByRole('dialog', { name: 'Approve 1 remaining voice?' })
     expect(warning).toHaveTextContent('Continuing approves the default audition for Alice and accepts the full cast.')
