@@ -12,6 +12,12 @@ Keep companion-specific credentials, operations, and product policy out of this 
   authenticated GitHub operations and continue safe local work.
 - Follow [contributor guidance](docs/CONTRIBUTING.md) for scope, working-state preservation, and
   risk-appropriate evidence. Existing maintainer/session approval covers its stated scope.
+- Before treating unavailable hosted CI as a merge blocker, consult any owner-authorized outage
+  record supplied by the active workspace/session. During an explicitly recorded exception, run
+  the required local equivalents, retain exact-commit command/results evidence on the PR, and
+  complete review. Existing authorization covers that process; do not request it again or re-enable
+  manually disabled workflows without following the record's restoration procedure. This changes
+  where checks run, not which checks are required or whether release/deployment is authorized.
 - Synchronize only the branch needed for the authorized task. Never push unrelated ahead-of-main
   commits or switch the user's primary checkout merely to satisfy cleanup.
 - Remove task-created branches/worktrees only after proving their work is preserved; report
