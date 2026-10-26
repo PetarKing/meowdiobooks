@@ -12,8 +12,8 @@
 [data-appearance="light"] .studio-hero--hybrid .quick-upload:hover { background: var(--matcha-soft); }
 [data-appearance="light"] .home-main:has(.home-scene--hybrid) .home-flow:has(.wip-shelf) { background: color-mix(in srgb, var(--surface-soft) 32%, transparent); border-color: color-mix(in srgb, var(--line) 24%, transparent); }
 .home-main:has(.home-scene--hybrid) .wip-shelf .panel-head { margin-bottom: 12px; }
-@media (max-width: 1000px) and (min-width: 701px) { .studio-hero.studio-hero--hybrid h1 { font-size: 52px; }.studio-hero.studio-hero--hybrid { gap: 28px; } }
-@media (min-width: 701px) and (max-height: 850px) {
+@media (max-width: 1000px) and (min-width: 751px) { .studio-hero.studio-hero--hybrid h1 { font-size: 52px; }.studio-hero.studio-hero--hybrid { gap: 28px; } }
+@media (min-width: 751px) and (max-height: 850px) {
   .studio-hero--hybrid.studio-hero--compact .studio-hero-copy { padding: 8px 0; }
   .studio-hero--hybrid.studio-hero--compact h1 { font-size: clamp(40px,3.6vw,60px); margin: 14px 0; }
   .studio-hero--hybrid.studio-hero--compact .studio-hero-copy > p { font-size: 13px; margin-bottom: 16px; }
@@ -22,13 +22,18 @@
   .home-main:has(.home-scene--hybrid) .home-flow:has(.wip-shelf) { padding-block: 12px; }
   .home-main:has(.home-scene--hybrid) .recent-books .recent-book-open { min-height: 112px; }
 }
-@media (max-width: 700px) {
+@media (max-width: 750px) {
   .app-shell:has(.home-scene--hybrid) .workspace .home-main { padding: 22px 20px 48px; }
   .studio-hero.studio-hero--hybrid { display: flex; flex-direction: column; align-items: stretch; min-height: 0; gap: 24px; margin-bottom: 28px; }
   .studio-hero.studio-hero--hybrid .studio-hero-copy { padding: 0; }
   .studio-hero.studio-hero--hybrid h1 { font-size: clamp(39px,10vw,49px); }
   .studio-hero.studio-hero--hybrid .sanctuary-art { border-radius: 60px 3px 3px 3px; }
-  .studio-hero--hybrid.studio-hero--compact .sanctuary-art > img { height: auto; aspect-ratio: 3/2; }
+  .studio-hero--hybrid.studio-hero--compact .sanctuary-art > img { height: clamp(104px,28vw,150px); aspect-ratio: auto; object-position: center 42%; }
+  .studio-hero--hybrid.studio-hero--compact h1 { font-size: clamp(34px,9.2vw,42px); line-height: 1.04; margin: 14px 0; }
+  .studio-hero--hybrid.studio-hero--compact .quick-upload { min-height: 76px; padding: 12px 16px; }
+  .studio-hero--hybrid.studio-hero--compact .quick-upload small { margin-top: 0; }
+  .studio-hero--hybrid.studio-hero--compact .quick-upload > span:nth-of-type(2) { gap: 3px; }
+  .studio-hero.studio-hero--hybrid.studio-hero--compact { gap: 16px; margin-bottom: 16px; }
   .home-main:has(.home-scene--hybrid) .home-flow:has(.wip-shelf) { padding: 16px 0; }
 }
 @media (prefers-reduced-motion: reduce) { .home-scene--hybrid * { animation: none !important; } }

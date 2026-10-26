@@ -145,3 +145,31 @@ captured errors. Browser viewport overrides were reset after review.
 Validation: production build, lint (two existing Fast Refresh warnings), Storybook/preview types,
 and 214 App/guide/fixture tests passed. No backend or provider behavior changed. This remains a
 local, unmerged experiment.
+
+## Mobile Home and shared empty-state alignment
+
+The earlier shell change aligned the footer, but Home and Library still centered their copy against
+different artwork heights. Empty Home and Library now share a layout contract for their label,
+heading, description, mobile action reservation, and page height. Text anchors match exactly at
+390, 750, 768, 1280, 1440 and 1920px widths in the retained measurements. Mobile artwork slots also
+begin at the same position; desktop illustrations keep their own proportions. Both empty footers
+match at every sampled viewport. Standalone height budgeting excludes the preview toolbar; only
+the preview supplies its additional height through a CSS custom property.
+
+Populated mobile Home keeps the sanctuary image as a shallow landscape strip. Its heading/import
+spacing is tighter, and the layout breakpoint matches the product's 750px mobile navigation. On a
+390×844 preview, the first card starts at 724px instead of 891px, and ends at 840px. The screenshot
+includes the 109px synthetic preview toolbar; the actual product has no such toolbar. Empty Home
+retains the more immersive illustration. Existing book-card styling and desktop populated Home
+remain unchanged.
+
+Browser review covered empty, 2-book and 12-book Home at 320, 390 and 750px, plus the paired empty
+pages at six phone/tablet/desktop sizes. No horizontal overflow or captured console errors. Both
+light and dark phone views were inspected. Screenshots and numeric evidence are under
+`assets/review/cat-companion/mobile-alignment/`. Viewport overrides were reset. These reusable UI
+changes remain in core, with no Cloud overrides, provider behavior, or new runtime dependency.
+
+Validation for this refinement: production build, lint (the same two existing Fast Refresh warnings),
+Storybook/preview types, and 214 App/guide/fixture tests passed. The final 1280×720 check still places
+both empty headings at 248.39px and both footers at 720px after separating preview spacing from
+standalone styling. Both in-app empty presets were refreshed. This remains local and unmerged.

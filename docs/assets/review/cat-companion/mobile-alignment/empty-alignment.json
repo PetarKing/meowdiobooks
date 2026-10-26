@@ -1,0 +1,158 @@
+[
+  {
+    "label": "Home · empty (0)",
+    "art": 572.5,
+    "description": 333.5,
+    "footer": 954.6875,
+    "heading": 234.390625,
+    "kicker": 201.390625,
+    "viewport": [
+      390,
+      844
+    ],
+    "width": 390
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 572.5,
+    "description": 333.5,
+    "footer": 954.6875,
+    "heading": 234.390625,
+    "kicker": 201.390625,
+    "viewport": [
+      390,
+      844
+    ],
+    "width": 390
+  },
+  {
+    "label": "Home · empty (0)",
+    "art": 544.90625,
+    "description": 305.90625,
+    "footer": 972.90625,
+    "heading": 186,
+    "kicker": 153,
+    "viewport": [
+      750,
+      900
+    ],
+    "width": 750
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 544.90625,
+    "description": 305.90625,
+    "footer": 972.90625,
+    "heading": 186,
+    "kicker": 153,
+    "viewport": [
+      750,
+      900
+    ],
+    "width": 750
+  },
+  {
+    "label": "Home · empty (0)",
+    "art": 379.75,
+    "description": 453.90625,
+    "footer": 1024,
+    "heading": 269.671875,
+    "kicker": 232.671875,
+    "viewport": [
+      768,
+      1024
+    ],
+    "width": 768
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 344.84375,
+    "description": 453.90625,
+    "footer": 1024,
+    "heading": 269.671875,
+    "kicker": 232.671875,
+    "viewport": [
+      768,
+      1024
+    ],
+    "width": 768
+  },
+  {
+    "label": "Home · empty (0)",
+    "art": 185.703125,
+    "description": 395.515625,
+    "footer": 720,
+    "heading": 248.390625,
+    "kicker": 211.390625,
+    "viewport": [
+      1280,
+      720
+    ],
+    "width": 1280
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 179.5,
+    "description": 395.515625,
+    "footer": 720,
+    "heading": 248.390625,
+    "kicker": 211.390625,
+    "viewport": [
+      1280,
+      720
+    ],
+    "width": 1280
+  },
+  {
+    "label": "Home · empty (0)",
+    "art": 225.359375,
+    "description": 423.78125,
+    "footer": 900,
+    "heading": 261,
+    "kicker": 224,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 161,
+    "description": 423.78125,
+    "footer": 900,
+    "heading": 261,
+    "kicker": 224,
+    "viewport": [
+      1440,
+      900
+    ],
+    "width": 1440
+  },
+  {
+    "label": "Home · empty (0)",
+    "art": 206.015625,
+    "description": 478.625,
+    "footer": 1080,
+    "heading": 273.59375,
+    "kicker": 236.59375,
+    "viewport": [
+      1920,
+      1080
+    ],
+    "width": 1920
+  },
+  {
+    "label": "Library · empty (0)",
+    "art": 222.1875,
+    "description": 478.625,
+    "footer": 1080,
+    "heading": 273.59375,
+    "kicker": 236.59375,
+    "viewport": [
+      1920,
+      1080
+    ],
+    "width": 1920
+  }
+]

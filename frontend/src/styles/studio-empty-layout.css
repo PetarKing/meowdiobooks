@@ -1,0 +1,21 @@
+/* Empty Home and Library share reading positions, independent of artwork height. */
+.app-shell .workspace main.home-main:has(.studio-empty-layout) { max-width: 1920px; padding: 24px clamp(28px,5vw,112px); }
+.app-shell .workspace main .library-page--empty { padding: 0; }
+.app-shell .workspace .studio-empty-layout { min-height: min(68dvh,calc(100dvh - 180px - var(--studio-preview-height,0px)),780px); margin: 0; }
+.app-shell .workspace .studio-empty-layout .studio-empty-copy { align-self: start; padding: clamp(32px,7dvh,92px) 0 0; }
+.app-shell .workspace .studio-empty-copy h1 { min-height: 2.08em; line-height: 1.04; margin: 22px 0; }
+.app-shell .workspace .studio-empty-copy > p { min-height: 3.4em; max-width: 350px; font-size: 16px; line-height: 1.7; margin: 0 0 28px; }
+@media (max-width: 750px) {
+  .app-shell .workspace main.home-main:has(.studio-empty-layout) { padding: 24px 20px 32px; }
+  .app-shell .workspace .studio-empty-layout { --empty-heading-size: clamp(39px,10vw,49px); --empty-art-height: clamp(220px,58vw,340px); min-height: 0; gap: 20px; }
+  /* Reserve the import and secondary-action slot on both empty pages. */
+  .app-shell .workspace .studio-empty-layout .studio-empty-copy { min-height: calc(270px + 2.08 * var(--empty-heading-size)); }
+  .app-shell .workspace .studio-empty-layout > .sanctuary-art { height: var(--empty-art-height); }
+  .app-shell .workspace .studio-empty-layout > .sanctuary-art > img { height: 100%; aspect-ratio: auto; object-position: center 42%; }
+  .app-shell .workspace .studio-empty-layout > .reading-cat-companion--empty { display: grid; place-items: center; width: 100%; max-width: none; height: var(--empty-art-height); margin: 0; }
+  .app-shell .workspace .studio-empty-layout .reading-cat-companion-art { width: min(100%,calc(var(--empty-art-height) * 400 / 340)); }
+  .app-shell .workspace .studio-empty-layout .studio-empty-copy { padding: 0; }
+  .app-shell .workspace .studio-empty-copy h1 { font-size: clamp(39px,10vw,49px); margin: 18px 0; }
+  .app-shell .workspace .library-page--empty .studio-empty-copy h1 { max-width: 7.4em; }
+  .app-shell .workspace .studio-empty-copy > p { font-size: 14px; margin-bottom: 20px; }
+}
