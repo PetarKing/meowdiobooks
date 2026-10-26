@@ -57,7 +57,7 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown; unif
 
 export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarning) {
   const { kind, readerState } = warning;
-  if (reviewIsPatternGroup(warning)) return action === "keep" ? "Keep this occurrence" : "Omit this occurrence";
+  if (reviewIsPatternGroup(warning)) return action === "keep" ? "Keep" : "Leave out";
   if (action === "keep-hyphen") return "Keep hyphen";
   if (action === "join-word") return "Join word";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep original text";
@@ -115,7 +115,7 @@ export function reviewQuestion(kind: string) {
 }
 
 export function reviewGuidance(warning: ReviewWarning) {
-  if (reviewIsPatternGroup(warning)) return "Choose once for this repeated text. You can keep or omit individual occurrences as exceptions.";
+  if (reviewIsPatternGroup(warning)) return "Check whether this repeated text should be spoken.";
   if (reviewIsVerifiedScriptGroup(warning)) return "AI checked these delivery cues in context. Suggested choices leave them unspoken. Uncertain text stays spoken and needs no decision.";
   const guidance: Partial<Record<string, string>> = {
     hyphenation: "Choose the spelling that matches the source. Both choices remove the line break; your source and reader stay unchanged.",
