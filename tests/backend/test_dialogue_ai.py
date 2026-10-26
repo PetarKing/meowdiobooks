@@ -16,6 +16,18 @@ from meowdiobooks.backend.dialogue_ai import (
 )
 
 
+def test_truncated_final_quote_reaches_ai_and_remains_manually_correctable():
+    scan = scan_dialogue([{"page": 1, "text": "Alice took a breath.\n\n“We can still reach the"}])
+    result = resolve_dialogue(scan, "fill-gaps", lambda *_: "?", ["unlabelled-candidates"])
+    assert len(result["aiWindows"]) == 1
+    owner = result["aiWindows"][0]["ownerIds"][0]
+    corrected = apply_dialogue_corrections(result, [{"spanId": owner, "action": "speaker", "speakerLabel": "Alice"}], revision="corrected")
+    spoken = next(row for row in corrected["spans"] if row["id"] == owner)
+    assert spoken["resolvedSpeakerLabel"] == "Alice"
+    assert spoken["text"] == "We can still reach the"
+    assert reconstruct_partition({"partition": corrected["spans"]}) == reconstruct_partition(scan)
+
+
 def test_subaru_explicit_label_is_preserved_and_only_open_turn_is_sent_to_qwen():
     scan = scan_dialogue(
         [{"page": 1, "text": "Subaru: [Where?]\n\n???: [Here.]\n\nLouis entered."}],
