@@ -1,7 +1,7 @@
 {
   "name": "meowdiobooks-workflow-ui",
   "private": true,
-  "version": "0.1.73",
+  "version": "0.1.74",
   "type": "module",
   "files": [
     "src",

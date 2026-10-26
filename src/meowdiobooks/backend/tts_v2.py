@@ -9,6 +9,7 @@ import shutil
 import struct
 import unicodedata
 from dataclasses import dataclass
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, BinaryIO, Callable, Mapping, Sequence
 from uuid import uuid4
@@ -66,6 +67,13 @@ def render_plan_audio(
     if not chapters:
         raise TTSContractError("Render plan contains no selected chapters")
     target_characters = _configured_synthesis_target()
+    pipeline = load_model_registry(repo_root).voice_pipeline(model_id)
+    runtime_versions = {}
+    for distribution in ("mlx-audio", "mlx"):
+        try:
+            runtime_versions[distribution] = version(distribution)
+        except PackageNotFoundError:
+            runtime_versions[distribution] = None
     cleanup_stale_audio_staging(package)
 
     os.environ.setdefault("HF_HUB_OFFLINE", "1")
@@ -191,7 +199,14 @@ def render_plan_audio(
                     "segments": metadata,
                     "omissions": list(chapter.get("omissions", [])),
                     "renderer": {
-                        "model": "qwen-1.7b-base-4bit",
+                        "model": pipeline.renderer_source,
+                        "modelRevision": pipeline.renderer_revision,
+                        "pipelineId": pipeline.id,
+                        "voiceRecipeVersion": pipeline.recipe_version,
+                        "runtimeVersions": runtime_versions,
+                        "requestedGenerationAttempts": [
+                            dict(settings) for settings in QWEN_GENERATION_ATTEMPTS
+                        ],
                         "language": language,
                         "chunking": {
                             "policy": "sentence-target-ellipsis-v1",

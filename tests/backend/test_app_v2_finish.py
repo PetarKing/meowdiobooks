@@ -1469,6 +1469,9 @@ def test_cast_generates_one_audition_for_compatible_distant_side_characters(tmp_
 
 
 def test_tts_v2_atomically_publishes_metadata_from_compiled_segment(tmp_path, monkeypatch):
+    (tmp_path / 'models.toml').write_bytes(
+        (Path(__file__).resolve().parents[2] / 'models.toml').read_bytes()
+    )
     class Result:
         audio = np.ones(100, dtype=np.float32) * 0.1
 
