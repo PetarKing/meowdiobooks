@@ -13,7 +13,7 @@ import { CastIdentityReview } from "../components/CastIdentityReview";
 import { CastingChoice } from "../components/CastingChoice";
 import { CastVoiceReview } from "../components/CastVoiceReview";
 import { VoiceLanguagePicker } from "../components/VoiceLanguagePicker";
-import { draftVoiceSelection } from "../workflow/voiceSelection";
+import { draftVoiceSelection, rankedVoiceLanguages } from "../workflow/voiceSelection";
 import { AcceptedSummary, PageTitle, StageLaunch } from "../pages/shared";
 import { confirmedVoiceRoutesForCast, voiceRoutesForCast } from "../voiceRoutes";
 import {
@@ -166,7 +166,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       const selection = draftVoiceSelection(snapshot?.voiceModels ?? [], [cast.voiceModel, voiceModel], [cast.language, cast.detectedLanguage, language]);
       setVoiceModel(selection.modelId);
       setLanguage(selection.language);
-      setNarrationLanguageConfirmed(false);
+      setNarrationLanguageConfirmed(Boolean(selection.language && (cast.language === selection.language || cast.detectedLanguage === selection.language)));
     } else {
       if (cast.voiceModel) setVoiceModel(cast.voiceModel);
       if (cast.language) setLanguage(cast.language);
@@ -207,7 +207,7 @@ export function CastPage({ model }: { model: CastPageModel; }) {
       }}>{t("Refresh voice options")}</button>
     </div>;
     // Confirmation is shared UI; only quote/reuse checks depend on the optional adapter.
-    const languages = snapshot?.voiceModels.find((row) => row.id === voiceModel)?.supportedLanguages ?? [];
+    const languages = rankedVoiceLanguages(snapshot?.voiceModels.find((row) => row.id === voiceModel)?.supportedLanguages ?? [], current.languageProbabilities, current.detectedLanguage);
     const showMethodRows = capabilities.showVoiceModelControls && availableVoiceModels.length > 1;
     const closeVoiceSetup = () => { setLanguagePickerOpen(false); updateCastingPreview(false); setDesigningVoices(false); };
     const generateAction = <button type="button" className="primary" disabled={busy || pendingConfirmations.length > 0 || (!keepExistingVoices && (voiceOptionsUnavailable || (enhancedCasting && !castingPreviewReady) || !voiceModel || !languages.includes(language) || !narrationLanguageConfirmed))} onClick={keepExistingVoices ? () => { closeVoiceSetup(); setEditingCast(false); } : generateVoices}>{t(keepExistingVoices ? "Continue" : castGenerationPaused ? "Continue voice generation" : "Generate voices")} →</button>;

@@ -195,7 +195,8 @@ def representative_language_sample(pages: list[dict[str, Any]], limit: int = 400
     if not pages:
         return ""
     indexes = sorted({0, len(pages) // 2, len(pages) - 1})
-    parts = [str(pages[index].get("text", "")).strip() for index in indexes]
+    share = max(0, (limit - 2 * (len(indexes) - 1)) // len(indexes))
+    parts = [str(pages[index].get("text", "")).strip()[:share] for index in indexes]
     return "\n\n".join(part for part in parts if part)[:limit]
 
 

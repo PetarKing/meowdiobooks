@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { WizardSnapshot } from "../api/contracts";
 import { useWorkflowModel } from "../app/useWorkflowModel";
 import { createFixtureGateway, snapshotFor } from "../../design-kit/fixtures";
-import { draftVoiceSelection } from "./voiceSelection";
+import { draftVoiceSelection, rankedVoiceLanguages } from "./voiceSelection";
 
 const models = [
   { id: "balanced", label: "Balanced", supportedLanguages: ["english", "french"] },
@@ -11,6 +11,12 @@ const models = [
 ];
 
 describe("draftVoiceSelection", () => {
+  it("ranks supported languages by probability without adding unsupported choices", () => {
+    expect(rankedVoiceLanguages(["english", "french", "spanish"], { french: 0.8, spanish: 0.15, english: 0.05, dutch: 0.99 }))
+      .toEqual(["french", "spanish", "english"]);
+    expect(rankedVoiceLanguages(["english", "french"], { english: NaN, french: 0.8 }))
+      .toEqual(["french", "english"]);
+  });
   it("recovers an unavailable model before any auditions are bound", () => {
     expect(draftVoiceSelection(models, ["removed-model", "balanced"], ["german", "french"]))
       .toEqual({ modelId: "balanced", language: "french" });
@@ -76,6 +82,26 @@ describe("saved audition selection", () => {
     expect(model.voiceModel).toBe("balanced");
     expect(model.language).toBe("english");
     expect(model.castGenerationPaused).toBe(false);
+    expect(model.narrationLanguageConfirmed).toBe(true);
+  });
+
+  it("preselects detection ahead of the snapshot default and keeps saved choices ahead of detection", async () => {
+    const base = snapshotFor("cast-identities");
+    const cast = { ...base.cast!, phase: "identity-review" as const, voiceModel: "balanced", language: undefined, detectedLanguage: "french" };
+    const detected = await restore({ ...base, voiceModels: models, cast, voiceSelection: { modelId: "balanced", language: "english" } });
+    expect(detected.language).toBe("french");
+    expect(detected.narrationLanguageConfirmed).toBe(true);
+    const saved = await restore({ ...base, voiceModels: models, cast: { ...cast, language: "english" } });
+    expect(saved.language).toBe("english");
+    expect(saved.narrationLanguageConfirmed).toBe(true);
+  });
+
+  it("does not automatically confirm unsupported detection", async () => {
+    const base = snapshotFor("cast-identities");
+    const model = await restore({ ...base, voiceModels: models,
+      cast: { ...base.cast!, phase: "identity-review", voiceModel: "balanced", language: undefined, detectedLanguage: "dutch" },
+    });
+    expect(model.language).toBe("english");
     expect(model.narrationLanguageConfirmed).toBe(false);
   });
 });

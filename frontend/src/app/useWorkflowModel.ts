@@ -751,7 +751,6 @@ export function useWorkflowModel({
     );
     setCastGenerationPaused(resumeMatchesProposal);
     setDesigningVoices(resumeMatchesProposal);
-    setNarrationLanguageConfirmed(Boolean((resumeMatchesProposal && recoverableCast?.language) || (restoredCast?.phase !== "identity-review" && restoredCast?.language)));
     setListeningChapterId(undefined);
     const savedModel = (
       resumeMatchesProposal ? recoverableCast?.modelId : undefined
@@ -762,9 +761,12 @@ export function useWorkflowModel({
     const boundAuditions = resumeMatchesProposal || (restoredCast && restoredCast.phase !== "identity-review");
     const selection = boundAuditions
       ? { modelId: savedModel ?? "", language: savedLanguage ?? (detected && supported.includes(detected) ? detected : supported.includes("english") ? "english" : supported[0] ?? "") }
-      : draftVoiceSelection(next.voiceModels, [savedModel, next.voiceSelection.modelId], [savedLanguage, detected]);
+      : draftVoiceSelection(next.voiceModels, [savedModel, next.voiceSelection.modelId], [restoredCast?.language, detected, next.voiceSelection.language]);
     setVoiceModel(selection.modelId);
     setLanguage(selection.language);
+    setNarrationLanguageConfirmed(Boolean(selection.language && (
+      boundAuditions || restoredCast?.language === selection.language || detected === selection.language
+    )));
     const newExportBook = exportBookId.current !== next.book.id;
     const unavailableChapters = new Set(next.recordingScript?.summary.emptyChapterIds ?? []);
     const availableChapterIds = next.chapters.map((row) => row.id).filter((id) => !unavailableChapters.has(id));

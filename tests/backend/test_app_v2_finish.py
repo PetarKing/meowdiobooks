@@ -554,6 +554,52 @@ def test_recording_script_split_publishes_ordinary_generation_chapters(tmp_path)
         assert snapshot["activeArtifacts"]["script"] == split["revision"]
 
 
+def test_cast_language_detection_is_cached_and_uses_reviewed_transcript(tmp_path):
+    from meowdiobooks.backend.cast_service import default_voice_settings
+
+    calls = []
+    observer, admission = object(), object()
+
+    def detect(root, pages, languages, **kwargs):
+        calls.append((pages, languages, kwargs))
+        return {"detectedLanguage": "french", "languageProbabilities": {"french": 0.9, "english": 0.1}}
+
+    def profile(_root, identities, *_args, **kwargs):
+        return {row["characterId"]: default_voice_settings(row["category"]) for row in identities}
+
+    def unavailable_auditions(*args):
+        raise RuntimeError("Synthetic interrupted audition")
+
+    proposal = {"status": "ready", "dossiers": [], "proposals": [{
+        "label": "Alice", "category": "character", "canonicalName": "Alice", "aliases": [],
+        "competingLabels": [], "reviewRequired": False, "reason": "Explicit label",
+    }]}
+    with TestClient(create_app_v2(
+        tmp_path, language_detector=detect, language_usage_observer=observer,
+        language_request_admission=admission, cast_proposer=lambda *_: proposal,
+        voice_profiler=profile, voice_auditioner=unavailable_auditions,
+    )) as client:
+        imported = client.post("/api/books/import", files={"file": ("book.pdf", _pdf(), "application/pdf")}).json()
+        book_id = imported["book"]["id"]
+        package, _, review = _seed_reviewed_transcript(tmp_path, book_id, include_narration=True)
+        write_artifact(package, "review", {**review, "revision": "review-excluded", "warningSnapshot": [{"occurrences": [{
+            "id": "exclude-narration", "blockId": "p1-b2", "sourceStart": 0, "sourceEnd": 15,
+        }]}], "decisions": [{"occurrenceId": "exclude-narration", "action": "exclude"}]})
+        identity = _process(client, book_id, "cast", {})
+        candidate = client.get(f"/api/books/{book_id}/stages/cast/candidates/{identity['revision']}").json()
+        assert candidate["detectedLanguage"] == "french"
+        assert candidate["languageProbabilities"]["french"] == 0.9
+        assert calls[0][0] == [{"text": "Hello"}]
+        assert {"french", "english"}.issubset(calls[0][1])
+        assert calls[0][2] == {"usage_observer": observer, "request_admission": admission}
+        settings = {"proposalRevision": identity["revision"], "language": "english"}
+        for _ in range(2):
+            response = client.post(f"/api/books/{book_id}/stages/cast/process", json={"settings": settings})
+            assert _wait(client, response.json()["id"])["status"] == "failed"
+            client.get(f"/api/books/{book_id}/snapshot")
+        assert len(calls) == 1
+
+
 def test_cast_to_generate_gates_exact_voices_and_uses_only_v2_artifacts(tmp_path, monkeypatch):
     proposal = {
         "status": "ready",

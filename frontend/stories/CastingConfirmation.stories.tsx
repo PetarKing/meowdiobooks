@@ -7,7 +7,8 @@ import { createFixtureGateway, snapshotFor } from "../design-kit/fixtures";
 function CastingConfirmation() {
   const [gateway] = useState(() => {
     const snapshot = snapshotFor("cast-identities");
-    snapshot.cast = { revision: "cast-confirmation-draft", phase: "identity-review", dossiers: [], proposals: [], language: "english", voiceModel: "qwen" };
+    snapshot.cast = { revision: "cast-confirmation-draft", phase: "identity-review", dossiers: [], proposals: [],
+      detectedLanguage: "french", languageProbabilities: { french: 0.9, english: 0.1 }, voiceModel: "qwen" };
     snapshot.castingPreviewAvailable = true;
     snapshot.voiceModels = [{ id: "qwen", label: "Studio", supportedLanguages: ["english", "french"] }];
     snapshot.voiceSelection = { modelId: "qwen", language: "english" };
@@ -27,7 +28,7 @@ function CastingConfirmation() {
 const meta = { title: "Workflow/Casting confirmation", component: CastingConfirmation } satisfies Meta<typeof CastingConfirmation>;
 export default meta;
 
-export const ConfirmSettledDefault: StoryObj<typeof meta> = {
+export const DetectedLanguage: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.click(await canvas.findByRole("button", { name: /Alice.*Continue/ }));
@@ -37,17 +38,21 @@ export const ConfirmSettledDefault: StoryObj<typeof meta> = {
     const dialog = within(await within(document.body).findByRole("dialog", { name: "Ready for their voices?" }));
     await dialog.findByText("≈ €2.94");
     const selector = dialog.getByRole("combobox", { name: "Narration language" });
-    await expect(selector).toHaveValue("");
-    await expect(dialog.getByRole("button", { name: "Generate voices →" })).toBeDisabled();
+    await expect(selector).toHaveValue("french");
+    await waitFor(() => expect(dialog.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     await userEvent.click(selector);
+    await expect(dialog.getAllByRole("option")[0]).toHaveAccessibleName("french");
     await userEvent.click(dialog.getByRole("option", { name: "english" }));
     await waitFor(() => expect(dialog.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
+    await userEvent.click(dialog.getByRole("button", { name: "← Back to cast" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Next →" }));
+    await expect(within(document.body).getByRole("combobox", { name: "Narration language" })).toHaveValue("english");
   },
 };
 
 export const ExpandedLanguage: StoryObj<typeof meta> = {
   play: async (context) => {
-    await ConfirmSettledDefault.play?.(context);
+    await DetectedLanguage.play?.(context);
     const dialog = within(within(document.body).getByRole("dialog", { name: "Ready for their voices?" }));
     await userEvent.click(dialog.getByRole("combobox", { name: "Narration language" }));
     await expect(dialog.getByRole("listbox")).toBeVisible();
