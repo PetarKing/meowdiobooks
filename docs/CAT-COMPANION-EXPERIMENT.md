@@ -173,3 +173,18 @@ Validation for this refinement: production build, lint (the same two existing Fa
 Storybook/preview types, and 214 App/guide/fixture tests passed. The final 1280×720 check still places
 both empty headings at 248.39px and both footers at 720px after separating preview spacing from
 standalone styling. Both in-app empty presets were refreshed. This remains local and unmerged.
+
+## Approved shelf spacing
+
+The user selected a faint outer wash with more horizontal padding rather than removing the
+container entirely. Dark uses 18% canvas and light 16% soft surface; phone shelves have 14px inner
+gutters. Card colors remain as approved. Phone titles reserve more room for the separate delete
+action. Storage stays right-aligned with the heading at every tested phone width; the book count
+also appears from 390px upward, leaving the storage total visible on narrower phones.
+
+Populated phone Home no longer reserves 68px for the hidden bottom navigation. Reduced main and
+shelf bottom padding bring the gap before the footer from 133px to 29px. Empty-state alignment is
+unchanged. Browser checks cover 2 and 12 books in both themes at 320, 375, 390 and 750px; storage
+is vertically centered beside the heading, with no horizontal overflow. Production build passed.
+Evidence is under `assets/review/cat-companion/shelf-spacing/`. The owner approved this version
+and authorized shipping followed by preservation-safe task worktree cleanup.
