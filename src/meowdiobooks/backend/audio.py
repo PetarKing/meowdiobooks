@@ -24,11 +24,15 @@ from .native_runtime import NativeModelLoader, load_native_model
 
 # Qwen evaluates released checkpoints with the generation-config defaults below. Keep the
 # primary path aligned with that configuration; cooler alternatives are bounded recovery
-# attempts for empty or non-finite output.
+# attempts for empty or non-finite output. Keep the former runtime's 4096-token
+# limit explicit: mlx-audio 0.6 inherits max_new_tokens from the checkpoint.
 QWEN_GENERATION_ATTEMPTS = (
-    {"temperature": 0.9, "top_k": 50, "top_p": 1.0, "repetition_penalty": 1.05},
-    {"temperature": 0.75, "top_k": 40, "top_p": 1.0, "repetition_penalty": 1.05},
-    {"temperature": 0.65, "top_k": 30, "top_p": 1.0, "repetition_penalty": 1.05},
+    {"temperature": 0.9, "top_k": 50, "top_p": 1.0, "repetition_penalty": 1.05,
+     "max_tokens": 4096},
+    {"temperature": 0.75, "top_k": 40, "top_p": 1.0, "repetition_penalty": 1.05,
+     "max_tokens": 4096},
+    {"temperature": 0.65, "top_k": 30, "top_p": 1.0, "repetition_penalty": 1.05,
+     "max_tokens": 4096},
 )
 
 VOICE_SAMPLE_SUFFIXES = {".wav", ".mp3", ".flac"}

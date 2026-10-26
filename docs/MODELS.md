@@ -82,6 +82,15 @@ and chapter rendering use Base eight-bit. Recipe version `2` identifies this cha
 so the application refreshes stale audition packs through the normal review flow. Existing audio
 files are preserved. Neither weight precision nor this update adds performance-cue support.
 
+The native runtime pins `mlx-audio==0.6.1` and its compatible MLX dependencies in `uv.lock`.
+This runtime update keeps the same VoiceDesign BF16, Base eight-bit and ASR four-bit checkpoints,
+reference format and audition composition (recipe `2`); accepted voice references remain valid.
+Generation explicitly retains the previous 4,096-token ceiling per synthesis call. The checkpoint's
+larger default must not silently change that limit during a runtime upgrade. Chapter receipts record
+the configured renderer source/revision, installed MLX runtime versions and requested sampling
+settings. MLX-Audio applies its own ICL repetition-penalty floor of 1.5 with a recent 64-token
+window; the recorded requested penalty of 1.05 is not an assertion that this override is absent.
+
 ## Verify setup
 
 ```bash

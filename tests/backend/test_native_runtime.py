@@ -16,7 +16,10 @@ def test_native_operations_release_exact_host_lease_on_success_and_failure(
 ):
     model_path = tmp_path / 'weights'
     model_path.mkdir()
-    pipeline = SimpleNamespace(audition_path='weights', renderer_path='weights')
+    pipeline = SimpleNamespace(
+        audition_path='weights', renderer_path='weights', id='test-pipeline',
+        renderer_source='test/base-8bit', renderer_revision='test-revision', recipe_version='2',
+    )
     registry = SimpleNamespace(
         voice_pipeline=lambda _: pipeline,
         transcription_model=lambda _: SimpleNamespace(model_path='weights', engine='mlx_audio'),

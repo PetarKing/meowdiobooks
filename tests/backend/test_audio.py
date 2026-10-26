@@ -15,6 +15,13 @@ from meowdiobooks.backend.audio import (
 from meowdiobooks.backend.tts_v2 import _clean_text, _synthesis_units, _synthesize
 
 
+@pytest.fixture
+def model_catalog(tmp_path):
+    (tmp_path / 'models.toml').write_bytes(
+        (Path(__file__).resolve().parents[2] / 'models.toml').read_bytes()
+    )
+
+
 class RecordingModel:
     def __init__(self) -> None:
         self.calls: list[dict[str, object]] = []
@@ -333,7 +340,7 @@ def test_recovery_does_not_swallow_cancellation(tmp_path):
     assert segment['referenceText'] == 'Accepted reference.'
 
 
-def test_mixed_render_records_recovery_for_correct_member(tmp_path, monkeypatch):
+def test_mixed_render_records_recovery_for_correct_member(tmp_path, monkeypatch, model_catalog):
     import json
     from meowdiobooks.backend import tts_v2
     first = recovery_segment(tmp_path, id='first', effectiveCharacterId='first-voice',
@@ -353,7 +360,7 @@ def test_mixed_render_records_recovery_for_correct_member(tmp_path, monkeypatch)
     assert len(model.calls) == 5
 
 
-def test_failed_recovery_preserves_previous_published_chapter(tmp_path, monkeypatch):
+def test_failed_recovery_preserves_previous_published_chapter(tmp_path, monkeypatch, model_catalog):
     from meowdiobooks.backend import tts_v2
     class Model(RecordingModel):
         sample_rate = 24_000
@@ -422,7 +429,7 @@ def test_multilingual_sentence_boundaries_preserve_nonwhitespace_characters():
     assert all(unit.endswith(('。', '…')) for unit in units)
 
 
-def test_ellipsis_receipt_describes_actual_pause_and_units(tmp_path, monkeypatch):
+def test_ellipsis_receipt_describes_actual_pause_and_units(tmp_path, monkeypatch, model_catalog):
     import json
     from meowdiobooks.backend import tts_v2
     model = ShortWordRecoveryModel()
@@ -465,7 +472,7 @@ def test_invalid_target_fails_before_acquiring_model(tmp_path, monkeypatch, valu
         }, 'english', lambda *args: None)
 
 
-def test_configured_target_controls_calls_and_receipt(tmp_path, monkeypatch):
+def test_configured_target_controls_calls_and_receipt(tmp_path, monkeypatch, model_catalog):
     import json
     from meowdiobooks.backend import tts_v2
     model = ShortWordRecoveryModel()
@@ -486,6 +493,42 @@ def test_configured_target_controls_calls_and_receipt(tmp_path, monkeypatch):
         assert [row['text'] for row in metadata['segments'][0]['synthesisUnits']] == [
             call['text'] for call in model.calls
         ]
+
+
+@pytest.mark.parametrize('mlx_installed', [True, False])
+def test_render_receipt_identifies_selected_checkpoint_and_installed_runtime(
+    tmp_path, monkeypatch, model_catalog, mlx_installed,
+):
+    import json
+    from meowdiobooks.backend import tts_v2
+    catalog = tmp_path / 'models.toml'
+    catalog.write_text(catalog.read_text().replace(
+        'mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit', 'example/custom-base-8bit',
+    ))
+    model = ShortWordRecoveryModel()
+    monkeypatch.setattr(tts_v2, '_load_model', lambda *args: (model, lambda: None))
+
+    def installed_version(name):
+        if name == 'mlx' and not mlx_installed:
+            raise tts_v2.PackageNotFoundError(name)
+        return {'mlx-audio': '0.6.1', 'mlx': '0.32.4'}[name]
+
+    monkeypatch.setattr(tts_v2, 'version', installed_version)
+    results = tts_v2.render_plan_audio(tmp_path, tmp_path, 'book', {
+        'contract': 'meowdiobooks.render-plan.v2',
+        'chapters': [{'chapterId': 'chapter', 'segments': [recovery_segment(tmp_path)]}],
+    }, 'english', lambda *args: None)
+    receipt = json.loads(Path(results[0]['metadataPath']).read_text())['renderer']
+    assert receipt['model'] == 'example/custom-base-8bit'
+    assert receipt['modelRevision'] == 'e7dd0585652209fa0d7783659aad4e8a324de11c'
+    assert receipt['pipelineId'] == 'qwen-voice-design-1.7b'
+    assert receipt['voiceRecipeVersion'] == '2'
+    assert receipt['runtimeVersions'] == {
+        'mlx-audio': '0.6.1', 'mlx': '0.32.4' if mlx_installed else None,
+    }
+    # Preserve the old ceiling even when a newer library inherits 8192 from the checkpoint.
+    assert all(call['max_tokens'] == 4096 for call in model.calls)
+    assert receipt['requestedGenerationAttempts'][0]['max_tokens'] == 4096
 
 
 @pytest.mark.parametrize('title', ['Mr.', 'Mrs.', 'Ms.', 'Dr.', 'Prof.', 'J.'])

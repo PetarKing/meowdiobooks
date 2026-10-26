@@ -15,7 +15,7 @@ def test_python_distribution_keeps_mlx_runtime_optional():
     assert "numpy==2.5.1" in dependencies
     assert "scipy==1.18.0" in dependencies
     assert not any(dependency.startswith("mlx-audio") for dependency in dependencies)
-    assert "mlx-audio==0.4.5" in runtime
+    assert "mlx-audio==0.6.1" in runtime
     assert "misaki[en]==0.9.4" in runtime
     assert any(dependency.startswith("en-core-web-sm @ ") for dependency in runtime)
 
