@@ -60,6 +60,7 @@ from .cast import (
 from .voice_reuse import (
     CastVoiceReuse,
     validated_imported_voices,
+    prepend_previous_voice,
     validate_source_book_ids,
     validate_cast_proposal_inputs,
 )
@@ -567,6 +568,10 @@ def create_app_v2(
     def workspace_for(book_id: str) -> BookWorkspace:
         return BookWorkspace.under(root, book_id)
 
+    if cast_voice_reuse is None:
+        from .local_voice_reuse import LocalVoiceReuse
+        cast_voice_reuse = LocalVoiceReuse(books=books, package_for_book=package_for)
+
     def write_cast_candidate(
         package: Path, payload: dict[str, Any]
     ) -> tuple[Path, dict[str, Any]]:
@@ -1045,8 +1050,7 @@ def create_app_v2(
                         layered.pop(key, None)
                     reused[character_id] = layered
                 elif (
-                    ((same_selection and recipe_is_current)
-                     or row.get("reusedVoiceSnapshot") is True)
+                    (same_selection and recipe_is_current)
                     and _has_complete_audition_pack(row)
                 ):
                     reused[character_id] = row
@@ -1054,25 +1058,26 @@ def create_app_v2(
                 settings.get("sourceBookIds", proposal.get("sourceBookIds", [])), book.id
             )
             imported = {}
-            reuse_selection_unchanged = (
-                same_selection
-                and source_book_ids == proposal.get("sourceBookIds", [])
+            needs_auditions = any(str(row["characterId"]) not in reused
+                                  for row in finalized["identities"]) or (
+                narrator_line_count > 0 and not (
+                    same_selection and recipe_is_current
+                    and isinstance(proposal.get("narrator"), dict)
+                    and _has_complete_audition_pack(proposal["narrator"])
+                )
             )
-            if source_book_ids and not reuse_selection_unchanged:
-                if cast_voice_reuse is None:
-                    raise CastContractError("Voice reuse is unavailable")
-                report(1, "Matching voices from selected books")
+            if cast_voice_reuse is not None and needs_auditions:
+                report(1, "Checking matching voices from prior books")
                 targets = cast_voice_targets(finalized, proposal, dialogue, review)
                 imported = validated_imported_voices(
                     cast_voice_reuse.apply(
                         book.id, package, targets, source_book_ids, language, model_id,
                         **({"preview_fingerprint": settings["castingPreviewFingerprint"]}
                            if settings.get("castingPreviewFingerprint") else {}),
-                    ),
-                    targets,
+                    ), targets,
                 )
-                matched.update({key: row for key, row in imported.items() if key != "narrator"})
-                reused.update({key: row for key, row in imported.items() if key != "narrator"})
+            elif source_book_ids and cast_voice_reuse is None:
+                raise CastContractError("Voice reuse is unavailable")
             affected = [
                 row
                 for row in finalized["identities"]
@@ -1086,7 +1091,6 @@ def create_app_v2(
             include_narrator_profile = (
                 narrator_line_count > 0
                 and (not same_language or not proposal.get("narrator"))
-                and "narrator" not in imported
             )
             profiles: dict[str, dict[str, str]] = {}
             if profile_targets or include_narrator_profile:
@@ -1202,6 +1206,7 @@ def create_app_v2(
                     selected_sharing_policy,
                     shareable_character_ids={
                         str(row["characterId"]) for row in affected
+                        if str(row["characterId"]) not in imported
                     },
                 )
                 shared_group_by_id = sharing_plan.group_by_character_id
@@ -1231,11 +1236,10 @@ def create_app_v2(
                         }
                     )
                 characters.append(character)
-            previous_narrator = imported.get("narrator") or proposal.get("narrator")
-            reusable_narrator = "narrator" in imported or (
+            previous_narrator = proposal.get("narrator")
+            reusable_narrator = (
                 isinstance(previous_narrator, dict)
-                and ((same_selection and recipe_is_current)
-                     or (same_language and previous_narrator.get("reusedVoiceSnapshot") is True))
+                and (same_selection and recipe_is_current)
                 and _has_complete_audition_pack(previous_narrator)
             )
             if narrator_line_count and not reusable_narrator:
@@ -1343,6 +1347,13 @@ def create_app_v2(
                 "identityDecisions": raw_decisions,
                 "sourceBookIds": source_book_ids,
             }
+            if narrator is not None and "narrator" in imported and not reusable_narrator:
+                body["narrator"] = prepend_previous_voice(narrator, imported["narrator"])
+            body["identities"] = [
+                prepend_previous_voice(row, imported[str(row["characterId"])])
+                if str(row["characterId"]) in imported and str(row["characterId"]) not in reused
+                else row for row in body["identities"]
+            ]
         return finish(body, "Cast candidate ready for review")
 
     def ensure_recording_script(book_id: str) -> dict[str, Any]:
@@ -1802,7 +1813,8 @@ def create_app_v2(
                 ],
             },
             "cast": visible_cast,
-            "castingPreviewAvailable": cast_voice_reuse is not None,
+            "castingPreviewAvailable": cast_voice_reuse is not None and getattr(cast_voice_reuse, "requires_quote", True),
+            "voiceReuseAvailable": cast_voice_reuse is not None,
             "voiceModels": voice_models(repo_root),
             "voiceSelection": {
                 "modelId": visible_cast.get("voiceModel") or default_voice_id,
@@ -2322,7 +2334,10 @@ def create_app_v2(
             if raw is None:
                 raw = proposal.get("identityDecisions", [])
             decisions = {str(row.get("label", "")): row for row in raw if row.get("label")}
-            finalized = finalize_identity_mapping(proposal.get("proposals", []), decisions)
+            finalized = finalize_identity_mapping(
+                [{**row, "reviewRequired": False} for row in proposal.get("proposals", [])],
+                decisions,
+            )
             preview_language = normalize_language(body.language or proposal.get("language") or "english")
             if (proposal.get("phase") == "audition-review"
                     and preview_language == normalize_language(proposal.get("language", "english"))):

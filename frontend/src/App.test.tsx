@@ -3332,6 +3332,32 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: /Apply all suggested choices/ })).not.toBeInTheDocument()
   })
 
+  it('shows exact hyphen spellings and previews the explicit choice', async () => {
+    const snapshot: WizardSnapshot = {
+      ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+    }
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-2', boundaryCandidates: [], warnings: [{
+      id: 'review:hyphenation', kind: 'hyphenation', severity: 'warning', decisionScope: 'occurrence',
+      availableActions: ['keep-hyphen', 'join-word'], occurrences: [{
+        id: 'hyphen-1', source: 'self-\nconfidence', page: 3,
+        availableActions: ['keep-hyphen', 'join-word'],
+        hyphenChoices: { 'keep-hyphen': 'self-confidence', 'join-word': 'selfconfidence' },
+      }],
+    }] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    const keep = await screen.findByRole('button', { name: 'Keep hyphen self-confidence' })
+    expect(screen.getByRole('heading', { name: 'Check hyphens' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Join word selfconfidence' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Leave out|Use narrator|Suggested/ })).not.toBeInTheDocument()
+    expect(keep).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(keep)
+    expect(keep).toHaveAttribute('aria-pressed', 'true')
+  })
+
   it('scrolls the next review group into view during automatic progression', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
@@ -3641,6 +3667,31 @@ describe('v2 wizard', () => {
         revision: 'cp', phase: 'identity-review' as const,
         dossiers: [
           { label: 'Alice', occurrenceCount: 4, examples: [{ source: 'Alice: Wait.' }] },
+          { label: 'Little adventurer', occurrenceCount: 2, examples: [{ source: 'Little adventurer: Look.' }] },
+        ],
+        proposals: [
+          { label: 'Alice', category: 'character', canonicalName: 'Alice', aliases: ['Little adventurer'], reviewRequired: true },
+          { label: 'Little adventurer', category: 'character', canonicalName: 'Alice', aliases: ['Alice'], reviewRequired: true },
+        ],
+      },
+      generatedChapters: [],
+    }
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
+    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
+    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
+  })
+
+  it('allows nested character labels to proceed without grouping confirmation', async () => {
+    const snapshot = {
+      ...base,
+      book: { ...base.book, completedStages: ['import','extract','dialogue','review'] as WizardStage[] },
+      cast: {
+        revision: 'cp', phase: 'identity-review' as const,
+        dossiers: [
+          { label: 'Alice', occurrenceCount: 4, examples: [{ source: 'Alice: Wait.' }] },
           { label: 'Alice Liddell', occurrenceCount: 2, examples: [{ source: 'Alice Liddell: Look.' }] },
         ],
         proposals: [
@@ -3652,9 +3703,9 @@ describe('v2 wizard', () => {
     }
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    expect(screen.getByRole('button', { name: 'Confirm cast identities →' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm grouping' }))
+    expect(screen.queryByRole('button', { name: 'Confirm grouping' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
   })
 

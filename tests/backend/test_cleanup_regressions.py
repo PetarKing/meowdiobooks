@@ -57,12 +57,16 @@ def test_cleanup_evidence_and_keep_policy_preserve_source(case):
         assert by_id[row["blockId"]][row["sourceStart"]:row["sourceEnd"]] == row["source"]
     accepted = accept_review_revision(
         workspace,
-        [{"occurrenceIds": [row["id"]], "action": "keep"} for row in occurrences],
+        [{"occurrenceIds": [row["id"]], "action": "keep-hyphen" if row["kind"] == "hyphenation" else "keep"} for row in occurrences],
         revision="keep-1",
     )
     rendered = apply_review_render_policies(dialogue, accepted)
     assert "".join(row["source"] for row in rendered["spans"]) == "".join(by_id.values())
-    assert "".join(row["text"] for row in rendered["spans"]) == "".join(by_id.values())
+    expected = "".join(by_id.values())
+    for row in occurrences:
+        if row["kind"] == "hyphenation":
+            expected = expected.replace(row["source"], row["hyphenChoices"]["keep-hyphen"])
+    assert "".join(row["text"] for row in rendered["spans"]) == expected
     assert (extraction, dialogue) == original
 
 

@@ -10,7 +10,7 @@ function reviewText(t: TFunction | undefined, key: string, values: Record<string
 export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): ReviewWarning[] {
   if (!Array.isArray(candidate.warnings)) return [];
   const aliases: Record<string, string> = { "missing-content": "empty-page", "extraction-artifact": "suspicious-extraction", "ocr-artifact": "suspicious-extraction", "layout-order": "reading-order", "peripheral-matter": "front-back-matter" };
-  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ patternGroupId: typeof occurrence.patternGroupId === "string" ? occurrence.patternGroupId : undefined, patternVerification: occurrence.patternVerification === "verified" ? "verified" : undefined, contextLayout: occurrence.contextLayout === "continuous" ? "continuous" : undefined, recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
+  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ hyphenChoices: occurrence.hyphenChoices as WarningOccurrence["hyphenChoices"], patternGroupId: typeof occurrence.patternGroupId === "string" ? occurrence.patternGroupId : undefined, patternVerification: occurrence.patternVerification === "verified" ? "verified" : undefined, contextLayout: occurrence.contextLayout === "continuous" ? "continuous" : undefined, recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
   // Older candidates attached corrections to deterministic categories. Preserve
   // occurrence IDs and capabilities for preview and acceptance of saved revisions.
   const aiWarnings = warnings.filter((warning) => warning.kind === "ai-cleanup");
@@ -57,6 +57,8 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): R
 export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarning) {
   const { kind, readerState } = warning;
   if (reviewIsPatternGroup(warning)) return action === "keep" ? "Keep this occurrence" : "Omit this occurrence";
+  if (action === "keep-hyphen") return "Keep hyphen";
+  if (action === "join-word") return "Join word";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave";
   if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
@@ -68,6 +70,7 @@ export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarni
 }
 
 export function reviewDecisionActions(warning: ReviewWarning): ReviewCapability[] {
+  if (warning.kind === "hyphenation") return (["keep-hyphen", "join-word"] as ReviewCapability[]).filter((action) => warning.availableActions.includes(action));
   const order: ReviewCapability[] = warning.kind === "ai-cleanup" || warning.availableActions.includes("repair")
     ? ["repair", "keep", "exclude", "narrate", "rerun-extraction", "rerun-dialogue"]
     : ["keep", "repair", "exclude", "narrate", "rerun-extraction", "rerun-dialogue"];
@@ -80,6 +83,7 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
   const subject = count === 1
     ? reviewText(t, "This highlighted text")
     : reviewText(t, "All {{count}} highlighted sections", { count });
+  if (kind === "hyphenation") return warning.occurrences[0]?.hyphenChoices?.[action] ?? "";
   if (kind === "ai-cleanup" && action === "keep") return reviewText(t, "Keep the original text for this suggestion.");
   if (kind === "empty-page" && action === "keep") return reviewText(t, "Confirm that all {{count}} pages are intentionally empty; nothing is removed.", { count });
   if (kind === "reading-order" && action === "keep") return reviewText(t, "Accept the extracted order for all {{count}} highlighted locations.", { count });
@@ -96,6 +100,7 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
 
 export function reviewQuestion(kind: string) {
   if (kind === "repeated-page-text") return "Should listeners hear this repeated text?";
+  if (kind === "hyphenation") return "How should this word be written?";
   if (kind === "ai-cleanup") return "What should happen to this text?";
   if (kind === "empty-page") return "Is this page intentionally empty?";
   if (kind === "suspicious-extraction") return "Does this text match the source?";
@@ -112,6 +117,7 @@ export function reviewGuidance(warning: ReviewWarning) {
   if (reviewIsPatternGroup(warning)) return "Choose once for this repeated text. You can keep or omit individual occurrences as exceptions.";
   if (reviewIsVerifiedScriptGroup(warning)) return "AI checked these delivery cues in context. Suggested choices leave them unspoken. Uncertain text stays spoken and needs no decision.";
   const guidance: Partial<Record<string, string>> = {
+    hyphenation: "Choose the spelling that matches the source. Both choices remove the line break; your source and reader stay unchanged.",
     "ai-cleanup": "Check each suggested correction against the source document before applying it.",
     "empty-page": "No text was extracted from this page. Confirm it only when the source page is intentionally blank or visual-only.",
     "suspicious-extraction": "Check whether the highlighted words match the source. Keep correct text or leave out debris.",
@@ -127,7 +133,7 @@ export function reviewGuidance(warning: ReviewWarning) {
 }
 
 export function reviewWarningLabel(kind: string) {
-  return ({ "repeated-page-text": "Repeated page text", "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
+  return ({ hyphenation: "Check hyphens", "repeated-page-text": "Repeated page text", "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
 }
 
 export function reviewUsesOccurrenceDecisions(warning: ReviewWarning) {

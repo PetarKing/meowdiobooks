@@ -43,6 +43,26 @@ describe("Voice design language confirmation", () => {
     window.history.replaceState({}, "", "/");
   });
 
+  it("loads automatic prior-book matches on the cast and clears them when language changes", async () => {
+    const snapshot = snapshotFor("cast-identities");
+    const cast = { ...snapshot.cast!, voiceModel: "qwen", language: "english", previousVoiceMatches: undefined };
+    const previewCasting = vi.fn().mockImplementation((_id, settings) => Promise.resolve({
+      ...quote, previousVoiceMatches: settings.language === "english" ? { Alice: { bookTitle: "First book" } } : {},
+    }));
+    const gateway = { ...createFixtureGateway("cast-identities"), previewCasting,
+      getBookSnapshot: vi.fn().mockResolvedValue({ ...snapshot, cast, voiceReuseAvailable: true,
+        castingPreviewAvailable: false,
+        voiceModels: [{ id: "qwen", label: "Local", supportedLanguages: ["english", "french"] }],
+        voiceSelection: { modelId: "qwen", language: "english" } }),
+    };
+    render(<App gateway={gateway} initialWorkflowLocation={{ bookId: fixtureBook.id, stepId: "cast" }} />);
+    await screen.findByText("From prior book");
+    expect(previewCasting).toHaveBeenCalledWith(fixtureBook.id, expect.objectContaining({ sourceBookIds: [] }));
+    fireEvent.click(screen.getByRole("button", { name: "french", hidden: true }));
+    await waitFor(() => expect(screen.queryByText("From prior book")).not.toBeInTheDocument());
+    await waitFor(() => expect(previewCasting).toHaveBeenLastCalledWith(fixtureBook.id, expect.objectContaining({ language: "french" })));
+  });
+
   it("hides provider choices in enhanced casting while retaining the restored model and its quote", async () => {
     const fetchPreview = vi.fn().mockResolvedValue({ ...quote, options: [
       { modelId: "other", label: "Other provider", description: "Technical provider details", estimatedCostMinor: 100 },
