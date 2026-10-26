@@ -12,6 +12,13 @@ import { persistWorkflowReturn, publicJourney } from './workflow/navigation'
 import { workflowStorageKey } from './workflow/workflowLocation'
 import { useWorkflowModel } from './app/useWorkflowModel'
 
+async function inspectDialogueChoices() {
+  await screen.findByRole('button', { name: /^(Accept all AI guesses|Check your choices)$/ });
+  const bulk = screen.queryByRole('button', { name: 'Accept all AI guesses' });
+  if (bulk) fireEvent.click(bulk);
+  fireEvent.click(screen.getByRole('button', { name: 'Check your choices' }));
+}
+
 describe('first return paint', () => {
   it('shows quiet restoration before effects run for an explicit book return', () => {
     const html = renderToString(<App workflowPersistenceNamespace="first-paint" initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate' }} />)
@@ -1360,20 +1367,20 @@ describe('v2 wizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
 
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenNthCalledWith(1, 'book-1', 'dialogue', 'd1')
     expect(wizardApi.getStageCandidate).toHaveBeenNthCalledWith(2, 'book-1', 'dialogue', 'dialogue-ai')
     expect(wizardApi.processStage).not.toHaveBeenCalled()
     expect(screen.queryByRole('region', { name: 'Current accepted transcript' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByRole('button', { name: /Dialogue Complete/ })).not.toHaveClass('revising')
-    const accept = screen.getByRole('button', { name: 'Accept dialogue result →' })
+    const accept = screen.getByRole('button', { name: 'Continue →' })
     expect(accept).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 1' }))
+    await inspectDialogueChoices()
     const row = screen.getByText('“We should go.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(within(row).getByText('Your correction')).toBeInTheDocument()
-    expect(row).toHaveTextContent('Bob')
-    fireEvent.click(within(row).getByRole('button', { name: 'Restore AI choice' }))
+    expect(within(row).getByRole('button', { name: 'Choose Bob' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(row).getByRole('button', { name: 'Choose Alice' })).toHaveAttribute('aria-description', 'AI choice')
+    fireEvent.click(within(row).getByRole('button', { name: 'Choose Alice' }))
     expect(accept).toBeEnabled()
     fireEvent.click(accept)
 
@@ -1423,6 +1430,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Change strategy' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change dialogue strategy?' })).getByRole('button', { name: 'Change strategy' }))
     expect(screen.queryByRole('region', { name: 'Current accepted transcript' })).not.toBeInTheDocument()
     vi.mocked(wizardApi.previewDialogue).mockResolvedValueOnce({
       ...base.dialogue!,
@@ -1454,6 +1462,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Dialogue'))
     fireEvent.click(screen.getByRole('button', { name: 'Change settings →' }))
     fireEvent.click(await screen.findByRole('button', { name: 'Change strategy' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Change dialogue strategy?' })).getByRole('button', { name: 'Change strategy' }))
     vi.mocked(wizardApi.previewDialogue).mockResolvedValueOnce(base.dialogue!)
 
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
@@ -1886,26 +1895,21 @@ describe('v2 wizard', () => {
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
 
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: /AI checks 12/ }))
-    fireEvent.click(screen.getByRole('button', { name: /Assigned 12/ }))
-    expect(screen.getByRole('button', { name: /Assigned 12/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
+    await inspectDialogueChoices()
+    fireEvent.click(screen.getByRole('button', { name: /AI chosen 12/ }))
+    expect(screen.getByRole('button', { name: /AI chosen 12/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Subaru: [Run!]')).toBeInTheDocument()
-    expect(screen.queryByText('Before 1')).not.toBeInTheDocument()
-    const firstPageOutcomes = screen.getAllByText('Character', { selector: 'b' })
-    expect(firstPageOutcomes).toHaveLength(10)
-    expect(screen.getAllByText('AI assigned', { selector: '.dialogue-decision-heading > small' })).toHaveLength(10)
     expect(screen.queryByText(/qwen:targeted-speaker-v2/)).not.toBeInTheDocument()
-    expect(firstPageOutcomes[0].closest('article')).toHaveTextContent('Speaker 1')
-    expect(firstPageOutcomes[9].closest('article')).toHaveTextContent('Speaker 10')
-    expect(screen.queryByText('Before 11')).not.toBeInTheDocument()
-    expect(screen.getByText('Page 1 of 2 · 12 lines')).toBeInTheDocument()
+    for (let index = 1; index <= 12; index += 1) {
+      const outcome = screen.getByRole('article')
+      expect(outcome).toHaveClass('dialogue-focused-outcome')
+      expect(outcome).toHaveTextContent(`Speaker ${index}`)
+      expect(screen.getByText(`Line ${index} of 12`)).toBeInTheDocument()
+      if (index < 12) fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    }
+    expect(screen.getByRole('button', { name: 'Next →' })).toBeDisabled()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
-    const secondPageOutcomes = screen.getAllByText('Character', { selector: 'b' })
-    expect(secondPageOutcomes[0].closest('article')).toHaveTextContent('Speaker 11')
-    expect(secondPageOutcomes[1].closest('article')).toHaveTextContent('Speaker 12')
-    expect(screen.queryByText('Before 1')).not.toBeInTheDocument()
   })
 
   it('shows a modest source window and expands it within hard unit and character caps', async () => {
@@ -1928,14 +1932,14 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    fireEvent.click(await screen.findByRole('tab', { name: /AI checks 1/ }))
+    await inspectDialogueChoices()
 
     const row = (await screen.findByText('“Target line.”')).closest('article') as HTMLElement
-    expect(within(row).getByText(/Before 7\. Before 8\. Before 9\./)).toBeInTheDocument()
+    expect(within(row).getByText(/Before 7\./)).toBeInTheDocument()
     expect(within(row).queryByText(/Before 6\./)).not.toBeInTheDocument()
     expect(within(row).getByText(/AFTER_START/)).toBeInTheDocument()
     expect(within(row).queryByText(/AFTER_END/)).not.toBeInTheDocument()
-    expect(row.querySelector('.ai-source-evidence p')?.textContent).toContain('Before 7.\n\nBefore 8.\n\nBefore 9.')
+    expect(row.querySelector('.ai-source-evidence p')?.textContent).toContain('Before 7.')
 
     fireEvent.click(within(row).getByRole('button', { name: 'Show more source context' }))
 
@@ -1962,7 +1966,7 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    fireEvent.click(await screen.findByRole('tab', { name: /AI checks 1/ }))
+    await inspectDialogueChoices()
 
     const row = (await screen.findByText(target, { selector: 'mark' })).closest('article') as HTMLElement
     expect(within(row).getByText('Tiny model before.')).toBeInTheDocument()
@@ -1990,8 +1994,8 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
 
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: /AI checks 1/ }))
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
+    await inspectDialogueChoices()
     expect(screen.getByText('“Restored.”')).toBeInTheDocument()
     expect(screen.getByText('Alice looked up.')).toBeInTheDocument()
     expect(wizardApi.getStageCandidate).toHaveBeenCalledWith('book-1', 'dialogue', 'dialogue-pending')
@@ -2089,15 +2093,15 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
 
-    fireEvent.click(await screen.findByRole('tab', { name: 'AI checks 1' }))
+    await inspectDialogueChoices()
     fireEvent.click(screen.getByRole('button', { name: /Not dialogue 1/ }))
     expect(await screen.findAllByText('“citation”')).toHaveLength(1)
     expect(screen.getByRole('button', { name: /Not dialogue 1/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Before')).toBeInTheDocument()
     expect(screen.getByText('after.')).toBeInTheDocument()
-    const rejected = screen.getByText('Kept as narration', { selector: 'b' }).closest('article')
+    const rejected = screen.getByRole('article')
     expect(rejected).toHaveClass('rejected')
-    expect(rejected).toHaveTextContent('Kept as narration')
+    expect(within(rejected).getByRole('button', { name: 'Choose Narrator' })).toHaveAttribute('aria-description', 'AI choice')
     expect(rejected).not.toHaveTextContent('surrounding text')
     expect(rejected).not.toHaveTextContent('Before “citation” after.Before “citation” after.')
   })
@@ -2122,56 +2126,46 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 3' }))
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
+    await inspectDialogueChoices()
 
     const resultFilters = within(screen.getByRole('group', { name: 'Filter AI results' })).getAllByRole('button')
     expect(resultFilters.map((button) => button.textContent)).toEqual([
-      'All3', 'Assigned1', 'Needs review1', 'Not dialogue1',
+      'All3', 'AI chosen1', 'Reviewed2', 'Needs review0', 'Not dialogue1',
     ])
-    expect(screen.getByRole('button', { name: /All 3/ })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: /Needs review 1/ }))
-    expect(screen.getByText('“Narrator line.”', { selector: 'mark' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Needs review 0/ }))
+    expect(screen.getByText('No lines need review.')).toBeInTheDocument()
     expect(screen.queryByText('“Character line.”', { selector: 'mark' })).not.toBeInTheDocument()
-
     fireEvent.click(screen.getByRole('button', { name: /Not dialogue 1/ }))
     expect(screen.getAllByText('“Prose label.”')).toHaveLength(1)
-    expect(screen.queryByText('“Character line.”')).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /All 3/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     const narratorRow = screen.getByText('“Narrator line.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Not dialogue 1/ })).toBeInTheDocument()
-    expect(within(narratorRow).getByText('Needs review · no clear speaker')).toBeInTheDocument()
-    expect(within(narratorRow).getByText('Narrator for now', { selector: 'b' })).toBeInTheDocument()
-    expect(within(narratorRow).getByText('Choose a character if you know who spoke', { selector: '.dialogue-change-choices > small' })).toBeInTheDocument()
-    expect(within(narratorRow).queryByRole('button', { name: 'Choose Narrator' })).not.toBeInTheDocument()
-    expect(within(narratorRow).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Needs review 0/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reviewed 2/ })).toBeInTheDocument()
+    expect(within(narratorRow).getByRole('button', { name: 'Choose Narrator' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(narratorRow).getByText('No AI guess')).toBeInTheDocument()
     fireEvent.click(within(narratorRow).getByRole('button', { name: 'Choose another character' }))
     const characterInput = within(narratorRow).getByLabelText('Character name')
     expect(characterInput).toHaveValue('')
     expect(characterInput).toHaveAttribute('placeholder', 'Search or type a character name')
     fireEvent.change(characterInput, { target: { value: 'Alice' } })
-    expect(within(narratorRow).getByText('Needs review · no clear speaker')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Assigned 1/ })).toBeInTheDocument()
-    fireEvent.click(within(narratorRow).getByRole('button', { name: 'Apply change' }))
-    expect(within(narratorRow).getByText('Your correction')).toBeInTheDocument()
-    expect(within(narratorRow).getByText('Change reader', { selector: '.dialogue-change-choices > small' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Assigned 1/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Needs review 0/ })).toBeInTheDocument()
+    fireEvent.click(within(narratorRow).getByRole('option', { name: 'Alice' }))
+    expect(within(narratorRow).getByRole('button', { name: 'Choose Alice' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /Needs review 0/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reviewed 2/ })).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: '← Previous' }))
     const characterRow = screen.getByText('“Character line.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(within(characterRow).getByText('Change reader', { selector: '.dialogue-change-choices > small' })).toBeInTheDocument()
-    expect(within(characterRow).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
     fireEvent.click(within(characterRow).getByRole('button', { name: 'Choose Narrator' }))
+    expect(within(characterRow).getByRole('button', { name: 'Choose Narrator' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: /AI chosen 0/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Needs review 0/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Reviewed 2/ })).toBeInTheDocument()
 
-    expect(within(characterRow).getByText('Your correction')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Assigned 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Needs review 1/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Not dialogue 1/ })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Accept dialogue result →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith(
       'book-1',
       'dialogue',
@@ -2206,36 +2200,32 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 2' }))
-    fireEvent.click(screen.getByRole('button', { name: /Needs review 2/ }))
-
-    expect(screen.getByRole('button', { name: /Needs review 2/ })).toHaveAttribute('aria-pressed', 'true')
-
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
     const first = screen.getByText('“We should go.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(within(first).getByText('Needs review · two possible readers')).toBeInTheDocument()
-    expect(within(first).getByText('Narrator for now')).toBeInTheDocument()
-    expect(within(first).getByText('Suggested readers', { selector: '.dialogue-change-choices > small' })).toBeInTheDocument()
+    expect(within(first).getByRole('button', { name: 'Choose Alice' })).toHaveAttribute('aria-description', 'AI suggestion')
+    expect(within(first).getByRole('button', { name: 'Choose Bob' })).toHaveAttribute('aria-description', 'AI suggestion')
+    expect(within(first).getByRole('button', { name: 'Choose Narrator' })).not.toHaveAttribute('aria-description', 'AI choice')
     expect(within(first).getByRole('button', { name: 'Choose Alice' })).toBeInTheDocument()
-    expect(within(first).getByRole('button', { name: 'Choose another character' })).toBeInTheDocument()
+    expect(within(first).queryByRole('button', { name: 'Choose another character' })).not.toBeInTheDocument()
     expect(within(first).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
-    expect(within(first).queryByRole('button', { name: 'Choose Narrator' })).not.toBeInTheDocument()
+    expect(within(first).getByRole('button', { name: 'Choose Narrator' })).toBeInTheDocument()
     expect(within(first).queryByText(/surrounding text/i)).not.toBeInTheDocument()
     expect(within(first).queryByText('We should go.', { selector: '.ai-spoken-text' })).not.toBeInTheDocument()
     fireEvent.click(within(first).getByRole('button', { name: 'Choose Bob' }))
 
-    expect(screen.getByRole('button', { name: /Needs review 2/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Assigned 0/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Accept dialogue result →' }))
+    expect(screen.getByText('Line 2 of 2')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Use narrator for remaining' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith(
       'book-1',
       'dialogue',
       'dialogue-suggested',
-      [{ spanId: 'suggested-1', action: 'speaker', speakerLabel: 'Bob', provenance: 'user' }],
+      [{ spanId: 'suggested-1', action: 'speaker', speakerLabel: 'Bob', provenance: 'user' }, { spanId: 'suggested-2', action: 'narrator', provenance: 'user' }],
     ))
   })
 
-  it('starts with a calm global overview and reviews only uncertain lines', async () => {
+  it('starts in required review without secondary navigation and lets completed choices be inspected', async () => {
     const snapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract'] as WizardStage[] } }
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'job-dialogue', status: 'succeeded', result: { revision: 'dialogue-guided-review' } })
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({
@@ -2262,41 +2252,32 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    expect(await screen.findByRole('tab', { name: 'Overview' })).toHaveAttribute('aria-selected', 'true')
-
-    const overview = screen.getByRole('region', { name: 'Dialogue overview' })
-    expect(screen.getByText('Your transcript is ready')).toBeInTheDocument()
-    expect(screen.getByRole('img', { name: 'Dialogue assignment summary' }).querySelectorAll('i')).toHaveLength(3)
-    expect(within(overview).getByText('By reader')).toBeInTheDocument()
-    const emilia = within(overview).getByText('Emilia').closest('.dialogue-reader-card') as HTMLElement
-    expect(emilia).toHaveTextContent('3')
-    expect(within(emilia).getByRole('img', { name: '2 known · 1 AI' })).toBeInTheDocument()
-    expect(within(overview).queryByText('Rem')).not.toBeInTheDocument()
-    fireEvent.click(within(overview).getByRole('button', { name: 'Show 4 more readers ↓' }))
-    expect(within(overview).getByText('Rem')).toBeInTheDocument()
-    expect(within(overview).queryByText('“We should go.”')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: /Review 2/ }))
-    expect(screen.getByRole('tab', { name: /Review 2/ })).toHaveAttribute('aria-selected', 'true')
-    expect(screen.getByText('Line 1 of 2')).toBeInTheDocument()
-    expect(screen.getByText('Uncertain lines · suggested speakers first')).toBeInTheDocument()
-    expect(screen.getByText('Two possible readers')).toBeInTheDocument()
-    expect(screen.getByText('AI could not safely choose between them.')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Review uncertain lines' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: 'Overview' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI checks' })).not.toBeInTheDocument()
+    expect(screen.getByText('Line 1 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Who reads this line?')).toBeInTheDocument()
     expect(screen.getByText('“We should go.”', { selector: 'mark' })).toBeInTheDocument()
     expect(screen.queryByText('“Wait here.”', { selector: 'mark' })).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
-    expect(screen.getByText('Line 2 of 2')).toBeInTheDocument()
-    expect(screen.getByText('No clear speaker')).toBeInTheDocument()
-    expect(screen.getByText('“Wait here.”', { selector: 'mark' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
-    expect(screen.getByText('Review complete')).toBeInTheDocument()
-    expect(screen.getByText('Accept your choices below, or inspect all AI checks.')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 3' }))
-    expect(screen.getByText('“Certainly.”', { selector: 'mark' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip for now →' }))
+    expect(screen.getByText('Line 2 of 3')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Emilia' }))
+    expect(screen.getByText('Who reads this line?')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Narrator' }))
     expect(screen.getByText('“We should go.”', { selector: 'mark' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Bob' }))
+    expect(screen.getByRole('region', { name: 'By reader' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Your transcript' })).toHaveFocus()
+    expect(screen.queryByText('Review complete')).not.toBeInTheDocument()
+
+    await inspectDialogueChoices()
+    expect(screen.getByText('“Certainly.”', { selector: 'mark' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
+    expect(screen.getByText('“We should go.”', { selector: 'mark' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
     expect(screen.getByText('“Wait here.”', { selector: 'mark' })).toBeInTheDocument()
   })
 
@@ -2317,8 +2298,9 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    fireEvent.click(await screen.findByRole('tab', { name: 'AI checks 2' }))
+    await inspectDialogueChoices()
     fireEvent.click(await screen.findByRole('button', { name: /All 2/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next →' }))
 
     const target = screen.getByText('“New voice.”', { selector: 'mark' }).closest('article') as HTMLElement
     expect(within(target).queryByRole('button', { name: 'Change' })).not.toBeInTheDocument()
@@ -2332,12 +2314,12 @@ describe('v2 wizard', () => {
     fireEvent.change(characterInput, { target: { value: 'A' } })
     expect(within(target).getByRole('option', { name: 'Alice' })).toBeInTheDocument()
     fireEvent.change(characterInput, { target: { value: 'Guest speaker' } })
-    expect(within(target).getByText('Needs review · no clear speaker')).toBeInTheDocument()
-    fireEvent.click(within(target).getByRole('button', { name: 'Apply change' }))
+    expect(within(target).getByText('No AI guess')).toBeInTheDocument()
+    fireEvent.click(within(target).getByRole('option', { name: 'Guest speaker' }))
 
-    expect(within(target).getByText('Your correction')).toBeInTheDocument()
-    expect(target).toHaveTextContent('Character · Guest speaker')
-    fireEvent.click(screen.getByRole('button', { name: 'Accept dialogue result →' }))
+    expect(within(target).getByRole('button', { name: 'Choose Guest speaker' })).toHaveAttribute('aria-pressed', 'true')
+    expect(within(target).getByRole('button', { name: 'Choose Guest speaker' })).toHaveTextContent('✓')
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith(
       'book-1',
       'dialogue',
@@ -2346,7 +2328,7 @@ describe('v2 wizard', () => {
     ))
   })
 
-  it('keeps narrator fallbacks implicit and applies a suggested reader in one click', async () => {
+  it('requires explicit narrator review and applies a suggested reader in one click', async () => {
     const snapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract'] as WizardStage[] } }
     vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'job-dialogue', status: 'succeeded', result: { revision: 'dialogue-quick-narrator' } })
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({
@@ -2366,25 +2348,23 @@ describe('v2 wizard', () => {
 
     await open(snapshot)
     fireEvent.click(screen.getByRole('button', { name: 'Build transcript →' }))
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('tab', { name: 'AI checks 2' }))
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
 
     const suggested = screen.getByText('“We should go.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(within(suggested).queryByRole('button', { name: 'Choose Narrator' })).not.toBeInTheDocument()
+    expect(within(suggested).getByRole('button', { name: 'Choose Narrator' })).toBeInTheDocument()
     fireEvent.click(within(suggested).getByRole('button', { name: 'Choose Alice' }))
-    expect(screen.getByRole('button', { name: /Needs review 2/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Assigned 0/ })).toBeInTheDocument()
 
     const unsure = screen.getByText('“Wait here.”', { selector: 'mark' }).closest('article') as HTMLElement
-    expect(within(unsure).queryByRole('button', { name: 'Choose Narrator' })).not.toBeInTheDocument()
+    expect(within(unsure).getByRole('button', { name: 'Choose Narrator' })).toBeInTheDocument()
     expect(within(unsure).getByRole('button', { name: 'Choose another character' })).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: 'Accept dialogue result →' }))
+    fireEvent.click(within(unsure).getByRole('button', { name: 'Choose Narrator' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith(
       'book-1',
       'dialogue',
       'dialogue-quick-narrator',
-      [{ spanId: 'suggested-1', action: 'speaker', speakerLabel: 'Alice', provenance: 'user' }],
+      [{ spanId: 'suggested-1', action: 'speaker', speakerLabel: 'Alice', provenance: 'user' }, { spanId: 'unsure-1', action: 'narrator', provenance: 'user' }],
     ))
   })
 
@@ -4346,11 +4326,11 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('navigation', { name: 'Wizard stages' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Dialogue In progress' })).toHaveAttribute('aria-current', 'step')
     finish({ id: 'dialogue-running', kind: 'v2:dialogue', status: 'succeeded', payload: { book_id: 'book-1' } })
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
     await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
     view.unmount()
     render(<App />)
-    expect(await screen.findByText('Your transcript is ready')).toBeInTheDocument()
+    expect(await screen.findByText('Your transcript')).toBeInTheDocument()
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 

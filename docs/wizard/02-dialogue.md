@@ -195,11 +195,46 @@ This phase has its own review before acceptance. The user sees:
 - regex overlaps and user-resolved interrupted turns;
 - source on the left and authoritative transcript result on the right.
 
-The user can accept the complete candidate or return to regexes, open-marker configuration and AI
-target scope and rerun. AI-checked lines can be filtered as Character, Suggested, Unsure or Narrator.
-Suggested means the independent checks disagreed but supplied one or more context-supported speaker
-options: Narrator still reads the line unless the user chooses one. Unsure means the checks withheld a
-character assignment without a supported suggestion. A single line can be corrected in place to a
+The result opens directly in a compact, one-line-at-a-time review when there are AI-processed dialogue
+lines. About 120 nearby characters of source context on each side are visible initially; More context
+expands the passage in place without changing the source. The completed review offers Check your
+choices to inspect or edit the full set using the same single-line cards. The browser disables acceptance until every such line
+has an explicit reader choice or is covered by a bulk choice; Skip for now only moves the reading
+position. This is a browser interaction gate, not a new backend artifact field.
+
+Accept all AI guesses keeps agreed AI readers and explicitly chooses the first suggestion for
+unresolved lines; lines with no usable guess use Narrator. Use narrator for remaining rejects the
+remaining AI reader guesses. Both operations preserve existing individual choices and leave explicit
+source labels and prose unchanged. Undo bulk choice restores the previous draft. Selecting the original AI reader directly restores it and confirms the line in one action. Keeping an agreed AI reader preserves AI
+provenance; selecting a suggestion or overriding a reader carries user provenance.
+
+Reader buttons show the answer directly: a green fill and checkmark identify the user's choice.
+AI-selected readers and tentative suggestions show the shared sparkle icon beside their names, with
+a pale warning tint that fades when another reader is chosen. Selecting an option replaces its
+sparkle with a checkmark. Accessible descriptions distinguish
+an AI choice from a tentative AI suggestion. Narrator fallback without a model
+choice is never labelled as an AI suggestion. Each line can show one extra reader selected from the
+picker, including a newly typed name. Choosing another replaces that extra button. The picker excludes
+readers already shown and hides when no other known characters remain. Selecting an option (or
+pressing Enter) commits immediately and closes the picker; clicking outside, pressing Escape, or
+clicking Other reader again dismisses it without a change. There are no Apply or Cancel buttons.
+The first decision on an unchecked line advances the required pass. Revisiting or changing a checked
+line keeps it in place. Change strategy opens a confirmation before discarding unsaved choices.
+
+Completing the required dialogue checks returns to the reader breakdown. The user can inspect
+all AI and reviewed lines through **Check your choices**, change strategy, or continue. Bulk
+choices use paired controls for remaining lines; the breakdown retains **Undo bulk choice**.
+The line review and reader breakdown are mutually exclusive views of the same transcript screen.
+The mandatory pass has no back or close control. Later inspections offer an explicit Back to readers
+button, with the filters alongside it when space allows. The legend lives in the
+By reader header, without a separate dialogue-total panel or reader-count badge.
+
+After review, the user can accept the complete candidate or return to regexes, open-marker
+configuration and AI target scope and rerun. AI-checked lines can be filtered as All, AI chosen, Reviewed, Needs review, or Not dialogue.
+Needs review counts only unchecked dialogue lines, including agreed AI guesses; it reaches zero after
+all choices are confirmed. Reviewed includes completed dialogue checks, while AI chosen contains
+unchanged AI speaker assignments. Choosing another reader keeps the line reviewed.
+When independent checks disagree, suggested readers remain options until a choice is confirmed. A single line can be corrected in place to a
 transcript-known or manually entered character, or Narrator. Corrections carry user provenance and
 leave every other line untouched.
 The accepted overview groups unchanged AI speaker and prose decisions into one modest AI-assisted

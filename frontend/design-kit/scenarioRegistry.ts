@@ -442,7 +442,7 @@ const baselineScenarioMetadata = {
     story: {
       surface: "workflow",
       actions: [],
-      heading: "Your transcript is ready",
+      heading: "Your transcript",
     },
   },
   review: {
