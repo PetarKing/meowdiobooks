@@ -48,6 +48,9 @@ _AUDIO_EXPORT_PROFILES = {
     AudioExportPreset.MP3_CHAPTERS: AudioExportProfile(
         AudioExportPreset.MP3_CHAPTERS, ".zip", "application/zip", "96k"
     ),
+    AudioExportPreset.MP3: AudioExportProfile(
+        AudioExportPreset.MP3, ".mp3", "audio/mpeg", "96k"
+    ),
 }
 
 
@@ -81,7 +84,7 @@ def package_audio_export(
             ffmpeg=ffmpeg,
             **({"command_runner": command_runner} if command_runner is not None else {}),
         )
-    return package_m4b(
+    return _package_single_audio(
         chapters,
         output,
         title=title,
@@ -89,6 +92,7 @@ def package_audio_export(
         description=description,
         cover=cover,
         bitrate=profile.bitrate,
+        mp3=preset == AudioExportPreset.MP3,
         ffmpeg=ffmpeg,
         **({"command_runner": command_runner} if command_runner is not None else {}),
     )
@@ -107,10 +111,22 @@ def package_m4b(
     command_runner=None,
 ) -> Path:
     """Create one chaptered AAC/M4B without modifying the source WAV revisions."""
+    return _package_single_audio(
+        chapters, output, title=title, author=author, cover=cover,
+        description=description, bitrate=bitrate, ffmpeg=ffmpeg, command_runner=command_runner,
+    )
+
+
+def _package_single_audio(
+    chapters: list[M4BChapter], output: Path, *, title: str, author: str, cover: Path,
+    description: str | None = None, bitrate: str = "128k", ffmpeg: str | None = None,
+    command_runner=None, mp3: bool = False,
+) -> Path:
+    format_name = "MP3" if mp3 else "M4B"
     executable = ffmpeg or shutil.which("ffmpeg")
     if not executable:
         raise FFmpegUnavailableError(
-            "M4B export requires FFmpeg. Install it with `brew install ffmpeg`, then retry."
+            f"{format_name} export requires FFmpeg. Install it with `brew install ffmpeg`, then retry."
         )
     if not chapters:
         raise M4BExportError("Select at least one generated chapter to export")
@@ -166,39 +182,38 @@ def package_m4b(
         "-map_chapters",
         "1",
         "-c:a",
-        "aac",
+        "libmp3lame" if mp3 else "aac",
         "-b:a",
         bitrate,
         "-c:v",
         "mjpeg",
         "-disposition:v:0",
         "attached_pic",
-        "-metadata",
-        "media_type=2",
+        *(["-ac", "1", "-id3v2_version", "3", "-metadata", f"album={title}"] if mp3
+          else ["-metadata", "media_type=2"]),
         "-metadata:s:v:0",
         "title=Cover",
         "-metadata:s:v:0",
         "comment=Cover (front)",
-        "-movflags",
-        "+faststart",
+        *([] if mp3 else ["-movflags", "+faststart"]),
         "-f",
-        "mp4",
+        "mp3" if mp3 else "mp4",
         str(output),
     ]
     try:
         (command_runner if command_runner is not None else subprocess.run)(command, check=True, capture_output=True, timeout=3600)
     except subprocess.TimeoutExpired as error:
         output.unlink(missing_ok=True)
-        raise M4BExportError("FFmpeg did not finish the M4B export within one hour") from error
+        raise M4BExportError(f"FFmpeg did not finish the {format_name} export within one hour") from error
     except subprocess.CalledProcessError as error:
         output.unlink(missing_ok=True)
         detail = error.stderr.decode("utf-8", errors="replace").strip()
         raise M4BExportError(
-            f"FFmpeg could not create the M4B: {detail or 'unknown error'}"
+            f"FFmpeg could not create the {format_name}: {detail or 'unknown error'}"
         ) from error
     if not output.is_file() or output.stat().st_size == 0:
         output.unlink(missing_ok=True)
-        raise M4BExportError("FFmpeg reported success but produced no M4B data")
+        raise M4BExportError(f"FFmpeg reported success but produced no {format_name} data")
     return output
 
 
@@ -387,6 +402,8 @@ def export_filename(
         suffix = " - selected MP3 chapters" if partial else " - MP3 chapters"
         return f"{base}{suffix}.zip"
     selected = " - selected chapters" if partial else ""
+    if preset == AudioExportPreset.MP3:
+        return f"{base}{selected}.mp3"
     compact = " - smaller" if preset == AudioExportPreset.M4B_COMPACT else ""
     return f"{base}{selected}{compact}.m4b"
 

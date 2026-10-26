@@ -1,4 +1,9 @@
 const zhCN: Record<string, string> = {
+  "MP3": "MP3",
+  "One file with all selected chapters": "所有选定章节合并为一个文件",
+  "A widely compatible audiobook, ready to play.": "兼容多种播放器，下载即可收听。",
+  "Create MP3": "创建 MP3",
+  "Saving MP3…": "正在保存 MP3…",
   "Accept all AI guesses": "接受所有 AI 建议",
   "Use narrator for remaining": "其余句子使用旁白",
   "AI choice": "AI 选择",

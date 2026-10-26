@@ -1185,6 +1185,7 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
         for preset, filename, media_type in (
             ("m4b-compact", "A Cat Finds a Voice - smaller.m4b", "audio/mp4"),
             ("mp3-chapters", "A Cat Finds a Voice - MP3 chapters.zip", "application/zip"),
+            ("mp3", "A Cat Finds a Voice.mp3", "audio/mpeg"),
         ):
             formatted = client.post(
                 f"/api/books/{book_id}/exports/audio",
@@ -1250,6 +1251,21 @@ def test_m4b_export_uses_current_v2_receipts_pdf_metadata_and_cover(
         assert unsupported_legacy_preset.json()["detail"] == (
             "Use the audio export endpoint for non-default formats"
         )
+
+        from meowdiobooks.backend.documents import render_default_cover
+        default_bytes = render_default_cover(tmp_path / "default-cover").read_bytes()
+        preview = client.get(f"/api/books/{book_id}/pages/0/image")
+        assert preview.status_code == 200
+        assert preview.content == default_bytes
+        default_export = client.post(
+            f"/api/books/{book_id}/exports/audio",
+            data={"chapters": json.dumps([{"chapterId": "opening-matter", "revision": "render-1"}]),
+                  "coverPage": "0", "preset": "mp3"},
+        )
+        assert default_export.status_code == 200, default_export.text
+        assert default_export.headers["content-type"].startswith("audio/mpeg")
+        assert captured["cover_bytes"] == default_bytes
+        assert client.get("/api/books/missing-book/pages/0/image").status_code == 404
 
         invalid_preset = client.post(
             f"/api/books/{book_id}/exports/audio",

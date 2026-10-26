@@ -104,6 +104,7 @@ from .documents import (
     inspect_source,
     pdf_metadata,
     render_pdf_page,
+    render_default_cover,
     representative_pages,
     source_path,
 )
@@ -2028,6 +2029,8 @@ def create_app_v2(
             if custom_cover:
                 cover = work / f"cover{custom_cover[1]}"
                 cover.write_bytes(custom_cover[0])
+            elif body.coverPage == 0:
+                cover = await run_in_threadpool(render_default_cover, work)
             elif file_processor is not None:
                 # A host rejection must fail closed; its permitted paths and policy
                 # may not include the local application's fallback asset.
@@ -2040,9 +2043,7 @@ def create_app_v2(
                         render_pdf_page, source, package / "preview", body.coverPage,
                     )
                 except (OSError, RuntimeError, subprocess.SubprocessError):
-                    cover = (
-                        repo_root / "frontend" / "src" / "assets" / "brand" / "meowdiobooks-mark.png"
-                    )
+                    cover = await run_in_threadpool(render_default_cover, work)
             partial = len(export_chapters) != len(chapter_order)
             profile = audio_export_profile(body.preset)
             filename = export_filename(title, partial=partial, preset=body.preset)
