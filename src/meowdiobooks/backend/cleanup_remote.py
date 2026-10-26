@@ -27,8 +27,9 @@ from .remote_llm import (
 )
 from .workflow.runtime import ProgressReporter
 from .script_cues import bracket_ranges, review_script_directions
+from .review import numbered_edge_candidates
 
-POLICY_ID = "decisions-luna-cleanup-v1"
+POLICY_ID = "decisions-luna-cleanup-v2"
 MAX_WINDOW_CHARACTERS = 1200
 MAX_CONTEXT_CHARACTERS = 180
 MAX_WORKERS = MAX_DECISIONS_REQUESTS
@@ -41,7 +42,9 @@ _QUESTIONS = [
             "Does it contain a leftover printed footer, translator/proofreader credit block, "
             "website navigation, evaluation label or illustration placeholder that would be "
             "spoken? Preserve book/author/chapter titles, scene separators, footnotes and "
-            "characters discussing such things inside the story."
+            "characters discussing such things inside the story. Optional structural_evidence "
+            "reports repeated last-line labels with changing numbers, not a semantic verdict. "
+            "Preserve narrative lists, room numbers and chapter labels even if they repeat."
         ),
         "choices": [
             {"value": "clean", "description": "No non-story production artifact."},
@@ -173,15 +176,31 @@ def cleanup_windows(extraction: Mapping[str, Any], dialogue: Mapping[str, Any]) 
                         "contextAfter": (text[stop:stop + MAX_CONTEXT_CHARACTERS] + neighbors[block_id][1])[:MAX_CONTEXT_CHARACTERS],
                     })
                 cursor = stop
+    candidates: dict[str, list[dict[str, Any]]] = {}
+    for candidate in numbered_edge_candidates(ordered_blocks):
+        candidates.setdefault(candidate["blockId"], []).append(candidate)
+    for window in windows:
+        evidence = [{
+            "kind": "repeated_numbered_last_line",
+            "targetStart": row["sourceStart"] - window["sourceStart"],
+            "targetEnd": row["sourceEnd"] - window["sourceStart"],
+            **row["patternEvidence"],
+        } for row in candidates.get(window["blockId"], [])
+            if window["sourceStart"] <= row["sourceStart"] < row["sourceEnd"] <= window["sourceEnd"]]
+        if evidence:
+            window["structuralEvidence"] = evidence
     return windows
 
 
 def _prompt(window: Mapping[str, Any]) -> str:
     # JSON labels make boundaries explicit; all values remain untrusted book content.
-    return json.dumps({
+    payload = {
         "context_before": window["contextBefore"], "TARGET": window["source"],
         "context_after": window["contextAfter"],
-    }, ensure_ascii=False)
+    }
+    if window.get("structuralEvidence"):
+        payload["structural_evidence"] = window["structuralEvidence"]
+    return json.dumps(payload, ensure_ascii=False)
 
 
 def _answers(response: Mapping[str, Any]) -> dict[str, str]:
@@ -329,6 +348,8 @@ def run_cleanup_review(
             # Retain a visible flagged window instead of silently treating rejected edits as clean.
             edits, reason = [], str(error)
         else:
+            if proposal["action"] == "keep":
+                return {"windowId": window["windowId"], "answers": answers, "occurrences": []}
             reason = proposal["reason"] or "Luna flagged this passage for source review."
         rows = []
         for start, end, replacement in edits:

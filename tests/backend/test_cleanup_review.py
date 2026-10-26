@@ -316,7 +316,7 @@ def test_ai_corrections_form_last_group_with_no_empty_or_duplicate_groups():
     workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
                                       extraction, dialogue, {'occurrences': [proposal]})
     assert [w['kind'] for w in workspace['warnings']] == [
-        'suspicious-extraction', 'front-back-matter', 'ai-cleanup']
+        'suspicious-extraction', 'ai-cleanup']
     rows = [row for w in workspace['warnings'] for row in w['occurrences']]
     assert len({row['id'] for row in rows}) == len(rows)
     assert sum(row['source'] == 'bro-\nken' for row in rows) == 1
