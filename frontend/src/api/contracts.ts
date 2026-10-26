@@ -227,6 +227,8 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
+  patternGroupId?: string;
+  patternVerification?: "verified";
   /** Context preserves whitespace adjacent to the anchored source. */
   contextLayout?: "continuous";
   recommendedAction?: "exclude";
@@ -246,6 +248,8 @@ export interface WarningOccurrence {
 }
 
 export interface ReviewWarning {
+  patternGroupId?: string;
+  patternVerification?: "verified";
   decisionScope?: "occurrence" | "identical-evidence" | "warning-kind";
   id: string;
   kind: string;

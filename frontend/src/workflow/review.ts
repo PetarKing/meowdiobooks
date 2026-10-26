@@ -10,7 +10,7 @@ function reviewText(t: TFunction | undefined, key: string, values: Record<string
 export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): ReviewWarning[] {
   if (!Array.isArray(candidate.warnings)) return [];
   const aliases: Record<string, string> = { "missing-content": "empty-page", "extraction-artifact": "suspicious-extraction", "ocr-artifact": "suspicious-extraction", "layout-order": "reading-order", "peripheral-matter": "front-back-matter" };
-  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ contextLayout: occurrence.contextLayout === "continuous" ? "continuous" : undefined, recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
+  const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ patternGroupId: typeof occurrence.patternGroupId === "string" ? occurrence.patternGroupId : undefined, patternVerification: occurrence.patternVerification === "verified" ? "verified" : undefined, contextLayout: occurrence.contextLayout === "continuous" ? "continuous" : undefined, recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
   // Older candidates attached corrections to deterministic categories. Preserve
   // occurrence IDs and capabilities for preview and acceptance of saved revisions.
   const aiWarnings = warnings.filter((warning) => warning.kind === "ai-cleanup");
@@ -28,17 +28,35 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): R
   if (!aiRows.length) return sourceWarnings;
   const uniqueRows = [...new Map(aiRows.map((row) => [row.id, row])).values()];
   const aiIds = new Set(uniqueRows.map((row) => row.id));
-  return [...sourceWarnings.map((warning) => ({ ...warning, occurrences: warning.occurrences.filter((row) => !aiIds.has(row.id)) })).filter((warning) => warning.occurrences.length), {
-    id: aiWarnings[0]?.id ?? "ai-cleanup",
+  const ordinary: WarningOccurrence[] = [];
+  const families = new Map<string, WarningOccurrence[]>();
+  for (const row of uniqueRows) {
+    if (row.patternVerification === "verified" && row.patternGroupId?.trim() && row.replacement === "" &&
+        row.proposalStatus === "proposed" && ["keep", "exclude"].every((action) => row.availableActions?.includes(action as ReviewCapability))) {
+      const members = families.get(row.patternGroupId) ?? [];
+      members.push(row);
+      families.set(row.patternGroupId, members);
+    } else ordinary.push(row);
+  }
+  const result = sourceWarnings.map((warning) => ({ ...warning, occurrences: warning.occurrences.filter((row) => !aiIds.has(row.id)) })).filter((warning) => warning.occurrences.length);
+  for (const [patternGroupId, occurrences] of families) {
+    result.push({ id: `review:pattern:${patternGroupId}`, kind: "repeated-page-text", decisionScope: "occurrence",
+      patternGroupId, patternVerification: "verified", severity: "warning",
+      detail: "Repeated page text was checked in context.", availableActions: ["keep", "exclude"], occurrences });
+  }
+  if (ordinary.length) result.push({
+    id: aiWarnings.find((warning) => !warning.occurrences.some((row) => row.patternGroupId))?.id ?? "ai-cleanup",
     kind: "ai-cleanup", decisionScope: "occurrence", severity: "warning",
     detail: "Review AI suggestions against the source.",
-    availableActions: [...new Set(uniqueRows.flatMap((row) => row.availableActions ?? []))],
-    occurrences: uniqueRows,
-  }];
+    availableActions: [...new Set(ordinary.flatMap((row) => row.availableActions ?? []))],
+    occurrences: ordinary,
+  });
+  return result;
 }
 
 export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarning) {
   const { kind, readerState } = warning;
+  if (reviewIsPatternGroup(warning)) return action === "keep" ? "Keep this occurrence" : "Omit this occurrence";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave";
   if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
@@ -77,6 +95,7 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
 }
 
 export function reviewQuestion(kind: string) {
+  if (kind === "repeated-page-text") return "Should listeners hear this repeated text?";
   if (kind === "ai-cleanup") return "What should happen to this text?";
   if (kind === "empty-page") return "Is this page intentionally empty?";
   if (kind === "suspicious-extraction") return "Does this text match the source?";
@@ -90,6 +109,7 @@ export function reviewQuestion(kind: string) {
 }
 
 export function reviewGuidance(warning: ReviewWarning) {
+  if (reviewIsPatternGroup(warning)) return "Choose once for this repeated text. You can keep or omit individual occurrences as exceptions.";
   if (reviewIsVerifiedScriptGroup(warning)) return "AI checked these delivery cues in context. Suggested choices leave them unspoken. Uncertain text stays spoken and needs no decision.";
   const guidance: Partial<Record<string, string>> = {
     "ai-cleanup": "Check each suggested correction against the source document before applying it.",
@@ -107,7 +127,7 @@ export function reviewGuidance(warning: ReviewWarning) {
 }
 
 export function reviewWarningLabel(kind: string) {
-  return ({ "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
+  return ({ "repeated-page-text": "Repeated page text", "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
 }
 
 export function reviewUsesOccurrenceDecisions(warning: ReviewWarning) {
@@ -133,6 +153,7 @@ export function reviewScriptCueDecisions(warning: ReviewWarning, decisions: Reco
 export function reviewOccurrenceActions(warning: ReviewWarning, occurrence: WarningOccurrence): ReviewCapability[] {
   if (!reviewUsesOccurrenceDecisions(warning)) return reviewDecisionActions(warning);
   const available = occurrence.availableActions ?? warning.availableActions;
+  if (reviewIsPatternGroup(warning)) return (["keep", "exclude", "repair"] as ReviewCapability[]).filter((action) => available.includes(action));
   if (reviewIsVerifiedScriptGroup(warning)) return (["keep", "exclude"] as ReviewCapability[]).filter((action) => available.includes(action));
   return reviewDecisionActions({ ...warning, availableActions: available.filter((action) =>
     action !== "repair" || typeof occurrence.replacement === "string",
@@ -149,6 +170,24 @@ export function reviewProposalDecisions(warning: ReviewWarning, decisions: Recor
   const next = { ...decisions };
   for (const row of warning.occurrences) {
     if (next[row.id] === undefined && reviewUsesOccurrenceDecisions(warning) && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
+  }
+  return next;
+}
+
+
+export function reviewIsPatternGroup(warning: ReviewWarning) {
+  return warning.kind === "repeated-page-text" && warning.patternVerification === "verified" &&
+    Boolean(warning.patternGroupId) && warning.occurrences.length > 0 && warning.occurrences.every((row) =>
+      row.patternVerification === "verified" && row.patternGroupId === warning.patternGroupId &&
+      row.proposalStatus === "proposed" && row.replacement === "" &&
+      ["keep", "exclude"].every((action) => row.availableActions?.includes(action as ReviewCapability)));
+}
+
+export function reviewPatternDecisions(warning: ReviewWarning, decisions: Record<string, ReviewCapability>, action: "keep" | "exclude") {
+  const next = { ...decisions };
+  if (!reviewIsPatternGroup(warning)) return next;
+  for (const row of warning.occurrences) {
+    if (next[row.id] === undefined) next[row.id] = action;
   }
   return next;
 }
