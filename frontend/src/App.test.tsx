@@ -3185,6 +3185,41 @@ describe('v2 wizard', () => {
     ]))
   })
 
+  it('keeps uncertain page boundaries by default while bulk corrections can continue to acceptance', async () => {
+    const boundaryAnchors = [
+      { blockId: 'p1', spanId: 's1', sourceStart: 10, sourceEnd: 13, source: 'her', page: 1 },
+      { blockId: 'p2', spanId: 's2', sourceStart: 0, sourceEnd: 4, source: 'eyes', page: 2 },
+    ]
+    const warning = { ...cleanupWarning, occurrences: cleanupWarning.occurrences.map((row, i) => ({ ...row,
+      boundaryAnchors, boundarySource: 'hereyes', boundaryDecision: i === 2 ? 'UNSURE' : 'SPACE',
+      proposalStatus: i === 2 ? 'source_review' : 'proposed',
+    })) }
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-boundaries', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-boundaries', warnings: [warning], boundaryCandidates: [] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    const apply = await screen.findByRole('button', { name: /^Apply all suggested choices/ })
+    expect(apply).toHaveTextContent('Apply all suggested choices (2)')
+    expect(screen.getByText('Page 1 → Page 2')).toBeInTheDocument()
+    expect(screen.getByText('hereyes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all suggested choices/ }))
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+    expect(screen.getByRole('button', { name: /^Keep original text Keep the original/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('button', { name: /^Apply correction/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-boundaries', 1, [], [
+      { occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-boundaries', [
+      { occurrenceIds: ['join'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
+    ]))
+  })
+
   it.each([cleanupWarning, scriptDirectionsWarning])('hides bulk action for a single suggestion in $kind', async (warning) => {
     const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-single', status: 'candidate' } } }
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-single', warnings: [{ ...warning, occurrences: [warning.occurrences[0]] }], boundaryCandidates: [] })

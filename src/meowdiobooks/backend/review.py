@@ -232,7 +232,7 @@ def add_cleanup_proposals(
 ) -> dict[str, Any]:
     """Attach validated model suggestions without changing any accepted source."""
     if result.get("unifiedSuggestions") is True and any(
-        not any(proposal.get(key) is not None for key in ("hyphenDecision", "editorialFamilyId", "patternGroupId"))
+        not any(proposal.get(key) is not None for key in ("hyphenDecision", "boundaryDecision", "editorialFamilyId", "patternGroupId"))
         for proposal in result.get("occurrences", [])
     ):
         raise ReviewContractError("Unified suggestions require verified source-bound evidence")
@@ -286,6 +286,24 @@ def add_cleanup_proposals(
                                                if w.get("kind") != "hyphenation"]}
     elif any(p.get("hyphenDecision") is not None for p in result.get("occurrences", [])):
         raise ReviewContractError("Hyphen decisions require source-bound evidence")
+    boundary_evidence = result.get("boundaryReview")
+    if boundary_evidence is not None:
+        from .boundary_review import boundary_cleanup_rows, validated_boundary_rows, suppress_boundary_conflicts
+        try:
+            others = [p for p in result.get("occurrences", []) if p.get("boundaryDecision") is None]
+            recomputed = suppress_boundary_conflicts(boundary_evidence, others)
+            if (boundary_evidence.get("windows") != recomputed["windows"]
+                    or boundary_evidence.get("occurrences") != recomputed["occurrences"]):
+                raise ValueError("Boundary conflict ownership differs from cleanup evidence")
+            boundary_proposals = boundary_cleanup_rows(
+                validated_boundary_rows(extraction, dialogue, boundary_evidence))
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+        actual = [p for p in result.get("occurrences", []) if p.get("boundaryDecision") is not None]
+        if actual != boundary_proposals:
+            raise ReviewContractError("Boundary proposals differ from verified evidence")
+    elif any(p.get("boundaryDecision") is not None for p in result.get("occurrences", [])):
+        raise ReviewContractError("Boundary proposals require source-bound evidence")
     blocks = _normalise_blocks(extraction)
     index = {str(block["id"]): block for block in blocks}
     cue_rows = _verified_script_occurrences(blocks, dialogue, result.get("scriptDirections", {}))
@@ -308,13 +326,15 @@ def add_cleanup_proposals(
                 or not 0 <= start < end <= len(block["text"])
                 or block["text"][start:end] != proposal.get("source")):
             raise ReviewContractError("Cleanup proposal does not match its exact source")
-        if "scriptDirections" in result and proposal.get("hyphenDecision") is None:
+        if ("scriptDirections" in result and proposal.get("hyphenDecision") is None
+                and proposal.get("boundaryDecision") is None):
             from .script_cues import bracket_ranges
             if any(max(start, left) < min(end, right)
                    for left, right in bracket_ranges(block["text"])):
                 raise ReviewContractError("General cleanup cannot override protected bracketed content")
         # Explicit hyphen choices own their range; a model must not supersede them.
-        if any(row.get("kind") == "hyphenation" and row["blockId"] == block["id"]
+        if proposal.get("boundaryDecision") is None and any(
+               row.get("kind") == "hyphenation" and row["blockId"] == block["id"]
                and max(start, row["sourceStart"]) < min(end, row["sourceEnd"])
                for warning in workspace.get("warnings", [])
                for row in warning.get("occurrences", [])):
@@ -340,6 +360,12 @@ def add_cleanup_proposals(
                     "model": "gpt-6-luna",
                     "availableActions": ["keep", "exclude", "repair"] if replacement is not None
                     else ["keep", "exclude"]})
+        if proposal.get("boundaryDecision") is not None:
+            row.update({key: deepcopy(proposal[key]) for key in
+                        ("boundaryDecision", "boundaryAnchors", "boundarySource", "boundaryWindowId")})
+            row.update(id="review:" + proposal["boundaryWindowId"], model="decisions",
+                       availableActions=["keep", "repair"] if replacement is not None else ["keep"],
+                       recommendedAction="repair" if replacement is not None else "keep")
         if proposal.get("hyphenDecision") is not None:
             row.update(hyphenDecision=proposal["hyphenDecision"], availableActions=["keep", "repair"],
                        model="decisions", recommendedAction="repair")
@@ -370,12 +396,13 @@ def add_cleanup_proposals(
                 raise ReviewContractError("Pattern proposal requires exact verified narrator footer evidence")
             row.update(patternGroupId=candidate["patternGroupId"], patternVerification="verified")
         # Even identical source strings can have different suggested replacements.
-        row["matchKey"] = _digest([row["source"], replacement])
+        row["matchKey"] = _digest([row.get("boundarySource", row["source"]), replacement])
         rows.append(row)
     if len({row["id"] for row in rows}) != len(rows):
         raise ReviewContractError("Cleanup proposals repeat a source range")
     for index, row in enumerate(rows):
-        if any(row["blockId"] == other["blockId"]
+        if any(row.get("boundaryDecision") is None and other.get("boundaryDecision") is None
+               and row["blockId"] == other["blockId"]
                and max(row["sourceStart"], other["sourceStart"])
                < min(row["sourceEnd"], other["sourceEnd"])
                for other in rows[:index]):
@@ -405,7 +432,7 @@ def add_cleanup_proposals(
                  for warning, occurrence in existing
                  if all(occurrence.get(key) == row[key]
                         for key in ("blockId", "sourceStart", "sourceEnd", "source"))]
-        matches = [] if row.get("hyphenDecision") else exact or _project_cleanup_anchor(row, existing)
+        matches = [] if row.get("hyphenDecision") or row.get("boundaryDecision") else exact or _project_cleanup_anchor(row, existing)
         if len(matches) != 1:
             # Partial overlaps or multiple possible owners are not proof of one issue.
             # Keep the usable proposal; never silently discard a correction.
@@ -448,6 +475,7 @@ def add_cleanup_proposals(
     return {**dict(workspace), "warnings": warnings,
             "unifiedSuggestions": result.get("unifiedSuggestions") is True,
             "hyphenReviewEvidence": deepcopy(hyphen_evidence),
+            "boundaryReviewEvidence": deepcopy(boundary_evidence),
             "focusedReviewEvidence": deepcopy(editorial_evidence),
             "runningHeaderReviewEvidence": deepcopy(header_evidence),
             "chapterReviewEvidence": deepcopy(chapter_evidence),
@@ -649,10 +677,13 @@ def accept_review_revision(
             }
 
     for key, occurrence in occurrence_index.items():
-        if key not in accepted and _is_verified_cue(occurrence):
+        if key not in accepted and ( _is_verified_cue(occurrence) or
+                (occurrence.get("boundaryDecision") is not None
+                 and occurrence.get("proposalStatus") == "source_review")):
             accepted[key] = {"occurrenceId": key, "warningId": occurrence["warningId"],
                              "action": "keep", "consequence": _consequence("keep", 1),
-                             "provenance": "preserve-undecided-script-direction"}
+                             "provenance": "preserve-undecided-boundary" if occurrence.get("boundaryDecision")
+                             else "preserve-undecided-script-direction"}
     missing = sorted(set(occurrence_index) - set(accepted))
     if missing:
         raise ReviewContractError(
@@ -660,6 +691,9 @@ def accept_review_revision(
         )
 
     ordered = [accepted[key] for key in sorted(accepted)]
+    accepted_boundary_repairs({"warningSnapshot": workspace.get("warnings", []),
+                               "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence"),
+                               "decisions": ordered})
     blockers = _blockers(workspace, ordered, occurrence_index)
     return {
         "contract": "meowdiobooks.review.v2",
@@ -672,6 +706,7 @@ def accept_review_revision(
         "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
         "unifiedSuggestions": workspace.get("unifiedSuggestions") is True,
         "hyphenReviewEvidence": deepcopy(workspace.get("hyphenReviewEvidence")),
+        "boundaryReviewEvidence": deepcopy(workspace.get("boundaryReviewEvidence")),
         "focusedReviewEvidence": deepcopy(workspace.get("focusedReviewEvidence")),
         "runningHeaderReviewEvidence": deepcopy(workspace.get("runningHeaderReviewEvidence")),
         "chapterReviewEvidence": deepcopy(workspace.get("chapterReviewEvidence")),
@@ -757,7 +792,24 @@ def apply_review_render_policies(
             action = owner[2] if owner is not None else "keep"
             occurrence_id = owner[3] if owner is not None else None
             result.append(_review_policy_span(span, piece_start, piece_end, action, occurrence_id))
-    return {**dict(dialogue), "spans": _apply_cleanup_repairs(result, review)}
+    repaired = _apply_cleanup_repairs(result, review)
+    _validated_boundary_context(repaired, review)
+    return {**dict(dialogue), "spans": repaired}
+
+
+def _validated_boundary_context(spans, review):
+    repairs = accepted_boundary_repairs(review)
+    if not repairs:
+        return []
+    from .boundary_render import BoundaryRenderError, validate_boundary_repairs
+    entries = [{"sourceSpanIds": [str(span["id"])],
+                "text": str(span.get("text", span.get("source", ""))),
+                "kind": "omission" if span.get("reviewAction") == "exclude" else "source",
+                "chapterId": span.get("chapterId") or "chapter-1"} for span in spans]
+    try:
+        return validate_boundary_repairs(repairs, spans, entries, capture_context=True)
+    except BoundaryRenderError as exc:
+        raise ReviewContractError(str(exc)) from exc
 
 
 def _repair_text(span: Mapping[str, Any], edits: Sequence[Mapping[str, Any]]) -> str:
@@ -786,6 +838,95 @@ def _hyphen_choices(source: str) -> dict[str, str]:
     return {"keep-hyphen": left + "-" + right, "join-word": left + right}
 
 
+def accepted_boundary_repairs(review: Mapping[str, Any]) -> list[dict[str, Any]]:
+    """Validate durable boundary proof and explicit choices, without applying source edits.
+
+    Consumers must additionally match both anchors to the current Dialogue/source before
+    rendering. These edits own a seam, never an independent replacement of the left span.
+    """
+    from .boundary_review import BATCH_SIZE, POLICY, _derived_row, boundary_spellings
+
+    occurrences = [row for warning in review.get("warningSnapshot", [])
+                   for row in warning.get("occurrences", [])]
+    boundary_rows = [row for row in occurrences if row.get("boundaryDecision") is not None]
+    evidence = review.get("boundaryReviewEvidence")
+    if evidence is None:
+        if boundary_rows:
+            raise ReviewContractError("Boundary choices require durable evidence")
+        return []
+    if not isinstance(evidence, dict) or evidence.get("policy") != POLICY:
+        raise ReviewContractError("Invalid boundary review evidence")
+    windows, stored = evidence.get("windows"), evidence.get("occurrences")
+    if not isinstance(windows, list) or not isinstance(stored, list) or len(windows) != len(stored):
+        raise ReviewContractError("Incomplete boundary review evidence")
+    expected = {}
+    for index, (window, original) in enumerate(zip(windows, stored, strict=True)):
+        try:
+            candidate = {key: value for key, value in window.items()
+                         if key not in {"response", "verification", "verificationSpelling"}}
+            anchors = candidate["anchors"]
+            if (len(anchors) != 2 or anchors[0]["blockId"] == anchors[1]["blockId"]
+                    or any(type(a["sourceStart"]) is not int or type(a["sourceEnd"]) is not int
+                           or a["sourceStart"] < 0 or a["sourceEnd"] <= a["sourceStart"]
+                           or len(a["source"]) != a["sourceEnd"] - a["sourceStart"]
+                           or not a["spanId"] for a in anchors)
+                    or candidate["source"] != "".join(a["source"] for a in anchors)
+                    or window["response"]["name"] != f"boundary{index % BATCH_SIZE}"
+                    or (window.get("verification") is not None
+                        and window["verification"]["name"] != f"verify{index % BATCH_SIZE}")):
+                raise ValueError("Invalid boundary anchors or question identity")
+            if candidate["options"] != boundary_spellings(anchors[0]["source"], anchors[1]["source"]):
+                raise ValueError("Boundary options differ from their tokens")
+            row = _derived_row(candidate, window)
+            if row != original or row["windowId"] in expected:
+                raise ValueError("Boundary rows differ from decision evidence")
+            expected[row["windowId"]] = row
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            raise ReviewContractError("Invalid durable boundary evidence") from exc
+    if (len(boundary_rows) != len(expected)
+            or {r.get("boundaryWindowId") for r in boundary_rows} != set(expected)):
+        raise ReviewContractError("Boundary warning snapshot differs from evidence")
+    decisions = {}
+    for decision in review.get("decisions", []):
+        key = str(decision.get("occurrenceId", ""))
+        if key in decisions:
+            raise ReviewContractError("Duplicate boundary review decision")
+        decisions[key] = decision.get("action")
+    repairs = []
+    for row in boundary_rows:
+        original = expected[row["boundaryWindowId"]]
+        anchor = original["anchors"][0]
+        if (any(row.get(key) != anchor[key] for key in
+                ("blockId", "sourceStart", "sourceEnd", "source", "page"))
+                or row.get("boundaryAnchors") != original["anchors"]
+                or row.get("boundarySource") != original["source"]
+                or row.get("boundaryDecision") != original["boundaryDecision"]
+                or row.get("replacement") != original.get("replacement")
+                or row.get("proposalStatus") != original["proposalStatus"]
+                or row.get("id") != "review:" + original["windowId"]):
+            raise ReviewContractError("Boundary warning differs from its verified source")
+        action = decisions.get(row["id"])
+        allowed = ["keep", "repair"] if "replacement" in original else ["keep"]
+        if row.get("availableActions") != allowed or action not in allowed:
+            raise ReviewContractError("Boundary choice requires an explicit supported decision")
+        if action == "repair":
+            repairs.append({"occurrenceId": row["id"], **{key: deepcopy(original[key]) for key in
+                            ("windowId", "anchors", "boundaryDecision", "source", "replacement",
+                             "policy", "chapterId", "renderRole", "sourceSpeakerLabel",
+                             "resolvedSpeakerLabel", "speakerLabels", "speakerStatus")}})
+    for repair in repairs:
+        for other in occurrences:
+            if other["id"] == repair["occurrenceId"] or decisions.get(other["id"]) not in {
+                    "repair", "exclude", "narrate", "keep-hyphen", "join-word"}:
+                continue
+            other_anchors = other.get("boundaryAnchors", [other])
+            if any(a["blockId"] == b["blockId"]
+                   and max(a["sourceStart"], b["sourceStart"]) < min(a["sourceEnd"], b["sourceEnd"])
+                   for a in repair["anchors"] for b in other_anchors):
+                raise ReviewContractError("Boundary repair conflicts with another accepted source edit")
+    return repairs
+
+
 def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
                    for row in warning.get("occurrences", [])}
@@ -796,6 +937,8 @@ def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]
             continue
         key = str(decision["occurrenceId"])
         row = occurrences.get(key)
+        if row is not None and row.get("boundaryDecision") is not None:
+            continue
         if action in {"keep-hyphen", "join-word"}:
             if (row is None or row.get("kind") != "hyphenation"
                     or action not in row.get("availableActions", [])
@@ -944,7 +1087,9 @@ def preview_review_transcript_page(
         _validate_action(ai_occurrences[key], action)
         ai_chosen[key] = action
     for key, occurrence in ai_occurrences.items():
-        if key not in ai_chosen and _is_verified_cue(occurrence):
+        if key not in ai_chosen and (_is_verified_cue(occurrence) or
+                (occurrence.get("boundaryDecision") is not None
+                 and occurrence.get("proposalStatus") == "source_review")):
             ai_chosen[key] = "keep"
     if set(ai_chosen) != set(ai_occurrences):
         raise ReviewContractError("Every cleanup proposal must be decided before preview")
@@ -960,10 +1105,22 @@ def preview_review_transcript_page(
         if warning_id not in occurrence_groups
         for occurrence in warning.get("occurrences", [])
     ] + [{"occurrenceId": key, "action": action} for key, action in ai_chosen.items()]
-    rendered = apply_review_render_policies(
-        dialogue,
-        {"warningSnapshot": list(warnings.values()), "decisions": decisions},
-    )
+    tentative = {"warningSnapshot": list(warnings.values()), "decisions": decisions,
+                 "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence")}
+    rendered = apply_review_render_policies(dialogue, tentative)
+    boundary_repairs = accepted_boundary_repairs(tentative)
+    if boundary_repairs:
+        spans = rendered.get("spans", [])
+        checked = _validated_boundary_context(spans, tentative)
+        span_index = {str(span["id"]): span for span in spans}
+        for repair in checked:
+            left, right = repair["anchors"]
+            left_span, right_span = span_index[left["spanId"]], span_index[right["spanId"]]
+            left_text = str(left_span.get("text", left_span.get("source", "")))
+            right_text = str(right_span.get("text", right_span.get("source", "")))
+            left_span["text"] = left_text[:-len(left["source"])] + repair["replacement"]
+            right_span["text"] = right_text[len(right["source"]):]
+            right_span["boundaryPreviewRemainder"] = True
 
     rows: list[dict[str, Any]] = []
     for span in rendered.get("spans", []):
@@ -989,15 +1146,16 @@ def preview_review_transcript_page(
                     or "Narrator"
                 )
             )
-            text = str(span.get("text") or span.get("source", ""))
+            text = str(span.get("text", span.get("source", "")))
         else:
             kind = "narration"
             reader = "Narrator"
-            text = str(span.get("text") or span.get("source", ""))
+            text = str(span.get("text", span.get("source", "")))
         text = text.strip()
         if not text:
             continue
-        if kind != "excluded" and not any(character.isalnum() for character in text):
+        if (kind != "excluded" and not span.get("boundaryPreviewRemainder")
+                and not any(character.isalnum() for character in text)):
             continue
         occurrence = occurrences.get(str(span.get("reviewOccurrenceId", "")))
         rows.append(

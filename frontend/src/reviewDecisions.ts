@@ -1,4 +1,4 @@
-import { reviewOccurrenceActions, reviewUsesOccurrenceDecisions } from "./workflow/review";
+import { reviewDefaultDecisions, reviewOccurrenceActions, reviewUsesOccurrenceDecisions } from "./workflow/review";
 import type { ReviewCapability, ReviewWarning, ReviewWarningDecision, WorkflowGateway } from "./api/contracts";
 
 export async function buildReviewWarningDecisions(
@@ -8,6 +8,7 @@ export async function buildReviewWarningDecisions(
   selectedActions: Record<string, ReviewCapability>,
   previewBulk: WorkflowGateway["previewReviewBulk"],
 ): Promise<ReviewWarningDecision[]> {
+  selectedActions = reviewDefaultDecisions(warnings, selectedActions);
   const decisions: ReviewWarningDecision[] = [];
   for (const warning of warnings) {
     if (reviewUsesOccurrenceDecisions(warning)) {
@@ -47,6 +48,7 @@ export async function buildReviewWarningDecisions(
 }
 
 export function buildReviewPreviewPolicies(warnings: ReviewWarning[], selectedActions: Record<string, ReviewCapability>) {
+  selectedActions = reviewDefaultDecisions(warnings, selectedActions);
   return {
     policies: warnings.filter((warning) => !reviewUsesOccurrenceDecisions(warning) && selectedActions[warning.id])
       .map((warning) => ({ warningId: warning.id, action: selectedActions[warning.id] })),

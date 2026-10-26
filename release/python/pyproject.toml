@@ -1,6 +1,6 @@
 [project]
 name = "meowdiobooks-workflow"
-version = "0.1.71"
+version = "0.1.72"
 license = { file = "LICENSE" }
 description = "Composable Meowdiobooks workflow, artifact, and local reference implementations."
 requires-python = ">=3.12,<3.13"

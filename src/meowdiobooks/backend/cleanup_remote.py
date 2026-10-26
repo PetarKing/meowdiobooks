@@ -31,6 +31,7 @@ from .review import numbered_edge_candidates
 from .cleanup_candidates import editorial_candidates
 from .cleanup_editorial import (EDITORIAL_SCHEMA, EDITORIAL_SYSTEM, editorial_verdict, editorial_proposals)
 from .hyphen_review import review_hyphens
+from .boundary_review import boundary_cleanup_rows, review_boundaries, suppress_boundary_conflicts
 from .chapter_semantic import confirm_chapter_candidates
 from .cleanup_patterns import (
     PATTERN_VERIFY_SCHEMA, PATTERN_VERIFY_SYSTEM, pattern_prompt,
@@ -301,7 +302,7 @@ def run_cleanup_review(
 ) -> dict[str, Any]:
     """Check all windows atomically; transport/schema failures never masquerade as clean.
 
-    Only structurally selected complete units, numbered footers and hyphens incur inference.
+    Only selected complete units, numbered footers, hyphens and block boundaries incur inference.
     Uncertain optional cleanup remains spoken. Caller owns immutable candidate publication.
     """
     decisions_config, repair_config = cleanup_model_configs(repo_root, models_path=models_path)
@@ -494,6 +495,11 @@ def run_cleanup_review(
         max(row["sourceStart"], other["sourceStart"]) < min(row["sourceEnd"], other["sourceEnd"])
         for other in occurrences)]
     occurrences += hyphen_rows
+    boundary_review = review_boundaries(
+        repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
+        usage_observer=usage_observer, request_admission=admission)
+    boundary_review = suppress_boundary_conflicts(boundary_review, occurrences)
+    occurrences += boundary_cleanup_rows(boundary_review["occurrences"])
     script_directions = review_script_directions(
         repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
         usage_observer=usage_observer, request_admission=admission,
@@ -502,7 +508,7 @@ def run_cleanup_review(
     return {
         "chapterReview": chapter_review, "runningHeaderReview": header_review,
         "scriptDirections": script_directions,
-        "hyphenReview": hyphen_review, "focusedReview": focused_review, "unifiedSuggestions": True,
+        "hyphenReview": hyphen_review, "boundaryReview": boundary_review, "focusedReview": focused_review, "unifiedSuggestions": True,
         "patternGroups": pattern_groups, "patternAssessmentMode": FAMILY_RULE_MODE,
         "occurrences": occurrences,
         "summary": {
@@ -515,6 +521,7 @@ def run_cleanup_review(
             "locallyValidatedWindows": len(source_windows),
             "editorialCandidates": len(editorial_windows),
             "hyphenCandidates": len(hyphen_review["windows"]),
+            "boundaryCandidates": len(boundary_review["windows"]),
             "proposals": sum(row["proposalStatus"] == "proposed" for row in occurrences),
             "sourceReview": sum(row["proposalStatus"] == "source_review" for row in occurrences),
             "patternGroups": len(pattern_groups),
