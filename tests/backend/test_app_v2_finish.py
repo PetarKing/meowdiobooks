@@ -2180,7 +2180,7 @@ def test_layered_voice_preview_mixes_exact_audition_revisions(tmp_path):
         np.testing.assert_allclose(mixed, np.array([0.4, 0.4, 0.1], dtype=np.float32))
 
 
-def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(tmp_path):
+def test_cross_book_reuse_preview_is_read_only_and_import_keeps_fresh_generation(tmp_path):
     from meowdiobooks.backend.cast_service import default_voice_settings
     calls = []
     recipe = ["1"]
@@ -2193,7 +2193,7 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
                     'totalVoiceCount': len(targets)}
 
         def apply(self, book_id, package, targets, source_ids, language, model_id, *, preview_fingerprint=None):
-            assert preview_fingerprint == "bound-source-revisions"
+            assert preview_fingerprint == ("bound-source-revisions" if source_ids else None)
             calls.append(('apply', source_ids))
             imported = {}
             for target in targets:
@@ -2210,7 +2210,7 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
                     'voiceDirection': 'Clear and natural.',
                     'voiceCandidates': [{'revision': revision, 'previewUrl': f'/voice/{revision}',
                                          'referenceAudio': relative, 'referenceText': 'Sample.'}],
-                    'reuseProvenance': {'bookId': 'source'}}
+                    'voiceReuse': {'bookId': 'source'}}
             self.imported = imported
             return imported
 
@@ -2223,10 +2223,31 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
     proposal = {'status': 'ready', 'dossiers': [], 'proposals': [
         {'label': 'Alice', 'category': 'character', 'canonicalName': 'Alice', 'aliases': [],
          'competingLabels': [], 'reviewRequired': False, 'reason': 'Explicit label.'}]}
-    def forbidden(*args, **kwargs):
-        pytest.fail('Imported voices must not be profiled or generated')
+    generated_calls = []
+
+    def profile(_repo, identities, *_args, **kwargs):
+        rows = [*identities, *([{'characterId': 'narrator', 'category': 'narrator'}]
+                               if kwargs.get('include_narrator') else [])]
+        return {row['characterId']: default_voice_settings(row['category']) for row in rows}
+
+    def audition(_repo, package, book_id, characters, report, _language, _model):
+        generated_calls.append([row['id'] for row in characters])
+        for row in characters:
+            revision = f"fresh-{len(generated_calls)}-{row['id']}"
+            relative = f"voices/{row['id']}/{revision}.wav"
+            path = package / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(b'RIFF-fresh')
+            candidate = {'revision': revision, 'previewUrl': f'/voice/{revision}',
+                         'referenceAudio': relative, 'referenceText': 'Fresh sample.'}
+            row.update(voicePreviewRevision=revision, voiceCandidates=[candidate],
+                       referenceAudio=relative, referenceText='Fresh sample.',
+                       previewUrl=candidate['previewUrl'])
+        return characters
     with TestClient(create_app_v2(tmp_path, cast_proposer=lambda *_: proposal,
-                                 voice_profiler=forbidden, voice_auditioner=forbidden,
+                                 voice_profiler=profile, voice_auditioner=audition,
+                                 voice_candidate_policy={'enabled': False, 'coverage_fraction': 0.8,
+                                     'min_voices': 0, 'max_voices': 1, 'extra_candidates': 1},
                                  cast_voice_reuse=Reuse(),
                                  default_voice_model="snapshot-test",
                                  voice_models=lambda *_: [
@@ -2245,8 +2266,11 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
         candidate = client.get(f"/api/books/{book_id}/stages/cast/candidates/{result['revision']}").json()
         assert candidate['sourceBookIds'] == ['source']
         assert candidate['narrator']['voicePreviewRevision'] == 'imported-narrator'
-        assert candidate['identities'][0]['reuseProvenance'] == {'bookId': 'source'}
+        assert candidate['identities'][0]['voiceReuse'] == {'bookId': 'source'}
         assert candidate['identities'][0]['voiceAccepted'] is False
+        assert len(generated_calls) == 1
+        for row in [candidate['narrator'], *candidate['identities']]:
+            assert [c['revision'].split('-')[0] for c in row['voiceCandidates']] == ['imported', 'fresh']
         assert calls == [('preview', ['source']), ('apply', ['source'])]
         # Reopening the same selection uses only destination snapshots, even if the
         # source subsequently disappears. The provider is not called again.
@@ -2264,11 +2288,11 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
         response = _accept(client, book_id, 'cast', reopened['revision'], decisions)
         assert response.status_code == 200, response.text
         accepted = read_artifact(tmp_path / 'packages' / book_id, 'cast')
-        assert accepted['narrator']['reuseProvenance'] == {'bookId': 'source'}
+        assert accepted['narrator']['voiceReuse'] == {'bookId': 'source'}
         assert accepted['identities'][0]['acceptedVoiceRevision'].startswith('imported-')
 
-        # Imported identities retain their own recipe and survive new casting defaults,
-        # even after source selection is cleared because the source book was deleted.
+        # A model/recipe change generates a compatible fresh pack and checks the
+        # latest source pool again; reuse is an additional first candidate.
         recipe[0] = "2"
         upgraded = _process(client, book_id, 'cast', {
             'proposalRevision': reopened['revision'], 'sourceBookIds': [],
@@ -2278,6 +2302,8 @@ def test_cross_book_reuse_preview_is_read_only_and_import_skips_all_generation(t
         assert after['auditionPackRecipeVersion'] == '2'
         assert after['narrator']['voicePreviewRevision'] == recast['narrator']['voicePreviewRevision']
         assert after['identities'][0]['voicePreviewRevision'] == recast['identities'][0]['voicePreviewRevision']
-        assert after['narrator']['reusedVoiceSnapshot'] is True
-        assert after['identities'][0]['reusedVoiceSnapshot'] is True
-        assert calls == [('preview', ['source']), ('apply', ['source'])]
+        assert len(generated_calls) == 2
+        assert calls == [('preview', ['source']), ('apply', ['source']), ('apply', [])]
+        for row in [after['narrator'], *after['identities']]:
+            assert row['voiceCandidates'][0]['revision'].startswith('imported-')
+            assert row['voiceCandidates'][1]['revision'].startswith('fresh-2-')
