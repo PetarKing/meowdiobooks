@@ -122,3 +122,7 @@
   .voice-candidate-play-wave i { animation: none !important; }
   .voice-inspector.cast-inspector, .voice-inspector.cast-inspector.closing { animation: none; }
 }
+
+/* Provenance sits beneath the standard audition heading. */
+.voice-candidate-tile.previous-book-derived { background: color-mix(in srgb, var(--poppy) 3%, var(--paper)); }
+.previous-book-caption::before { content: "↶ "; }

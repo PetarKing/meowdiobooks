@@ -197,20 +197,35 @@ describe("CastVoiceReview", () => {
     expect(document.body.style.overflow).not.toBe("hidden");
   });
 
-  it("offers an optional source voice picker only when opened", async () => {
-    const load = vi.fn().mockResolvedValue({ sources: [{ bookId: "earlier", title: "Earlier book", voiceCount: 1, voices: [{ characterId: "different", name: "Different name", revision: "v1" }] }], exactMatchCount: 0, remainingVoiceCount: 3, totalVoiceCount: 3 });
-    const reuse = vi.fn();
-    render(<CastVoiceReview bookId="book" cast={cast} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={vi.fn()} onRegenerate={vi.fn()} loadSourceVoices={load} onReuseVoice={reuse} />);
+  it("places a previous-book voice first without a source picker and allows another choice", () => {
+    const voice = cast.identities!.find((row) => row.characterId === "many")!;
+    const prior = { ...voice.voiceCandidates![0], revision: "prior", source: "previous-book" as const, previousBookTitle: "Earlier book" };
+    const updated = { ...cast, identities: cast.identities!.map((row) => row === voice ? { ...row, voiceCandidates: [prior, ...row.voiceCandidates!] } : row) };
+    const approve = vi.fn();
+    render(<CastVoiceReview bookId="book" cast={updated} selections={{}} routes={{}} onRouteChange={vi.fn()} onApprove={approve} onRegenerate={vi.fn()} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
-    expect(load).not.toHaveBeenCalled();
+    expect(within(screen.getByRole("dialog", { name: "Many voice" })).getByText("From prior book")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Apply Audition 2" }));
+    expect(approve).toHaveBeenCalledWith("many", voice.voiceCandidates![0].revision);
     fireEvent.click(screen.getByRole("button", { name: "Create a new audition" }));
-    const details = screen.getByText("Use a voice from another book").closest("details")!;
-    details.open = true;
-    fireEvent(details, new Event("toggle"));
-    const select = await screen.findByRole("combobox", { name: "Existing voice" });
-    fireEvent.change(select, { target: { value: JSON.stringify({ bookId: "earlier", characterId: "different", revision: "v1" }) } });
-    fireEvent.click(screen.getByRole("button", { name: "Use voice" }));
-    expect(reuse).toHaveBeenCalledWith("many", { bookId: "earlier", characterId: "different", revision: "v1" });
+    expect(screen.queryByText("Use a voice from another book")).not.toBeInTheDocument();
+  });
+
+  it("shows prior-book provenance only while that audition is the active choice", () => {
+    const voice = cast.identities!.find((row) => row.characterId === "many")!;
+    const prior = { ...voice.voiceCandidates![0], revision: "prior", source: "previous-book" as const };
+    const updated = { ...cast, identities: [{ ...voice, voiceCandidates: [prior, ...voice.voiceCandidates!] }] };
+    const props = { bookId: "book", cast: updated, routes: {}, onRouteChange: vi.fn(), onApprove: vi.fn(), onRegenerate: vi.fn() };
+    const view = render(<CastVoiceReview {...props} selections={{}} />);
+    const tile = () => screen.getByRole("button", { name: "Open Many voice" });
+    expect(tile()).toHaveTextContent("From prior book");
+    expect(tile().closest(".cast-tile-shell")).toHaveClass("previous-book-match");
+    view.rerender(<CastVoiceReview {...props} selections={{ many: voice.voiceCandidates![0].revision }} />);
+    expect(tile()).not.toHaveTextContent("From prior book");
+    expect(tile().closest(".cast-tile-shell")).not.toHaveClass("previous-book-match");
+    view.rerender(<CastVoiceReview {...props} selections={{ many: "prior" }} />);
+    expect(tile()).toHaveTextContent("From prior book");
   });
 
   it("pauses an expected hosted transcript action and retries only after another explicit click", async () => {
@@ -572,7 +587,7 @@ describe("stable cast choices", () => {
     const view = render(<CastVoiceReview {...props} selections={{}} />);
     fireEvent.click(screen.getByRole("button", { name: "Open Many voice" }));
     expect(screen.getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByText("Default audition")).toBeInTheDocument();
+    expect(screen.queryByText("Default audition")).not.toBeInTheDocument();
     view.rerender(<CastVoiceReview {...props} selections={{ many: "many-2" }} />);
     expect(screen.getByRole("button", { name: "Apply Audition 2" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Apply Audition 1" })).toHaveAttribute("aria-pressed", "false");

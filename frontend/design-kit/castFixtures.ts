@@ -48,6 +48,7 @@ function voice(name: string, index: number): CastVoice {
   };
 }
 export function castFor(variant: CastFixtureVariant): CastArtifact {
+  if (variant === "reuse-review") return { ...castFor("review-spectrum-identities"), previousVoiceMatches: { "Royal Chorus": { bookTitle: "Prior book" }, "Queen of Hearts": { bookTitle: "Prior book" }, Alice: { bookTitle: "Prior book" } } };
   const dense = variant === "dense-identities" || variant === "dense-voices";
   const names = [
     "Alice",
@@ -65,6 +66,13 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
       i,
     ),
   );
+  // Synthetic provenance for local UI approval; no provider or account access.
+  if (["identity-review", "auditions"].includes(variant)) {
+    const alice = identities[0];
+    alice.voiceCandidates = [{ ...alice.voiceCandidates![0], revision: "alice-previous-book", source: "previous-book", previousBookTitle: "Through the Looking-Glass" }, ...alice.voiceCandidates!];
+    alice.voiceAccepted = false;
+    delete alice.acceptedVoiceRevision;
+  }
   if (dense) {
     identities[identities.length - 1] = {
       ...voice("Alice & White Rabbit", 100), category: "group",
@@ -113,6 +121,7 @@ export function castFor(variant: CastFixtureVariant): CastArtifact {
   ].includes(variant);
   const fixture: CastArtifact = {
     revision: "cast-fixture-1",
+    ...(["identity-review", "auditions"].includes(variant) ? { previousVoiceMatches: { Alice: { bookTitle: "Through the Looking-Glass" }, "White Rabbit": { bookTitle: "Through the Looking-Glass" } } } : {}),
     phase: identity ? "identity-review" : "audition-review",
     voiceModel: "qwen",
     language: "english",

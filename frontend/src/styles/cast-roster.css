@@ -146,3 +146,9 @@
 }
 
 .voice-cast-board .voice-tile-play-cue .voice-playback-icon { width: 16px; height: 16px; }
+
+.cast-board .cast-roster-card.cast-roster-identity.previous-book-match:not(.needs-review):not(.has-suggestions),
+.voice-cast-board .cast-roster-card.cast-tile-shell.previous-book-match {
+  --roster-accent: color-mix(in srgb, var(--poppy) 45%, #71658c);
+}
+.cast-board .cast-roster-review:has(.previous-book-badge) { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 3px 10px; }

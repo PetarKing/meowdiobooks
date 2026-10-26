@@ -55,9 +55,10 @@ function OverloadedHarness() {
   return <CastIdentityReview cast={overloaded} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[{ id: "qwen", label: "Qwen", supportedLanguages: ["english"] }]} voiceModel="qwen" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} />;
 }
 
-function ReviewSignalsHarness() {
+function ReviewSignalsHarness({ reused = false }: { reused?: boolean } = {}) {
   const signalCast: CastArtifact = {
     revision: "cast-signals",
+    ...(reused ? { previousVoiceMatches: { Cecilus: { bookTitle: "Prior book" }, "fake Cecilus": { bookTitle: "Prior book" } } } : {}),
     phase: "identity-review",
     dossiers: [
       { label: "Cecilus", occurrenceCount: 8, examples: [] },
@@ -106,18 +107,16 @@ function EnsembleHarness() {
 }
 
 describe("CastIdentityReview", () => {
-  it("filters a large cast by source labels without concealing outstanding confirmations", () => {
+  it("filters a large cast by source labels and review state", () => {
     render(<EnsembleHarness />);
     const search = screen.getByRole("searchbox", { name: "Search cast" });
     fireEvent.change(search, { target: { value: "moonLIGHT" } });
     expect(screen.getByRole("button", { name: "Inspect Émilia" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Inspect Member 1" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Inspect Narrator" })).toBeInTheDocument();
-    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
     expect(screen.getByText("1 of 14 cast members shown")).toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Show cast" }), { target: { value: "ready" } });
     expect(screen.getByText("No cast members match these filters.")).toBeInTheDocument();
-    expect(screen.getByText("1 source label needs confirmation")).toBeInTheDocument();
     fireEvent.click(within(screen.getByRole("searchbox", { name: "Search cast" }).closest(".collection-toolbar")!).getByRole("button", { name: "Clear" }));
     expect(search).toHaveFocus();
     expect(screen.getByText("14 of 14 cast members shown")).toBeInTheDocument();
@@ -176,21 +175,32 @@ describe("CastIdentityReview", () => {
     expect(within(languageGroup).getByRole("button", { name: "portuguese" })).toBeInTheDocument();
   });
 
+  it("keeps mandatory and optional reviews ahead of prior-book provenance", () => {
+    render(<ReviewSignalsHarness reused />);
+    const required = screen.getByRole("button", { name: "Inspect Cecilus Segmunt" });
+    expect(required).toHaveClass("needs-review", "previous-book-match");
+    expect(required).toHaveTextContent(/Must review.*From prior book/);
+    const optional = screen.getByRole("button", { name: "Inspect fake Cecilus" });
+    expect(optional).toHaveClass("has-suggestions", "previous-book-match");
+    expect(optional).not.toHaveClass("needs-review");
+    expect(optional).toHaveTextContent(/Should review.*From prior book/);
+    fireEvent.click(optional);
+    expect(screen.getByRole("dialog", { name: "Inspect fake Cecilus" })).toHaveTextContent("Optional check");
+  });
+
   it("blocks only material grouping decisions and keeps possible matches informational", () => {
     render(<ReviewSignalsHarness />);
 
     const autoGrouped = screen.getByRole("button", { name: "Inspect Cecilus Segmunt" });
     expect(autoGrouped).toHaveClass("auto-grouped");
     expect(autoGrouped).not.toHaveClass("qwen-review");
-    expect(autoGrouped).toHaveTextContent("Required · Check this merge");
-    expect(screen.getByText("2 required · blocks continue")).toBeInTheDocument();
-    expect(screen.getByText("1 suggested · optional")).toBeInTheDocument();
+    expect(autoGrouped).toHaveTextContent("Must review");
 
     const possibleMatch = screen.getByRole("button", { name: "Inspect fake Cecilus" });
     expect(possibleMatch).toHaveClass("has-suggestions");
     expect(possibleMatch).not.toHaveClass("auto-grouped");
     expect(possibleMatch).not.toHaveTextContent("Required");
-    expect(possibleMatch).toHaveTextContent("Review suggested");
+    expect(possibleMatch).toHaveTextContent("Should review");
     expect(screen.queryByText(/auto-grouped/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Qwen review|Qwen suggestion/i)).not.toBeInTheDocument();
 
@@ -225,7 +235,6 @@ describe("CastIdentityReview", () => {
     expect(narrator).not.toHaveAttribute("draggable", "true");
     expect(narrator).toHaveTextContent("Normal book prose");
     expect(narrator).not.toHaveTextContent("reassigned labels");
-    expect(screen.getByText("3 source labels are currently grouped into 3 cast members. Narrator is separate.")).toBeInTheDocument();
 
     fireEvent.click(narrator);
     const narratorDialog = screen.getByRole("dialog", { name: "Inspect Narrator" });
@@ -267,7 +276,6 @@ describe("CastIdentityReview", () => {
 
     const dialog = screen.getByRole("dialog", { name: "Inspect Cecilus" });
     expect(dialog).toHaveTextContent("Ready");
-    expect(screen.getByText("Cast structure is ready")).toBeInTheDocument();
     expect(within(dialog).queryByRole("button", { name: "Accept suggestion" })).not.toBeInTheDocument();
     const primaryCard = within(dialog).getByText("Primary label").closest("article")!;
     expect(within(primaryCard).getByText("Primary label")).toBeInTheDocument();
@@ -300,8 +308,7 @@ describe("CastIdentityReview", () => {
     render(<OverloadedHarness />);
     const tile = screen.getByRole("button", { name: "Inspect One" });
     expect(tile).toHaveClass("suspicious-merge");
-    expect(tile).toHaveTextContent("Required");
-    expect(tile).toHaveTextContent("Check this merge");
+    expect(tile).toHaveTextContent("Must review");
   });
 
   it("merges an entire dragged cast member into the drop target", () => {

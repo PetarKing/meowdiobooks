@@ -281,8 +281,6 @@ export function CastIdentityReview({
   const selectedModel = voiceModels.find((row) => row.id === voiceModel);
   const dossierByLabel = new Map(cast.dossiers.map((row) => [row.label, row]));
   const confirmationLabels = strongConfirmationLabelsForCast(cast, decisions);
-  const remaining = confirmationLabels.filter((label) => !resolvedLabels.includes(label)).length;
-  const advisoryCount = groups.filter((group) => group.advisoryReview).length;
 
   useEffect(() => () => {
     if (closeTimer.current !== undefined) window.clearTimeout(closeTimer.current);
@@ -510,17 +508,8 @@ export function CastIdentityReview({
     && !active.labels.includes(label) && decisions[label]?.category !== NARRATOR_KEY) : [];
 
   return <div ref={workbenchRef} className="cast-workbench">
-    <div className="cast-toolbar">
-      <div className="cast-toolbar-copy">
-        <p className="cast-review-key" aria-label={t("Cast review status")}>
-          {remaining > 0 ? <><span className="visually-hidden">{t(remaining === 1 ? "1 source label needs confirmation" : "{{count}} source labels need confirmation", { count: remaining })}</span><span className="required">{t("{{count}} required · blocks continue", { count: remaining })}</span></> : <span className="ready">{t("Cast structure is ready")}</span>}
-          {advisoryCount > 0 && <span className="advisory">{t("{{count}} suggested · optional", { count: advisoryCount })}</span>}
-        </p>
-        <small>{t("{{labels}} source labels are currently grouped into {{members}} cast members. Narrator is separate.", { labels: cast.proposals.length, members: groups.length })}</small>
-        <small className="desktop-drag-help">{t("Drag one cast member onto another to merge them, or onto Narrator to use the narrator voice.")}</small>
-      </div>
+    {(onReclassify || !hideVoiceSettings) && <div className="cast-toolbar">
       <div className="cast-toolbar-actions">
-        {remaining > 0 && <button type="button" className="primary compact" onClick={() => { const next = groups.find(group => group.needsReview); if (next) openInspector(next.primaryLabel); }}>{t("Review required identities")} →</button>}
         {onReclassify && <button type="button" className="ghost compact danger-subtle cast-reclassify-action" onClick={onReclassify}>{t("Reclassify from Dialogue")}</button>}
         {!hideVoiceSettings && <DismissibleDetails>
           <summary>{flags[language] ?? "🌐"} {language ? t(language) : t("Choose language")}{!hideVoiceModel && <> · {selectedModel?.label ?? t("Choose voice model")}</>}</summary>
@@ -530,7 +519,7 @@ export function CastIdentityReview({
           </div>
         </DismissibleDetails>}
       </div>
-    </div>
+    </div>}
 
     {largeCollection && <CollectionToolbar query={collectionQuery} onQueryChange={setCollectionQuery} filter={collectionFilter} onFilterChange={setCollectionFilter} searchLabel={t("Search cast")} filterLabel={t("Show cast")} countLabel={t("{{shown}} of {{total}} cast members shown", { shown: visibleGroups.length, total: groups.length })} clearLabel={t("Clear")} filters={[
       { value: "all", label: t("All") }, { value: "required", label: t("Required") }, { value: "suggested", label: t("Suggested") }, { value: "ready", label: t("Ready") },
@@ -550,8 +539,8 @@ export function CastIdentityReview({
         name={group.name} symbol={suspicious ? "!" : tileSymbol(group)}
         portraitClassName={`portrait-tone-${groups.indexOf(group) % 4}`}
         detail={t(group.occurrenceCount === 1 ? "{{count}} line" : "{{count}} lines", { count: group.occurrenceCount })}
-        badge={group.needsReview ? <span className="cast-review-badge required">{t(suspicious || group.autoGrouped ? "Required · Check this merge" : "Required review")}</span> : group.advisoryReview ? <span className="cast-review-badge advisory">{t("Review suggested")}</span> : undefined}
-        cardClassName={`${group.needsReview ? "needs-review" : group.advisoryReview ? "has-suggestions" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
+        badge={<>{group.needsReview ? <span className="cast-review-badge required">{t("Must review")}</span> : group.advisoryReview ? <span className="cast-review-badge advisory">{t("Should review")}</span> : null}{group.labels.some((label) => cast.previousVoiceMatches?.[label]) && <span className="previous-book-badge">{t("From prior book")}</span>}</>}
+        cardClassName={`${group.labels.some((label) => cast.previousVoiceMatches?.[label]) ? "previous-book-match" : ""} ${group.needsReview ? "needs-review" : group.advisoryReview ? "has-suggestions" : "ready"} ${group.autoGrouped ? "auto-grouped" : ""} ${group.qwenReview ? "qwen-review" : ""} ${suspicious ? "suspicious-merge" : ""} ${active?.key === group.key ? "selected" : ""} ${draggedGroupKey === group.key ? "dragging" : ""} ${dropTargetKey === group.key ? "drop-target" : ""} ${mergeSuccessKey === group.key ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[group.primaryLabel] = element; }}
         inspectProps={{ draggable: true, "aria-label": t("Inspect {{name}}", { name: group.name }), onClick: () => openInspector(group.primaryLabel), onDragStart: (event) => startDrag(event, group), onDragEnd: () => { setDraggedGroupKey(undefined); setDropTargetKey(undefined); dragAutoScroll.stop(); }, onDragOver: (event) => dragOver(event, group.key), onDragLeave: () => setDropTargetKey(undefined), onDrop: (event) => dropOn(event, group) }}
       />; })}
@@ -579,7 +568,7 @@ export function CastIdentityReview({
 
     {active && <InspectorShell label={t("Inspect {{name}}", { name: active.name })} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
-        <div><span className={`cast-status-dot ${active.needsReview ? "needs-review" : active.advisoryReview ? "has-suggestions" : "ready"}`} /> <small>{t(active.needsReview ? "Confirmation required" : active.advisoryReview ? "Review suggested" : "Ready")}</small><h2>{active.name}</h2><p>{t(`${active.occurrenceCount === 1 ? "{{lines}} spoken line" : "{{lines}} spoken lines"} across ${active.labels.length === 1 ? "{{labels}} source label" : "{{labels}} source labels"}.`, { lines: active.occurrenceCount, labels: active.labels.length })}</p></div>
+        <div><span className={`cast-status-dot ${active.needsReview ? "needs-review" : active.advisoryReview ? "has-suggestions" : "ready"}`} /> <small>{t(active.needsReview ? "Confirmation required" : active.advisoryReview ? "Should review" : "Ready")}</small><h2>{active.name}</h2><p>{t(`${active.occurrenceCount === 1 ? "{{lines}} spoken line" : "{{lines}} spoken lines"} across ${active.labels.length === 1 ? "{{labels}} source label" : "{{labels}} source labels"}.`, { lines: active.occurrenceCount, labels: active.labels.length })}</p></div>
         <div className="cast-inspector-actions">{active.needsReview && <button type="button" className="primary" onClick={confirmMaterialDecision}>{t(active.labels.length > 1 ? "Confirm grouping" : "Confirm classification")}</button>}<button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button></div>
       </header>
       {(active.needsReview || active.advisoryReview) && <p className={`cast-review-explanation ${active.needsReview ? "required" : "advisory"}`}><strong>{t(active.needsReview ? "Required before continuing" : "Optional check")}</strong><span>{t(active.needsReview ? "Confirm this identity before moving to Voices." : "Compare the source labels if this looks uncertain. You can continue without changing it.")}</span></p>}
