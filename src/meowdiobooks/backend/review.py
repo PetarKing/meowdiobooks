@@ -24,6 +24,10 @@ class ReviewContractError(ValueError):
 
 
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
+    "hyphenation": {
+        "severity": "warning",
+        "actions": ("keep-hyphen", "join-word"),
+    },
     "ai-cleanup": {
         "severity": "warning",
         "actions": ("keep", "exclude", "repair"),
@@ -86,16 +90,6 @@ _NOTE_SECTION_BOUNDARY = re.compile(
     r"^\s*(?:(?:chapter|part|book)\s+\S+|prologue\b|epilogue\b|"
     r"(?:human|machine)\s+translated\s+by\b|proofread\s+by\b|"
     r"japanese\s+to\s+english\s+checking\s+by\b|art\s+sources?\b)",
-    re.IGNORECASE,
-)
-_PERIPHERAL = re.compile(
-    r"^\s*(?:copyright|contents|table of contents|translator(?:'s)? note|"
-    r"translation note|acknowledgements?|about the author|index|bibliography)\b",
-    re.IGNORECASE,
-)
-_CREDIT_HEADING = re.compile(
-    r"^\s*(?:(?:(?:human|machine)\s+)?translated\s+by|proofread\s+by|"
-    r"japanese\s+to\s+english\s+checking\s+by|art\s+sources?)\s*:\s*$",
     re.IGNORECASE,
 )
 _LINE_HYPHEN = re.compile(r"(?<![\w-])[A-Za-z]{2,}[-\u00ad][ \t\r]*\n[ \t]*[a-z]{2,}(?![\w-])")
@@ -206,6 +200,12 @@ def add_cleanup_proposals(
             if any(max(start, left) < min(end, right)
                    for left, right in bracket_ranges(block["text"])):
                 raise ReviewContractError("General cleanup cannot override protected bracketed content")
+        # Explicit hyphen choices own their range; a model must not supersede them.
+        if any(row.get("kind") == "hyphenation" and row["blockId"] == block["id"]
+               and max(start, row["sourceStart"]) < min(end, row["sourceEnd"])
+               for warning in workspace.get("warnings", [])
+               for row in warning.get("occurrences", [])):
+            continue
         replacement = proposal.get("replacement")
         if replacement is not None and not isinstance(replacement, str):
             raise ReviewContractError("Cleanup replacement must be text or null")
@@ -376,7 +376,13 @@ def _validate_verified_cue_sources(dialogue, review, *, rendered=False):
                             and row.get("blockId") == cue["blockId"]
                             and row["sourceStart"] <= left < right <= row["sourceEnd"]]
                 expected = min(policies)[1] if policies else "keep"
-                if span.get("reviewAction", "keep") != expected:
+                actual = span.get("reviewAction", "keep")
+                # A spelling repair marks its whole owning span, including retained
+                # cues outside the edited range. The repair IDs and exact resulting
+                # text are independently checked by review_source_validation_view.
+                if actual == "repair" and expected == "keep" and span.get("reviewRepairs"):
+                    actual = "keep"
+                if actual != expected:
                     raise ReviewContractError("Rendered script direction differs from its accepted choice")
         if cursor != end or "".join(pieces) != cue.get("source"):
             raise ReviewContractError("Script direction no longer matches its exact source")
@@ -605,15 +611,30 @@ def _repair_text(span: Mapping[str, Any], edits: Sequence[Mapping[str, Any]]) ->
     return text
 
 
+def _hyphen_choices(source: str) -> dict[str, str]:
+    if _LINE_HYPHEN.fullmatch(source) is None:
+        raise ReviewContractError("Hyphen choice requires an exact line-wrapped word")
+    left, right = re.split(r"[-\u00ad][ \t\r]*\n[ \t]*", source)
+    return {"keep-hyphen": left + "-" + right, "join-word": left + right}
+
+
 def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
                    for row in warning.get("occurrences", [])}
     result = {}
     for decision in review.get("decisions", []):
-        if decision.get("action") != "repair":
+        action = decision.get("action")
+        if action not in {"repair", "keep-hyphen", "join-word"}:
             continue
         key = str(decision["occurrenceId"])
         row = occurrences.get(key)
+        if action in {"keep-hyphen", "join-word"}:
+            if (row is None or row.get("kind") != "hyphenation"
+                    or action not in row.get("availableActions", [])
+                    or row.get("hyphenChoices") != _hyphen_choices(row["source"])):
+                raise ReviewContractError("Hyphen choice requires durable source evidence")
+            result[key] = {**row, "replacement": row["hyphenChoices"][action]}
+            continue
         if (row is None or row.get("proposalStatus") != "proposed"
                 or "repair" not in row.get("availableActions", [])
                 or not isinstance(row.get("replacement"), str)):
@@ -996,9 +1017,10 @@ def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, An
 def _text_occurrences(
     blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
 ) -> list[dict[str, Any]]:
-    numbered_edges = _numbered_edge_occurrences(blocks)
-    numbered_pages = {row["page"] for row in numbered_edges}
-    result = [*_footnote_occurrences(blocks), *_credit_occurrences(blocks, spans), *numbered_edges]
+    # Repeated numbered footer evidence makes an isolated top numeral ambiguous
+    # (often a chapter-local counter). Preserve it without a second folio warning.
+    numbered_pages = {row["page"] for row in numbered_edge_candidates(blocks)}
+    result = _footnote_occurrences(blocks)
     edge_lines: dict[str, list[tuple[Mapping[str, Any], int, int, str]]] = defaultdict(list)
     page_blocks: dict[int, list[str]] = defaultdict(list)
     for block in blocks:
@@ -1012,12 +1034,18 @@ def _text_occurrences(
         is_last_block = block_id == siblings[-1]
         for match in _LINE_HYPHEN.finditer(text):
             occurrence = _from_match(
-                "suspicious-extraction", block, match,
+                "hyphenation", block, match,
                 "Possible line-wrapped word. Check the source before joining: a genuine "
                 "compound or interrupted speech must retain its hyphen. Do not exclude the word.",
             )
             occurrence["detectionRule"] = "line-wrap-hyphen"
-            result.append(occurrence)
+            # A repair must fit one spoken span so neither reader nor source ownership changes.
+            if any(str(span.get("blockId")) == block_id
+                   and int(span.get("spokenStart", span.get("sourceStart", 0))) <= match.start()
+                   and match.end() <= int(span.get("spokenEnd", span.get("sourceEnd", 0)))
+                   for span in spans):
+                occurrence["hyphenChoices"] = _hyphen_choices(match.group())
+                result.append(occurrence)
         for line_index, match in enumerate(lines):
             value = match.group(0)
             stripped = value.strip()
@@ -1064,12 +1092,6 @@ def _text_occurrences(
                 result.append(
                     _from_match("page-number", block, match, "Page-number-shaped edge line.")
                 )
-            elif _PERIPHERAL.match(stripped):
-                result.append(
-                    _from_match(
-                        "front-back-matter", block, match, "Front/back/editorial matter candidate."
-                    )
-                )
             if is_edge and len(stripped) >= 3 and not _PAGE_NUMBER.fullmatch(stripped):
                 edge_lines[" ".join(stripped.casefold().split())].append(
                     (block, match.start(), match.end(), value)
@@ -1099,11 +1121,13 @@ def _text_occurrences(
     return result
 
 
-def _numbered_edge_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Find changing folios attached to a repeated publisher/edition label.
+def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
+    """Return exact model candidates from repeated last-line labels and changing folios.
 
-    Keep each original evidence string and match key: digit normalization is only
-    detection evidence, never authority for an identical-evidence bulk decision.
+    This language-neutral structural signal is not proof of a publisher/footer role.
+    Three distinct pages must share a label and folio offset. Candidates remain
+    model evidence only and never create deterministic review items or omissions.
+    This pure helper also supports candidate-recall benchmarks without model calls.
     """
     pages: dict[int, list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
     for block in blocks:
@@ -1122,92 +1146,29 @@ def _numbered_edge_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict
         if label is None:
             continue
         name = label["label"].strip()
-        if any(not word[:1].isupper() for word in name.split()):
-            continue
-        if not (
-            re.search(r"\b(?:press|publishing|editions?|translations?)\b|mtls?\b", name, re.I)
-            or re.fullmatch(r"[A-Z][a-z]+[A-Z][A-Za-z]+", name)
+        if not any(char.isalpha() for char in name) or any(
+            not (char.isalpha() or char.isspace() or char in "-–—&") for char in name
         ):
             continue
         key = (" ".join(name.casefold().split()), int(label["number"]) - page)
         candidates[key].append((block, match))
     result = []
-    for rows in candidates.values():
-        if len({int(block["page"]) for block, _ in rows}) < 2:
+    for (_, folio_offset), rows in candidates.items():
+        repeated_pages = sorted({int(block["page"]) for block, _ in rows})
+        if len(repeated_pages) < 3:
             continue
         for block, match in rows:
             occurrence = _from_match(
                 "page-number", block, match,
-                "Numbered page-edge publisher label repeats with a consistent page offset.",
+                "Last-line label repeats on at least three pages with a consistent folio offset; verify its role.",
             )
-            occurrence["detectionRule"] = "numbered-publisher-footer"
+            occurrence["detectionRule"] = "repeated-numbered-edge"
+            occurrence["patternEvidence"] = {
+                "distinctPageCount": len(repeated_pages), "folioOffset": folio_offset,
+                "firstPage": repeated_pages[0], "lastPage": repeated_pages[-1],
+            }
             result.append(occurrence)
     return result
-
-
-def _credit_occurrences(
-    blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
-) -> list[dict[str, Any]]:
-    """Keep contributor names with an explicit heading, bounded to its paragraph.
-
-    Do not infer continuation across source blocks or pages: a short name-shaped
-    line there may instead be a chapter title or story text.
-    """
-    result = []
-    for block in blocks:
-        text = str(block["text"])
-        lines = list(re.finditer(r"[^\n]+", text))
-        for index, match in enumerate(lines):
-            if not _CREDIT_HEADING.fullmatch(match.group()):
-                continue
-            if any(
-                str(span.get("blockId")) == str(block["id"])
-                and span.get("renderRole") == "dialogue"
-                and int(span.get("spokenStart", span.get("sourceStart", 0))) < match.end()
-                and int(span.get("spokenEnd", span.get("sourceEnd", 0))) > match.start()
-                for span in spans
-            ):
-                continue
-            end = match.end()
-            for following in lines[index + 1:]:
-                value = following.group().strip()
-                if (
-                    text[end:following.start()].count("\n") > 1
-                    or not _credit_name(value)
-                    or any(
-                        str(span.get("blockId")) == str(block["id"])
-                        and span.get("renderRole") == "dialogue"
-                        and int(span.get("sourceStart", 0)) < following.end()
-                        and int(span.get("sourceEnd", 0)) > following.start()
-                        for span in spans
-                    )
-                ):
-                    break
-                end = following.end()
-            occurrence = _occurrence(
-                "front-back-matter", str(block["id"]), match.start(), end,
-                text[match.start():end], int(block["page"]),
-                "Production credit heading and adjacent contributor names; verify before excluding.",
-                block_text=text,
-            )
-            occurrence["detectionRule"] = "production-credit-block"
-            result.append(occurrence)
-    return result
-
-
-def _credit_name(value: str) -> bool:
-    if (
-        not value or len(value) > 80 or _NOTE_SECTION_BOUNDARY.match(value)
-        or re.match(r"^(?:The|A|An)\s", value)
-    ):
-        return False
-    # Names/handles only. Quotes, sentence punctuation, scene separators and
-    # ordinary lowercase prose terminate the credit. This intentionally abstains
-    # on ambiguous multiline editorial disclaimers and contributor continuations.
-    words = value.split()
-    return len(words) <= 5 and all(
-        re.fullmatch(r"[A-Z@][\w'’.-]*", word) and not word.endswith(".") for word in words
-    )
 
 
 def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
@@ -1358,7 +1319,7 @@ def _looks_like_page_furniture(value: str) -> bool:
     folded = stripped.casefold()
     if re.search(r":\s*\[", stripped) or stripped.startswith(('"', "'", "“", "‘", "「", "『")):
         return False
-    if re.search(r"https?://|www\.|@\w|\b(?:translated|proofread|translation notes?|art sources?)\b", folded):
+    if re.search(r"https?://|www\.|@\w", folded):
         return True
     return False
 
@@ -1542,7 +1503,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
-                        "occurrence" if kind == "ai-cleanup" or all(_is_verified_cue(row) for row in evidence_group) else
+                        "occurrence" if kind in {"ai-cleanup", "hyphenation"} or all(_is_verified_cue(row) for row in evidence_group) else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"
@@ -1645,7 +1606,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             "excluded"
             if action == "exclude"
             else "corrected"
-            if action == "repair"
+            if action in {"repair", "keep-hyphen", "join-word"}
             else "narrator"
             if action == "narrate"
             else "unchanged"
@@ -1658,7 +1619,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             else ["review", "cast", "script", "generate"]
             if action == "rerun-dialogue"
             else ["generate"]
-            if action in {"exclude", "narrate", "repair"}
+            if action in {"exclude", "narrate", "repair", "keep-hyphen", "join-word"}
             else []
         ),
     }

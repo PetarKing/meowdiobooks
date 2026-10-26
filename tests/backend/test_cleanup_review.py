@@ -7,8 +7,27 @@ from meowdiobooks.backend.dialogue import malformed_playable_spans
 from meowdiobooks.backend.recording_script import build_recording_script
 from meowdiobooks.backend.review import (
     ReviewContractError, accept_review_revision, add_cleanup_proposals,
-    apply_review_render_policies, build_review_workspace, preview_review_transcript_page,
+    apply_review_render_policies, build_review_workspace as build_current_workspace, preview_review_transcript_page,
 )
+
+
+def build_review_workspace(extraction, dialogue):
+    """Exercise cleanup compatibility with the persisted pre-hyphen-choice format.
+
+    Current hyphen ownership and repair choices have their own end-to-end tests.
+    """
+    workspace = build_current_workspace(extraction, dialogue)
+    for warning in workspace['warnings']:
+        if warning['kind'] != 'hyphenation':
+            continue
+        warning.update(id='review:suspicious-extraction', kind='suspicious-extraction',
+                       decisionScope='warning-kind')
+        actions = ['keep', 'exclude'] if warning['readerState'] == 'narrator' else ['keep', 'narrate', 'exclude']
+        warning['availableActions'] = actions
+        for row in warning['occurrences']:
+            row.update(kind='suspicious-extraction', warningId=warning['id'], availableActions=actions)
+            row.pop('hyphenChoices', None)
+    return workspace
 
 
 def fixture(source='Ada: [A bro-\nken sign.]', before='bro-\nken', after='broken'):
@@ -316,7 +335,7 @@ def test_ai_corrections_form_last_group_with_no_empty_or_duplicate_groups():
     workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue),
                                       extraction, dialogue, {'occurrences': [proposal]})
     assert [w['kind'] for w in workspace['warnings']] == [
-        'suspicious-extraction', 'front-back-matter', 'ai-cleanup']
+        'suspicious-extraction', 'ai-cleanup']
     rows = [row for w in workspace['warnings'] for row in w['occurrences']]
     assert len({row['id'] for row in rows}) == len(rows)
     assert sum(row['source'] == 'bro-\nken' for row in rows) == 1

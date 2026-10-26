@@ -10,7 +10,6 @@ from meowdiobooks.backend.review import (
     accept_review_revision,
     apply_review_render_policies,
     build_review_workspace,
-    preview_bulk_decision,
 )
 
 
@@ -58,67 +57,74 @@ def test_cleanup_evidence_and_keep_policy_preserve_source(case):
         assert by_id[row["blockId"]][row["sourceStart"]:row["sourceEnd"]] == row["source"]
     accepted = accept_review_revision(
         workspace,
-        [{"occurrenceIds": [row["id"]], "action": "keep"} for row in occurrences],
+        [{"occurrenceIds": [row["id"]], "action": "keep-hyphen" if row["kind"] == "hyphenation" else "keep"} for row in occurrences],
         revision="keep-1",
     )
     rendered = apply_review_render_policies(dialogue, accepted)
     assert "".join(row["source"] for row in rendered["spans"]) == "".join(by_id.values())
-    assert "".join(row["text"] for row in rendered["spans"]) == "".join(by_id.values())
+    expected = "".join(by_id.values())
+    for row in occurrences:
+        if row["kind"] == "hyphenation":
+            expected = expected.replace(row["source"], row["hyphenChoices"]["keep-hyphen"])
+    assert "".join(row["text"] for row in rendered["spans"]) == expected
     assert (extraction, dialogue) == original
 
 
-def test_numbered_footer_detection_does_not_make_different_evidence_bulk_identical():
-    case = next(case for case in CASES if case["id"] == "numbered-brand-footer")
-    workspace = build_review_workspace(*_artifacts(case))
-    occurrences = workspace["warnings"][0]["occurrences"]
-    preview = preview_bulk_decision(workspace, occurrences[0]["id"], "exclude")
-    assert preview["affectedCount"] == 1
-    assert occurrences[0]["matchKey"] != occurrences[1]["matchKey"]
 
-
-def test_explicit_credit_exclusion_removes_names_but_preserves_story_and_source():
-    case = next(case for case in CASES if case["id"] == "credit-paragraph")
-    extraction, dialogue = _artifacts(case)
+@pytest.mark.parametrize("source", [
+    "She wondered if the\ncontents had been shared with her.",
+    "Copyright was the subject of their discussion.",
+    "Index the books before leaving, she said.",
+    "Translated By:\nAda Reed\n\nThe door opened.",
+    "Traduit par :\nCamille Martin\n\nLa porte s’ouvrit.",
+    "翻訳：\n山田花子\n\n扉が開いた。",
+])
+def test_semantic_editorial_roles_are_not_inferred_from_words(source):
+    extraction, dialogue = _artifacts({"blocks": [{"id": "b", "page": 1, "text": source}]})
     workspace = build_review_workspace(extraction, dialogue)
-    credit = workspace["warnings"][0]["occurrences"][0]
-    assert credit["detectionRule"] == "production-credit-block"
-    accepted = accept_review_revision(
-        workspace, [{"occurrenceIds": [credit["id"]], "action": "exclude"}], revision="exclude-1"
-    )
+    assert not workspace["warnings"]
+    accepted = accept_review_revision(workspace, [], revision="keep")
     rendered = apply_review_render_policies(dialogue, accepted)
-    assert "".join(row["source"] for row in rendered["spans"]) == extraction["blocks"][0]["text"]
-    spoken = "".join(
-        row["text"] for row in rendered["spans"] if row.get("reviewAction") != "exclude"
-    )
-    assert spoken.strip() == "The door opened."
+    assert rendered["spans"][0]["text"] == source
 
 
-def test_credit_continuation_stops_before_an_attributed_dialogue_line():
-    text = "Translated By:\nAda Reed\nRun"
-    extraction, dialogue = _artifacts({"blocks": [{"id": "b0", "page": 1, "text": text}]})
-    boundary = text.index("Run")
-    template = dialogue["spans"][0]
-    dialogue["spans"] = [
-        {
-            **template, "id": "narration", "sourceEnd": boundary, "spokenEnd": boundary,
-            "source": text[:boundary], "text": text[:boundary],
-        },
-        {
-            **template, "id": "speech", "sourceStart": boundary, "spokenStart": boundary,
-            "source": text[boundary:], "text": text[boundary:], "renderRole": "dialogue",
-        },
-    ]
-    workspace = build_review_workspace(extraction, dialogue)
-    credit = next(
-        row for warning in workspace["warnings"] for row in warning["occurrences"]
-        if row.get("detectionRule") == "production-credit-block"
-    )
-    assert credit["source"] == "Translated By:\nAda Reed"
-    accepted = accept_review_revision(
-        workspace, [{"occurrenceIds": [credit["id"]], "action": "exclude"}], revision="exclude-1"
-    )
-    rendered = apply_review_render_policies(dialogue, accepted)
-    assert "".join(row["source"] for row in rendered["spans"]) == text
-    assert "".join(
-        row["text"] for row in rendered["spans"] if row.get("reviewAction") != "exclude"
-    ).strip() == "Run"
+@pytest.mark.parametrize("label", ["maison des livres", "青空文庫", "издательство", "دار الكتب"])
+def test_numbered_edge_candidates_are_language_neutral_and_exact(label):
+    from meowdiobooks.backend.review import numbered_edge_candidates
+    blocks = [{"id": str(i), "page": i, "text": f"Unique prose {i}.\n{label} {i + 7}"}
+              for i in range(1, 4)]
+    rows = numbered_edge_candidates(blocks)
+    assert len(rows) == 3
+    for row, block in zip(rows, blocks):
+        assert row["source"] == block["text"][row["sourceStart"]:row["sourceEnd"]]
+        assert row["source"] == f"{label} {block['page'] + 7}"
+    assert numbered_edge_candidates(blocks[:2]) == []
+
+
+@pytest.mark.parametrize("mutation", ["offset", "body", "dialogue", "punctuation", "same_page"])
+def test_numbered_edge_candidates_require_consistent_structural_evidence(mutation):
+    from meowdiobooks.backend.review import numbered_edge_candidates
+    blocks = [{"id": str(i), "page": i, "text": f"Unique prose {i}.\npetite maison {i + 7}"}
+              for i in range(1, 4)]
+    if mutation == "offset":
+        blocks[-1]["text"] = "Unique prose.\npetite maison 99"
+    elif mutation == "body":
+        for block in blocks:
+            block["text"] += "\nMore prose."
+    elif mutation in {"dialogue", "punctuation"}:
+        for block in blocks:
+            block["text"] = block["text"].replace("petite maison", "“petite maison”" if mutation == "dialogue" else "petite maison:")
+    else:
+        for block in blocks:
+            block["page"] = 1
+    assert numbered_edge_candidates(blocks) == []
+
+
+def test_numbered_footer_evidence_keeps_ambiguous_resetting_top_counters():
+    # A footer's changing folio is not a deletion verdict; it does establish that
+    # the small top numeral might be a section counter instead of a second folio.
+    blocks = [{"id": str(i), "page": i,
+               "text": f"{1 + (i % 2)}\nUnique narrative sentence {i}.\n青空文庫 {i + 50}"}
+              for i in range(1, 5)]
+    extraction, dialogue = _artifacts({"blocks": blocks})
+    assert build_review_workspace(extraction, dialogue)["warnings"] == []

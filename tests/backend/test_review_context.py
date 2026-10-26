@@ -75,8 +75,9 @@ def test_deterministic_and_ai_review_share_source_context(replacement):
                 'replacement': replacement}
     result = add_cleanup_proposals(workspace, extraction, dialogue, {'occurrences': [proposal]})
     proposed = [row for warning in result['warnings'] for row in warning['occurrences']
-                if row.get('proposalStatus')]
+                if row.get('kind') == 'hyphenation']
     assert proposed
+    assert all(not row.get('proposalStatus') for row in proposed)
     for row in proposed:
         assert 'They stopped beside the old house.' in row['contextBefore']
         assert 'The faded letters were almost impossible to read.' in row['contextAfter']

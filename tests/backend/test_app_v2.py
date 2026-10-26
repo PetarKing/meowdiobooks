@@ -1457,20 +1457,20 @@ def test_cleanup_failure_retry_preview_acceptance_and_reopen(tmp_path, monkeypat
         result = _process(client, book_id, 'review', {})
         candidate = client.get(f"/api/books/{book_id}/stages/review/candidates/{result['revision']}").json()
         ai = next(row for warning in candidate['warnings'] for row in warning['occurrences']
-                  if row.get('proposalStatus'))
-        assert ai['kind'] == 'ai-cleanup'
+                  if row.get('kind') == 'hyphenation')
+        assert ai['kind'] == 'hyphenation'
         assert sum(row['source'] == ai['source'] for w in candidate['warnings'] for row in w['occurrences']) == 1
-        assert ai['replacement'] == 'broken'
+        assert ai['hyphenChoices']['join-word'] == 'broken'
         policies = [{'warningId': row['id'], 'action': 'keep'} for row in candidate['warnings']
                     if row.get('decisionScope') != 'occurrence']
         preview = client.post(f'/api/books/{book_id}/review/transcript-preview', json={
             'revision': result['revision'], 'page': 1, 'policies': policies,
-            'occurrencePolicies': [{'occurrenceId': ai['id'], 'action': 'repair'}],
+            'occurrencePolicies': [{'occurrenceId': ai['id'], 'action': 'join-word'}],
         })
         assert preview.status_code == 200, preview.text
         assert any(row['text'] == 'A broken sign.' for row in preview.json()['spans'])
         choices = [{'occurrenceIds': [row['id']],
-                    'action': 'repair' if row.get('proposalStatus') == 'proposed' else 'keep'}
+                    'action': 'join-word' if row.get('kind') == 'hyphenation' else 'keep'}
                    for warning in candidate['warnings'] for row in warning['occurrences']]
         _accept(client, book_id, 'review', result['revision'], choices)
         accepted = read_artifact(tmp_path / 'packages' / book_id, 'review')

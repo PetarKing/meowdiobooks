@@ -136,7 +136,8 @@ def test_full_check_routes_flagged_only_preserves_source_and_emits_exact_edits(m
 @pytest.mark.parametrize("change", [
     proposal("hero", "villain"),
     {"action": "source_review", "edits": [], "reason": "Missing source words"},
-    {"action": "keep", "edits": [], "reason": "No clear safe edit"},
+    {"action": "keep", "edits": [{"before": "hero", "after": ""}], "reason": "Contradictory"},
+    {"action": "keep", "edits": [], "reason": 123},
 ])
 def test_flagged_but_unrepairable_windows_stay_visible(monkeypatch, change):
     monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(word_damage="uncertain"))
@@ -466,3 +467,63 @@ def test_explicit_registry_path_is_used_by_runner(monkeypatch, tmp_path):
     monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers())
     cleanup.run_cleanup_review(ROOT, *artifacts("Story."), lambda *a: None, models_path=tmp_path / "hosted.toml")
     assert recorded == [(ROOT, tmp_path / "hosted.toml")]
+
+
+@pytest.mark.parametrize("initial", ["review", "uncertain"])
+def test_valid_second_pass_keep_clears_flag_without_changing_source(monkeypatch, initial):
+    extraction, dialogue = artifacts("The contents were shared with her.")
+    before = deepcopy((extraction, dialogue))
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(production=initial))
+    monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": json.dumps(
+        {"action": "keep", "edits": [], "reason": "This is ordinary narrative prose."})})
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    assert result["occurrences"] == []
+    assert result["summary"]["sourceReview"] == result["summary"]["flaggedWindows"] == 0
+    assert result["windows"][0]["answers"]["production"] == initial
+    assert (extraction, dialogue) == before
+
+
+def _numbered_pages(label="Room"):
+    blocks = [{"id": str(i), "page": i, "text": f"They explored the building.\n{label} {i}"}
+              for i in range(1, 4)]
+    return ({"revision": "e1", "blocks": blocks}, {"revision": "d1", "spans": [
+        {"id": b["id"], "blockId": b["id"], "sourceStart": 0, "sourceEnd": len(b["text"]),
+         "source": b["text"], "renderRole": "narration"} for b in blocks]})
+
+
+def test_repeated_numbered_story_is_only_model_evidence_and_keep_retains_it(monkeypatch):
+    from meowdiobooks.backend.review import build_review_workspace
+    extraction, dialogue = _numbered_pages()
+    assert build_review_workspace(extraction, dialogue)["warnings"] == []
+    seen = []
+
+    def decide(_root, _config, prompt, *_args, **_kwargs):
+        payload = json.loads(prompt)
+        evidence = payload["structural_evidence"][0]
+        assert payload["TARGET"][evidence["targetStart"]:evidence["targetEnd"]].startswith("Room ")
+        assert evidence["distinctPageCount"] == 3
+        assert evidence["folioOffset"] == 0
+        assert evidence["firstPage"] == 1 and evidence["lastPage"] == 3
+        seen.append(payload)
+        return answers(production="review")
+
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
+    monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": json.dumps(
+        {"action": "keep", "edits": [], "reason": "Narrative room labels; retain them."})})
+    before = deepcopy((extraction, dialogue))
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    assert result["occurrences"] == [] and len(seen) == 3
+    assert (extraction, dialogue) == before
+
+
+def test_pattern_context_does_not_add_other_page_text_or_cross_spoken_boundaries():
+    extraction, dialogue = _numbered_pages("青空文庫")
+    windows = cleanup.cleanup_windows(extraction, dialogue)
+    for window in windows:
+        evidence = window["structuralEvidence"][0]
+        assert all(isinstance(v, int) for k, v in evidence.items() if k != "kind")
+        assert len(window["source"][evidence["targetStart"]:evidence["targetEnd"]]) > 0
+    for span in dialogue["spans"]:
+        span["spokenEnd"] = span["source"].index("\n")
+    limited = cleanup.cleanup_windows(extraction, dialogue)
+    assert all("structuralEvidence" not in window for window in limited)
