@@ -23,6 +23,18 @@ function mount(rows = examples, initialDecisions: DialogueCorrectionDecision[] =
 const accept = () => screen.getByRole('button', { name: 'Continue →' });
 
 describe('required dialogue review', () => {
+  it('puts ambiguous and narrator-fallback lines before confident AI assignments', () => {
+    mount([examples[0], examples[2], line('one-suggestion', { suggestedSpeakers: ['Rabbit'] }), examples[1]]);
+    expect(screen.getByText('“suggested”')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Alice' }));
+    expect(screen.getByText('“one-suggestion”')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Rabbit' }));
+    expect(screen.getByText('“unknown”')).toBeInTheDocument();
+    expect(accept()).toBeDisabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Narrator' }));
+    expect(screen.getByText('“agreed”')).toBeInTheDocument();
+  });
+
   it('does not count skips or inspecting other views as decisions', () => {
     const onAccept = mount();
     expect(accept()).toBeDisabled();
@@ -177,7 +189,7 @@ describe('required dialogue review', () => {
 
   it('resumes at the first unchecked line when earlier choices already exist', () => {
     mount(examples, [{ spanId: 'suggested', action: 'speaker', speakerLabel: 'Rabbit', provenance: 'user' }]);
-    expect(screen.getByText('“agreed”')).toBeInTheDocument();
+    expect(screen.getByText('“unknown”')).toBeInTheDocument();
     expect(screen.getByText('Line 2 of 3')).toBeInTheDocument();
     expect(accept()).toBeDisabled();
   });
