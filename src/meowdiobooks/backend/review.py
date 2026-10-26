@@ -24,6 +24,10 @@ class ReviewContractError(ValueError):
 
 
 WARNING_CONFIG: dict[str, dict[str, Any]] = {
+    "hyphenation": {
+        "severity": "warning",
+        "actions": ("keep-hyphen", "join-word"),
+    },
     "ai-cleanup": {
         "severity": "warning",
         "actions": ("keep", "exclude", "repair"),
@@ -206,6 +210,12 @@ def add_cleanup_proposals(
             if any(max(start, left) < min(end, right)
                    for left, right in bracket_ranges(block["text"])):
                 raise ReviewContractError("General cleanup cannot override protected bracketed content")
+        # Explicit hyphen choices own their range; a model must not supersede them.
+        if any(row.get("kind") == "hyphenation" and row["blockId"] == block["id"]
+               and max(start, row["sourceStart"]) < min(end, row["sourceEnd"])
+               for warning in workspace.get("warnings", [])
+               for row in warning.get("occurrences", [])):
+            continue
         replacement = proposal.get("replacement")
         if replacement is not None and not isinstance(replacement, str):
             raise ReviewContractError("Cleanup replacement must be text or null")
@@ -605,15 +615,30 @@ def _repair_text(span: Mapping[str, Any], edits: Sequence[Mapping[str, Any]]) ->
     return text
 
 
+def _hyphen_choices(source: str) -> dict[str, str]:
+    if _LINE_HYPHEN.fullmatch(source) is None:
+        raise ReviewContractError("Hyphen choice requires an exact line-wrapped word")
+    left, right = re.split(r"[-\u00ad][ \t\r]*\n[ \t]*", source)
+    return {"keep-hyphen": left + "-" + right, "join-word": left + right}
+
+
 def _accepted_repairs(review: Mapping[str, Any]) -> dict[str, Mapping[str, Any]]:
     occurrences = {str(row["id"]): row for warning in review.get("warningSnapshot", [])
                    for row in warning.get("occurrences", [])}
     result = {}
     for decision in review.get("decisions", []):
-        if decision.get("action") != "repair":
+        action = decision.get("action")
+        if action not in {"repair", "keep-hyphen", "join-word"}:
             continue
         key = str(decision["occurrenceId"])
         row = occurrences.get(key)
+        if action in {"keep-hyphen", "join-word"}:
+            if (row is None or row.get("kind") != "hyphenation"
+                    or action not in row.get("availableActions", [])
+                    or row.get("hyphenChoices") != _hyphen_choices(row["source"])):
+                raise ReviewContractError("Hyphen choice requires durable source evidence")
+            result[key] = {**row, "replacement": row["hyphenChoices"][action]}
+            continue
         if (row is None or row.get("proposalStatus") != "proposed"
                 or "repair" not in row.get("availableActions", [])
                 or not isinstance(row.get("replacement"), str)):
@@ -1012,12 +1037,18 @@ def _text_occurrences(
         is_last_block = block_id == siblings[-1]
         for match in _LINE_HYPHEN.finditer(text):
             occurrence = _from_match(
-                "suspicious-extraction", block, match,
+                "hyphenation", block, match,
                 "Possible line-wrapped word. Check the source before joining: a genuine "
                 "compound or interrupted speech must retain its hyphen. Do not exclude the word.",
             )
             occurrence["detectionRule"] = "line-wrap-hyphen"
-            result.append(occurrence)
+            # A repair must fit one spoken span so neither reader nor source ownership changes.
+            if any(str(span.get("blockId")) == block_id
+                   and int(span.get("spokenStart", span.get("sourceStart", 0))) <= match.start()
+                   and match.end() <= int(span.get("spokenEnd", span.get("sourceEnd", 0)))
+                   for span in spans):
+                occurrence["hyphenChoices"] = _hyphen_choices(match.group())
+                result.append(occurrence)
         for line_index, match in enumerate(lines):
             value = match.group(0)
             stripped = value.strip()
@@ -1542,7 +1573,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
-                        "occurrence" if kind == "ai-cleanup" or all(_is_verified_cue(row) for row in evidence_group) else
+                        "occurrence" if kind in {"ai-cleanup", "hyphenation"} or all(_is_verified_cue(row) for row in evidence_group) else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"
@@ -1645,7 +1676,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             "excluded"
             if action == "exclude"
             else "corrected"
-            if action == "repair"
+            if action in {"repair", "keep-hyphen", "join-word"}
             else "narrator"
             if action == "narrate"
             else "unchanged"
@@ -1658,7 +1689,7 @@ def _consequence(action: str, count: int) -> dict[str, Any]:
             else ["review", "cast", "script", "generate"]
             if action == "rerun-dialogue"
             else ["generate"]
-            if action in {"exclude", "narrate", "repair"}
+            if action in {"exclude", "narrate", "repair", "keep-hyphen", "join-word"}
             else []
         ),
     }

@@ -417,7 +417,7 @@
       ],
       "expected": [
         {
-          "kind": "suspicious-extraction",
+          "kind": "hyphenation",
           "source": "un-\nderstand"
         }
       ]
@@ -433,7 +433,7 @@
       ],
       "expected": [
         {
-          "kind": "suspicious-extraction",
+          "kind": "hyphenation",
           "source": "frag­\nment"
         }
       ]
@@ -449,7 +449,7 @@
       ],
       "expected": [
         {
-          "kind": "suspicious-extraction",
+          "kind": "hyphenation",
           "source": "well-\nknown"
         }
       ]

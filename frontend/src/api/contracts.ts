@@ -219,6 +219,8 @@ export interface DialogueArtifact {
 }
 
 export type ReviewCapability =
+  | "keep-hyphen"
+  | "join-word"
   | "repair"
   | "keep"
   | "exclude"
@@ -234,6 +236,7 @@ export interface WarningOccurrence {
   readerState?: "narrator" | "assigned-speaker" | "mixed";
   proposalStatus?: "proposed" | "source_review";
   cleanupReason?: string;
+  hyphenChoices?: Partial<Record<ReviewCapability, string>>;
   replacement?: string;
   availableActions?: ReviewCapability[];
   id: string;

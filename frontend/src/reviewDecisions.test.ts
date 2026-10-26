@@ -150,3 +150,27 @@ it("preserves only explicit continuous context metadata through normalization", 
   const [warning] = normalizeCandidateWarnings({ warnings: [{ ...cleanupWarning, occurrences: rows }] });
   expect(warning.occurrences.map((row) => row.contextLayout)).toEqual(["continuous", undefined, undefined]);
 });
+
+describe("explicit hyphen decisions", () => {
+  it("preserves both previews and serializes a separate spelling choice for each occurrence", async () => {
+    const [warning] = normalizeCandidateWarnings({ warnings: [{
+      id: "review:hyphenation", kind: "hyphenation", decisionScope: "occurrence", severity: "warning",
+      availableActions: ["keep-hyphen", "join-word"], occurrences: [{
+        id: "h1", source: "self-\nconfidence", page: 3,
+        hyphenChoices: { "keep-hyphen": "self-confidence", "join-word": "selfconfidence" },
+        availableActions: ["keep-hyphen", "join-word"],
+      }],
+    }] });
+    expect(reviewOccurrenceActions(warning, warning.occurrences[0])).toEqual(["keep-hyphen", "join-word"]);
+    expect(reviewActionTitle("keep-hyphen", warning)).toBe("Keep hyphen");
+    expect(reviewActionTitle("join-word", warning)).toBe("Join word");
+    expect(reviewConsequence("keep-hyphen", warning)).toBe("self-confidence");
+    expect(reviewConsequence("join-word", warning)).toBe("selfconfidence");
+    expect(reviewProposalDecisions(warning, {})).toEqual({});
+    expect(reviewWarningResolved(warning, {})).toBe(false);
+    expect(reviewWarningResolved(warning, { h1: "keep-hyphen" })).toBe(true);
+    expect(await buildReviewWarningDecisions("b", "r", [warning], { h1: "keep-hyphen" }, vi.fn())).toEqual([
+      { occurrenceIds: ["h1"], action: "keep-hyphen", provenance: "user" },
+    ]);
+  });
+});
