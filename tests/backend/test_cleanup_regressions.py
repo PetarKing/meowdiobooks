@@ -114,3 +114,13 @@ def test_numbered_edge_candidates_require_consistent_structural_evidence(mutatio
         for block in blocks:
             block["page"] = 1
     assert numbered_edge_candidates(blocks) == []
+
+
+def test_numbered_footer_evidence_keeps_ambiguous_resetting_top_counters():
+    # A footer's changing folio is not a deletion verdict; it does establish that
+    # the small top numeral might be a section counter instead of a second folio.
+    blocks = [{"id": str(i), "page": i,
+               "text": f"{1 + (i % 2)}\nUnique narrative sentence {i}.\n青空文庫 {i + 50}"}
+              for i in range(1, 5)]
+    extraction, dialogue = _artifacts({"blocks": blocks})
+    assert build_review_workspace(extraction, dialogue)["warnings"] == []

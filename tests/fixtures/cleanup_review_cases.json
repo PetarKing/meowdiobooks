@@ -21,20 +21,7 @@
           "text": "2\nThe story continues.\nFernMTLs 3"
         }
       ],
-      "expected": [
-        {
-          "kind": "page-number",
-          "source": "1"
-        },
-        {
-          "kind": "page-number",
-          "source": "2"
-        },
-        {
-          "kind": "page-number",
-          "source": "2"
-        }
-      ]
+      "expected": []
     },
     {
       "id": "numbered-edition-offset",

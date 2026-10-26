@@ -986,6 +986,9 @@ def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, An
 def _text_occurrences(
     blocks: Sequence[Mapping[str, Any]], spans: Sequence[Mapping[str, Any]]
 ) -> list[dict[str, Any]]:
+    # Repeated numbered footer evidence makes an isolated top numeral ambiguous
+    # (often a chapter-local counter). Preserve it without a second folio warning.
+    numbered_pages = {row["page"] for row in numbered_edge_candidates(blocks)}
     result = _footnote_occurrences(blocks)
     edge_lines: dict[str, list[tuple[Mapping[str, Any], int, int, str]]] = defaultdict(list)
     page_blocks: dict[int, list[str]] = defaultdict(list)
@@ -1045,7 +1048,10 @@ def _text_occurrences(
             is_edge = (is_first_block and line_index < 2) or (
                 is_last_block and line_index >= max(0, len(lines) - 2)
             )
-            if is_edge and _PAGE_NUMBER.fullmatch(stripped):
+            if (
+                is_edge and _PAGE_NUMBER.fullmatch(stripped)
+                and not (is_first_block and line_index < 2 and int(block["page"]) in numbered_pages)
+            ):
                 result.append(
                     _from_match("page-number", block, match, "Page-number-shaped edge line.")
                 )
