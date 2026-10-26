@@ -25,6 +25,8 @@ The artwork is generated with the built-in imagegen tool and encoded as a 539 KB
 
 Artwork never substitutes for names, acceptance state, source evidence or actual audio. Neutral primitives must not import direction artwork.
 
+Native chapter playback publishes chapter, book and author metadata through the browser's Media Session API when playback starts. Its artwork uses the original 512px reading-cat PNG rather than the 192px page favicon, so operating-system media surfaces receive the full-resolution brand mark. The browser owns the final lock-screen presentation and native playback controls. Opening an idle player does not claim the session; closing it clears only metadata that player still owns.
+
 ## Character avatars
 
 - Avatars represent cast identity; they do not replace names, roles, or acceptance state.
