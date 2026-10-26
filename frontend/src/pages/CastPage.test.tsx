@@ -50,7 +50,7 @@ describe("Voice design language confirmation", () => {
     ] });
     const { processStage } = await openVoiceDesign(fetchPreview, false);
     await screen.findByText("≈ €2.94");
-    expect(screen.getByRole("button", { name: /Create new voices/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Create new voices|Reuse voices/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Studio|Other provider|Technical provider details|Designed voices/)).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "Voice model" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "Narration language" }), { target: { value: "english" } });
