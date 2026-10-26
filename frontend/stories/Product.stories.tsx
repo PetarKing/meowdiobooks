@@ -31,6 +31,7 @@ export const ReviewBoundaries: Story = scenario("review-boundaries");
 export const ReviewFinal: Story = scenario("review-final");
 export const ReviewAccepted: Story = scenario("review-accepted");
 export const CastIdentities: Story = scenario("cast-identities");
+export const CastReuseReview: Story = scenario("cast-reuse-review");
 export const CastReviewStates: Story = scenario("cast-review-states");
 export const CastDense: Story = scenario("cast-dense");
 export const CastVoices: Story = scenario("cast-voices");

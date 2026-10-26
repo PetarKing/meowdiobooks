@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
-import type { WorkflowGateway, CastingPreview, SourceVoice, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
+import type { WorkflowGateway, CastArtifact, CastVoice, VoiceCandidate, VoiceRoute, VoiceSampleTranscript, VoiceSettings } from "../api/contracts";
 import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
 import { collectionMatches } from "./collectionSearch";
@@ -23,8 +23,6 @@ interface Props {
   onRegenerate: (characterId: string, settings: VoiceSettings) => void;
   onTranscribe?: (file: File) => Promise<VoiceSampleTranscript>;
   onUpload?: (characterId: string, file: File, referenceText: string) => void;
-  loadSourceVoices?: () => Promise<CastingPreview>;
-  onReuseVoice?: (characterId: string, source: SourceVoice) => void;
   /** Retained for host source compatibility; audition deletion has no UI control. */
   onDelete?: (characterId: string, revision: string) => void;
   regeneratingCharacterId?: string;
@@ -195,7 +193,7 @@ function audioTime(seconds: number) {
 }
 
 export function CastVoiceReview({
-  bookId, layeredVoicePreviewUrl, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, loadSourceVoices, onReuseVoice, regeneratingCharacterId, uploadingCharacterId,
+  bookId, layeredVoicePreviewUrl, cast, selections, routes, confirmedRoutes = {}, onRouteChange, onConfirmRoute, onApprove, onRegenerate, onTranscribe, onUpload, regeneratingCharacterId, uploadingCharacterId,
 }: Props) {
   const { t } = useTranslation();
   const voices = useMemo(
@@ -515,18 +513,19 @@ export function CastVoiceReview({
         const playing = playingTileId === voice.characterId;
         const sharedGroupId = sharedGroupFor(voice, selections);
         const sharedColor = sharedGroupId == null ? undefined : sharedGroupColors.get(sharedGroupId);
-        const statusLabel = t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : selected ? sharedGroupId ? "shared voice" : "voice selected" : required ? "audition required" : "not yet approved");
+        const priorBookApplied = !required && routeFor(voice, routes).kind === "dedicated" && tilePreviewFor(voice, selections)?.source === "previous-book";
+        const statusLabel = priorBookApplied ? t("From prior book") : t(routeFor(voice, routes).kind === "layered" ? selected ? "voices layered" : "confirm suggested voices" : selected ? sharedGroupId ? "shared voice" : "voice selected" : required ? "audition required" : "not yet approved");
         return <CastRosterCard
           key={voice.characterId}
           name={voice.name} symbol={isNarrator ? "N" : initials(voice.name)}
-          cardClassName={selected ? "is-approved" : required ? "is-required" : "is-pending"}
+          cardClassName={priorBookApplied ? "previous-book-match" : selected ? "is-approved" : required ? "is-required" : "is-pending"}
           portraitClassName={`portrait-tone-${Math.floor(stableHue(voice.characterId) / 90)} ${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required" : "voice-pending"}`}
           detailClassName={`${isNarrator ? "cast-narrator-tile" : ""} ${selected ? "voice-selected" : required ? "voice-required needs-review" : "voice-pending voice-default-ready"} ${sharedColor == null ? "" : `shared-voice shared-voice-${sharedColor}`}`}
           dataSharedVoiceGroup={sharedGroupId}
           style={sharedGroupId ? sharedVoiceStyles.get(sharedGroupId) : undefined}
           portraitContent={playing ? <span className="voice-tile-wave" aria-hidden="true"><i /><i /><i /><i /><i /><i /><i /></span> : undefined}
           portraitCue={previewUrl && !playing ? <span className="voice-tile-play-cue" aria-hidden="true"><PlaybackIcon /></span> : undefined}
-          badge={!selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
+          badge={priorBookApplied ? <span className="previous-book-badge">{t("From prior book")}</span> : !selected && <span className={`cast-review-badge voice-tile-alert ${required ? "required" : "advisory pending"}`}><b>{t(required ? routeFor(voice, routes).kind === "layered" ? "Confirm layered voices" : "Audition required" : "Not yet approved")}</b></span>}
           detail={voice.category === "group" ? t(label(voice.category)) : undefined}
           previewProps={{ "aria-label": t("{{action}} {{name}} preview", { action: t(playing ? "Stop" : "Play"), name: voice.name }), "aria-pressed": playing, disabled: !previewUrl, onClick: () => toggleTilePreview(voice) }}
           inspectRef={(element) => { tileRefs.current[voice.characterId] = element; }}
@@ -595,11 +594,10 @@ export function CastVoiceReview({
               const applied = candidate.revision === approvedRevision;
               const selected = candidate.revision === chosenVoiceRevision(inspected, selections);
               const playingCandidate = playingCandidateRevision === candidate.revision;
-              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${selected ? "applied selected" : ""}`}>
+              return <article key={candidate.revision} className={`voice-candidate-tile ${candidate.source === "previous-book" ? "previous-book-derived" : ""} ${candidate.source === "upload" ? "sample-derived" : ""} ${candidate.source === "shared" ? "shared-derived" : ""} ${selected ? "applied selected" : ""}`}>
                 <div className="voice-candidate-actions">
                   <button type="button" className="voice-candidate-choice" aria-label={t("Apply Audition {{number}}", { number })} aria-pressed={selected} onClick={() => onApprove(inspected.characterId, candidate.revision)}>
-                    <span><b>{t("Audition {{number}}", { number })}</b><small>{t(candidate.source === "upload" ? "From your sample" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest audition" : "Earlier audition")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
-                    {selected && !applied && <small>{t("Default audition")}</small>}
+                    <span><b>{t("Audition {{number}}", { number })}</b><small className={candidate.source === "previous-book" ? "previous-book-caption" : undefined}>{t(candidate.source === "previous-book" ? "From prior book" : candidate.source === "upload" ? "From your sample" : candidate.source === "shared" ? "Shared voice" : candidate.revision === inspected.voicePreviewRevision ? "Newest audition" : "Earlier audition")}</small><span className="voice-candidate-summary">{candidateSummary(candidate, t)}</span></span>
                     {applied && <strong className="candidate-applied-badge"><span aria-hidden="true">✓</span><span className="visually-hidden">{t("✓ Applied")}</span></strong>}
                   </button>
                 </div>
@@ -656,7 +654,6 @@ export function CastVoiceReview({
                 {t(regeneratingCharacterId === inspected.characterId ? "Creating audition…" : "Generate new audition →")}
               </button>
             </div></>}
-            {loadSourceVoices && onReuseVoice && <ExistingVoiceChoice key={inspected.characterId} load={loadSourceVoices} busy={regeneratingCharacterId === inspected.characterId} onChoose={(source) => { rememberAuditionSubmission(); onReuseVoice(inspected.characterId, source); }} />}
             {auditionSource === "sample" && onUpload && <div className="voice-sample-panel">
               <div><b>{t("Generate this line in the sampled voice")}</b><p>{t("voiceSample.help", { ns: "edition" })}</p></div>
               {!sampleFile && <label className={`voice-sample-upload ${uploadingCharacterId === inspected.characterId ? "busy" : ""}`}>
@@ -711,30 +708,6 @@ function VoiceSelect<K extends keyof Pick<VoiceSettings, "presentation" | "age" 
   return <label>{title}<span className="voice-select-control"><select aria-label={title} value={value} onChange={(event) => onChange(event.target.value as VoiceSettings[K])}>{values.map((option) => <option key={option} value={option}>{t(label(option))}</option>)}</select><span aria-hidden="true">{t(label(value))}</span></span><input type="hidden" name={field} value={value} /></label>;
 }
 
-
-function ExistingVoiceChoice({ load, busy, onChoose }: { load: () => Promise<CastingPreview>; busy: boolean; onChoose: (source: SourceVoice) => void }) {
-  const { t } = useTranslation();
-  const [sources, setSources] = useState<CastingPreview["sources"]>();
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [selection, setSelection] = useState("");
-  function fetchSources() {
-    setLoading(true); setFailed(false);
-    void load().then((result) => setSources(result.sources)).catch(() => setFailed(true)).finally(() => setLoading(false));
-  }
-  return <details className="existing-voice-choice" onToggle={(event) => { if (event.currentTarget.open && !sources && !loading && !failed) fetchSources(); }}>
-    <summary>{t("Use a voice from another book")}</summary>
-    {loading && <small role="status">{t("Loading voices…")}</small>}
-    {failed && <div role="alert">{t("Couldn’t load voices.")} <button type="button" onClick={fetchSources}>{t("Retry")}</button></div>}
-    {sources && (sources.some((source) => source.voices?.length) ? <div className="joined-control">
-      <select aria-label={t("Existing voice")} value={selection} onChange={(event) => setSelection(event.target.value)} disabled={busy}>
-        <option value="">{t("Choose a voice")}</option>
-        {sources.map((source) => <optgroup key={source.bookId} label={source.title}>{source.voices?.map((voice) => <option key={`${voice.characterId}:${voice.revision}`} value={JSON.stringify({ bookId: source.bookId, characterId: voice.characterId, revision: voice.revision })}>{voice.name}</option>)}</optgroup>)}
-      </select>
-      <button type="button" disabled={!selection || busy} onClick={() => onChoose(JSON.parse(selection) as SourceVoice)}>{t(busy ? "Copying…" : "Use voice")}</button>
-    </div> : <small>{t("No compatible voices in other books.")}</small>)}
-  </details>;
-}
 
 /** Fixed geometry keeps playback marks aligned across platforms and typefaces. */
 function PlaybackIcon({ state = "play" }: { state?: "play" | "stop" | "pause" }) {

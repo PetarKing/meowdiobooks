@@ -299,7 +299,8 @@ export interface VoiceCandidate {
   referenceAudio?: string;
   direction: string;
   voiceSettings?: VoiceSettings;
-  source?: "generated" | "upload" | "shared";
+  source?: "generated" | "upload" | "shared" | "previous-book";
+  previousBookTitle?: string;
   sharedVoiceGroupId?: string;
   referenceMode?: "transcript-conditioned" | "speaker-embedding";
   durationSeconds?: number;
@@ -339,6 +340,8 @@ export interface CastVoice {
 }
 
 export interface CastArtifact {
+  /** Read-only exact-label matches, supplied by the composition. */
+  previousVoiceMatches?: Record<string, { bookTitle: string }>;
   revision: string;
   phase: "identity-review" | "audition-review" | "accepted";
   reusedFromRevision?: string;

@@ -76,3 +76,7 @@
   .cast-drag-scroll-cue.down { bottom: 68px; }
   .cast-merge-undo { right: 14px; bottom: 84px; max-width: calc(100vw - 28px); }
 }
+
+/* Match provenance uses the same plain treatment as review suggestions. */
+.previous-book-badge { display: inline-flex; align-items: baseline; gap: 4px; color: inherit; font: inherit; }
+.previous-book-badge::before { content: "↶"; }

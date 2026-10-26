@@ -46,6 +46,7 @@ export type CastFixtureVariant =
   | "layered"
   | "layered-confirmed"
   | "missing-audition"
+  | "reuse-review"
   | "review-spectrum-identities"
   | "voice-design";
 
@@ -616,6 +617,7 @@ const baselineScenarioMetadata = {
 
 /** Failure and recovery variants use the same real pages and in-memory gateway. */
 export const scenarioMetadata = {
+  "cast-reuse-review": { ...baselineScenarioMetadata["cast-review-states"], label: "Cast · prior voices and required review", description: "Mandatory and optional review labels precede prior-book provenance.", castFixture: "reuse-review" },
   ...baselineScenarioMetadata,
   "home-shelf": { ...baselineScenarioMetadata.home, label: "Create · six local books", description: "Responsive shelf of six synthetic local drafts.", gatewayVariant: "home-shelf" },
   "generate-long-book": { ...baselineScenarioMetadata.generate, label: "Generate · 120 chapters", description: "A long synthetic book for tracklist selection, estimates and listening.", snapshotVariant: "generate-long-book" },

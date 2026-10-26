@@ -14,7 +14,8 @@ describe('synthetic review gateway', () => {
     const draft = await gateway.getStageCandidate('kit-book', 'cast', first.result!.revision!);
     const voice = draft.identities!.find(row => row.characterId === characterId)!;
     const earlier = accepted.cast!.identities![0].voiceCandidates!;
-    expect(earlier).toHaveLength(3);
+    expect(earlier).toHaveLength(4);
+    expect(earlier[0].source).toBe("previous-book");
     expect(voice.voiceCandidates).toHaveLength(earlier.length + 1);
     expect(voice.voiceCandidates!.slice(0, earlier.length)).toEqual(earlier);
     expect(voice.voicePreviewRevision).not.toBe(accepted.cast!.identities![0].voicePreviewRevision);

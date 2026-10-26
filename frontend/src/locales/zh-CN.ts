@@ -1,4 +1,7 @@
 const zhCN: Record<string, string> = {
+  "Must review": "必须检查",
+  "Should review": "建议检查",
+  "From prior book": "来自先前书籍",
   "MP3": "MP3",
   "One file with all selected chapters": "所有选定章节合并为一个文件",
   "A widely compatible audiobook, ready to play.": "兼容多种播放器，下载即可收听。",

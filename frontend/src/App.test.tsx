@@ -2688,7 +2688,7 @@ describe('v2 wizard', () => {
       expect.objectContaining({ language: 'english', castingPreviewFingerprint: 'initial-english-quote' })))
   })
 
-  it('uses host casting choices and submits selected sources only on Continue', async () => {
+  it('uses host casting estimates without legacy source selection', async () => {
     const snapshot: WizardSnapshot = { ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
       castingPreviewAvailable: true,
@@ -2715,46 +2715,17 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('region', { name: 'Cast members' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
     expect(screen.getByRole('combobox', { name: 'Narration language' })).toHaveValue('english')
-    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
-    fireEvent.click(screen.getByRole('checkbox', { name: /Earlier book/ }))
+    await screen.findByText('≈ €0.00')
+    expect(screen.queryByRole('button', { name: /Reuse voices/ })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
     fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
     fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
     expect(screen.getByRole('button', { name: 'Continue →' })).toBeDisabled()
-    expect(await screen.findByRole('checkbox', { name: /Earlier book/ })).toBeChecked()
+    expect(screen.queryByRole('checkbox', { name: /Earlier book/ })).not.toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Continue →' })).toBeEnabled())
     expect(wizardApi.processStage).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Continue →' }))
-    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({ sourceBookIds: ['earlier'], castingPreviewFingerprint: 'preview-bound' })))
-  })
-
-  it('allows reuse as the only cast edit and clears it when those edits are cancelled', async () => {
-    const snapshot: WizardSnapshot = { ...base,
-      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue', 'review'] },
-      castingPreviewAvailable: true,
-      cast: { ...base.cast!, phase: 'audition-review', language: 'english', voiceModel: 'qwen' },
-    }
-    vi.mocked(wizardApi.previewCasting!).mockResolvedValue({
-      sources: [{ bookId: 'earlier', title: 'Earlier book', voiceCount: 2 }],
-      fingerprint: 'edit-reuse', exactMatchCount: 1, totalVoiceCount: 1, remainingVoiceCount: 0, currency: 'EUR',
-      options: [{ modelId: 'qwen', label: 'Studio', description: 'Expressive voices', estimatedCostMinor: 0 }],
-    })
-    await open(snapshot)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Cast & voices'))
-    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
-    expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeDisabled()
-    fireEvent.click(screen.getByRole('checkbox', { name: /Earlier book/ }))
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeEnabled())
-    fireEvent.click(screen.getByRole('button', { name: '← Back to cast' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Cancel cast edits' }))
-    fireEvent.click(screen.getByRole('button', { name: '← Edit cast' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Design the voices →' }))
-    fireEvent.click(await screen.findByRole('button', { name: /Reuse voices/ }))
-    expect(screen.getByRole('checkbox', { name: /Earlier book/ })).not.toBeChecked()
-    expect(screen.getByRole('button', { name: 'Apply cast edits →' })).toBeDisabled()
-    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'cast', expect.objectContaining({ sourceBookIds: [], castingPreviewFingerprint: 'preview-bound' })))
   })
 
   it('resumes enhanced voice design with the saved explicit language', async () => {
@@ -3625,10 +3596,10 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: 'Generate required auditions →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Inspect Alice' }))
     const identityDialog = screen.getByRole('dialog', { name: 'Inspect Alice' })
-    expect(identityDialog).toHaveTextContent('Review suggested')
+    expect(identityDialog).toHaveTextContent('Should review')
     expect(identityDialog).toHaveTextContent('Optional check')
     expect(within(identityDialog).queryByRole('button', { name: /Confirm/ })).not.toBeInTheDocument()
-    expect(screen.getByText('Cast structure is ready')).toBeInTheDocument()
+    expect(screen.queryByText('Cast structure is ready')).not.toBeInTheDocument()
   })
 
   it('blocks auditions until an AI-created multi-label identity is confirmed', async () => {
@@ -3779,7 +3750,7 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('button', { name: 'Accept cast & voices →' })).not.toBeInTheDocument()
   })
 
-  it('warns before defaulting only unapproved voices and preserves an approved earlier revision', async () => {
+  it('warns before defaulting only unapproved prior-book voices and preserves an approved earlier revision', async () => {
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import','extract','dialogue','review'] },
@@ -3795,7 +3766,7 @@ describe('v2 wizard', () => {
         identities: [{
           characterId: 'alice', name: 'Alice', voicePreviewRevision: 'av2', previewUrl: '/a2.wav', referenceText: 'Newest Alice.',
           voiceCandidates: [
-            { revision: 'av1', previewUrl: '/a1.wav', referenceText: 'Earlier Alice.', direction: 'Gentle.' },
+            { revision: 'av1', previewUrl: '/a1.wav', referenceText: 'Earlier Alice.', direction: 'Gentle.', source: 'previous-book' },
             { revision: 'av2', previewUrl: '/a2.wav', referenceText: 'Newest Alice.', direction: 'Bright.' },
           ],
         }],
@@ -3811,6 +3782,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(narratorDialog).getByRole('button', { name: 'Close voice' }))
     fireEvent.animationEnd(narratorDialog)
 
+    expect(screen.getByRole('button', { name: 'Open Alice voice' })).toHaveTextContent('From prior book')
     fireEvent.click(screen.getByRole('button', { name: 'Accept cast & voices →' }))
     const warning = screen.getByRole('dialog', { name: 'Approve 1 remaining voice?' })
     expect(warning).toHaveTextContent('Continuing approves the default audition for Alice and accepts the full cast.')
