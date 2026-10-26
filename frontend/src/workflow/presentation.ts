@@ -150,6 +150,7 @@ const audioExportBitrates: Record<AudioExportPreset, number> = {
   "m4b-high": 128,
   "m4b-compact": 64,
   "mp3-chapters": 96,
+  "mp3": 96,
 };
 
 export function estimatedAudioExportBytes(seconds: number, preset: AudioExportPreset) {
@@ -160,6 +161,7 @@ export function formatLibraryExport(item: LibraryExport, t: TFunction) {
   const preset = item.preset ?? (item.filename.toLowerCase().endsWith(".zip") ? "mp3-chapters" : "m4b-high");
   if (preset === "m4b-compact") return t("Smaller M4B");
   if (preset === "mp3-chapters") return t("MP3 chapters");
+  if (preset === "mp3" || item.filename.toLowerCase().endsWith(".mp3")) return t("MP3");
   return t("High-quality M4B");
 }
 

@@ -488,7 +488,7 @@ export interface Job {
 
 export interface M4BExportChapter { chapterId: string; revision: string }
 export interface M4BExportOptions { title?: string; author?: string; description?: string; cover?: File; coverPage?: number }
-export type AudioExportPreset = "m4b-high" | "m4b-compact" | "mp3-chapters";
+export type AudioExportPreset = "m4b-high" | "m4b-compact" | "mp3" | "mp3-chapters";
 export interface AudioExportOptions extends M4BExportOptions { preset: AudioExportPreset }
 export interface M4BDownload { blob: Blob; filename: string }
 export interface LibraryExport {

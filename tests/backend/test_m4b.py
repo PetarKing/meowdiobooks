@@ -85,6 +85,8 @@ def test_package_m4b_reports_the_optional_dependency(tmp_path, monkeypatch):
 
 
 def test_export_filename_marks_partial_books_and_removes_path_characters():
+    assert export_filename("My / Cat: Book", partial=False, preset=AudioExportPreset.MP3) == "My Cat Book.mp3"
+    assert export_filename("My / Cat: Book", partial=True, preset=AudioExportPreset.MP3) == "My Cat Book - selected chapters.mp3"
     assert export_filename("My / Cat: Book", partial=False) == "My Cat Book.m4b"
     assert export_filename("My / Cat: Book", partial=True) == "My Cat Book - selected chapters.m4b"
     assert export_filename(
@@ -327,3 +329,52 @@ def test_real_ffmpeg_mp3_zip_contains_playable_tagged_chapters(tmp_path):
         assert any(
             stream.get("disposition", {}).get("attached_pic") == 1 for stream in payload["streams"]
         )
+
+
+@pytest.mark.skipif(not shutil.which('ffmpeg') or not shutil.which('ffprobe'), reason='FFmpeg required')
+@pytest.mark.parametrize('chapter_count', [1, 2])
+def test_direct_mp3_is_playable_with_book_title_cover_and_all_chapters(tmp_path, chapter_count):
+    from meowdiobooks.backend.documents import render_default_cover
+
+    chapters = []
+    for index in range(chapter_count):
+        audio = tmp_path / f'{index}.wav'
+        _wav(audio, 1.0)
+        chapters.append(M4BChapter(f'ch-{index}', f'Chapter {index}', audio))
+    output = tmp_path / export_filename('The Listening Book', partial=False, preset=AudioExportPreset.MP3)
+    package_audio_export(chapters, output, title='The Listening Book', author='Test Author',
+                         description='A test audiobook', cover=render_default_cover(tmp_path),
+                         preset=AudioExportPreset.MP3)
+    assert not zipfile.is_zipfile(output)
+    probe = subprocess.run(['ffprobe', '-v', 'error', '-show_chapters', '-show_streams', '-show_format', '-of', 'json', str(output)], check=True, capture_output=True, text=True)
+    metadata = json.loads(probe.stdout)
+    assert metadata['format']['format_name'] == 'mp3'
+    assert metadata['format']['tags']['title'] == 'The Listening Book'
+    assert metadata['format']['tags']['album'] == 'The Listening Book'
+    assert metadata['format']['tags']['artist'] == 'Test Author'
+    assert float(metadata['format']['duration']) == pytest.approx(chapter_count, abs=0.1)
+    assert [row['tags']['title'] for row in metadata['chapters']] == [row.title for row in chapters]
+    assert any(row['disposition']['attached_pic'] == 1 for row in metadata['streams'])
+    subprocess.run(['ffmpeg', '-v', 'error', '-i', str(output), '-map', '0:a:0', '-f', 'null', '-'], check=True, capture_output=True)
+
+
+@pytest.mark.parametrize('failure', ['timeout', 'encoder', 'empty'])
+def test_direct_mp3_never_returns_a_partial_or_empty_file(tmp_path, failure):
+    audio = tmp_path / 'chapter.wav'
+    _wav(audio, 1)
+    cover = tmp_path / 'cover.png'
+    cover.write_bytes(b'cover')
+    output = tmp_path / 'Book.mp3'
+
+    def run(command, **options):
+        if failure == 'empty':
+            return
+        output.write_bytes(b'partial')
+        if failure == 'timeout':
+            raise subprocess.TimeoutExpired(command, options['timeout'])
+        raise subprocess.CalledProcessError(1, command, stderr=b'failed')
+
+    with pytest.raises(M4BExportError):
+        package_audio_export([M4BChapter('c1', 'Chapter', audio)], output, title='Book', author='Author',
+                             cover=cover, preset=AudioExportPreset.MP3, ffmpeg='ffmpeg', command_runner=run)
+    assert not output.exists()

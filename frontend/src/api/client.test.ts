@@ -419,10 +419,10 @@ describe('HttpWizardApi', () => {
 
   it('creates the selected audio export without downloading its body', async () => {
     const exported = {
-      id: 'export-zip', bookId: 'book-1', title: 'A Cat', author: 'Maou',
-      filename: 'A Cat - MP3 chapters.zip', location: '/library/A Cat - MP3 chapters.zip',
-      chapterCount: 1, partial: false, sizeBytes: 39_073_505, preset: 'mp3-chapters',
-      mediaType: 'application/zip', createdAt: '2026-07-19T19:01:26Z',
+      id: 'export-mp3', bookId: 'book-1', title: 'A Cat', author: 'Maou',
+      filename: 'A Cat.mp3', location: '/library/A Cat.mp3',
+      chapterCount: 1, partial: false, sizeBytes: 39_073_505, preset: 'mp3',
+      mediaType: 'audio/mpeg', createdAt: '2026-07-19T19:01:26Z',
     }
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(exported), {
       status: 201,
@@ -432,7 +432,7 @@ describe('HttpWizardApi', () => {
 
     const result = await new HttpWizardApi('/api').createAudioExport('book-1', [
       { chapterId: 'chapter-1', revision: 'render-1' },
-    ], { preset: 'mp3-chapters', title: 'A Cat', description: '' })
+    ], { preset: 'mp3', title: 'A Cat', description: '', coverPage: 0 })
 
     expect(result).toEqual(exported)
     expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/exports/audio', expect.objectContaining({
@@ -441,7 +441,8 @@ describe('HttpWizardApi', () => {
     }))
     const request = fetchMock.mock.calls[0][1] as RequestInit
     const body = request.body as FormData
-    expect(body.get('preset')).toBe('mp3-chapters')
+    expect(body.get('preset')).toBe('mp3')
+    expect(body.get('coverPage')).toBe('0')
     expect(body.has('description')).toBe(true)
     expect(body.get('description')).toBe('')
   })

@@ -318,7 +318,7 @@ export class HttpWizardApi implements WorkflowGateway {
     if (options.author) body.append("author", options.author);
     if (options.description !== undefined) body.append("description", options.description);
     if (options.cover) body.append("cover", options.cover);
-    if (options.coverPage) body.append("coverPage", String(options.coverPage));
+    if (options.coverPage !== undefined) body.append("coverPage", String(options.coverPage));
     if ("preset" in options) body.append("preset", (options as AudioExportOptions).preset);
     const response = await this.fetcher(`${this.baseUrl}/books/${bookId}/exports/${endpoint}`, {
       method: "POST",

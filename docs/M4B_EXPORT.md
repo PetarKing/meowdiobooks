@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Meowdiobooks can package a completed generation run as a chaptered M4B or an ordered ZIP of MP3
+Meowdiobooks can package a completed generation run as a chaptered M4B or one MP3 containing the selected
 chapters. Export is a presentation step over existing immutable chapter revisions; it never regenerates
 speech or changes an accepted source, cast, recording script, or render.
 
@@ -18,7 +18,9 @@ Wizard Step 6, **Export**, unlocks after at least one chapter finishes successfu
 - The default `m4b-high` result uses 128 kbps AAC in an M4B container with one seekable chapter marker
   per chapter.
 - `m4b-compact` uses the same M4B structure at 64 kbps AAC.
-- `mp3-chapters` creates a ZIP with one ordered, tagged 96 kbps mono MP3 per selected chapter.
+- `mp3` creates one directly downloadable 96 kbps mono MP3, named and tagged with the book title.
+  Selected chapters are concatenated in book order; ID3 chapter markers are included, although player support varies.
+- Legacy `mp3-chapters` API requests and saved ZIP downloads remain supported.
 - The UI shows an approximate size for every preset based on selected audio duration. Cover and
   container overhead mean the final size can differ slightly.
 
@@ -39,8 +41,10 @@ Title and author use this precedence:
 5. `Meowdiobooks` for a missing author.
 
 Cover art uses the selected PDF page, defaulting to page 1, or an optional PNG, JPEG or WebP selected
-in Export and limited to 20 MB. If that page cannot be rendered, export falls back to the square
-Meowdiobooks artwork shipped with the application. Export-only metadata and cover choices never alter
+in Export and limited to 20 MB. Selecting “Use default cover” (`coverPage: 0`) uses the built-in book-and-headphones artwork.
+Text and EPUB sources use this artwork by default; removing a custom image restores the selected
+PDF page or default cover. Local PDF-render failures also use this artwork; a host processor rejection
+still fails closed. The default artwork is deterministic and requires no image-model call. Export-only metadata and cover choices never alter
 the source PDF, generated WAVs or accepted artifacts.
 
 The optional description is limited to 2,000 characters and is saved in Library metadata and
@@ -73,9 +77,9 @@ brew install ffmpeg
 ```
 
 M4B export uses FFmpeg's concat demuxer, `ffmetadata`, AAC encoding, attached cover art, and MP4
-fast-start metadata. MP3 export encodes each chapter with `libmp3lame`, writes ID3v2 title, album,
-artist, track, genre, and cover metadata, then stores the already-compressed MP3s in book order without
-redundant ZIP recompression. It runs locally and receives only paths inside the selected book package
+fast-start metadata. Direct MP3 export uses the same ordered concat input with `libmp3lame`, ID3v2 book title, album,
+artist, description, chapter markers and cover metadata. The legacy chapter ZIP path still encodes
+and tags each chapter separately, without redundant ZIP recompression. It runs locally and receives only paths inside the selected book package
 or application assets.
 
 ## Validation and failure behavior
