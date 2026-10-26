@@ -12,17 +12,34 @@ function comparisonKey(value: string) {
   return value.trim().toLocaleLowerCase();
 }
 
+// Only waive review for existing groups whose names form one nested chain.
+// Whole tokens avoid accidental matches such as Ann / Anna; pairwise nesting
+// avoids accepting John Smith / Jane Smith merely because both include Smith.
+function hasNestedLabels(labels: string[]) {
+  const names = labels.map((label) =>
+    comparisonKey(label.normalize("NFKC")).split(/\s+/u),
+  ).sort((left, right) => left.length - right.length);
+  return names.every((shorter, index) => {
+    if (!shorter.some(Boolean)) return false;
+    if (index === names.length - 1) return true;
+    const longer = names[index + 1];
+    return longer.some((_, start) =>
+      shorter.every((token, offset) => token === longer[start + offset]),
+    );
+  });
+}
+
 export function strongConfirmationLabelsForCast(
   cast: CastArtifact,
   decisions: Record<string, IdentityDecision>,
 ) {
-  const groupSizes = new Map<string, number>();
+  const groups = new Map<string, string[]>();
   for (const proposal of cast.proposals) {
     const decision = decisions[proposal.label];
     const category = decision?.category ?? proposal.category;
     const anchor = decision?.primaryLabel || proposal.label;
     const key = `${category}:${comparisonKey(anchor)}`;
-    groupSizes.set(key, (groupSizes.get(key) ?? 0) + 1);
+    groups.set(key, [...(groups.get(key) ?? []), proposal.label]);
   }
   return cast.proposals.filter((proposal) => {
     if (!proposal.reviewRequired) return false;
@@ -30,6 +47,7 @@ export function strongConfirmationLabelsForCast(
     const category = decision?.category ?? proposal.category;
     const anchor = decision?.primaryLabel || proposal.label;
     const key = `${category}:${comparisonKey(anchor)}`;
-    return category !== "character" || (groupSizes.get(key) ?? 0) > 1;
+    const labels = groups.get(key) ?? [];
+    return category !== "character" || (labels.length > 1 && !hasNestedLabels(labels));
   }).map((proposal) => proposal.label);
 }
