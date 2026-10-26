@@ -28,8 +28,12 @@ from .remote_llm import (
 from .workflow.runtime import ProgressReporter
 from .script_cues import bracket_ranges, review_script_directions
 from .review import numbered_edge_candidates
+from .cleanup_patterns import (
+    PATTERN_VERIFY_SCHEMA, PATTERN_VERIFY_SYSTEM, pattern_prompt, pattern_verdict,
+    representative_windows, split_pattern_windows,
+)
 
-POLICY_ID = "decisions-luna-cleanup-v2"
+POLICY_ID = "decisions-luna-cleanup-v3"
 MAX_WINDOW_CHARACTERS = 1200
 MAX_CONTEXT_CHARACTERS = 180
 MAX_WORKERS = MAX_DECISIONS_REQUESTS
@@ -189,7 +193,8 @@ def cleanup_windows(extraction: Mapping[str, Any], dialogue: Mapping[str, Any]) 
             if window["sourceStart"] <= row["sourceStart"] < row["sourceEnd"] <= window["sourceEnd"]]
         if evidence:
             window["structuralEvidence"] = evidence
-    return windows
+    return split_pattern_windows(windows, [row for group in candidates.values() for row in group],
+                                 spans, context_limit=MAX_CONTEXT_CHARACTERS)
 
 
 def _prompt(window: Mapping[str, Any]) -> str:
@@ -330,8 +335,13 @@ def run_cleanup_review(
                 usage_observer=usage_observer, request_admission=admission,
             )
         answers = _answers(response)
+        if window.get("patternGroupId") and answers["word_damage"] == "clean":
+            return {"windowId": window["windowId"], "answers": answers, "occurrences": [],
+                    "patternStatus": "eligible" if answers["production"] == "review" else "vetoed"}
         if all(value == "clean" for value in answers.values()):
             return {"windowId": window["windowId"], "answers": answers, "occurrences": []}
+        # A mechanical defect follows the ordinary individually validated repair path.
+        window = {key: value for key, value in window.items() if key != "patternGroupId"}
         with request_slot("repair", poll_cancelled):
             result = remote_chat_completion(
                 repo_root, repair_config, _REPAIR_SYSTEM, _prompt(window),
@@ -402,6 +412,47 @@ def run_cleanup_review(
     if len(by_id) != len(windows):
         raise CleanupReviewError("The cleanup review did not process every source window.")
     ordered = [by_id[window["windowId"]] for window in windows]
+    pattern_groups = []
+    families: dict[str, list[dict[str, Any]]] = {}
+    for window in windows:
+        if window.get("patternGroupId"):
+            families.setdefault(window["patternGroupId"], []).append(window)
+    for group_id, members in families.items():
+        eligible = [window for window in members if by_id[window["windowId"]].get("patternStatus") == "eligible"]
+        representatives = representative_windows(eligible)
+        group = {"patternGroupId": group_id, "candidateCount": len(members),
+                 "eligibleCount": len(eligible),
+                 "eligibleWindowIds": [row["windowId"] for row in eligible],
+                 "representativeWindowIds": [row["windowId"] for row in representatives],
+                 "vetoes": [{"windowId": row["windowId"], "answers": by_id[row["windowId"]]["answers"]}
+                            for row in members if row not in eligible]}
+        if len(eligible) < 3:
+            group.update(verdict="insufficient", reason="Fewer than three contextually eligible footer instances.")
+        else:
+            checkpoint(96, "Checking repeated page matter in context")
+            with request_slot("repair", poll_cancelled):
+                verification = remote_chat_completion(
+                    repo_root, repair_config, PATTERN_VERIFY_SYSTEM, pattern_prompt(representatives),
+                    max_completion_tokens=1000, response_schema=PATTERN_VERIFY_SCHEMA,
+                    usage_observer=usage_observer, request_admission=admission,
+                )
+            try:
+                response = json.loads(verification["text"])
+            except (KeyError, ValueError, TypeError):
+                response = None
+            verdict, reason = pattern_verdict(response, representatives)
+            group.update(verdict=verdict, reason=reason, verification=response)
+            if verdict == "verified":
+                for window in eligible:
+                    by_id[window["windowId"]]["occurrences"] = [{
+                        **window, "replacement": "", "reason": reason,
+                        "proposalStatus": "proposed", "patternVerification": "verified",
+                        "model": repair_config.model, "policy": POLICY_ID,
+                    }]
+        for window in members:
+            by_id[window["windowId"]]["patternGroupId"] = group_id
+            by_id[window["windowId"]]["patternVerdict"] = group["verdict"]
+        pattern_groups.append(group)
     occurrences = [row for result in ordered for row in result["occurrences"]]
     script_directions = review_script_directions(
         repo_root, extraction, dialogue, (decisions_config, repair_config), checkpoint,
@@ -410,12 +461,18 @@ def run_cleanup_review(
     report(99, "Luna cleanup proposals are ready for review")
     return {
         "scriptDirections": script_directions,
+        "patternGroups": pattern_groups,
         "occurrences": occurrences,
         "summary": {
             "model": repair_config.model, "policy": POLICY_ID, "inputWindows": len(windows),
             "flaggedWindows": sum(bool(result["occurrences"]) for result in ordered),
             "proposals": sum(row["proposalStatus"] == "proposed" for row in occurrences),
             "sourceReview": sum(row["proposalStatus"] == "source_review" for row in occurrences),
+            "patternGroups": len(pattern_groups),
+            "patternVerifiedGroups": sum(group["verdict"] == "verified" for group in pattern_groups),
+            "patternPreservedWindows": sum(bool(row.get("patternGroupId")) and not row["occurrences"]
+                                           for row in ordered),
         },
-        "windows": [{"windowId": row["windowId"], "answers": row["answers"]} for row in ordered],
+        "windows": [{key: row[key] for key in ("windowId", "answers", "patternGroupId", "patternVerdict", "patternStatus")
+                     if key in row} for row in ordered],
     }

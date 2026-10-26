@@ -184,6 +184,8 @@ def add_cleanup_proposals(
     index = {str(block["id"]): block for block in blocks}
     cue_rows = _verified_script_occurrences(blocks, dialogue, result.get("scriptDirections", {}))
     rows = []
+    pattern_candidates = {(row["blockId"], row["sourceStart"], row["sourceEnd"]): row
+                          for row in numbered_edge_candidates(blocks)}
     for proposal in result.get("occurrences", []):
         block = index.get(str(proposal.get("blockId", "")))
         start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
@@ -217,6 +219,26 @@ def add_cleanup_proposals(
                     "model": "gpt-6-luna",
                     "availableActions": ["keep", "exclude", "repair"] if replacement is not None
                     else ["keep", "exclude"]})
+        if proposal.get("patternGroupId") is not None:
+            candidate = pattern_candidates.get((str(block["id"]), start, end))
+            group = next((group for group in result.get("patternGroups", [])
+                          if group.get("patternGroupId") == proposal["patternGroupId"]), None)
+            evidence = next((window for window in result.get("windows", [])
+                             if window.get("windowId") == proposal.get("windowId")), None)
+            if (candidate is None or group is None or evidence is None
+                    or group.get("verdict") != "verified"
+                    or proposal.get("windowId") not in group.get("eligibleWindowIds", [])
+                    or evidence.get("patternStatus") != "eligible"
+                    or evidence.get("answers") != {"production": "review", "word_damage": "clean"}
+                    or replacement != "" or proposal.get("patternVerification") != "verified"
+                    or proposal["patternGroupId"] != candidate["patternGroupId"]
+                    or not any(str(span.get("blockId")) == str(block["id"])
+                               and span.get("renderRole") == "narration"
+                               and span.get("spokenStart", span.get("sourceStart", 0)) <= start
+                               and end <= span.get("spokenEnd", span.get("sourceEnd", 0))
+                               for span in dialogue.get("spans", []))):
+                raise ReviewContractError("Pattern proposal requires exact verified narrator footer evidence")
+            row.update(patternGroupId=candidate["patternGroupId"], patternVerification="verified")
         # Even identical source strings can have different suggested replacements.
         row["matchKey"] = _digest([row["source"], replacement])
         rows.append(row)
@@ -256,6 +278,8 @@ def add_cleanup_proposals(
             "model": row["model"], "cleanupReason": cleanup_reason,
             "matchKey": _digest([occurrence["source"], replacement]),
         })
+        if row.get("patternGroupId"):
+            occurrence.update(patternGroupId=row["patternGroupId"], patternVerification="verified")
         if replacement is not None:
             warning["occurrences"].remove(occurrence)
             occurrence.update(kind="ai-cleanup", availableActions=["keep", "exclude", "repair"])
@@ -1116,7 +1140,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
         key = (" ".join(name.casefold().split()), int(label["number"]) - page)
         candidates[key].append((block, match))
     result = []
-    for (_, folio_offset), rows in candidates.items():
+    for (label_key, folio_offset), rows in candidates.items():
         repeated_pages = sorted({int(block["page"]) for block, _ in rows})
         if len(repeated_pages) < 3:
             continue
@@ -1126,6 +1150,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
                 "Last-line label repeats on at least three pages with a consistent folio offset; verify its role.",
             )
             occurrence["detectionRule"] = "repeated-numbered-edge"
+            occurrence["patternGroupId"] = "numbered-edge:" + _digest([label_key, folio_offset])
             occurrence["patternEvidence"] = {
                 "distinctPageCount": len(repeated_pages), "folioOffset": folio_offset,
                 "firstPage": repeated_pages[0], "lastPage": repeated_pages[-1],
@@ -1435,6 +1460,11 @@ def _group_occurrences(
             for occurrence in occurrences:
                 by_match[str(occurrence["matchKey"])].append(occurrence)
             evidence_groups = list(by_match.values())
+        elif kind == "ai-cleanup":
+            by_pattern: dict[str, list[dict[str, Any]]] = defaultdict(list)
+            for occurrence in occurrences:
+                by_pattern[str(occurrence.get("patternGroupId", ""))].append(occurrence)
+            evidence_groups = list(by_pattern.values())
         else:
             evidence_groups = [occurrences]
         for evidence_group in evidence_groups:
@@ -1454,6 +1484,8 @@ def _group_occurrences(
             suffix = (
                 f":{evidence_group[0]['matchKey']}"
                 if kind == "repeated-matter"
+                else f":{evidence_group[0]['patternGroupId']}"
+                if kind == "ai-cleanup" and evidence_group[0].get("patternGroupId")
                 else ""
             )
             warning_id = f"review:{kind}{suffix}"
@@ -1475,6 +1507,9 @@ def _group_occurrences(
                     "availableActions": available_actions,
                     "readerState": reader_state,
                     "occurrences": evidence_group,
+                    **({"patternGroupId": evidence_group[0]["patternGroupId"],
+                        "patternVerification": "verified"}
+                       if kind == "ai-cleanup" and evidence_group[0].get("patternGroupId") else {}),
                 }
             )
     return result
