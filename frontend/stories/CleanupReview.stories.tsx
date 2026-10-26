@@ -35,8 +35,8 @@ export const SourceCheckAfterBulkApply: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
-    await expect(canvas.getByText("No correction was proposed. Check the source before keeping or leaving out this text.")).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
+    await expect(canvas.getByRole("heading", { name: "Does this text match the source?" })).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
@@ -45,13 +45,13 @@ export const KeptChoiceIsPreservedByBulk: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /^Keep Keep the original/ }));
-    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all suggested choices/ })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
+    await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
     await expect(canvas.getByRole("button", { name: /^Keep Keep the original/ })).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(canvas.getByRole("button", { name: /^Leave This highlighted/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all suggested choices/ })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: /^Leave(?: \(Suggested\))? This highlighted/ }));
+    await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
   },
 };
 export const ConsolidatedSourceWarning: Story = {
@@ -65,8 +65,8 @@ export const ConsolidatedSourceWarning: Story = {
     await expect(canvas.getByRole("button", { name: /3 AI suggestions.*2 occurrences/ })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: /3 AI suggestions.*2 occurrences/ }));
     await expect(canvas.getByText("broken")).toBeVisible();
-    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all suggested choices/ })).toBeDisabled();
+    await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
+    await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
@@ -77,9 +77,9 @@ export const ManySuggestions: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Example 1 of 150")).toBeVisible();
     await expect(canvas.queryByText("Corrected fragment 149")).not.toBeInTheDocument();
-    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: /^Keep Keep the original/ }));
-    await expect(canvas.getByRole("button", { name: /^Apply all suggested choices/ })).toBeDisabled();
+    await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
   },
 };

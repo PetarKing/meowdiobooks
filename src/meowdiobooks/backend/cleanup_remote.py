@@ -14,6 +14,9 @@ from pathlib import Path
 from threading import Event, Lock
 from typing import Any
 
+from .cleanup_concurrency import (
+    MAX_DECISIONS_REQUESTS, MAX_REPAIR_REQUESTS, cancellation_poll, request_slot,
+)
 from .model_config import RemoteTextModelConfig, load_model_registry
 from .remote_llm import (
     RemoteModelUnavailableError,
@@ -28,7 +31,7 @@ from .script_cues import bracket_ranges, review_script_directions
 POLICY_ID = "decisions-luna-cleanup-v1"
 MAX_WINDOW_CHARACTERS = 1200
 MAX_CONTEXT_CHARACTERS = 180
-MAX_WORKERS = 4
+MAX_WORKERS = MAX_DECISIONS_REQUESTS
 
 _QUESTIONS = [
     {
@@ -101,11 +104,12 @@ def cleanup_model_configs(
         raise RemoteModelUnavailableError("Cleanup review requires the gpt-6-luna remote profile.")
     repair = replace(
         selected, id="luna-cleanup-repair", display_name="Luna cleanup", policy=POLICY_ID,
-        engine="openai_responses", reasoning_effort="low", max_concurrent_batches=MAX_WORKERS,
+        engine="openai_responses", reasoning_effort="low", max_concurrent_batches=MAX_REPAIR_REQUESTS,
     )
     decisions = replace(
         repair, id="luna-cleanup-decisions", display_name="Luna Decisions cleanup",
         engine="openai_decisions",
+        max_concurrent_batches=MAX_DECISIONS_REQUESTS,
         pricing_version="openai-decisions-2026-10-25", reasoning_effort=None,
         service_tier=None, default_service_tier_price_multiplier=1.0,
         input_usd_per_million_tokens=0.1, cached_input_usd_per_million_tokens=0.01,
@@ -286,25 +290,35 @@ def run_cleanup_review(
             progress = max(progress, percent)
             report(progress, message)
 
-    def admission(config, metadata):
+    def check_stopped():
         if stopped.is_set():
             raise CleanupReviewError("Cleanup review stopped before all windows completed.")
-        checkpoint(5, "Checking cleanup with Luna")  # Cancellation before every paid attempt.
+
+    def check_cancelled():
+        check_stopped()
+        checkpoint(5, "Checking cleanup with Luna")
+
+    poll_cancelled = cancellation_poll(check_stopped, check_cancelled)
+
+    def admission(config, metadata):
+        check_cancelled()  # Cancellation before every paid attempt, including retries.
         return request_admission(config, metadata) if request_admission else None
 
     def process(window):
-        response = remote_decisions_completion(
-            repo_root, decisions_config, _prompt(window), _QUESTIONS,
-            usage_observer=usage_observer, request_admission=admission,
-        )
+        with request_slot("decisions", poll_cancelled):
+            response = remote_decisions_completion(
+                repo_root, decisions_config, _prompt(window), _QUESTIONS,
+                usage_observer=usage_observer, request_admission=admission,
+            )
         answers = _answers(response)
         if all(value == "clean" for value in answers.values()):
             return {"windowId": window["windowId"], "answers": answers, "occurrences": []}
-        result = remote_chat_completion(
-            repo_root, repair_config, _REPAIR_SYSTEM, _prompt(window),
-            max_completion_tokens=2048, response_schema=_REPAIR_SCHEMA,
-            usage_observer=usage_observer, request_admission=admission,
-        )
+        with request_slot("repair", poll_cancelled):
+            result = remote_chat_completion(
+                repo_root, repair_config, _REPAIR_SYSTEM, _prompt(window),
+                max_completion_tokens=2048, response_schema=_REPAIR_SCHEMA,
+                usage_observer=usage_observer, request_admission=admission,
+            )
         try:
             proposal = json.loads(result["text"])
         except (KeyError, ValueError, TypeError) as error:

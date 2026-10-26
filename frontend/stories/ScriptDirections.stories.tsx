@@ -27,7 +27,8 @@ export const Suggestions: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await expect(canvas.getByRole("heading", { name: "Script directions" })).toBeVisible();
-    await expect(canvas.getByText(/The floorboards creaked/)).toBeVisible();
+    await expect(canvas.queryByText(/The floorboards creaked/)).not.toBeInTheDocument();
+    await expect(canvas.getByText(/MARA:/)).toBeVisible();
     await expect(canvas.getByText(/If they hear us/)).toBeVisible();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
@@ -36,8 +37,8 @@ export const ManualChoiceSurvivesBulk: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
-    const apply = canvas.getByRole("button", { name: /^Apply all suggested choices/ });
-    await expect([...apply.closest(".resolution-options")!.querySelectorAll("button")].map((button) => button.querySelector("b")?.textContent)).toEqual(["Keep", "Leave", "Apply all suggested choices (3)"]);
+    const apply = canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ });
+    await expect([...apply.closest(".resolution-options")!.querySelectorAll("button")].map((button) => button.querySelector("b")?.textContent)).toEqual(["Keep", "Leave (Suggested)", "Apply all suggested choices (3)"]);
     await userEvent.click(canvas.getByRole("button", { name: /^Keep This highlighted/ }));
     await userEvent.click(apply);
     await expect(apply).toBeDisabled();
@@ -51,13 +52,13 @@ export const LeaveThenBulkRemainsEditable: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByRole("button", { name: /^Leave This highlighted/ }));
-    const apply = canvas.getByRole("button", { name: /^Apply all suggested choices/ });
+    await userEvent.click(canvas.getByRole("button", { name: /^Leave(?: \(Suggested\))? This highlighted/ }));
+    const apply = canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ });
     await expect(apply).toHaveTextContent("Apply all suggested choices (2)");
     await userEvent.click(apply);
     await expect(apply).toBeDisabled();
     await userEvent.click(canvas.getByRole("button", { name: "← Previous example" }));
-    await expect(canvas.getByRole("button", { name: /^Leave This highlighted/ })).toHaveAttribute("aria-pressed", "true");
+    await expect(canvas.getByRole("button", { name: /^Leave(?: \(Suggested\))? This highlighted/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.click(canvas.getByRole("button", { name: /^Keep This highlighted/ }));
     await expect(canvas.getByRole("button", { name: /^Keep This highlighted/ })).toHaveAttribute("aria-pressed", "true");
     await expect(canvas.queryByText("Leave selected for this passage")).not.toBeInTheDocument();

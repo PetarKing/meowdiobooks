@@ -2,15 +2,16 @@
 import io
 import json
 import threading
-import time
 import urllib.error
 from copy import deepcopy
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
 from meowdiobooks.backend import cleanup_remote as cleanup
+from meowdiobooks.backend import cleanup_concurrency
 from meowdiobooks.backend import remote_llm
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -154,13 +155,16 @@ def test_unreadable_repair_fails_instead_of_disappearing(monkeypatch):
 
 def test_bounded_concurrency_processes_every_window(monkeypatch):
     lock, active, peak = threading.Lock(), 0, 0
+    enough_started = threading.Event()
 
     def decide(*args, **kwargs):
         nonlocal active, peak
         with lock:
             active += 1
             peak = max(peak, active)
-        time.sleep(0.005)
+            if active > 4:
+                enough_started.set()
+        assert enough_started.wait(5), "Screening still stops at four concurrent requests"
         with lock:
             active -= 1
         return answers()
@@ -169,7 +173,181 @@ def test_bounded_concurrency_processes_every_window(monkeypatch):
     result = cleanup.run_cleanup_review(ROOT, *artifacts("\n\n".join(f"Paragraph {i}" for i in range(20))), lambda *a: None)
     assert result["summary"]["inputWindows"] == 20
     assert len(result["windows"]) == 20
-    assert 1 < peak <= 4
+    assert 4 < peak <= cleanup.MAX_WORKERS
+
+
+@pytest.mark.parametrize("kind,limit", [("decisions", 40), ("repair", 4)])
+def test_provider_limits_are_shared_by_concurrent_book_jobs(monkeypatch, kind, limit):
+    """Two jobs can fill one provider limit, but cannot each get their own allowance."""
+    lock = threading.Lock()
+    release, full, all_waiting = threading.Event(), threading.Event(), threading.Event()
+    active = peak = completed = 0
+    waiting_threads = set()
+    actual_gate = threading.BoundedSemaphore(limit)
+
+    class ObservedGate:
+        def acquire(self, *, timeout):
+            with lock:
+                waiting_threads.add(threading.get_ident())
+                if len(waiting_threads) == limit * 2:
+                    all_waiting.set()
+            return actual_gate.acquire(timeout=timeout)
+
+        def release(self):
+            actual_gate.release()
+
+    monkeypatch.setitem(cleanup_concurrency._SLOTS, kind, ObservedGate())
+
+    def provider_call():
+        nonlocal active, peak, completed
+        with lock:
+            active += 1
+            peak = max(active, peak)
+            if active == limit:
+                full.set()
+        assert release.wait(5), "Test did not release the provider calls"
+        with lock:
+            active -= 1
+            completed += 1
+
+    def decide(*args, **kwargs):
+        if kind == "decisions":
+            provider_call()
+        return answers(word_damage="review" if kind == "repair" else "clean")
+
+    def repair(*args, **kwargs):
+        provider_call()
+        return {"text": json.dumps({"action": "source_review", "edits": [], "reason": "Inspect source"})}
+
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
+    monkeypatch.setattr(cleanup, "remote_chat_completion", repair)
+    inputs = artifacts("\n\n".join(f"Paragraph {index}" for index in range(limit)))
+    with ThreadPoolExecutor(max_workers=2) as jobs:
+        futures = [jobs.submit(cleanup.run_cleanup_review, ROOT, *inputs, lambda *a: None) for _ in range(2)]
+        try:
+            assert full.wait(5)
+            assert all_waiting.wait(5), "Both books must reach the shared gate"
+            assert peak == limit
+        finally:
+            release.set()
+        results = [future.result(timeout=5) for future in futures]
+    assert completed == limit * 2
+    assert peak == limit
+    expected_ids = [window["windowId"] for window in cleanup.cleanup_windows(*inputs)]
+    assert all([row["windowId"] for row in result["windows"]] == expected_ids for result in results)
+    assert results[0] == results[1]
+
+
+@pytest.mark.parametrize("kind", ["decisions", "repair"])
+def test_cancellation_waiting_for_provider_slot_does_not_admit_or_call(monkeypatch, kind):
+    """A waiting request notices cancellation without waiting for a busy provider to finish."""
+    waiting = threading.Event()
+
+    class ObservedGate(threading.BoundedSemaphore):
+        def acquire(self, *args, **kwargs):
+            if kwargs.get("timeout") is not None:
+                waiting.set()
+            return super().acquire(*args, **kwargs)
+
+    gate = ObservedGate(1)
+    gate.acquire()
+    monkeypatch.setitem(cleanup_concurrency._SLOTS, kind, gate)
+    cancel = threading.Event()
+    admissions = []
+
+    def report(*args):
+        if cancel.is_set():
+            raise RuntimeError("cancelled while queued")
+
+    def decide(*args, **kwargs):
+        assert kind == "repair", "Cancelled Decisions request reached provider"
+        return answers(word_damage="review")
+
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
+    monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: pytest.fail("Cancelled repair reached provider"))
+    with ThreadPoolExecutor(max_workers=1) as job:
+        future = job.submit(cleanup.run_cleanup_review, ROOT, *artifacts("A passage."), report,
+                            request_admission=lambda *a: admissions.append(a))
+        try:
+            assert waiting.wait(5), "Cancellation must happen while waiting for the provider slot"
+            cancel.set()
+            with pytest.raises(RuntimeError, match="cancelled while queued"):
+                future.result(timeout=2)
+            assert admissions == []
+        finally:
+            gate.release()
+
+
+def test_provider_slot_is_released_on_failure_without_extra_progress_writes(monkeypatch):
+    gate = threading.BoundedSemaphore(1)
+    monkeypatch.setitem(cleanup_concurrency._SLOTS, "decisions", gate)
+    with pytest.raises(RuntimeError):
+        with cleanup_concurrency.request_slot("decisions", lambda: pytest.fail("No wait needs no progress write")):
+            raise RuntimeError("provider failed")
+    assert gate.acquire(blocking=False)
+    gate.release()
+
+
+def test_waiting_threads_share_progress_checks_but_not_stop_detection(monkeypatch):
+    clock = [100.0]
+    monkeypatch.setattr(cleanup_concurrency, "monotonic", lambda: clock[0])
+    stopped = threading.Event()
+    cancelled = threading.Event()
+    reports = []
+
+    def check_stopped():
+        if stopped.is_set():
+            raise RuntimeError("job stopped")
+
+    def check_cancelled():
+        reports.append(clock[0])
+        if cancelled.is_set():
+            raise RuntimeError("job cancelled")
+
+    poll = cleanup_concurrency.cancellation_poll(check_stopped, check_cancelled)
+    with ThreadPoolExecutor(max_workers=40) as waiters:
+        list(waiters.map(lambda _: poll(), range(80)))
+    assert reports == [100.0]
+    clock[0] = 100.05
+    stopped.set()
+    with pytest.raises(RuntimeError, match="job stopped"):
+        poll()  # A stopped job is noticed even inside the coalescing interval.
+    assert reports == [100.0]
+    stopped.clear()
+    cancelled.set()
+    clock[0] = 100.2
+    with pytest.raises(RuntimeError, match="job cancelled"):
+        poll()
+    assert reports == [100.0, 100.2]
+
+
+@pytest.mark.parametrize("kind", ["decisions", "repair"])
+def test_admission_cancels_after_acquiring_slot_before_network_and_releases_it(monkeypatch, kind):
+    acquired = threading.Event()
+
+    class ObservedGate(threading.BoundedSemaphore):
+        def acquire(self, *args, **kwargs):
+            success = super().acquire(*args, **kwargs)
+            if success:
+                acquired.set()
+            return success
+
+    gate = ObservedGate(1)
+    monkeypatch.setitem(cleanup_concurrency._SLOTS, kind, gate)
+    monkeypatch.setattr(remote_llm, "configured_api_key", lambda *a: "test-key")
+    monkeypatch.setattr(remote_llm.urllib.request, "urlopen", lambda *a, **k: pytest.fail("Cancelled request reached network"))
+    if kind == "repair":
+        monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(word_damage="review"))
+
+    def report(*args):
+        if acquired.is_set():
+            raise RuntimeError("cancelled before admission")
+
+    with pytest.raises(RuntimeError, match="cancelled before admission"):
+        cleanup.run_cleanup_review(ROOT, *artifacts("A passage."), report,
+                                   request_admission=lambda *a: pytest.fail("Cancelled request reserved quota"))
+    assert gate.acquire(blocking=False)
+    gate.release()
 
 
 def test_config_strictly_requires_luna(monkeypatch):
