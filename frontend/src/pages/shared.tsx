@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type {
   DialogueAttributionTarget,
@@ -20,6 +20,7 @@ import {
   reviewWarningLabel
 } from "../workflow/review";
 import type { DialogueConflictGroup } from "./helpers";
+import { speakerAccent } from "../workflow/speakerColor";
 
 export function StepEyebrow({ stage, children }: { stage: WizardStep; children: ReactNode; }) {
   return <span className="step-eyebrow">{children}<PhaseHelp stage={stage} /></span>;
@@ -90,7 +91,7 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
         <button type="button" aria-label={t("Zoom in PDF preview")} disabled={pdfZoomIndex === reviewPdfZoomLevels.length - 1} onClick={() => setPdfZoomIndex((current) => Math.min(reviewPdfZoomLevels.length - 1, current + 1))}>+</button>
       </div> : undefined} rightLabel={t("AUDIOBOOK TRANSCRIPT")} rightMeta={<small>{loading ? t("Loading page {{page}}…", { page }) : t("Read-only preview")}</small>} rightClassName="review-transcript-pane" className={`review-transcript-compare ${loading ? "loading" : ""}`}>
         {preview?.spans.length ? <article aria-label={t("Audiobook transcript page {{page}}", { page: preview.page })} onCopy={(event) => event.preventDefault()}>
-          {preview.spans.map((span) => <p key={span.id} className={`transcript-span ${span.reader === "Narrator" ? "narration" : span.kind}`}><b>{t(span.reader, { defaultValue: span.reader })}{span.kind === "excluded" && span.warningKind ? <small> · {t(reviewWarningLabel(span.warningKind))}</small> : null}</b><span>{span.text}</span></p>)}
+          {preview.spans.map((span) => <p key={span.id} className={`transcript-span ${span.reader === "Narrator" ? "narration" : span.kind}`} style={span.kind === "dialogue" && span.reader !== "Narrator" ? { "--speaker-accent": speakerAccent(span.reader) } as CSSProperties : undefined}><b>{t(span.reader, { defaultValue: span.reader })}{span.kind === "excluded" && span.warningKind ? <small> · {t(reviewWarningLabel(span.warningKind))}</small> : null}</b><span>{span.text}</span></p>)}
         </article> : loading ? <div className="transcript-loading">{t("Opening the transcript…")}</div> : <div className="transcript-empty"><span aria-hidden="true">☾</span><b>{t("No spoken text on this page")}</b><small>{t("The source page may be blank or everything on it was excluded.")}</small></div>}
       </PageComparison>
     </section>
