@@ -18,7 +18,7 @@ function Scopes({ unlabeled = 3, unknown = 2, request = vi.fn(), advancedRules =
     busy: false, capabilities: { localDialogueAttribution: true, showExecutionBadge: true, showProviderCostReceipts: false, showVoiceModelControls: true, advancedDialogueRules: advancedRules },
     completed: [], revisingStages: [], dialogueCandidate: undefined, dialogueInitialDecisions: [], dialogueRulesOpen: rulesOpen,
     editingAcceptedDialogue: false, conflictChoices: {}, structuralChoices: {}, setDialogueRulesOpen: vi.fn(),
-    acceptCandidate: vi.fn(), refreshDialogue: vi.fn(), reopenAcceptedDialogueReview: vi.fn(), requestDialogueTranscript: request,
+    continueAcceptedDialogue: vi.fn(), acceptCandidate: vi.fn(), refreshDialogue: vi.fn(), reopenAcceptedDialogueReview: vi.fn(), requestDialogueTranscript: request,
     setConflictChoices: vi.fn(), setDialogueCandidate: vi.fn(), setDialogueInitialDecisions: vi.fn(), setEditingAcceptedDialogue: vi.fn(),
     setError: vi.fn(), setStructuralChoices: vi.fn(), t,
   }} />;

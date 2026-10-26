@@ -24,7 +24,7 @@ type Props = {
   result: DialogueArtifact;
   busy: boolean;
   initialDecisions?: DialogueCorrectionDecision[];
-  requireChanges?: boolean;
+  onContinueUnchanged?: () => void;
   onChangeStrategy: () => void;
   onAccept: (decisions: DialogueCorrectionDecision[]) => void;
 };
@@ -60,7 +60,7 @@ const filterOptions: Array<[DialogueFilter, string]> = [
   ["not-dialogue", "Not dialogue"],
 ];
 
-export function DialogueResultReview({ result, busy, initialDecisions = [], requireChanges = false, onChangeStrategy, onAccept }: Props) {
+export function DialogueResultReview({ result, busy, initialDecisions = [], onContinueUnchanged, onChangeStrategy, onAccept }: Props) {
   const { t } = useTranslation();
   const [view, setView] = useState<DialogueView>(result.examples.some((row) => needsAttention(row) && !initialDecisions.some(({ spanId }) => spanId === row.spanId)) ? "review" : "overview");
   const [filter, setFilter] = useState<DialogueFilter>("all");
@@ -439,7 +439,7 @@ export function DialogueResultReview({ result, busy, initialDecisions = [], requ
       </section>
     </section>}
 
-    <div className="phase-action dialogue-floating-action" role="group" aria-label={`${t("Change strategy")} / ${t("Accept dialogue result")}`}><button ref={strategyTriggerRef} className="ghost" onClick={() => setConfirmStrategy(true)}>{t("Change strategy")}</button><button className="primary" disabled={busy || remainingReviewCount > 0 || requireChanges && !decisionsChanged} onClick={() => { if (!busy && remainingReviewCount === 0) onAccept(orderedDecisions); }}>{t("Continue")} →</button></div>
+    <div className="phase-action dialogue-floating-action" role="group" aria-label={`${t("Change strategy")} / ${t("Accept dialogue result")}`}><button ref={strategyTriggerRef} className="ghost" onClick={() => setConfirmStrategy(true)}>{t("Change strategy")}</button><button className="primary" disabled={busy || remainingReviewCount > 0} onClick={() => { if (busy || remainingReviewCount > 0) return; if (onContinueUnchanged && !decisionsChanged) onContinueUnchanged(); else onAccept(orderedDecisions); }}>{t("Continue")} →</button></div>
     </fieldset>
     {confirmStrategy && <DialogBackdrop className="dialogue-strategy-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) setConfirmStrategy(false); }}>
       <DialogSurface className="dialogue-strategy-confirm" aria-labelledby={strategyTitleId} aria-describedby={strategyDescriptionId} initialFocusRef={cancelStrategyRef} returnFocusRef={strategyTriggerRef} onDismiss={() => setConfirmStrategy(false)}>
