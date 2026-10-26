@@ -108,6 +108,35 @@ can have the same structure. A valid contextual repair proposal still requires u
 Chapter names and explicit note-section rules still contain language-specific vocabulary; this
 change does not claim to remove every English heuristic in the workflow.
 
+## Repeated numbered page matter
+
+A repeated numbered footer forms a candidate family only when the same normalized label and
+number-to-page offset occur on at least three distinct pages. Exact source ranges must fit within
+accepted narrator speech. The cleanup scan isolates each footer target from adjacent prose; dialogue,
+cross-span fragments and mixed or unrecognized patterns keep the ordinary individual path.
+
+Each instance still receives its own contextual Decisions assessment. Only production=`review` and
+word-damage=`clean` instances qualify for the family. A single bounded Luna call assesses the first,
+middle and last qualifying examples separately. All must classify as non-story page furniture before
+the system proposes omitting any qualifying member. A negative, uncertain, incomplete or malformed
+family assessment preserves the family without running individual repair calls for every member.
+Fewer than three qualifying instances also remain spoken. Actual word-damage findings retain the
+ordinary individually validated correction path.
+
+This saves repeated repair calls, not the per-instance contextual checks. A 400-instance family can
+use one representative verification call instead of 400 repair calls; separate defects still incur
+their own work. Sampling and two uses of the same model do not prove that every proposed omission is
+correct. All changes remain explicit review choices. A numbered room or chapter label can share the
+same structure and must be preserved when context does not support a footer interpretation.
+
+Each proposed member retains its exact source, distinct evidence key, and individual keep/omit
+choice. Group controls must expand into individual decisions and retain manual exceptions; normalized
+pattern similarity does not grant the existing identical-evidence bulk permission. Admission checks
+bind each proposal to its own contextual answer, family membership and representative verdict.
+The candidate and accepted review retain `cleanupPatternEvidence`: family verdicts and their member
+assessments only, without duplicating the unrelated full-book scan. Uncertain and vetoed members are
+recorded there rather than silently reported as clean.
+
 ## Runtime contract
 
 The configured Luna profile supplies the endpoint and credential variable. Local operators configure

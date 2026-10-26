@@ -194,3 +194,29 @@ def test_group_evidence_counts_representatives_and_verdict_are_revalidated(monke
         result["windows"].append(deepcopy(row))
     with pytest.raises(ReviewContractError, match="Pattern"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+
+
+def test_insufficient_contextual_support_preserves_family_without_luna_calls(monkeypatch):
+    calls = mocks(monkeypatch, veto="青空文庫 9")
+    extraction, dialogue = artifacts(3)
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    assert result["occurrences"] == [] and calls["verification"] == calls["repair"] == []
+    assert result["patternGroups"][0]["verdict"] == "insufficient"
+    workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+    accepted = accept_review_revision(workspace, [], revision="preserved")
+    assert accepted["cleanupPatternEvidence"]["groups"][0]["eligibleCount"] == 2
+    assert apply_review_render_policies(dialogue, accepted)["spans"] == dialogue["spans"]
+
+
+def test_group_verification_transport_failure_keeps_atomic_failure_behavior(monkeypatch):
+    mocks(monkeypatch)
+    extraction, dialogue = artifacts()
+    original = deepcopy((extraction, dialogue))
+
+    def unavailable(*_args, **_kwargs):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(cleanup, "remote_chat_completion", unavailable)
+    with pytest.raises(RuntimeError, match="provider unavailable"):
+        cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    assert (extraction, dialogue) == original
