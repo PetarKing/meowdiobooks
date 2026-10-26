@@ -1,0 +1,130 @@
+[
+  {
+    "width": 390,
+    "appearance": "light",
+    "rows": [
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.50098 0.205882 0.185686)",
+        "label": "color(srgb 0.50098 0.205882 0.185686)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(67, 102, 39)",
+        "label": "rgb(67, 102, 39)"
+      },
+      {
+        "speaker": "Narrator",
+        "border": "rgb(199, 207, 183)",
+        "label": "rgb(94, 104, 79)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(67, 102, 39)",
+        "label": "rgb(67, 102, 39)"
+      },
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.50098 0.205882 0.185686)",
+        "label": "color(srgb 0.50098 0.205882 0.185686)"
+      }
+    ],
+    "contrastViolations": []
+  },
+  {
+    "width": 390,
+    "appearance": "dark",
+    "rows": [
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.975294 0.806078 0.75098)",
+        "label": "color(srgb 0.975294 0.806078 0.75098)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(182, 220, 172)",
+        "label": "rgb(182, 220, 172)"
+      },
+      {
+        "speaker": "Narrator",
+        "border": "rgb(98, 126, 120)",
+        "label": "rgb(204, 215, 208)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(182, 220, 172)",
+        "label": "rgb(182, 220, 172)"
+      },
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.975294 0.806078 0.75098)",
+        "label": "color(srgb 0.975294 0.806078 0.75098)"
+      }
+    ],
+    "contrastViolations": []
+  },
+  {
+    "width": 1440,
+    "appearance": "light",
+    "rows": [
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.50098 0.205882 0.185686)",
+        "label": "color(srgb 0.50098 0.205882 0.185686)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(67, 102, 39)",
+        "label": "rgb(67, 102, 39)"
+      },
+      {
+        "speaker": "Narrator",
+        "border": "rgb(199, 207, 183)",
+        "label": "rgb(94, 104, 79)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(67, 102, 39)",
+        "label": "rgb(67, 102, 39)"
+      },
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.50098 0.205882 0.185686)",
+        "label": "color(srgb 0.50098 0.205882 0.185686)"
+      }
+    ],
+    "contrastViolations": []
+  },
+  {
+    "width": 1440,
+    "appearance": "dark",
+    "rows": [
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.975294 0.806078 0.75098)",
+        "label": "color(srgb 0.975294 0.806078 0.75098)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(182, 220, 172)",
+        "label": "rgb(182, 220, 172)"
+      },
+      {
+        "speaker": "Narrator",
+        "border": "rgb(98, 126, 120)",
+        "label": "rgb(204, 215, 208)"
+      },
+      {
+        "speaker": "Petra Leyte",
+        "border": "rgb(182, 220, 172)",
+        "label": "rgb(182, 220, 172)"
+      },
+      {
+        "speaker": "Subaru Natsuki",
+        "border": "color(srgb 0.975294 0.806078 0.75098)",
+        "label": "color(srgb 0.975294 0.806078 0.75098)"
+      }
+    ],
+    "contrastViolations": []
+  }
+]
