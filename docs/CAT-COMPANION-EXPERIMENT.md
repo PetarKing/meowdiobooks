@@ -114,3 +114,34 @@ no browser console errors were captured. Hidden-tab and reduced-motion CSS handl
 The shared lazy atmosphere is 1.54 KB gzip plus 0.67 KB CSS in this build; no new runtime dependency.
 Screenshots are retained in `assets/review/cat-companion/refinement/`. This remains a local,
 unmerged visual experiment.
+
+## First-visit readiness and collection-size review
+
+The shared atmosphere and reading-cat SVG now load with the application rather than separate lazy
+chunks. They render synchronously on a Library mount, avoiding the empty artwork frame on first
+navigation. Optional dithercn and earlier sky alternatives remain lazy. This changes reusable core
+presentation only; no Cloud credentials, provider operations, or hosted overrides are involved.
+The production entry grew about 3.1 KB gzip, while the two art chunks and separate atmosphere CSS
+request disappeared. This is an asset-readiness tradeoff, not a measured frame-time improvement.
+
+The standalone and synthetic preview shells now use the same full-height flex layout and compact
+footer for empty and populated pages. Previously, at a 933px viewport, Home ended at 933px but the
+populated Library ended at 1078px. Afterward both ended at 933px in an actual Home-to-Library
+navigation, with the cat SVG already present. A stable scrollbar gutter also avoids a width jump
+when a collection requires scrolling. Artwork aspect-ratio reservations remain.
+
+Six collection presets are first in the Preview menu: Home and Library with 0, 2, or 12 items.
+Each uses a consistent in-memory collection for both product tabs, so switching between Create and
+Library preserves the chosen density. Long titles, multilingual titles, partial exports and several
+synthetic cover colors are represented. Selecting a preset updates the review URL; workflow
+navigation remains contained within the preview. The page title identifies the selected preset.
+
+At 1440×900, all four empty/few states end at 900px. The 12-item Home scrolls to 1294px and Library
+to 1748px; all six have 1440px document width. The large collections were also reviewed in dark mode
+and at 390px, where both contain 12 cards with no horizontal overflow. Exact desktop measurements
+and screenshots are under `assets/review/cat-companion/collections/`. The browser console had no
+captured errors. Browser viewport overrides were reset after review.
+
+Validation: production build, lint (two existing Fast Refresh warnings), Storybook/preview types,
+and 214 App/guide/fixture tests passed. No backend or provider behavior changed. This remains a
+local, unmerged experiment.

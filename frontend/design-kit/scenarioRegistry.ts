@@ -54,6 +54,9 @@ export type DialogueFixtureVariant = "conflicts" | "standard";
 
 export type GatewayVariant =
   | "default"
+  | "collection-empty"
+  | "collection-few"
+  | "collection-many"
   | "dialogue-reconnect"
   | "dialogue-running"
   | "empty-books"
@@ -619,6 +622,12 @@ const baselineScenarioMetadata = {
 export const scenarioMetadata = {
   "cast-reuse-review": { ...baselineScenarioMetadata["cast-review-states"], label: "Cast · prior voices and required review", description: "Mandatory and optional review labels precede prior-book provenance.", castFixture: "reuse-review" },
   ...baselineScenarioMetadata,
+  "preview-home-empty": { ...baselineScenarioMetadata.home, label: "Home · empty (0)", description: "0 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-empty" },
+  "preview-home-few": { ...baselineScenarioMetadata.home, label: "Home · few (2)", description: "2 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-few" },
+  "preview-home-many": { ...baselineScenarioMetadata.home, label: "Home · many (12)", description: "12 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-many" },
+  "preview-library-empty": { ...baselineScenarioMetadata.library, label: "Library · empty (0)", description: "0 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-empty", story: { surface: "library", actions: [], heading: "No audiobooks yet." } },
+  "preview-library-few": { ...baselineScenarioMetadata.library, label: "Library · few (2)", description: "2 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-few", story: { surface: "library", actions: [], heading: "Your audiobooks" } },
+  "preview-library-many": { ...baselineScenarioMetadata.library, label: "Library · many (12)", description: "12 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-many", story: { surface: "library", actions: [], heading: "Your audiobooks" } },
   "home-shelf": { ...baselineScenarioMetadata.home, label: "Create · six local books", description: "Responsive shelf of six synthetic local drafts.", gatewayVariant: "home-shelf" },
   "generate-long-book": { ...baselineScenarioMetadata.generate, label: "Generate · 120 chapters", description: "A long synthetic book for tracklist selection, estimates and listening.", snapshotVariant: "generate-long-book" },
   "library-missing-cover": { ...baselineScenarioMetadata.library, label: "Library · missing cover", description: "A broken cover resolves to the readable production fallback.", gatewayVariant: "library-missing-cover" },

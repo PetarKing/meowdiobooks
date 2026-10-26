@@ -1,8 +1,7 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
+import { HomeAtmosphere } from './HomeAtmosphere';
+import { ReadingCatIllustration } from './ReadingCatIllustration';
 import './ReadingCatCompanion.css';
-
-const Atmosphere = lazy(() => import('./HomeAtmosphere').then(module => ({ default: module.HomeAtmosphere })));
-const ReadingCat = lazy(() => import('./ReadingCatIllustration').then(module => ({ default: module.ReadingCatIllustration })));
 
 /** Decorative only: never delays navigation, import, or Library controls. */
 export function ReadingCatCompanion({ variant }: { variant: 'library' | 'empty' }) {
@@ -14,7 +13,7 @@ export function ReadingCatCompanion({ variant }: { variant: 'library' | 'empty' 
     return () => document.removeEventListener('visibilitychange', update);
   }, []);
   return <div className={`reading-cat-companion reading-cat-companion--${variant}`} data-paused={quiet || hidden}>
-    {!quiet && <div className="library-atmosphere" aria-hidden="true"><Suspense fallback={null}><Atmosphere /></Suspense></div>}
-    <div className="reading-cat-companion-art" aria-hidden="true"><Suspense fallback={null}><ReadingCat /></Suspense></div>
+    {!quiet && <div className="library-atmosphere" aria-hidden="true"><HomeAtmosphere /></div>}
+    <div className="reading-cat-companion-art" aria-hidden="true"><ReadingCatIllustration /></div>
   </div>;
 }
