@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type {
   AcceptanceDecision,
   ReviewCapability,
@@ -29,6 +28,7 @@ import {
   reviewScriptCueDecisions,
   reviewIsPatternGroup,
   reviewPatternDecisions,
+  reviewSuggestedAction,
 } from "../workflow/review";
 
 export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
@@ -55,7 +55,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const visibleActions = isAiCleanup || isPatternGroup
     ? (["keep", "exclude", "repair"] as ReviewCapability[]).filter((action) => occurrenceActions.includes(action) && (action !== "repair" || !deletionSuggestion))
     : occurrenceActions;
-  const proposals = candidateWarnings.filter((group) => group.kind === "ai-cleanup").flatMap((group) => group.occurrences.filter((row) => reviewOccurrenceActions(group, row).includes("repair")).map((row) => ({ warning: group, occurrence: row })));
+  const proposals = candidateWarnings.filter((group) => group.kind === "ai-cleanup").flatMap((group) => group.occurrences.filter((row) => reviewSuggestedAction(group, row)).map((row) => ({ warning: group, occurrence: row })));
   const pendingProposalCount = proposals.filter(({ occurrence: row }) => reviewDecisions[row.id] === undefined).length;
   const pendingSuggestionCount = isScriptCue ? pendingCueCount : pendingProposalCount;
   const suggestionCount = isScriptCue ? warning.occurrences.filter((row) => reviewOccurrenceActions(warning, row).includes("exclude")).length : proposals.length;
@@ -244,15 +244,14 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
             {isPatternGroup && <div className="resolution-options" role="group" aria-label={t("Choose for repeated text")}>
               <p>{t("Applies to {{count}} undecided occurrences. Your individual choices are preserved.", { count: pendingPatternCount })}</p>
-              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "exclude"))}><b>{t("Omit repeated text")}</b></button>
-              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "keep"))}><b>{t("Keep repeated text")}</b></button>
+              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "exclude"))}><b>{t("Apply to all: leave out")}</b></button>
+              <button disabled={pendingPatternCount === 0} onClick={() => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "keep"))}><b>{t("Apply to all: keep")}</b></button>
             </div>}
-            <OccurrenceChoices grouped={Boolean(isPatternGroup)} label={t("Adjust this occurrence")}>
             <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>
-            <h3>{t(hasCleanupSuggestion && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
+            <h3>{t(hasCleanupSuggestion && occurrence.cueVerification !== "verified" && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
             <div className="resolution-options">
               {visibleActions.map((action) => {
-                const recommended = (isScriptCue && occurrence.recommendedAction === action)
+                const recommended = ((isScriptCue || isAiCleanup) && occurrence.recommendedAction === action)
                   || (hasCleanupSuggestion && (deletionSuggestion ? action === "exclude" : action === "repair"));
                 const selected = selectedAction === action || (deletionSuggestion && action === "exclude" && selectedAction === "repair");
                 return <button key={action} aria-pressed={selected} aria-description={recommended ? t("Suggested choice for this passage") : undefined} className={[recommended ? "review-recommended" : "", selected ? "selected" : ""].filter(Boolean).join(" ")} onClick={() => perOccurrence ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}>
@@ -267,7 +266,6 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
                 </button>
               </div>}
             </div>
-            </OccurrenceChoices>
           </section>
         </> : null}
       </div>
@@ -276,9 +274,4 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     <div className="phase-action"><button className="primary" disabled={!complete || busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button></div>
   </>;
 
-}
-
-
-function OccurrenceChoices({ grouped, label, children }: { grouped: boolean; label: string; children: ReactNode }) {
-  return grouped ? <details className="review-pattern-exceptions"><summary>{label}</summary>{children}</details> : <>{children}</>;
 }

@@ -515,6 +515,7 @@ def _coalesce_narration(partition: Sequence[dict[str, Any]]) -> list[dict[str, A
         previous = rebuilt[-1] if rebuilt else None
         if (
             previous is not None
+            and not span.get("chapterBoundaryDraft")
             and previous.get("renderRole") == "narration"
             and span.get("renderRole") == "narration"
             and previous.get("blockId") == span.get("blockId")

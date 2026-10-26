@@ -15,11 +15,19 @@ from meowdiobooks.backend import cleanup_concurrency
 from meowdiobooks.backend import remote_llm
 
 ROOT = Path(__file__).resolve().parents[2]
+PASSAGE = "A complete synthetic passage with enough text for a bounded editorial candidate."
+
+
+@pytest.fixture(autouse=True)
+def isolate_focused_cleanup(monkeypatch):
+    monkeypatch.setattr(cleanup, "review_hyphens", lambda *a, **k: {"occurrences": [], "windows": [], "summary": {}})
+    monkeypatch.setattr(cleanup, "confirm_chapter_candidates", lambda *a, **k: {})
+
 
 
 def artifacts(text, *, spoken_start=0, spoken_end=None):
     return ({"blocks": [{"id": "b1", "text": text, "page": 2}]}, {"spans": [{
-        "id": "s1", "blockId": "b1", "sourceStart": 0, "sourceEnd": len(text),
+        "id": "s1", "blockId": "b1", "renderRole": "narration", "sourceStart": 0, "sourceEnd": len(text),
         "spokenStart": spoken_start, "spokenEnd": len(text) if spoken_end is None else spoken_end,
         "source": text,
     }]})
@@ -74,7 +82,7 @@ def test_missing_malformed_or_duplicate_answers_fail_candidate(monkeypatch, resp
     monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: response)
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: pytest.fail("No repair"))
     with pytest.raises(cleanup.CleanupReviewError):
-        cleanup.run_cleanup_review(ROOT, *artifacts("Story text."), lambda *a: None)
+        cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), lambda *a: None)
 
 
 @pytest.mark.parametrize("before,after", [
@@ -103,35 +111,30 @@ def test_unsafe_ambiguous_or_overlapping_proposals_rejected(source, change):
         cleanup.validate_cleanup_edits(source, change)
 
 
-def test_full_check_routes_flagged_only_preserves_source_and_emits_exact_edits(monkeypatch):
-    extraction, dialogue = artifacts("Un-\nbroken.\n\nClean prose.")
+def test_focused_check_routes_flagged_only_and_preserves_whole_source(monkeypatch):
+    notice = "Synthetic production notice with a complete standalone distribution condition."
+    extraction, dialogue = artifacts(notice + "\n\n" + PASSAGE)
     before = deepcopy((extraction, dialogue))
     calls = []
 
     def decide(root, config, prompt, questions, **kwargs):
-        assert config.model == "gpt-6-luna"
         target = json.loads(prompt)["TARGET"]
-        return answers(word_damage="review" if "Un-" in target else "clean")
+        return answers(production="review" if target == notice else "clean")
 
-    def repair(root, config, system, prompt, **kwargs):
-        calls.append(json.loads(prompt)["TARGET"])
-        return {"text": json.dumps(proposal("Un-\nbroken", "Unbroken"))}
+    def verify(root, config, system, prompt, **kwargs):
+        examples = json.loads(prompt)["examples"]
+        calls.extend(examples)
+        return {"text": json.dumps({"assessments": [{"windowId": row["windowId"],
+            "role": "EDITORIAL", "complete": True} for row in examples], "reason": "Standalone notice."})}
 
     monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
-    monkeypatch.setattr(cleanup, "remote_chat_completion", repair)
+    monkeypatch.setattr(cleanup, "remote_chat_completion", verify)
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
-    assert result["summary"] == {
-        "model": "gpt-6-luna", "policy": cleanup.POLICY_ID,
-        "inputWindows": 2, "flaggedWindows": 1, "proposals": 1, "sourceReview": 0,
-        "patternGroups": 0, "patternVerifiedGroups": 0, "patternPreservedWindows": 0,
-    }
-    assert calls == ["Un-\nbroken."]
-    assert result["occurrences"][0]["sourceStart"] == 0
-    assert result["occurrences"][0]["sourceEnd"] == 10
-    assert result["occurrences"][0]["replacement"] == "Unbroken"
-    assert result["occurrences"][0]["proposalStatus"] == "proposed"
+    assert result["summary"]["proposals"] == 1 and result["summary"]["sourceReview"] == 0
+    assert [row["TARGET"] for row in calls] == [notice]
+    assert result["occurrences"][0]["source"] == notice
+    assert result["occurrences"][0]["replacement"] == ""
     assert (extraction, dialogue) == before
-    assert len(result["windows"]) == 2
 
 
 @pytest.mark.parametrize("change", [
@@ -140,19 +143,20 @@ def test_full_check_routes_flagged_only_preserves_source_and_emits_exact_edits(m
     {"action": "keep", "edits": [{"before": "hero", "after": ""}], "reason": "Contradictory"},
     {"action": "keep", "edits": [], "reason": 123},
 ])
-def test_flagged_but_unrepairable_windows_stay_visible(monkeypatch, change):
+def test_uncertain_units_preserve_source_without_mandatory_review(monkeypatch, change):
     monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(word_damage="uncertain"))
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": json.dumps(change)})
-    result = cleanup.run_cleanup_review(ROOT, *artifacts("The hero."), lambda *a: None)
-    assert result["summary"]["sourceReview"] == 1
-    assert result["occurrences"][0]["replacement"] is None
+    result = cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), lambda *a: None)
+    assert result["summary"]["sourceReview"] == 0
+    assert result["occurrences"] == []
 
 
-def test_unreadable_repair_fails_instead_of_disappearing(monkeypatch):
-    monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(word_damage="review"))
+def test_unreadable_optional_verifier_preserves_without_proposal(monkeypatch):
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(production="review"))
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": "not json"})
-    with pytest.raises(cleanup.CleanupReviewError):
-        cleanup.run_cleanup_review(ROOT, *artifacts("Broken word."), lambda *a: None)
+    result = cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), lambda *a: None)
+    assert not result["occurrences"]
+    assert result["focusedReview"]["groups"][0]["verdict"] == "invalid"
 
 
 def test_bounded_concurrency_processes_every_window(monkeypatch):
@@ -172,7 +176,7 @@ def test_bounded_concurrency_processes_every_window(monkeypatch):
         return answers()
 
     monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
-    result = cleanup.run_cleanup_review(ROOT, *artifacts("\n\n".join(f"Paragraph {i}" for i in range(20))), lambda *a: None)
+    result = cleanup.run_cleanup_review(ROOT, *artifacts("\n\n".join(f"Paragraph {i}. " + PASSAGE * 10 for i in range(20))), lambda *a: None)
     assert result["summary"]["inputWindows"] == 20
     assert len(result["windows"]) == 20
     assert 4 < peak <= cleanup.MAX_WORKERS
@@ -215,7 +219,7 @@ def test_provider_limits_are_shared_by_concurrent_book_jobs(monkeypatch, kind, l
     def decide(*args, **kwargs):
         if kind == "decisions":
             provider_call()
-        return answers(word_damage="review" if kind == "repair" else "clean")
+        return answers(production="review" if kind == "repair" else "clean")
 
     def repair(*args, **kwargs):
         provider_call()
@@ -223,7 +227,7 @@ def test_provider_limits_are_shared_by_concurrent_book_jobs(monkeypatch, kind, l
 
     monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
     monkeypatch.setattr(cleanup, "remote_chat_completion", repair)
-    inputs = artifacts("\n\n".join(f"Paragraph {index}" for index in range(limit)))
+    inputs = artifacts("\n\n".join(f"Paragraph {index}. " + PASSAGE * 10 for index in range(limit)))
     with ThreadPoolExecutor(max_workers=2) as jobs:
         futures = [jobs.submit(cleanup.run_cleanup_review, ROOT, *inputs, lambda *a: None) for _ in range(2)]
         try:
@@ -263,12 +267,12 @@ def test_cancellation_waiting_for_provider_slot_does_not_admit_or_call(monkeypat
 
     def decide(*args, **kwargs):
         assert kind == "repair", "Cancelled Decisions request reached provider"
-        return answers(word_damage="review")
+        return answers(production="review")
 
     monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: pytest.fail("Cancelled repair reached provider"))
     with ThreadPoolExecutor(max_workers=1) as job:
-        future = job.submit(cleanup.run_cleanup_review, ROOT, *artifacts("A passage."), report,
+        future = job.submit(cleanup.run_cleanup_review, ROOT, *artifacts(PASSAGE), report,
                             request_admission=lambda *a: admissions.append(a))
         try:
             assert waiting.wait(5), "Cancellation must happen while waiting for the provider slot"
@@ -339,14 +343,14 @@ def test_admission_cancels_after_acquiring_slot_before_network_and_releases_it(m
     monkeypatch.setattr(remote_llm, "configured_api_key", lambda *a: "test-key")
     monkeypatch.setattr(remote_llm.urllib.request, "urlopen", lambda *a, **k: pytest.fail("Cancelled request reached network"))
     if kind == "repair":
-        monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(word_damage="review"))
+        monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(production="review"))
 
     def report(*args):
         if acquired.is_set():
             raise RuntimeError("cancelled before admission")
 
     with pytest.raises(RuntimeError, match="cancelled before admission"):
-        cleanup.run_cleanup_review(ROOT, *artifacts("A passage."), report,
+        cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), report,
                                    request_admission=lambda *a: pytest.fail("Cancelled request reserved quota"))
     assert gate.acquire(blocking=False)
     gate.release()
@@ -429,7 +433,7 @@ def test_outage_fails_candidate_and_cancellation_stops_before_network(monkeypatc
     monkeypatch.setattr(remote_llm.urllib.request, "urlopen", offline)
     monkeypatch.setattr(remote_llm.time, "sleep", lambda _: None)
     with pytest.raises(remote_llm.RemoteModelUnavailableError):
-        cleanup.run_cleanup_review(ROOT, *artifacts("Story"), lambda *a: None)
+        cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), lambda *a: None)
     assert len(calls) == 4
     calls.clear()
 
@@ -437,7 +441,7 @@ def test_outage_fails_candidate_and_cancellation_stops_before_network(monkeypatc
         raise RuntimeError("cancelled")
 
     with pytest.raises(RuntimeError, match="cancelled"):
-        cleanup.run_cleanup_review(ROOT, *artifacts("Story"), cancelled)
+        cleanup.run_cleanup_review(ROOT, *artifacts(PASSAGE), cancelled)
     assert calls == []
 
 
@@ -471,8 +475,8 @@ def test_explicit_registry_path_is_used_by_runner(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize("initial", ["review", "uncertain"])
-def test_valid_second_pass_keep_clears_flag_without_changing_source(monkeypatch, initial):
-    extraction, dialogue = artifacts("The contents were shared with her.")
+def test_legacy_keep_shape_or_uncertainty_never_authorizes_whole_unit_deletion(monkeypatch, initial):
+    extraction, dialogue = artifacts("The contents were shared with her, and the story continued as before.")
     before = deepcopy((extraction, dialogue))
     monkeypatch.setattr(cleanup, "remote_decisions_completion", lambda *a, **k: answers(production=initial))
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": json.dumps(
@@ -498,24 +502,21 @@ def test_repeated_numbered_story_is_only_model_evidence_and_keep_retains_it(monk
     assert build_review_workspace(extraction, dialogue)["warnings"] == []
     seen = []
 
+    extraction["method"] = "native"
     def decide(_root, _config, prompt, *_args, **_kwargs):
         payload = json.loads(prompt)
-        if "structural_evidence" not in payload:
-            return answers()
-        evidence = payload["structural_evidence"][0]
-        assert payload["TARGET"][evidence["targetStart"]:evidence["targetEnd"]].startswith("Room ")
-        assert evidence["distinctPageCount"] == 3
-        assert evidence["folioOffset"] == 0
-        assert evidence["firstPage"] == 1 and evidence["lastPage"] == 3
+        for row in payload["examples"]:
+            assert row["TARGET"].startswith("Room ")
+            assert row["structural_evidence"][0]["distinctPageCount"] == 3
         seen.append(payload)
-        return answers(production="review")
+        return {"answers": [{"type": "choice", "name": "family", "choice": "PRESERVE"}]}
 
     monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
     monkeypatch.setattr(cleanup, "remote_chat_completion", lambda *a, **k: {"text": json.dumps(
         {"action": "keep", "edits": [], "reason": "Narrative room labels; retain them."})})
     before = deepcopy((extraction, dialogue))
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
-    assert result["occurrences"] == [] and len(seen) == 3
+    assert result["occurrences"] == [] and len(seen) == 1
     assert (extraction, dialogue) == before
 
 

@@ -24,9 +24,26 @@ from meowdiobooks.backend.review import ReviewContractError
 @pytest.fixture(autouse=True)
 def offline_cleanup_provider(monkeypatch):
     """These lifecycle tests isolate provider behavior, tested in test_cleanup_remote."""
+    def offline_review(_root, extraction, _dialogue, *_args, **_kwargs):
+        from meowdiobooks.backend.chapters import is_chapter_heading_hint
+        from meowdiobooks.backend.chapter_semantic import (
+            chapter_review_plan, assemble_chapter_review,
+        )
+
+        # Lifecycle fixtures isolate model behavior using the same source-bound packets.
+        plan = chapter_review_plan(extraction, _dialogue)
+        batches = [{"targets": packet, "response": {"assessments": [
+            {"boundaryId": row["boundaryId"],
+             "role": "chapter" if is_chapter_heading_hint(row["TARGET"]) else "other",
+             "reason": "Offline lifecycle fixture classification."}
+            for row in packet]}} for packet in plan["packets"]]
+        return {
+            "occurrences": [], "summary": {"inputWindows": 0},
+            "chapterReview": assemble_chapter_review(plan, batches),
+        }
+
     monkeypatch.setattr(
-        "meowdiobooks.backend.cleanup_remote.run_cleanup_review",
-        lambda *args, **kwargs: {"occurrences": [], "summary": {"inputWindows": 0}},
+        "meowdiobooks.backend.cleanup_remote.run_cleanup_review", offline_review,
     )
 
 

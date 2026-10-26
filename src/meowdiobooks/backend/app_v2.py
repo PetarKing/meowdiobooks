@@ -687,6 +687,9 @@ def create_app_v2(
         strategy = str(settings.get("strategy", "narrate"))
         report(5, "Checking dialogue formats")
         scan = scan_dialogue(extraction["blocks"], **dialogue_scan_settings(settings))
+        from .chapter_partition import partition_chapter_headings
+
+        scan = partition_chapter_headings(scan)
         blockers = dialogue_progression_blockers(scan)
         if blockers:
             raise WorkflowInputError(

@@ -619,6 +619,7 @@ export interface RawDialogueCandidate extends ArtifactCandidate {
 }
 
 export interface ReviewCandidate extends ArtifactCandidate {
+  unifiedSuggestions?: boolean;
   warnings?: Array<Record<string, unknown>>;
   boundaryCandidates?: BoundaryCandidate[];
   recovery?: Record<string, unknown> | null;

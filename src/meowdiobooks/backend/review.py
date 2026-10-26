@@ -81,16 +81,16 @@ _PAGE_NUMBER = re.compile(r"^\s*(?:\d{1,4}|[ivxlcdm]{1,10})\s*$", re.IGNORECASE)
 _WEB_ADDRESS = re.compile(r"\b(?:https?://|www\.)[^\s<>{}\[\]\"']+", re.IGNORECASE)
 _WEB_ADDRESS_TRAILING_PUNCTUATION = ".,;:!?)]}"
 _FOOTNOTE = re.compile(r"^\s*(?:\[?\d{1,3}\]?|[*†‡])(?:[.)\]]|\s{1,3})\s*\S")
-_CHAPTER_LIST_ENTRY = re.compile(r"^\s*\d{1,3}[.)]\s+chapter\s+\d+\b", re.IGNORECASE)
+# Exact whole-line hints only open a note section; marker and boundary checks still
+# determine the review range. These are multilingual recall hints, not deletion rules.
 _NOTE_SECTION_HEADER = re.compile(
-    r"^\s*(?:(?:translator(?:'s)?|translation|tl)\s+notes?)\s*:?\s*$",
-    re.IGNORECASE,
-)
-_NOTE_SECTION_BOUNDARY = re.compile(
-    r"^\s*(?:(?:chapter|part|book)\s+\S+|prologue\b|epilogue\b|"
-    r"(?:human|machine)\s+translated\s+by\b|proofread\s+by\b|"
-    r"japanese\s+to\s+english\s+checking\s+by\b|art\s+sources?\b)",
-    re.IGNORECASE,
+    r"^\s*(?:(?:translator(?:'s)?|translation|tl)\s+notes?|"
+    r"notes?\s+(?:du\s+traducteur|de\s+traduction)|"
+    r"anmerkungen?\s+(?:des\s+übersetzers|zur\s+übersetzung)|übersetzeranmerkungen|"
+    r"note\s+(?:del\s+traduttore|di\s+traduzione)|"
+    r"notas?\s+(?:del\s+traductor|de\s+traducción|do\s+tradutor|de\s+tradução)|"
+    r"примечания?\s+переводчика|译者注|譯者註|翻译注释|翻譯註釋|"
+    r"訳注|翻訳者注|訳者注|번역자\s*주|역자\s*주)\s*[:：]?\s*$", re.IGNORECASE,
 )
 _LINE_HYPHEN = re.compile(r"(?<![\w-])[A-Za-z]{2,}[-\u00ad][ \t\r]*\n[ \t]*[a-z]{2,}(?![\w-])")
 
@@ -231,13 +231,64 @@ def add_cleanup_proposals(
     dialogue: Mapping[str, Any], result: Mapping[str, Any],
 ) -> dict[str, Any]:
     """Attach validated model suggestions without changing any accepted source."""
+    if result.get("unifiedSuggestions") is True and any(
+        not any(proposal.get(key) is not None for key in ("hyphenDecision", "editorialFamilyId", "patternGroupId"))
+        for proposal in result.get("occurrences", [])
+    ):
+        raise ReviewContractError("Unified suggestions require verified source-bound evidence")
+    editorial_evidence = result.get("focusedReview")
+    editorial_proposals = []
+    if editorial_evidence is not None:
+        from .cleanup_editorial import verified_editorial_occurrences
+        try:
+            editorial_proposals = verified_editorial_occurrences(extraction, dialogue, editorial_evidence)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+        if [p for p in result.get("occurrences", []) if p.get("editorialFamilyId") is not None] != editorial_proposals:
+            raise ReviewContractError("Editorial proposals differ from their verified evidence")
+    elif any(p.get("editorialFamilyId") is not None for p in result.get("occurrences", [])):
+        raise ReviewContractError("Editorial proposals require source-bound evidence")
+    chapter_evidence = result.get("chapterReview")
+    if chapter_evidence is not None:
+        from .chapter_semantic import validate_chapter_review
+        try:
+            boundaries = validate_chapter_review(extraction, dialogue, chapter_evidence, footer_evidence=result)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+        add_source_context(boundaries, _normalise_blocks(extraction))
+        workspace = {**workspace, "boundaryCandidates": boundaries}
+    hyphen_evidence = result.get("hyphenReview")
+    if hyphen_evidence is not None:
+        from .hyphen_review import validated_hyphen_proposals
+        try:
+            hyphen_proposals = validated_hyphen_proposals(extraction, dialogue, hyphen_evidence)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+        actual = [p for p in result.get("occurrences", []) if p.get("hyphenDecision") is not None]
+        hyphen_proposals = [p for p in hyphen_proposals if not any(
+            e["blockId"] == p["blockId"] and e["sourceStart"] <= p["sourceStart"]
+            and p["sourceEnd"] <= e["sourceEnd"] for e in editorial_proposals)]
+        if actual != hyphen_proposals:
+            raise ReviewContractError("Cleanup hyphens differ from their verified evidence")
+        workspace = {**workspace, "warnings": [w for w in workspace.get("warnings", [])
+                                               if w.get("kind") != "hyphenation"]}
+    elif any(p.get("hyphenDecision") is not None for p in result.get("occurrences", [])):
+        raise ReviewContractError("Hyphen decisions require source-bound evidence")
     blocks = _normalise_blocks(extraction)
     index = {str(block["id"]): block for block in blocks}
     cue_rows = _verified_script_occurrences(blocks, dialogue, result.get("scriptDirections", {}))
     rows = []
     pattern_candidates = {(row["blockId"], row["sourceStart"], row["sourceEnd"]): row
                           for row in numbered_edge_candidates(blocks)}
-    pattern_evidence = _validate_pattern_groups(result, pattern_candidates, dialogue.get("spans", []))
+    family_rule_mode = result.get("patternAssessmentMode") == "numbered-footer-rule-v1"
+    if family_rule_mode:
+        from .cleanup_patterns import validate_family_rule_evidence
+        try:
+            pattern_evidence = validate_family_rule_evidence(extraction, dialogue, result)
+        except (ValueError, TypeError, KeyError) as exc:
+            raise ReviewContractError(str(exc)) from exc
+    else:
+        pattern_evidence = _validate_pattern_groups(result, pattern_candidates, dialogue.get("spans", []))
     for proposal in result.get("occurrences", []):
         block = index.get(str(proposal.get("blockId", "")))
         start, end = proposal.get("sourceStart"), proposal.get("sourceEnd")
@@ -245,7 +296,7 @@ def add_cleanup_proposals(
                 or not 0 <= start < end <= len(block["text"])
                 or block["text"][start:end] != proposal.get("source")):
             raise ReviewContractError("Cleanup proposal does not match its exact source")
-        if "scriptDirections" in result:
+        if "scriptDirections" in result and proposal.get("hyphenDecision") is None:
             from .script_cues import bracket_ranges
             if any(max(start, left) < min(end, right)
                    for left, right in bracket_ranges(block["text"])):
@@ -277,6 +328,9 @@ def add_cleanup_proposals(
                     "model": "gpt-6-luna",
                     "availableActions": ["keep", "exclude", "repair"] if replacement is not None
                     else ["keep", "exclude"]})
+        if proposal.get("hyphenDecision") is not None:
+            row.update(hyphenDecision=proposal["hyphenDecision"], availableActions=["keep", "repair"],
+                       model="decisions", recommendedAction="repair")
         if proposal.get("patternGroupId") is not None:
             candidate = pattern_candidates.get((str(block["id"]), start, end))
             group = next((group for group in result.get("patternGroups", [])
@@ -290,7 +344,8 @@ def add_cleanup_proposals(
                     or group.get("verdict") != "verified"
                     or proposal.get("windowId") not in group.get("eligibleWindowIds", [])
                     or evidence.get("patternStatus") != "eligible"
-                    or evidence.get("answers") != {"production": "review", "word_damage": "clean"}
+                    or (not family_rule_mode and evidence.get("answers") != {"production": "review", "word_damage": "clean"})
+                    or (family_rule_mode and evidence.get("assessmentScope") != "family-rule")
                     or replacement != "" or proposal.get("patternVerification") != "verified"
                     or proposal["patternGroupId"] != candidate["patternGroupId"]
                     or not any(str(span.get("blockId")) == str(block["id"])
@@ -324,7 +379,7 @@ def add_cleanup_proposals(
                  for warning, occurrence in existing
                  if all(occurrence.get(key) == row[key]
                         for key in ("blockId", "sourceStart", "sourceEnd", "source"))]
-        matches = exact or _project_cleanup_anchor(row, existing)
+        matches = [] if row.get("hyphenDecision") else exact or _project_cleanup_anchor(row, existing)
         if len(matches) != 1:
             # Partial overlaps or multiple possible owners are not proof of one issue.
             # Keep the usable proposal; never silently discard a correction.
@@ -365,6 +420,10 @@ def add_cleanup_proposals(
         ))
     warnings.extend(_group_occurrences([*cue_rows, *novel], dialogue.get("spans", [])))
     return {**dict(workspace), "warnings": warnings,
+            "unifiedSuggestions": result.get("unifiedSuggestions") is True,
+            "hyphenReviewEvidence": deepcopy(hyphen_evidence),
+            "focusedReviewEvidence": deepcopy(editorial_evidence),
+            "chapterReviewEvidence": deepcopy(chapter_evidence),
             "cleanupSummary": dict(result.get("summary", {})),
             "cleanupPatternEvidence": pattern_evidence,
             "scriptDirectionsSummary": dict(result.get("scriptDirections", {}).get("summary", {})),
@@ -584,6 +643,10 @@ def accept_review_revision(
         "sourceReconstruction": dict(workspace["sourceReconstruction"]),
         "warningSnapshot": list(workspace.get("warnings", [])),
         "cleanupSummary": dict(workspace.get("cleanupSummary", {})),
+        "unifiedSuggestions": workspace.get("unifiedSuggestions") is True,
+        "hyphenReviewEvidence": deepcopy(workspace.get("hyphenReviewEvidence")),
+        "focusedReviewEvidence": deepcopy(workspace.get("focusedReviewEvidence")),
+        "chapterReviewEvidence": deepcopy(workspace.get("chapterReviewEvidence")),
         "cleanupPatternEvidence": deepcopy(workspace.get("cleanupPatternEvidence", {"groups": [], "windows": []})),
         "scriptDirectionsSummary": dict(workspace.get("scriptDirectionsSummary", {})),
         "decisions": ordered,
@@ -1365,11 +1428,16 @@ def _note_range_end(text: str, lines: Sequence[re.Match[str]], start: int) -> in
 
 
 def _is_footnote_marker(value: str) -> bool:
-    return bool(_FOOTNOTE.match(value) and not _CHAPTER_LIST_ENTRY.match(value))
+    from .chapters import is_chapter_heading_hint
+    without_number = re.sub(r"^\s*\d{1,3}[.)]\s+", "", value)
+    return bool(_FOOTNOTE.match(value) and not is_chapter_heading_hint(without_number))
 
 
 def _is_note_section_boundary(value: str) -> bool:
-    return bool(_NOTE_SECTION_BOUNDARY.match(value))
+    from .chapters import is_chapter_heading_hint
+    # A short standalone label ends a note, regardless of its language or wording.
+    # Prefer leaving a continuation ungrouped over extending a note into new content.
+    return is_chapter_heading_hint(value) or bool(re.fullmatch(r"\s*[^\n.!?。！？:：]{1,80}[:：]\s*", value))
 
 
 def _continues_note_across_block(

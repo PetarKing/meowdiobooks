@@ -65,3 +65,36 @@ describe("verified repeated page text", () => {
     expect(reviewPatternDecisions(unsafe, {}, "exclude")).toEqual({});
   });
 });
+
+describe("unified AI suggestions", () => {
+  it("keeps numbered families separate while combining other suggestions and preserving exceptions", async () => {
+    const input = { ...candidate(400), unifiedSuggestions: true };
+    const mixed = { ...input, warnings: [...input.warnings,
+      { id: "hyphens", kind: "ai-cleanup", availableActions: ["keep", "repair"], occurrences: [
+        { id: "word", source: "confi-\ndence", replacement: "confidence", availableActions: ["keep", "repair"] }] },
+      { id: "cue", kind: "stage-direction", availableActions: ["keep", "exclude"], occurrences: [
+        { id: "cue-row", source: "(softly)", cueVerification: "verified", recommendedAction: "exclude", availableActions: ["keep", "exclude"] }] },
+    ] };
+    const { reviewProposalDecisions } = await import("./workflow/review");
+    const warnings = normalizeCandidateWarnings(mixed);
+    expect(warnings).toHaveLength(2);
+    const [family, warning] = warnings;
+    expect(family.kind).toBe("repeated-page-text");
+    expect(family.occurrences).toHaveLength(400);
+    expect(warning.kind).toBe("ai-cleanup");
+    expect(warning.occurrences).toHaveLength(2);
+    const individual = { "footer-9": "keep" as const, word: "keep" as const };
+    const choices = reviewProposalDecisions(warning, reviewPatternDecisions(family, individual, "exclude"));
+    expect(choices["footer-9"]).toBe("keep");
+    expect(choices.word).toBe("keep");
+    expect(choices["footer-0"]).toBe("exclude");
+    expect(choices["cue-row"]).toBe("exclude");
+    expect(reviewWarningResolved(warning, choices)).toBe(true);
+    const preview = vi.fn();
+    const decisions = await buildReviewWarningDecisions("b", "r", warnings, choices, preview);
+    expect(decisions).toHaveLength(402);
+    expect(decisions.every((row) => row.occurrenceIds.length === 1)).toBe(true);
+    expect(preview).not.toHaveBeenCalled();
+    expect(normalizeCandidateWarnings(JSON.parse(JSON.stringify(mixed)))).toEqual(warnings);
+  });
+});

@@ -1,4 +1,4 @@
-"""Repeated matter needs individual contextual eligibility and bounded group confirmation."""
+"""Repeated matter needs one family screen and bounded rule confirmation."""
 from copy import deepcopy
 import json
 from pathlib import Path
@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[2]
 def artifacts(n=9, label="青空文庫"):
     blocks = [{"id": str(i), "page": i, "text": f"Unique story sentence {i}.\n{label} {i + 7}"}
               for i in range(1, n + 1)]
-    return ({"revision": "e1", "blocks": blocks}, {"revision": "d1", "extractionRevision": "e1", "spans": [
+    return ({"revision": "e1", "method": "native", "blocks": blocks}, {"revision": "d1", "extractionRevision": "e1", "spans": [
         {"id": b["id"], "blockId": b["id"], "sourceStart": 0, "sourceEnd": len(b["text"]),
          "source": b["text"], "text": b["text"], "page": b["page"], "renderRole": "narration"}
         for b in blocks]})
@@ -35,13 +35,10 @@ def mocks(monkeypatch, *, verdict="FOOTER", veto=None, damage=None):
     def decide(_root, _config, prompt, _questions, **_kwargs):
         packet = json.loads(prompt)
         calls["decisions"].append(packet)
-        if "structural_evidence" not in packet:
-            return answers()
-        if packet["TARGET"] == veto:
-            return answers("uncertain")
-        if packet["TARGET"] == damage:
-            return answers("review", "uncertain")
-        return answers("review")
+        if _questions[0]["name"] == "family":
+            rejected = any(row["TARGET"] in {veto, damage} for row in packet["examples"])
+            return {"answers": [{"type": "choice", "name": "family", "choice": "UNSURE" if rejected else "FOOTER"}]}
+        return answers()
 
     def complete(_root, _config, _system, prompt, **_kwargs):
         packet = json.loads(prompt)
@@ -63,7 +60,7 @@ def test_large_family_needs_one_verifier_and_keeps_distinct_source_choices(monke
     original = deepcopy((extraction, dialogue))
     calls = mocks(monkeypatch)
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
-    assert len(calls["decisions"]) == 60
+    assert len(calls["decisions"]) == 1  # One family rule screen, never one call per footer.
     assert len(calls["verification"]) == 1 and calls["repair"] == []
     representatives = calls["verification"][0]["examples"]
     assert [row["TARGET"] for row in representatives] == ["青空文庫 8", "青空文庫 23", "青空文庫 37"]
@@ -103,16 +100,13 @@ def test_narrative_numbered_labels_never_propagate_rejected_group(verdict, monke
     assert len(calls["verification"]) == 1 and calls["repair"] == []
 
 
-def test_context_veto_and_word_damage_are_not_group_omissions(monkeypatch):
-    calls = mocks(monkeypatch, veto="青空文庫 9", damage="青空文庫 11")
+def test_representative_context_veto_preserves_entire_family(monkeypatch):
+    calls = mocks(monkeypatch, veto="青空文庫 8")
     result = cleanup.run_cleanup_review(ROOT, *artifacts(), lambda *a: None)
-    proposals = {row["source"]: row for row in result["occurrences"]}
-    assert "青空文庫 9" not in proposals
-    assert proposals["青空文庫 11"]["replacement"] is None
-    assert "patternGroupId" not in proposals["青空文庫 11"]
-    assert len(calls["verification"]) == len(calls["repair"]) == 1
-    assert len(result["patternGroups"][0]["vetoes"]) == 2
-    assert len([r for r in result["occurrences"] if r.get("patternVerification") == "verified"]) == 7
+    assert result["occurrences"] == []
+    assert len(calls["decisions"]) == 1
+    assert calls["verification"] == calls["repair"] == []
+    assert result["patternGroups"][0]["verdict"] == "preserve"
 
 
 def test_dialogue_and_cross_spoken_boundary_candidates_do_not_join_families():
@@ -145,7 +139,7 @@ def test_invalid_group_authority_cannot_be_attached_to_proposals(monkeypatch):
     extraction, dialogue = artifacts()
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
     result["occurrences"][0]["patternGroupId"] = "forged"
-    with pytest.raises(ReviewContractError, match="Pattern"):
+    with pytest.raises(ReviewContractError, match="[Pp]attern|[Ff]ooter"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
 
 
@@ -157,7 +151,7 @@ def test_vetoed_anchor_cannot_borrow_a_neighbors_eligible_window_evidence(monkey
     target = next(row for row in numbered_edge_candidates(extraction["blocks"]) if row["source"] == "青空文庫 9")
     borrowed.update({key: target[key] for key in ("blockId", "sourceStart", "sourceEnd", "source")})
     result["occurrences"] = [borrowed]
-    with pytest.raises(ReviewContractError, match="Pattern"):
+    with pytest.raises(ReviewContractError, match="[Pp]attern|[Ff]ooter"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
 
 
@@ -169,7 +163,7 @@ def test_occurrence_evidence_must_agree_with_its_verified_group(monkeypatch, fie
     proposal = result["occurrences"][0]
     evidence = next(row for row in result["windows"] if row["windowId"] == proposal["windowId"])
     evidence[field] = value
-    with pytest.raises(ReviewContractError, match="Pattern"):
+    with pytest.raises(ReviewContractError, match="[Pp]attern|[Ff]ooter"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
 
 
@@ -192,19 +186,19 @@ def test_group_evidence_counts_representatives_and_verdict_are_revalidated(monke
     else:
         row = next(row for row in result["windows"] if row.get("patternGroupId"))
         result["windows"].append(deepcopy(row))
-    with pytest.raises(ReviewContractError, match="Pattern"):
+    with pytest.raises(ReviewContractError, match="[Pp]attern|[Ff]ooter"):
         add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
 
 
-def test_insufficient_contextual_support_preserves_family_without_luna_calls(monkeypatch):
+def test_family_screen_veto_preserves_without_luna_calls(monkeypatch):
     calls = mocks(monkeypatch, veto="青空文庫 9")
     extraction, dialogue = artifacts(3)
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
     assert result["occurrences"] == [] and calls["verification"] == calls["repair"] == []
-    assert result["patternGroups"][0]["verdict"] == "insufficient"
+    assert result["patternGroups"][0]["verdict"] == "preserve"
     workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
     accepted = accept_review_revision(workspace, [], revision="preserved")
-    assert accepted["cleanupPatternEvidence"]["groups"][0]["eligibleCount"] == 2
+    assert accepted["cleanupPatternEvidence"]["groups"][0]["eligibleCount"] == 3
     assert apply_review_render_policies(dialogue, accepted)["spans"] == dialogue["spans"]
 
 
@@ -220,3 +214,41 @@ def test_group_verification_transport_failure_keeps_atomic_failure_behavior(monk
     with pytest.raises(RuntimeError, match="provider unavailable"):
         cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
     assert (extraction, dialogue) == original
+
+
+def test_physical_production_method_required_and_logical_chunks_never_form_rule():
+    from meowdiobooks.backend.cleanup_patterns import numbered_family_manifest
+    extraction, dialogue = artifacts()
+    extraction.update(kind="extraction", pageCount=9, pages=[{"page": i, "method": "native"} for i in range(1, 10)])
+    assert len(numbered_family_manifest(extraction, dialogue)) == 1
+    extraction["method"] = "text"
+    extraction["sourcePagination"] = "logical ~6000-character chunks, not printed pages"
+    assert numbered_family_manifest(extraction, dialogue) == []
+
+
+def test_unsupported_geometry_is_preserved_and_samples_are_bounded(monkeypatch):
+    from meowdiobooks.backend.cleanup_patterns import numbered_family_manifest
+    extraction, dialogue = artifacts(30)
+    # First/middle/last have the same shape; five additional shapes exceed remaining slots.
+    shapes = [("", ""), ("", "  "), ("Story.\n", ""),
+              ("Story.\n", "  "), ("Story.\n\n", ""), ("Story.\n\n", "  ")]
+    for index, (body, indent) in enumerate(shapes, 1):
+        extraction["blocks"][index]["text"] = body + indent + f"青空文庫 {index + 8}"
+    for block, span in zip(extraction["blocks"], dialogue["spans"]):
+        span.update(source=block["text"], text=block["text"], sourceEnd=len(block["text"]))
+    family = numbered_family_manifest(extraction, dialogue)[0]
+    assert len(family["representatives"]) <= 6 and family["unsupported"]
+    supported = {r["ruleGeometry"] for r in family["representatives"]}
+    assert all(r["ruleGeometry"] not in supported for r in family["unsupported"])
+    mocks(monkeypatch)
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    omitted = {r["windowId"] for r in result["occurrences"]}
+    assert omitted.isdisjoint(r["windowId"] for r in family["unsupported"])
+
+
+def test_family_manifest_rejects_mismatched_reader_source():
+    from meowdiobooks.backend.cleanup_patterns import numbered_family_manifest
+    extraction, dialogue = artifacts()
+    dialogue["spans"][0]["source"] = "forged"
+    family = numbered_family_manifest(extraction, dialogue)[0]
+    assert len(family["members"]) == 8

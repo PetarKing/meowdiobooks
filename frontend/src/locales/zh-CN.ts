@@ -224,6 +224,8 @@ const zhCN: Record<string, string> = {
   "Omit this occurrence": "省略此处内容",
   "Choose for repeated text": "选择如何处理重复文字",
   "Applies to {{count}} undecided occurrences. Your individual choices are preserved.": "应用于 {{count}} 处尚未决定的内容。保留您的单独选择。",
+  "Apply to all: leave out": "全部设为不朗读",
+  "Apply to all: keep": "全部设为保留",
   "Omit repeated text": "省略重复文字",
   "Keep repeated text": "保留重复文字",
   "Check hyphens": "检查连字符",

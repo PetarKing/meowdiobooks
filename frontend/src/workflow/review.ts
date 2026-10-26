@@ -7,7 +7,7 @@ function reviewText(t: TFunction | undefined, key: string, values: Record<string
   return key.replace(/\{\{(\w+)\}\}/g, (_match, name: string) => String(values[name] ?? ""));
 }
 
-export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): ReviewWarning[] {
+export function normalizeCandidateWarnings(candidate: { warnings?: unknown; unifiedSuggestions?: boolean }): ReviewWarning[] {
   if (!Array.isArray(candidate.warnings)) return [];
   const aliases: Record<string, string> = { "missing-content": "empty-page", "extraction-artifact": "suspicious-extraction", "ocr-artifact": "suspicious-extraction", "layout-order": "reading-order", "peripheral-matter": "front-back-matter" };
   const warnings: ReviewWarning[] = (candidate.warnings as Array<Record<string, unknown>>).map((row) => { const rawKind = String(row.kind ?? "review-warning"); const readerState = String(row.readerState ?? ""); return { decisionScope: row.decisionScope as ReviewWarning["decisionScope"], id: String(row.id ?? row.kind), kind: aliases[rawKind] ?? rawKind, detail: String(row.detail ?? "Compare the highlighted text with your source document."), severity: (["notice", "warning", "blocking"].includes(String(row.severity)) ? String(row.severity) : "warning") as ReviewWarning["severity"], readerState: (["narrator", "assigned-speaker", "mixed"].includes(readerState) ? readerState : undefined) as ReviewWarning["readerState"], availableActions: Array.isArray(row.availableActions) ? row.availableActions.map(String).filter((action) => action !== "defer") as ReviewCapability[] : ["keep"], occurrences: Array.isArray(row.occurrences) ? (row.occurrences as Array<Record<string, unknown>>).map((occurrence) => ({ hyphenChoices: occurrence.hyphenChoices as WarningOccurrence["hyphenChoices"], patternGroupId: typeof occurrence.patternGroupId === "string" ? occurrence.patternGroupId : undefined, patternVerification: occurrence.patternVerification === "verified" ? "verified" : undefined, contextLayout: occurrence.contextLayout === "continuous" ? "continuous" : undefined, recommendedAction: occurrence.recommendedAction === "exclude" ? "exclude" : undefined, cueVerification: occurrence.cueVerification === "verified" ? "verified" : undefined, readerState: occurrence.readerState as WarningOccurrence["readerState"], proposalStatus: occurrence.proposalStatus as WarningOccurrence["proposalStatus"], cleanupReason: occurrence.cleanupReason == null ? undefined : String(occurrence.cleanupReason), id: String(occurrence.id), source: String(occurrence.source ?? occurrence.text ?? ""), text: String(occurrence.text ?? occurrence.source ?? ""), page: Number(occurrence.page ?? 0), contextBefore: occurrence.contextBefore == null ? undefined : String(occurrence.contextBefore), contextAfter: occurrence.contextAfter == null ? undefined : String(occurrence.contextAfter), replacement: typeof occurrence.replacement === "string" ? occurrence.replacement : undefined, availableActions: Array.isArray(occurrence.availableActions) ? occurrence.availableActions.map(String) as ReviewCapability[] : undefined, reason: occurrence.reason == null ? undefined : String(occurrence.reason) })) : [] }; });
@@ -18,6 +18,7 @@ export function normalizeCandidateWarnings(candidate: { warnings?: unknown }): R
   const sourceWarnings: ReviewWarning[] = [];
   for (const warning of warnings) {
     const moved = warning.occurrences.filter((row) => warning.kind === "ai-cleanup" ||
+      (candidate.unifiedSuggestions === true && row.cueVerification === "verified") ||
       (typeof row.replacement === "string" && (row.availableActions ?? warning.availableActions).includes("repair")));
     aiRows.push(...moved.map((row) => ({ ...row, availableActions: row.availableActions ?? warning.availableActions })));
     if (warning.kind === "ai-cleanup") continue;
@@ -59,8 +60,8 @@ export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarni
   if (reviewIsPatternGroup(warning)) return action === "keep" ? "Keep this occurrence" : "Omit this occurrence";
   if (action === "keep-hyphen") return "Keep hyphen";
   if (action === "join-word") return "Join word";
-  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep";
-  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave";
+  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep original text";
+  if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave out";
   if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
   if (kind === "empty-page" && action === "keep") return "Confirm this page is intentionally empty";
   if (kind === "empty-page" && action === "rerun-extraction") return "Try extraction again";
@@ -172,10 +173,18 @@ export function reviewWarningResolved(warning: ReviewWarning, decisions: Record<
     : warning.availableActions.includes(decisions[warning.id]);
 }
 
+export function reviewSuggestedAction(warning: ReviewWarning, row: WarningOccurrence): ReviewCapability | undefined {
+  const actions = reviewOccurrenceActions(warning, row);
+  if (row.recommendedAction === "exclude" && row.cueVerification === "verified" && actions.includes("exclude")) return "exclude";
+  if (typeof row.replacement === "string" && actions.includes("repair")) return "repair";
+  return undefined;
+}
+
 export function reviewProposalDecisions(warning: ReviewWarning, decisions: Record<string, ReviewCapability>) {
   const next = { ...decisions };
   for (const row of warning.occurrences) {
-    if (next[row.id] === undefined && reviewUsesOccurrenceDecisions(warning) && reviewOccurrenceActions(warning, row).includes("repair")) next[row.id] = "repair";
+    const action = reviewSuggestedAction(warning, row);
+    if (next[row.id] === undefined && reviewUsesOccurrenceDecisions(warning) && action) next[row.id] = action;
   }
   return next;
 }
