@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-import re
 from typing import Any
 
 from .boundary_render import BoundaryRenderError, validate_boundary_repairs
@@ -48,7 +47,6 @@ def compile_render_plan(
     except BoundaryRenderError as exc:
         raise RenderPlanError(str(exc)) from exc
     repair_by_pair = {(row["anchors"][0]["spanId"], row["anchors"][1]["spanId"]): row for row in boundary_repairs}
-    intact_words = _intact_words(entries)
     available_chapters = {str(row.get("chapterId") or "chapter-1") for row in entries}
     unknown_chapters = sorted(set(selected) - available_chapters)
     if unknown_chapters:
@@ -61,7 +59,6 @@ def compile_render_plan(
     }
     segments_by_chapter: dict[str, list[dict[str, Any]]] = {value: [] for value in selected}
     omissions: list[dict[str, Any]] = []
-    repaired_line_hyphenations = 0
     segment_number = 0
     boundaries = source_boundaries(spans, recording_script)
     pending_boundaries: dict[str, str] = {}
@@ -106,8 +103,8 @@ def compile_render_plan(
                     pending_boundaries[chapter_id] = boundary
             if not part:
                 continue
-            text, line_hyphenations = _repair_line_break_hyphenation(part, intact_words)
-            repaired_line_hyphenations += line_hyphenations
+            # Review owns spelling; pacing partitions may not infer another correction.
+            text = part
             speakable = any(character.isalnum() for character in text)
             kind = pending_boundaries.get(chapter_id, "turn")
             if not segments_by_chapter[chapter_id]:
@@ -162,42 +159,9 @@ def compile_render_plan(
                 for segment in chapter["segments"]
             ),
             "omittedChapters": len(omitted_chapter_ids),
-            "repairedLineBreakHyphenations": repaired_line_hyphenations,
+            "repairedLineBreakHyphenations": 0,
         },
     }
-
-
-_LINE_BREAK_HYPHEN = re.compile(
-    r"(?P<left>[^\W\d_]+)-[ \t]*\r?\n[ \t]*(?P<right>[^\W\d_]+)",
-    re.UNICODE,
-)
-_INTACT_WORD = re.compile(r"[^\W\d_]+", re.UNICODE)
-
-
-def _intact_words(entries: Sequence[Mapping[str, Any]]) -> set[str]:
-    """Collect book-local evidence without treating split fragments as intact words."""
-
-    words: set[str] = set()
-    for entry in entries:
-        text = _LINE_BREAK_HYPHEN.sub(" ", str(entry.get("text", "")))
-        words.update(match.group(0).casefold() for match in _INTACT_WORD.finditer(text))
-    return words
-
-
-def _repair_line_break_hyphenation(text: str, intact_words: set[str]) -> tuple[str, int]:
-    """Join only line-broken words corroborated elsewhere in the accepted book text."""
-
-    repaired = 0
-
-    def replace(match: re.Match[str]) -> str:
-        nonlocal repaired
-        joined = match.group("left") + match.group("right")
-        if joined.casefold() not in intact_words:
-            return match.group(0)
-        repaired += 1
-        return joined
-
-    return _LINE_BREAK_HYPHEN.sub(replace, text), repaired
 
 
 def _dialogue_spans(dialogue: Mapping[str, Any]) -> list[dict[str, Any]]:

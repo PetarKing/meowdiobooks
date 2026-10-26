@@ -13,7 +13,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-DIALOGUE_SCAN_VERSION = 11
+from .chapters import is_chapter_heading_hint
+
+DIALOGUE_SCAN_VERSION = 12
 
 
 class DialogueContractError(ValueError):
@@ -832,11 +834,24 @@ def _structural_claim(candidate: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+# These authored structural/sign prefixes are not sufficient speaker evidence.
+# Keep this bounded: arbitrary titles and names cannot be distinguished by casing.
+# A user-owned custom recipe can deliberately interpret one of these as a character.
+_STRUCTURAL_LABELS = frozenset({
+    "the end", "contents", "table of contents", "dedication", "acknowledgments",
+    "acknowledgements", "author's note", "author’s note", "translator's note",
+    "translator’s note", "editor's note", "editor’s note",
+    "warning", "caution", "danger", "notice", "note", "important", "attention",
+})
+
+
 def _plausible_builtin_label(profile: RegexProfile, speaker: str) -> bool:
     """Keep bundled label recipes conservative; custom recipes remain user-owned."""
     if profile.custom:
         return True
     value = normalize = " ".join(speaker.split())
+    if normalize.casefold() in _STRUCTURAL_LABELS or is_chapter_heading_hint(normalize):
+        return False
     if not normalize or len(normalize) > 80 or any(mark in value for mark in "[]{}():,;"):
         return False
     if set(value) <= {"?", "!", ".", "-", "_"}:

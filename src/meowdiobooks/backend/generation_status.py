@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -12,6 +13,7 @@ from .review import apply_review_render_policies
 
 RecipeCache = dict[tuple[str, ...], dict[str, dict[str, Any]] | None]
 _RECIPE_INPUTS = ("dialogue", "review", "cast", "script")
+_LINE_BREAK_HYPHEN = re.compile(r"[^\W\d_]+-[ \t]*\r?\n[ \t]*[^\W\d_]+")
 
 
 def generated_chapters(
@@ -88,14 +90,23 @@ def chapter_audio_stale_reasons(
         for kind, current_revision in current_inputs.items()
         if str(pinned.get(kind) or "") != str(current_revision or "")
     ]
-    if not reasons:
-        return []
     chapter_id = str(metadata.get("chapterId") or "")
     if not chapter_id:
         return reasons
     cache = comparison_cache if comparison_cache is not None else {}
-    previous = _chapter_recipes(package, pinned, cache)
     current = _chapter_recipes(package, current_inputs, cache)
+    # Older renderers could join line-break hyphens after Review. Recompiling both
+    # histories with today's compiler hides that change, even at identical revisions.
+    # Compare their immutable receipt against the accepted text for affected chapters.
+    if current is not None and chapter_id in current:
+        segments = current[chapter_id]["segments"]
+        if any(_LINE_BREAK_HYPHEN.search(str(row.get("text") or "")) for row in segments):
+            recorded = metadata.get("segments")
+            if not isinstance(recorded, list) or _spoken_texts(recorded, "mixGroupId") != _spoken_texts(segments, "mixGroup"):
+                return [*reasons, "rendered-text:reviewed-hyphen-spelling"]
+    if not reasons:
+        return []
+    previous = _chapter_recipes(package, pinned, cache)
     if (
         previous is not None
         and current is not None
@@ -106,6 +117,20 @@ def chapter_audio_stale_reasons(
         return []
     return reasons
 
+
+
+def _spoken_texts(segments: list[dict[str, Any]], group_key: str) -> list[str]:
+    """One text per timeline slot; native receipts collapse layered voice tracks."""
+    result = []
+    previous_group = None
+    for segment in segments:
+        if not isinstance(segment, dict) or not isinstance(segment.get("text"), str):
+            return []  # An incomplete receipt cannot establish text equivalence.
+        group = segment.get(group_key)
+        if group is None or group != previous_group:
+            result.append(" ".join(segment["text"].split()))
+        previous_group = group
+    return result
 
 def _chapter_recipes(
     package: Path, inputs: dict[str, Any], cache: RecipeCache

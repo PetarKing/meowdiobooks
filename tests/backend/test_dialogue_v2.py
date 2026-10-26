@@ -898,3 +898,91 @@ def test_stable_visible_span_ids_are_derived_from_source_boundaries():
 
     assert first["acceptedMatches"][0]["spanId"] == "span:p9-b1:9-13"
     assert first["acceptedMatches"][0]["spanId"] == second["acceptedMatches"][0]["spanId"]
+
+
+@pytest.mark.parametrize("source", [
+    "Chapter One — The Return",
+    "CHAPTER I — THE ARRIVAL",
+    "Chapitre Deux — Le Retour",
+    "THE END — AT LAST",
+    "WARNING: KEEP OUT",
+    "NOTE: This door opens inward.",
+    "DANGER: HIGH VOLTAGE\n\nDANGER: HIGH VOLTAGE",
+    "NOTICE: The library closes at dusk.",
+])
+def test_builtin_heading_and_sign_prefixes_remain_spoken_narration(source):
+    scan = scan_dialogue([{"page": 1, "text": source}])
+    assert scan["summary"]["explicitTurns"] == 0
+    assert all(row["renderRole"] == "narration" for row in scan["partition"])
+    assert "".join(row["text"] for row in scan["partition"]) == source
+    assert reconstruct_partition(scan) == {1: source}
+
+
+@pytest.mark.parametrize("source,prefix,body", [
+    ("CHAPTER I: “The beginning.”", "CHAPTER I:", "The beginning."),
+    ('WARNING: "Keep out."', "WARNING:", "Keep out."),
+    ("NOTE: [The door opens inward.]", "NOTE:", "The door opens inward."),
+])
+def test_delimited_builtin_label_cannot_bypass_structural_prefix_preservation(source, prefix, body):
+    scan = scan_dialogue([{"page": 1, "text": source}])
+    assert scan["summary"]["explicitTurns"] == 0
+    spoken = "".join(row["text"] for row in scan["partition"])
+    assert prefix in spoken and body in spoken
+    assert reconstruct_partition(scan) == {1: source}
+
+
+@pytest.mark.parametrize("name", ["Alice", "Hope", "Grace", "May", "Jean de La Fontaine", "Ludwig van Beethoven"])
+def test_heading_guard_does_not_reclassify_proper_speaker_names(name):
+    source = f"{name} — Come inside."
+    scan = scan_dialogue([{"page": 1, "text": source}])
+    match, = scan["acceptedMatches"]
+    assert match["sourceSpeakerLabel"] == name
+    assert match["text"] == "Come inside."
+    assert match["speakerStatus"] == "explicit"
+
+
+def test_custom_recipe_can_explicitly_interpret_a_structural_word_as_a_speaker():
+    source = "WARNING: Keep out."
+    scan = scan_dialogue([{"page": 1, "text": source}], enabled_profile_ids=["custom-warning"],
+                         custom_profiles=[{"id": "custom-warning", "pattern":
+                                           r"^(?P<speaker>WARNING): (?P<text>[^\n]+)"}])
+    match, = scan["acceptedMatches"]
+    assert match["sourceSpeakerLabel"] == "WARNING" and match["text"] == "Keep out."
+
+
+@pytest.mark.parametrize("source,prefix", [
+    ("Chapter One — The Return\n\nThe traveler arrived.", "Chapter One — The Return"),
+    ("WARNING: Never drink the water.\n\nThe sign stood beside the well.", "WARNING: Never drink the water."),
+    ("DANGER: HIGH VOLTAGE\n\nDANGER: HIGH VOLTAGE", "DANGER: HIGH VOLTAGE"),
+])
+def test_default_heading_and_sign_words_survive_to_the_final_render_plan(source, prefix):
+    from meowdiobooks.backend.chapter_partition import partition_chapter_headings
+    from meowdiobooks.backend.dialogue_ai import resolve_dialogue
+    from meowdiobooks.backend.recording_script import build_recording_script
+    from meowdiobooks.backend.render_plan import compile_render_plan
+    from meowdiobooks.backend.review import build_review_workspace, accept_review_revision, apply_review_render_policies
+
+    def unexpected_model_call(*args, **kwargs):
+        raise AssertionError("A structural heading/sign must not require attribution inference")
+
+    scan = partition_chapter_headings(scan_dialogue([{"page": 1, "text": source}]))
+    resolved = resolve_dialogue(scan, "fill-gaps", unexpected_model_call)
+    extraction = {"revision": "e1", "blocks": scan["blocks"]}
+    dialogue = {"revision": "d1", "extractionRevision": "e1", "spans": resolved["partition"]}
+    workspace = build_review_workspace(extraction, dialogue)
+    review = accept_review_revision(workspace, [
+        {"occurrenceIds": [row["id"]], "action": "keep"}
+        for warning in workspace["warnings"] for row in warning["occurrences"]
+    ], revision="r1")
+    rendered = apply_review_render_policies(dialogue, review)
+    cast = {"revision": "c1", "identities": [], "labelToCharacterId": {}, "narrator": {
+        "characterId": "narrator", "name": "Narrator", "category": "narrator",
+        "voiceAccepted": True, "acceptedVoiceRevision": "v1",
+        "referenceAudio": "voices/narrator.wav", "referenceText": "A synthetic reference sentence.",
+    }}
+    script = build_recording_script(rendered, review, cast, revision="s1")
+    plan = compile_render_plan(rendered, cast, script, ["chapter-1"])
+    spoken = "".join(segment["text"] for chapter in plan["chapters"] for segment in chapter["segments"])
+    assert prefix in spoken
+    assert spoken.count(prefix) == source.count(prefix)
+    assert all(span["renderRole"] == "narration" for span in rendered["spans"])
