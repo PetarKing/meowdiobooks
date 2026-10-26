@@ -449,6 +449,7 @@ export interface WizardSnapshot {
   cast?: CastArtifact;
   voiceModels: Array<{ id: string; label: string; recipeVersion?: string; supportedLanguages: string[] }>;
   castingPreviewAvailable?: boolean;
+  voiceReuseAvailable?: boolean;
   voiceSelection: { modelId?: string; language?: string };
   recoverableStages?: Partial<Record<ProcessableStage, {
     attempt: number;
@@ -555,6 +556,7 @@ export interface ExtractionProcessSettings {
 export interface SourceVoice { bookId: string; characterId: string; revision: string }
 
 export interface CastingPreview {
+  previousVoiceMatches?: CastArtifact["previousVoiceMatches"];
   fingerprint?: string;
   sources: Array<{ bookId: string; title: string; voiceCount: number; voices?: Array<{ characterId: string; name: string; revision: string }> }>;
   exactMatchCount: number;

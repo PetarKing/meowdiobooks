@@ -86,6 +86,8 @@ def _has_complete_audition_pack(voice: dict[str, Any]) -> bool:
         and alternatives > 0
         else 0
     )
+    if isinstance(plan, dict) and plan.get("priorBookCandidates") == 1:
+        expected += 1
     if candidates:
         return len(candidates) >= expected
     return bool(str(voice.get("voicePreviewRevision", "")).strip())

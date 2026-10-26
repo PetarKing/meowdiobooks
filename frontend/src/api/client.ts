@@ -148,6 +148,7 @@ export class HttpWizardApi implements WorkflowGateway {
       cast: hasRevision(raw.cast) ? raw.cast as unknown as WizardSnapshot["cast"] : undefined,
       voiceModels: Array.isArray(raw.voiceModels) ? raw.voiceModels as WizardSnapshot["voiceModels"] : [],
       castingPreviewAvailable: raw.castingPreviewAvailable === true,
+      voiceReuseAvailable: raw.voiceReuseAvailable === true,
       voiceSelection: raw.voiceSelection as WizardSnapshot["voiceSelection"] ?? {},
       recordingScript: hasRevision(raw.recordingScript)
         ? raw.recordingScript as unknown as WizardSnapshot["recordingScript"]

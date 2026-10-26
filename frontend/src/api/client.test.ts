@@ -250,7 +250,7 @@ describe('HttpWizardApi', () => {
   })
 
   it('normalizes the clean v2 snapshot into the frontend wizard contract', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ voiceReuseAvailable: true,
       book: {
         id: 'book-1', title: 'Alice', author: 'Lewis Carroll', source_name: 'alice.pdf', page_count: 120,
         accepted_stage_revisions: [{ stage: 'import', revision: 1 }, { stage: 'extract', revision: 1 }],
@@ -275,6 +275,7 @@ describe('HttpWizardApi', () => {
     expect(snapshot.warnings[0]).toMatchObject({ decisionScope: "occurrence", readerState: "mixed" })
     expect(snapshot.warnings[0].occurrences[2]).toMatchObject({ replacement: "", availableActions: ["keep", "exclude", "repair"], readerState: "narrator", proposalStatus: "proposed" })
     expect(snapshot.chapters).toEqual([])
+    expect(snapshot.voiceReuseAvailable).toBe(true)
   })
 
   it('does not treat invalidated historical receipts as currently complete', async () => {

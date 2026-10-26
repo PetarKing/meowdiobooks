@@ -319,24 +319,30 @@ Changes at an architecture boundary must keep these checks green:
 When a companion adapter is introduced, it should run the same command/artifact fixtures and frontend
 gateway behavior suite as the local adapters before either package is released.
 
-### Optional cross-book casting
+### Automatic cross-book casting
 
-The default Cast UI does not offer manual source-book selection or an existing-voice picker.
-The optional `cast_voice_reuse` backend extension still exposes read-only preview/quote data,
-`apply`, and `import_voice` for compatible compositions. Its legacy source-ID, unique-match,
-and fingerprint validation contracts remain unchanged; removing the UI is not a migration of
-persisted backend artifacts. The shared UI requests quotes with an empty source selection.
+The default Cast UI automatically checks prior books through `cast_voice_reuse.preview`, using
+an empty source selection. `voiceReuseAvailable` enables live provenance during Cast editing;
+`castingPreviewAvailable` separately enables hosted price quotes. Read-only previews can inspect
+unconfirmed identities, but the generation and acceptance review gates remain unchanged.
 
-Compositions can supply optional `previousVoiceMatches` on a Cast artifact, keyed by exact
-source label with a source `bookTitle`, to display prior-book provenance during identity review.
-Required review remains blocking and takes visual priority; suggested review remains optional.
-An audition with `source: "previous-book"` displays that provenance. The Voices roster derives
-its label and color from the currently chosen candidate, not merely from the existence of a match.
-An explicit choice overrides the normal first-playable-candidate default. Bulk acceptance retains
-the existing confirmation for choices that have not been individually approved.
+`match_latest_voices` matches normalized exact literal labels and aliases, using names only for
+legacy identities without labels. It selects the newest eligible book by creation time, with book
+ID as a stable tie-break. Multiple matching voices in that book remain unmatched rather than being
+guessed. It never merges destination characters, uses fuzzy similarity, or calls an AI matcher.
 
-These are presentation contracts. Automatic account-scoped discovery, latest-book tie-breaking,
-asset import, and generation of additional candidates are not implemented by this UI change.
-The composition remains responsible for source authorization, compatibility, and copying complete
-immutable voice assets into the destination. The source book is provenance, never an ongoing
-dependency. Core preserves destination identity and requires normal audition acceptance.
+Standalone Core uses `LocalVoiceReuse` over its book store. Compositions supply an adapter over
+their authorized store and provider-compatible receipts. Only accepted selected voices with valid
+compatible audio are eligible. Local matches require the same language and model. Imports copy
+complete audio references into destination-owned files, so deleting the source cannot break them.
+
+Each match is offered first with `source: "previous-book"` and `previousBookTitle`, followed by
+normally generated alternatives. An explicit choice overrides the first-playable default. The
+whole pack is retained across unchanged retries; model/recipe changes regenerate alternatives.
+Required identity review remains blocking and takes visual priority; suggested review stays optional.
+The Voices grid derives provenance from the chosen candidate. Bulk acceptance retains its existing
+confirmation, and selected references/settings flow through to render planning.
+
+The adapter retains explicit source-ID/import APIs for compatible clients, but the default UI has
+no manual source-book or voice picker. Supplied preview fingerprints are revalidated before import.
+Provider pricing counts generated alternatives for all targets, even when a prior voice is offered.
