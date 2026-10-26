@@ -2693,6 +2693,12 @@ def create_app_v2(
             row for row in candidates if str(row.get("revision")) != voice_revision
         ]
         updated = {**target, "voiceCandidates": remaining, "voiceAccepted": False}
+        if removed.get("source") == "previous-book":
+            plan = target.get("voiceCandidatePlan")
+            if isinstance(plan, dict):
+                plan = {**plan}
+                plan.pop("priorBookCandidates", None)
+                updated["voiceCandidatePlan"] = plan
         if str(target.get("voicePreviewRevision")) == voice_revision:
             fallback = remaining[-1]
             updated.update(
