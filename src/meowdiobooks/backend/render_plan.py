@@ -72,6 +72,10 @@ def compile_render_plan(
         kind = str(entry.get("kind", "source"))
         source_ids = [str(value) for value in entry.get("sourceSpanIds", [])]
         if kind == "omission":
+            for source_id in source_ids:
+                for _offset, boundary in boundaries.get(source_id, []):
+                    if pending_boundaries.get(chapter_id) != "chapter-heading":
+                        pending_boundaries[chapter_id] = boundary
             omissions.append(
                 {
                     "entryId": str(entry.get("id")),
