@@ -1601,7 +1601,7 @@ def test_review_candidate_api_enriches_saved_extraction_chapter_context(tmp_path
         assert boundary['contextAfter'].strip() == 'Morning came at last.'
 
 
-def test_review_boundary_repair_cannot_publish_across_selected_chapters(tmp_path, monkeypatch):
+def test_review_boundary_repair_is_skipped_across_selected_chapters(tmp_path, monkeypatch):
     from meowdiobooks.backend import boundary_review as br, cleanup_remote
     from test_boundary_review import mock_model
 
@@ -1641,6 +1641,15 @@ def test_review_boundary_repair_cannot_publish_across_selected_chapters(tmp_path
                 for row in rows
             ],
         })
-        assert response.status_code == 409
-        assert "one chapter" in response.json()["detail"]
-        assert "review" not in client.get(f"/api/books/{book_id}/snapshot").json()["activeArtifacts"]
+        assert response.status_code == 200, response.text
+        snapshot = client.get(f"/api/books/{book_id}/snapshot").json()
+        assert 'review' in snapshot['activeArtifacts']
+        audit_paths = list((tmp_path / 'packages' / book_id / '.audit' / 'review-resolution').glob('*.json'))
+        assert len(audit_paths) == 1
+        audit = json.loads(audit_paths[0].read_text())
+        assert any(e['reason'] == 'incompatible-boundary-context' for e in audit['events'])
+        accepted = client.get(f"/api/books/{book_id}/stages/review/candidates/{audit['reviewRevision']}").json()
+        assert accepted['renderPolicyVersion'] == 1
+        assert all(d['action'] == 'keep' for d in accepted['decisions'])
+        assert 'events' not in accepted and 'requested' not in accepted
+        assert 'incompatible-boundary-context' not in response.text

@@ -566,13 +566,23 @@ def _validate_verified_cue_sources(dialogue, review, *, rendered=False):
                             and row.get("blockId") == cue["blockId"]
                             and row["sourceStart"] <= left < right <= row["sourceEnd"]]
                 expected = min(policies)[1] if policies else "keep"
+                if review.get("renderPolicyVersion") == 1:
+                    from .review_resolution import inclusion_policies, policy_at
+                    _, expected = policy_at(inclusion_policies(review), cue['blockId'], left, right)
                 actual = span.get("reviewAction", "keep")
                 # A spelling repair marks its whole owning span, including retained
                 # cues outside the edited range. The repair IDs and exact resulting
                 # text are independently checked by review_source_validation_view.
                 if actual == "repair" and expected == "keep" and span.get("reviewRepairs"):
                     actual = "keep"
-                if actual != expected:
+                if review.get("renderPolicyVersion") == 1:
+                    if actual == "repair" and expected in {"keep", "narrate"} and span.get("reviewRepairs"):
+                        actual = expected
+                    matches = (actual == expected
+                               and (expected != "narrate" or span.get("renderRole") == "narration"))
+                else:
+                    matches = actual == expected
+                if not matches:
                     raise ReviewContractError("Rendered script direction differs from its accepted choice")
         if cursor != end or "".join(pieces) != cue.get("source"):
             raise ReviewContractError("Script direction no longer matches its exact source")
@@ -630,6 +640,7 @@ def accept_review_revision(
     decisions: Sequence[Mapping[str, Any]],
     *,
     revision: str,
+    resolve_overlaps: bool = False,
 ) -> dict[str, Any]:
     """Compile an immutable/history-ready receipt from explicit Review decisions."""
 
@@ -691,9 +702,10 @@ def accept_review_revision(
         )
 
     ordered = [accepted[key] for key in sorted(accepted)]
-    accepted_boundary_repairs({"warningSnapshot": workspace.get("warnings", []),
-                               "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence"),
-                               "decisions": ordered})
+    if not resolve_overlaps:
+        accepted_boundary_repairs({"warningSnapshot": workspace.get("warnings", []),
+                                   "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence"),
+                                   "decisions": ordered})
     blockers = _blockers(workspace, ordered, occurrence_index)
     return {
         "contract": "meowdiobooks.review.v2",
@@ -735,6 +747,9 @@ def apply_review_render_policies(
     dialogue: Mapping[str, Any], review: Mapping[str, Any]
 ) -> dict[str, Any]:
     """Apply accepted exclude/narrate ranges without changing source coverage."""
+    if review.get("renderPolicyVersion") is not None:
+        from .review_resolution import render_resolved_review
+        return render_resolved_review(dialogue, review)
     _validate_verified_cue_sources(dialogue, review)
     occurrences = {
         str(row["id"]): row
@@ -1107,6 +1122,8 @@ def preview_review_transcript_page(
     ] + [{"occurrenceId": key, "action": action} for key, action in ai_chosen.items()]
     tentative = {"warningSnapshot": list(warnings.values()), "decisions": decisions,
                  "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence")}
+    from .review_resolution import resolve_review_revision
+    tentative, _audit = resolve_review_revision(dialogue, tentative)
     rendered = apply_review_render_policies(dialogue, tentative)
     boundary_repairs = accepted_boundary_repairs(tentative)
     if boundary_repairs:
@@ -1499,7 +1516,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
 
 
 def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Anchor complete notes only while an explicit note section is active."""
+    """Group note sections and keep isolated notes' split words together."""
     result: list[dict[str, Any]] = []
     section_active = False
     pending_tail: str | None = None
@@ -1570,7 +1587,7 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
             end_index = (
                 _note_range_end(text, lines, line_index)
                 if section_active
-                else line_index + 1
+                else _isolated_note_range_end(text, lines, line_index)
             )
             end_match = lines[end_index - 1]
             result.append(
@@ -1595,6 +1612,23 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
         previous_page = page
 
     return result
+
+
+def _isolated_note_range_end(text: str, lines: Sequence[re.Match[str]], start: int) -> int:
+    """Extend only across a verified line-wrapped word, never ordinary prose."""
+    end = start + 1
+    while end < len(lines):
+        previous, current = lines[end - 1], lines[end]
+        value = current.group(0).strip()
+        if (_is_footnote_marker(value) or _NOTE_SECTION_HEADER.fullmatch(value)
+                or _is_note_section_boundary(value)):
+            break
+        # Use the same exact word evidence as spelling Review. In particular,
+        # blank lines and uppercase continuations do not satisfy this pattern.
+        if not _LINE_HYPHEN.search(text, previous.start(), current.end()):
+            break
+        end += 1
+    return end
 
 
 def _note_range_end(text: str, lines: Sequence[re.Match[str]], start: int) -> int:

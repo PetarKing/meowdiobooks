@@ -450,13 +450,16 @@ export function useWorkflowModel({
     let disposed = false;
     setReviewPreviewLoading(true);
     const { policies, occurrencePolicies } = buildReviewPreviewPolicies(normalizeCandidateWarnings(reviewCandidate), reviewDecisions);
+    const reviewBoundaryChoices = (reviewCandidate.boundaryCandidates ?? snapshot?.boundaryCandidates ?? [])
+      .flatMap(({ id }) => boundaryDecisions[id] ? [{ boundaryId: id, action: boundaryDecisions[id] }] : []);
     const timer = window.setTimeout(() => {
       void gateway.previewReviewTranscript(
         book.id,
         String(reviewCandidate.revision),
         reviewPreviewPage,
         policies,
-        ...(occurrencePolicies.length ? [occurrencePolicies] : []),
+        occurrencePolicies,
+        reviewBoundaryChoices,
       ).then(async (preview) => {
         if (disposed) return;
         if (preview.imageUrl) await decodeImage(preview.imageUrl);
@@ -474,7 +477,7 @@ export function useWorkflowModel({
       disposed = true;
       window.clearTimeout(timer);
     };
-  }, [book, gateway, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewPage, setError]);
+  }, [book, gateway, reviewCandidate, reviewDecisions, boundaryDecisions, snapshot?.boundaryCandidates, reviewFinalCheck, reviewPreviewPage, setError]);
 
   useEffect(() => {
     setBooks([]);
