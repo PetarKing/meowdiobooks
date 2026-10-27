@@ -446,8 +446,13 @@ export function useWorkflowModel({
   }, [exportCover]);
 
   useEffect(() => {
-    if (!reviewFinalCheck || !book || !reviewCandidate?.revision) return;
+    if (!reviewFinalCheck || !book || !reviewCandidate?.revision) {
+      setReviewTranscriptPreview(undefined);
+      setReviewPreviewLoading(false);
+      return;
+    }
     let disposed = false;
+    setError("");
     setReviewPreviewLoading(true);
     const { policies, occurrencePolicies } = buildReviewPreviewPolicies(normalizeCandidateWarnings(reviewCandidate), reviewDecisions);
     const timer = window.setTimeout(() => {
@@ -464,6 +469,7 @@ export function useWorkflowModel({
       }).catch((reason) => {
         if (!disposed) {
           setReviewTranscriptPreview(undefined);
+          setReviewFinalCheck(false);
           setError(message(reason));
         }
       }).finally(() => {

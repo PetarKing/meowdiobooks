@@ -8,6 +8,16 @@ import type { ReviewWarning } from "../api/contracts";
 afterEach(async () => { await changeAppLocale("en"); });
 
 describe("workflow service copy boundary", () => {
+  it.each(["en", "zh-CN"] as const)("explains overlapping review choices in %s without diagnostics", async (locale) => {
+    await changeAppLocale(locale);
+    const raw = "Cleanup repair crosses another review decision; keep it or revise that decision";
+    const copy = message(new Error(raw));
+    expect(copy).toBe("A correction overlaps another review choice. Keep the original text for that correction or revise the overlapping choice.");
+    const rendered = localizeErrorMessage(copy, i18n.t);
+    if (locale === "en") expect(rendered).toBe(copy);
+    else expect(rendered).toMatch(/[\u4e00-\u9fff]/);
+    expect(message(new Error(`${raw}: /private/operator-data`))).toContain("Something went wrong");
+  });
   it.each(["en", "zh-CN"] as const)("translates reviewed operation failures and keeps a support reference in %s", async (locale) => {
     await changeAppLocale(locale);
     const reference = "0123456789abcdef0123456789abcdef";

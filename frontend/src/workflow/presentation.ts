@@ -45,6 +45,7 @@ function referencedOperationError(value: string) {
 export function message(reason: unknown) {
   if (isActionRequiredError(reason)) return reason.handled ? '' : reason.actionRequired.message;
   const raw = reason instanceof Error ? reason.message : "";
+  if (raw === "Cleanup repair crosses another review decision; keep it or revise that decision") return "A correction overlaps another review choice. Keep the original text for that correction or revise the overlapping choice.";
   if (referencedOperationError(raw)) return raw;
   if (/model.+not installed/i.test(raw)) return "errors.aiUnavailable";
   if (/Wait for this book's processing to finish/i.test(raw)) return "errors.bookProcessingActive";

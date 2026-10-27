@@ -1499,7 +1499,7 @@ def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[s
 
 
 def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Anchor complete notes only while an explicit note section is active."""
+    """Group note sections and keep isolated notes' split words together."""
     result: list[dict[str, Any]] = []
     section_active = False
     pending_tail: str | None = None
@@ -1570,7 +1570,7 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
             end_index = (
                 _note_range_end(text, lines, line_index)
                 if section_active
-                else line_index + 1
+                else _isolated_note_range_end(text, lines, line_index)
             )
             end_match = lines[end_index - 1]
             result.append(
@@ -1595,6 +1595,23 @@ def _footnote_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str,
         previous_page = page
 
     return result
+
+
+def _isolated_note_range_end(text: str, lines: Sequence[re.Match[str]], start: int) -> int:
+    """Extend only across a verified line-wrapped word, never ordinary prose."""
+    end = start + 1
+    while end < len(lines):
+        previous, current = lines[end - 1], lines[end]
+        value = current.group(0).strip()
+        if (_is_footnote_marker(value) or _NOTE_SECTION_HEADER.fullmatch(value)
+                or _is_note_section_boundary(value)):
+            break
+        # Use the same exact word evidence as spelling Review. In particular,
+        # blank lines and uppercase continuations do not satisfy this pattern.
+        if not _LINE_HYPHEN.search(text, previous.start(), current.end()):
+            break
+        end += 1
+    return end
 
 
 def _note_range_end(text: str, lines: Sequence[re.Match[str]], start: int) -> int:
