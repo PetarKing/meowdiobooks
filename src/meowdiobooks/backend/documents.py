@@ -16,6 +16,7 @@ from pypdf.errors import PyPdfError
 
 from meowdiobooks.util import sha256_bytes
 
+from .document_errors import DocumentImportError
 from .text_documents import TEXT_SUFFIXES, read_text_document
 
 SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
@@ -27,6 +28,16 @@ def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
     return (
         data_root / "packages" / book_id / "source" / f"original{Path(source_name).suffix.lower()}"
     )
+
+
+class _ImportPdfReader(PdfReader):
+    """Reject encrypted imports before choosing or invoking a security handler."""
+
+    def _handle_encryption(self, password: str | bytes | None) -> None:
+        # Pinned pypdf 6.18.1 invokes this hook only after its parsed trailer marks
+        # the document encrypted. Reject here before unsupported handlers or an
+        # unavailable crypto implementation can bypass import validation/cleanup.
+        raise DocumentImportError("encrypted-pdf")
 
 
 def inspect_source(path: Path) -> tuple[str, int]:
@@ -41,9 +52,9 @@ def inspect_source(path: Path) -> tuple[str, int]:
     if signature != b"%PDF-":
         raise ValueError("The uploaded file is not a valid PDF")
     try:
-        reader = PdfReader(path)
+        reader = _ImportPdfReader(path)
         if reader.is_encrypted:
-            raise ValueError("Encrypted PDFs are not supported yet")
+            raise DocumentImportError("encrypted-pdf")
         return "pdf", len(reader.pages)
     except PyPdfError as error:
         raise ValueError("The uploaded PDF is malformed or exceeds safe parsing limits") from error

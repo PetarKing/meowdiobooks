@@ -26,7 +26,20 @@ export function userFacingDetail(value: string | undefined, fallback: string) {
 
 const pausedVoices = /^Oops—voice generation paused at (.+)\. (?:(\d+) of (\d+) completed voices are safely saved\.|No completed voices were lost\.) Choose Continue voice generation below to resume (?:from this voice|the remaining voices)\.$/;
 
+const documentImportErrors = new Set([
+  "This PDF is encrypted or password-protected. Upload an unprotected copy to continue.",
+  "This EPUB contains protected content. Upload an unprotected copy to continue.",
+  "This EPUB uses unsupported compression. Upload another EPUB or a PDF, TXT, or Markdown file.",
+]);
+
+const legacyDocumentImportErrors = new Map([
+  ["Encrypted PDFs are not supported yet", "This PDF is encrypted or password-protected. Upload an unprotected copy to continue."],
+  ["Encrypted EPUB resources are not supported", "This EPUB contains protected content. Upload an unprotected copy to continue."],
+  ["Encrypted or unsupported EPUB compression", "This EPUB could not be read. Try another copy of the book."],
+]);
+
 const referencedOperationErrors = new Set([
+  ...documentImportErrors,
   "We couldn’t create the audio. Please try again.",
   "We couldn’t transcribe the voice sample. Please try again.",
   "We couldn’t read this voice sample. Please try another recording.",
@@ -45,7 +58,9 @@ function referencedOperationError(value: string) {
 export function message(reason: unknown) {
   if (isActionRequiredError(reason)) return reason.handled ? '' : reason.actionRequired.message;
   const raw = reason instanceof Error ? reason.message : "";
-  if (referencedOperationError(raw)) return raw;
+  if (documentImportErrors.has(raw) || referencedOperationError(raw)) return raw;
+  const legacyImportError = legacyDocumentImportErrors.get(raw);
+  if (legacyImportError) return legacyImportError;
   if (/model.+not installed/i.test(raw)) return "errors.aiUnavailable";
   if (/Wait for this book's processing to finish/i.test(raw)) return "errors.bookProcessingActive";
   if (/Could not remove this book's working files/i.test(raw)) return "errors.deleteWorkingData";

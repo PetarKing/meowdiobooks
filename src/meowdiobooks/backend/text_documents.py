@@ -11,6 +11,8 @@ from zipfile import BadZipFile, ZIP_DEFLATED, ZIP_STORED, ZipFile
 
 from lxml import etree
 
+from .document_errors import DocumentImportError
+
 TEXT_SUFFIXES = {".epub", ".txt", ".md"}
 MAX_TEXT_BYTES = 20 * 1024 * 1024
 MAX_MEMBER_BYTES = 8 * 1024 * 1024
@@ -187,12 +189,14 @@ def _read_epub(path: Path) -> tuple[list[str], dict[str, str]]:
             if name in names or name != entry.filename.rstrip("/"):
                 raise ValueError("EPUB contains ambiguous resource names")
             names.add(name)
-            if entry.flag_bits & 1 or entry.compress_type not in {ZIP_STORED, ZIP_DEFLATED}:
-                raise ValueError("Encrypted or unsupported EPUB compression")
+            if entry.flag_bits & 1:
+                raise DocumentImportError("encrypted-epub")
+            if entry.compress_type not in {ZIP_STORED, ZIP_DEFLATED}:
+                raise DocumentImportError("unsupported-epub-compression")
             if entry.file_size > MAX_MEMBER_BYTES:
                 raise ValueError("EPUB resource exceeds the 8 MiB limit")
         if "META-INF/encryption.xml" in names:
-            raise ValueError("Encrypted EPUB resources are not supported")
+            raise DocumentImportError("encrypted-epub")
 
         def read(name: str) -> bytes:
             with archive.open(name) as stream:
