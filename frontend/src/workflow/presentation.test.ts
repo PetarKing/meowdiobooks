@@ -8,6 +8,46 @@ import type { ReviewWarning } from "../api/contracts";
 afterEach(async () => { await changeAppLocale("en"); });
 
 describe("workflow service copy boundary", () => {
+  it.each(["en", "zh-CN"] as const)("preserves protected-file guidance and support references in %s", async (locale) => {
+    await changeAppLocale(locale);
+    const reference = "0123456789abcdef0123456789abcdef";
+    for (const base of [
+      "This PDF is encrypted or password-protected. Upload an unprotected copy to continue.",
+      "This EPUB contains protected content. Upload an unprotected copy to continue.",
+      "This EPUB uses unsupported compression. Upload another EPUB or a PDF, TXT, or Markdown file.",
+    ]) {
+      for (const raw of [base, `${base} Reference: ${reference}.`]) {
+        expect(message(new Error(raw))).toBe(raw);
+        const rendered = localizeErrorMessage(message(new Error(raw)), i18n.t);
+        if (locale === "en") expect(rendered).toBe(raw);
+        else {
+          expect(rendered).toMatch(/[\u4e00-\u9fff]/);
+          expect(rendered).not.toContain(base);
+        }
+        if (raw !== base) expect(rendered).toContain(reference);
+      }
+      for (const raw of [
+        `${base} Arbitrary unreviewed details.`,
+        `${base} Reference: ${reference}. Arbitrary unreviewed details.`,
+        `${base} Reference: ${reference}.\n`,
+        `${base} Reference: token-secret.`,
+        `${base} Reference: ${reference.toUpperCase()}.`,
+      ]) expect(message(new Error(raw))).toBe("Something went wrong while completing this step. Try again; your accepted work is unchanged.");
+    }
+  });
+
+  it("maps only exact legacy protected-file errors to reviewed guidance", () => {
+    const cases = [
+      ["Encrypted PDFs are not supported yet", "This PDF is encrypted or password-protected. Upload an unprotected copy to continue."],
+      ["Encrypted EPUB resources are not supported", "This EPUB contains protected content. Upload an unprotected copy to continue."],
+      ["Encrypted or unsupported EPUB compression", "This EPUB could not be read. Try another copy of the book."],
+    ];
+    for (const [raw, expected] of cases) {
+      expect(message(new Error(raw))).toBe(expected);
+      expect(message(new Error(`${raw}: arbitrary diagnostics`))).toBe("Something went wrong while completing this step. Try again; your accepted work is unchanged.");
+    }
+  });
+
   it.each(["en", "zh-CN"] as const)("translates reviewed operation failures and keeps a support reference in %s", async (locale) => {
     await changeAppLocale(locale);
     const reference = "0123456789abcdef0123456789abcdef";

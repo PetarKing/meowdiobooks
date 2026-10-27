@@ -229,6 +229,13 @@ There is no host-to-local parsing fallback. ZIP members are never unpacked; path
 per-member and cumulative expanded sizes, duplicate resources, XML entities, unsupported embedded
 content, invalid UTF-8 and empty text are validated. The new readers add no runtime dependencies.
 Import failure rolls back new extraction artifacts and restores pre-existing artifact pointers.
+Protected PDFs and EPUBs remain rejected. `DocumentImportError` carries a stable `code`
+(`encrypted-pdf`, `encrypted-epub`, or `unsupported-epub-compression`) and fixed public guidance;
+host document boundaries may preserve these classifications without forwarding parser diagnostics.
+PDF inspection uses the pinned pypdf 6.18.1 `_handle_encryption` hook, reached only after the
+parsed trailer identifies encryption, to reject before any password or security-handler processing.
+Parser upgrades must preserve this gate; standard, AES, and unsupported-handler fixtures verify it.
+The default UI translates only the reviewed messages, optionally followed by a valid support reference.
 
 ### Book-list fault isolation
 
