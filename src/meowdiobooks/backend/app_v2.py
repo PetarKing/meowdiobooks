@@ -2293,6 +2293,14 @@ def create_app_v2(
                 raise ReviewContractError(
                     "Review candidate references a superseded Dialogue revision"
                 )
+            chapter_plan = compile_reviewed_chapters(
+                dialogue['spans'], workspace.get('boundaryCandidates', []),
+                [row.model_dump() for row in body.boundaryDecisions],
+            ) if body.boundaryDecisions or not workspace.get('boundaryCandidates') else None
+            if chapter_plan is not None:
+                dialogue = {**dialogue, 'spans': [
+                    {**span, 'chapterId': chapter_plan['spanChapterIds'][str(span['id'])]}
+                    for span in dialogue['spans']]}
             result = preview_review_transcript_page(
                 extraction,
                 dialogue,
@@ -2844,6 +2852,7 @@ def create_app_v2(
                     candidate,
                     warning_decisions,
                     revision=uuid4().hex,
+                    resolve_overlaps=True,
                 )
                 if accepted_payload["requiresNewUpstreamRevision"]:
                     upstream = [
@@ -2873,10 +2882,18 @@ def create_app_v2(
                     boundary_decisions,
                 )
                 accepted_payload.update(chapter_plan)
+                from .review_resolution import resolve_review_revision, write_resolution_audit
+                mapped_dialogue = {**dialogue, "spans": [
+                    {**span, "chapterId": chapter_plan["spanChapterIds"][str(span["id"])]}
+                    for span in dialogue["spans"]]}
+                accepted_payload, resolution_audit = resolve_review_revision(mapped_dialogue, accepted_payload)
                 # Review owns both chapter assignment and render-policy decisions. Compile the
                 # complete downstream Dialogue shape before publishing, so later stages never
                 # discover an accepted Review revision that they cannot execute.
                 _dialogue_with_chapters(dialogue, accepted_payload)
+                if not accepted_payload["canStartCast"]:
+                    raise ReviewContractError("Review still has progression blockers")
+                write_resolution_audit(package_for(book_id), resolution_audit)
                 path, accepted_payload = write_artifact(
                     package_for(book_id), "review", accepted_payload, publish=False
                 )

@@ -1,5 +1,4 @@
 const zhCN: Record<string, string> = {
-  "A correction overlaps another review choice. Keep the original text for that correction or revise the overlapping choice.": "一处修正与另一项审阅选择重叠。请为该修正保留原文，或调整与之重叠的选择。",
   "Ready for their voices?": "准备好生成声音了吗？",
   "Generation method": "生成方式",
   "Cancel voice setup": "取消声音设置",

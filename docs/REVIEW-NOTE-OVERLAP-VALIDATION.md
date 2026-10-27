@@ -1,73 +1,85 @@
-# Review note overlap verification
+# Review overlap resolution verification
 
-Baseline: `aeca6de4676fc9e22284c050cfde31d80097d314`. Tested on macOS, Python 3.12,
-Node 22, with the locked dependencies. No inference provider was called.
+The reusable source contract belongs in Core: Review resolves competing decisions against immutable
+Dialogue source, then every downstream consumer renders the same versioned effective decisions.
+Hosted credentials, customer artifacts and operator deployment evidence remain outside this repository.
 
-## Reproduction and expected behavior
+## Behavior and compatibility
 
-The synthetic source `[4] A scholar stud-\n ied the records.\nStory resumes.`
-previously produced a footnote ending at `stud-`. Excluding that note while joining
-the wrapped word failed with `Cleanup repair crosses another review decision`.
-The new note range includes the continuation line. Preview and recording-script
-checks now exclude the complete note, preserve `Story resumes.`, and reconstruct
-the original source exactly. The overlap guard remains active for saved drafts
-with the historical partial range; no saved decision is rewritten.
+New previews and acceptances use `renderPolicyVersion: 1`; historical accepted receipts without this
+marker retain their old renderer. A new acceptance stores effective decisions, while a package-private
+`.audit/review-resolution/<revision>.json` records the original receipt, source/render digests,
+effective decisions, and every suppressed correction or competing inclusion interval. Audit writes
+precede publication; failure preserves the previous accepted state. Audit data is not included in
+candidate/snapshot API responses or the UI. No new controls, messages or summary are displayed.
 
-`tests/backend/test_review_note_overlap.py` covers both spelling choices, soft
-hyphens, CRLF, tabs, chained wraps, blank lines, note/chapter boundaries,
-following lowercase prose, immutable inputs, and saved-draft conflict recovery.
+Precedence is independent of request order:
 
-## Commands
+- Narrower inclusion scopes win. Equal-width conflicts prefer keep, then narrate, then exclude.
+  Keeping a correction is not an instruction to restore an excluded passage.
+- Explicitly kept corrections protect their source. Dedicated spelling choices beat general cleanup.
+  Identical replacements collapse; equal-priority conflicting replacements preserve original text.
+- Exclusions make contained corrections irrelevant. Partially excluded corrections are skipped whole;
+  replacements are never clipped or allowed to resurrect removed text.
+- Adjacent retained pieces with compatible reading context may share a correction. Different readers,
+  chapters, or protected source delimiters remain boundaries.
+- Two-block seam corrections have lowest precedence. Incompatible or overlapping seams are skipped;
+  original source/evidence validation still rejects malformed or stale inputs.
+- Saved pre-fix footnote candidates receive a narrowly proven wrapped-word continuation. No arbitrary
+  note expansion or customer artifact rewrite is performed. Source snapshots and requested ranges
+  remain available in the private audit.
 
-From the repository root after installing the locked development dependencies:
+Preview receives the current chapter decisions through the existing gateway, with no visible UI change.
+Acceptance resolves after chapter assignment, so a seam crossing selected chapters is skipped in both.
+
+## Reproduction
+
+Baseline: `aeca6de4676fc9e22284c050cfde31d80097d314` (workflow 0.1.76).
 
 ```sh
 PYTHONPATH=src .venv/bin/pytest -q -m 'not uses_audio_decoder and not runs_models'
 .venv/bin/ruff check src/meowdiobooks tests
 .venv/bin/python scripts/check_publication.py
-npm --prefix frontend test -- --run
+npm --prefix frontend ci
+npm --prefix frontend test
 npm --prefix frontend run lint
 npm --prefix frontend run build
+npm --prefix frontend run storybook:check
+npm --prefix frontend run test-storybook
+npm --prefix frontend run build-storybook
+npm --prefix frontend run test:consumer
+npm --prefix frontend run visual:review -- /tmp/meowdiobooks-visual-review
+# With frontend Vite running on 127.0.0.1:5186:
+cd frontend
+node scripts/verify-review-overlap.mjs http://127.0.0.1:5186 /tmp/review-resolution-browser
 ```
 
-For the real Chromium interaction check, start the development server in one terminal:
+Focused tests cover overlapping inclusion scopes, duplicate and conflicting edits, multiple
+length-changing edits, kept spelling, exclusions, compatible/incompatible reader intervals, boundary
+source tampering, chapter splits, source reconstruction, recording-script repair metadata, private
+immutable audits, audit failure, and legacy receipt behavior. API tests exercise preview and accept
+through real routes with the actual chapter compiler. Browser checks exercise desktop and phone
+Review with a synthetic gateway: one preview, original choices preserved, no rereview or automatic
+acceptance. API/script tests separately verify actual backend resolution.
 
-```sh
-npm --prefix frontend run dev -- --host 127.0.0.1 --port 5186
-```
+The three supplied public-domain PDFs (Alice 4 pages, Pride 4 pages, Ah Q 2 pages) were compared with
+the baseline using native extraction and lossless narrator spans. Warning workspaces and all preview
+outputs remain identical. These comparisons do not invoke attribution or voice inference.
 
-Then run:
+A private read-only reproduction also exercised the original saved 130-page candidate with its saved
+correction proposals: every page previews, preview agrees with the recording script, source remains
+exact, and the audit records one wrapped-note range repair and one correction suppressed inside that
+removed note. No provider calls or saved customer-state changes were made. Raw evidence stays in the
+consuming application's ignored operator directory.
 
-```sh
-node frontend/scripts/verify-review-overlap.mjs http://127.0.0.1:5186 /tmp/meowdiobooks-review-overlap
-```
+## Independent review
 
-The script writes screenshots and `report.json` for desktop (1440 px) and phone
-(390 px). It uses a synthetic in-memory gateway: the first preview fails, the
-decision view returns with actionable guidance and the selected correction, and
-changing that correction to Keep original text allows preview to succeed.
-Footnote exclusion remains selected and nothing is automatically accepted.
-The App tests additionally check chapter choices, network errors, valid empty
-previews, and obsolete failures after returning to decisions and reopening.
+The requested GPT-6.1 Sol high reviewer ran existing and new contract tests, checked 1,000 generated
+inclusion cases against an independent per-character oracle, and permuted competing correction
+graphs. Its cue-routing validator concern was fixed and retained as a regression. Final review found
+no blocker. A second fresh-context reviewer verified the real API's chapter consistency, private
+audit visibility, write-failure preservation and historical-receipt compatibility; those four cases
+are retained in `test_review_resolution_api.py`.
 
-## Public-domain sample comparison
-
-Native extraction and lossless narrator spans were passed through the baseline
-and changed Review implementations. Workspaces and every preview page were
-identical for these unmodified samples:
-
-| Sample | Pages | Source reconstruction | Workspace / preview |
-| --- | ---: | --- | --- |
-| Alice explicit dialogue | 4 | Exact | Identical |
-| Pride inferred multispeaker | 4 | Exact | Identical |
-| Ah Q traditional Chinese dialogue | 2 | Exact | Identical |
-
-This checks Review range behavior, not speaker-attribution accuracy or voice
-generation. A separate private operator check regenerated a workspace from the
-affected 130-page book's existing accepted inputs and previewed all pages
-successfully; no saved customer state changed. Private artifacts are excluded
-from this repository.
-
-Two independent reviews examined source-range safety and frontend recovery/races;
-neither found a blocking issue. Shared release publication, Cloud pin adoption,
-and Alpha deployment remain separate follow-up steps.
+Release follows the immutable Core publication and Cloud pin/deployment gates. The Cloud outage
+record authorizes local CI equivalents; exact tested commits and logs are recorded on the PR.

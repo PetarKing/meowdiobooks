@@ -239,3 +239,13 @@ validation as cleanup repairs. Model proposals overlapping those ranges do not r
 these explicit choices. Previously saved generic extraction/cleanup warnings retain
 their original actions and behavior. Words spanning multiple reader intervals are not
 converted to a single repair.
+
+## Automatic overlap precedence
+
+New Review previews and acceptances resolve overlapping choices using the versioned rules in
+[Review overlap verification](REVIEW-NOTE-OVERLAP-VALIDATION.md). This resolves compatible edits and
+preserves original source when equal-priority corrections disagree. Accepted effective decisions
+are durable; historical unversioned receipts keep their original behavior. The original requests
+and resolution reasons are stored privately with the book for support, without adding UI controls
+or exposing an audit through the workflow API. Malformed source evidence remains an error rather
+than an automatically suppressed correction.

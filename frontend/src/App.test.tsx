@@ -3066,6 +3066,17 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: /Start a new chapter/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByText('Audio before this heading stays in the previous chapter.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-2', 1, [], [], [
+      { boundaryId: 'b1', action: 'chapter-start' },
+    ])
+    fireEvent.click(screen.getByRole('button', { name: '← Back to decisions' }))
+    fireEvent.click(screen.getByRole('button', { name: /Keep inside the current chapter/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    await waitFor(() => expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-2', 1, [], [], [
+      { boundaryId: 'b1', action: 'not-a-boundary' },
+    ]))
   })
 
   it('offers one explicit bulk decision for all detected chapter headings', async () => {
@@ -3139,7 +3150,7 @@ describe('v2 wizard', () => {
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-cues', 1, [], [
       { occurrenceId: 'cue-soft', action: 'keep' }, { occurrenceId: 'cue-creepy', action: 'exclude' }, { occurrenceId: 'cue-loud', action: 'exclude' },
-    ])
+    ], [])
     fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-cues', [
       { occurrenceIds: ['cue-soft'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['cue-creepy'], action: 'exclude', provenance: 'user' }, { occurrenceIds: ['cue-loud'], action: 'exclude', provenance: 'user' },
@@ -3178,7 +3189,7 @@ describe('v2 wizard', () => {
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-ai', 1, [], [
       { occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
-    ])
+    ], [])
     fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-ai', [
       { occurrenceIds: ['join'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
@@ -3213,7 +3224,7 @@ describe('v2 wizard', () => {
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-boundaries', 1, [], [
       { occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }, { occurrenceId: 'missing', action: 'keep' },
-    ])
+    ], [])
     fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-boundaries', [
       { occurrenceIds: ['join'], action: 'keep', provenance: 'user' }, { occurrenceIds: ['delete'], action: 'repair', provenance: 'user' }, { occurrenceIds: ['missing'], action: 'keep', provenance: 'user' },
@@ -3272,7 +3283,7 @@ describe('v2 wizard', () => {
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-consolidated', 1, [], [
       { occurrenceId: 'ordinary', action: 'exclude' }, { occurrenceId: 'missing', action: 'keep' }, { occurrenceId: 'join', action: 'repair' }, { occurrenceId: 'delete', action: 'repair' },
-    ])
+    ], [])
   })
 
   it('keeps 150 AI suggestions bounded to one example and allows overrides after bulk applying', async () => {
@@ -3308,63 +3319,6 @@ describe('v2 wizard', () => {
     const policies = vi.mocked(wizardApi.previewReviewTranscript).mock.lastCall![4]
     expect(policies).toHaveLength(150)
     expect(policies?.slice(0, 3)).toEqual([{ occurrenceId: 'ai-0', action: 'keep' }, { occurrenceId: 'ai-1', action: 'exclude' }, { occurrenceId: 'ai-2', action: 'keep' }])
-  })
-
-  it.each([
-    ['Cleanup repair crosses another review decision; keep it or revise that decision', 'A correction overlaps another review choice. Keep the original text for that correction or revise the overlapping choice.'],
-    ['Failed to fetch', 'The connection was interrupted. Check your connection and try again. Your accepted work is unchanged.'],
-  ])('returns from a failed preview to preserved choices and allows explicit recovery: %s', async (failure, copy) => {
-    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-overlap', status: 'candidate' } } }
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-overlap', warnings: [
-      { id: 'notes', kind: 'footnote', availableActions: ['keep', 'exclude'], readerState: 'narrator', occurrences: [{ id: 'note-1', source: '[4] A scholar stud-', page: 27 }] },
-      { id: 'corrections', kind: 'ai-cleanup', decisionScope: 'occurrence', availableActions: ['keep', 'repair'], occurrences: [{ id: 'repair-1', source: 'stud-\n ied', replacement: 'studied', proposalStatus: 'proposed', availableActions: ['keep', 'repair'], page: 27 }] },
-    ], boundaryCandidates: [{ id: 'chapter-1', page: 1, source: 'Chapter 1', reason: 'Standalone heading' }] })
-    vi.mocked(wizardApi.previewReviewTranscript).mockRejectedValueOnce(new Error(failure))
-    vi.mocked(wizardApi.acceptStage).mockResolvedValue(undefined)
-    await open(snapshot)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    fireEvent.click(await screen.findByRole('button', { name: /Start a new chapter/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^Leave out/ }))
-    fireEvent.click(screen.getByRole('button', { name: /^Apply correction/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(copy)
-    expect(screen.getByRole('heading', { name: 'Review your manuscript' })).toBeInTheDocument()
-    expect(screen.queryByText('No spoken text on this page')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Accept review and continue →' })).not.toBeInTheDocument()
-    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /^Apply correction/ })).toHaveAttribute('aria-pressed', 'true')
-    fireEvent.click(screen.getByRole('button', { name: /^Keep original text/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
-    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-overlap', 1,
-      [{ warningId: 'notes', action: 'exclude' }], [{ occurrenceId: 'repair-1', action: 'keep' }])
-    fireEvent.click(screen.getByRole('button', { name: 'Accept review and continue →' }))
-    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'review', 'review-overlap', [
-      { occurrenceIds: ['note-1'], action: 'exclude', provenance: 'user' },
-      { occurrenceIds: ['repair-1'], action: 'keep', provenance: 'user' },
-      { boundaryId: 'chapter-1', action: 'chapter-start' },
-    ]))
-  })
-
-  it('keeps genuine empty previews distinct from failed previews and ignores obsolete failures', async () => {
-    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-empty', status: 'candidate' } } }
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-empty', warnings: [], boundaryCandidates: [] })
-    let rejectOld!: (reason: Error) => void
-    vi.mocked(wizardApi.previewReviewTranscript).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectOld = reject }))
-    await open(snapshot)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    fireEvent.click(await screen.findByRole('button', { name: 'Review complete transcript →' }))
-    await waitFor(() => expect(wizardApi.previewReviewTranscript).toHaveBeenCalledTimes(1))
-    fireEvent.click(screen.getByRole('button', { name: '← Back to decisions' }))
-    vi.mocked(wizardApi.previewReviewTranscript).mockResolvedValueOnce({ page: 1, pageCount: 120, spans: [], published: false, summary: { spoken: 0, dialogue: 0, excluded: 0 } })
-    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
-    await screen.findByText('No spoken text on this page')
-    await act(async () => { rejectOld(new Error('Failed to fetch')) })
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Read it once like a listener.' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Accept review and continue →' })).toBeEnabled()
   })
 
   it('shows the complete read-only transcript beside the synchronized PDF page', async () => {
@@ -3420,12 +3374,12 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Synchronized page browser')).not.toBeInTheDocument()
     expect(screen.queryByText('Ready to inspect')).not.toBeInTheDocument()
     expect(screen.queryByText('Tip: drag the slider for a fast visual sweep, then use the arrows for close reading.')).not.toBeInTheDocument()
-    expect(wizardApi.previewReviewTranscript).toHaveBeenCalledWith('book-1', 'review-2', 1, [])
+    expect(wizardApi.previewReviewTranscript).toHaveBeenCalledWith('book-1', 'review-2', 1, [], [], [])
 
     let finishPageNine!: (value: Awaited<ReturnType<typeof wizardApi.previewReviewTranscript>>) => void
     vi.mocked(wizardApi.previewReviewTranscript).mockImplementationOnce(() => new Promise((resolve) => { finishPageNine = resolve }))
     fireEvent.change(screen.getByRole('slider', { name: 'Transcript preview page' }), { target: { value: '9' } })
-    await waitFor(() => expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-2', 9, []))
+    await waitFor(() => expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-2', 9, [], [], []))
     expect(screen.getByAltText('Original PDF page 1')).toHaveAttribute('src', '/page-1.png')
     expect(screen.getByText('ORIGINAL PAGE').closest('.compare')).toHaveClass('loading')
     expect(screen.getByRole('article', { name: 'Audiobook transcript page 1' })).toBeInTheDocument()

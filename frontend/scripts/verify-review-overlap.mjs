@@ -1,4 +1,4 @@
-/** Verify Review preview failure and explicit recovery with synthetic data. */
+/** Verify unchanged Review UI accepts a resolved overlap without another decision. */
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -34,11 +34,9 @@ try {
       gateway.getBookSnapshot = async () => structuredClone(snapshot);
       gateway.getStageCandidate = async () => structuredClone(candidate);
       gateway.listBookJobs = async () => [];
-      let previewRequests = 0;
       window.proof = { requests: [], accepted: [] };
       gateway.previewReviewTranscript = async (...args) => {
         window.proof.requests.push(args);
-        if (++previewRequests === 1) throw new Error('Cleanup repair crosses another review decision; keep it or revise that decision');
         return { page: 1, pageCount: 120, published: false, summary: { spoken: 1, dialogue: 0, excluded: 0 }, spans: [{ id: 's', kind: 'narration', reader: 'Narrator', text: 'Story resumes.', blockId: 'b', sourceStart: 0, sourceEnd: 14 }] };
       };
       gateway.acceptStage = async (...args) => { window.proof.accepted.push(args); };
@@ -48,23 +46,16 @@ try {
     await page.getByRole('button', { name: /^Leave out/ }).click();
     await page.getByRole('button', { name: /^Apply correction/ }).click();
     await page.getByRole('button', { name: 'Review complete transcript →' }).click();
-    const alert = page.getByRole('alert');
-    await alert.waitFor();
-    assert.match(await alert.innerText(), /A correction overlaps another review choice/);
-    assert.equal(await page.getByText('No spoken text on this page').count(), 0);
-    assert.equal(await page.getByRole('button', { name: 'Accept review and continue →' }).count(), 0);
-    assert.equal(await page.getByRole('button', { name: /^Apply correction/ }).getAttribute('aria-pressed'), 'true');
-    await page.screenshot({ path: `${out}/overlap-recovery-${width}.png`, fullPage: true });
-    await page.getByRole('button', { name: /^Keep original text/ }).click();
-    await page.getByRole('button', { name: 'Review complete transcript →' }).click();
     await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
-    assert.equal(await alert.count(), 0);
+    assert.equal(await page.getByRole('alert').count(), 0);
+    assert.equal(await page.getByText('Story resumes.').count(), 1);
+    await page.getByRole('button', { name: 'Accept review and continue →' }).waitFor();
     const proof = await page.evaluate(() => window.proof);
-    assert.deepEqual(proof.requests[1].slice(3), [[{ warningId: 'notes', action: 'exclude' }], [{ occurrenceId: 'repair-1', action: 'keep' }]]);
+    assert.deepEqual(proof.requests[0].slice(3), [[{ warningId: 'notes', action: 'exclude' }], [{ occurrenceId: 'repair-1', action: 'repair' }], [{ boundaryId: 'chapter-1', action: 'chapter-start' }]]);
     assert.deepEqual(proof.accepted, []);
-    await page.screenshot({ path: `${out}/overlap-recovered-${width}.png`, fullPage: true });
+    await page.screenshot({ path: `${out}/overlap-resolved-${width}.png`, fullPage: true });
     assert.deepEqual(errors, []);
-    results.push({ width, failureReturnedToDecisions: true, actionableMessage: true, choicePreserved: true, retryPreviewSucceeded: true, automaticAcceptance: false, errors });
+    results.push({ width, previewSucceeded: true, requestedChoicesPreserved: true, rereviewRequired: false, automaticAcceptance: false, errors });
     await page.close();
   }
 } finally { await browser.close(); }

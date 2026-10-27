@@ -249,6 +249,14 @@ describe('HttpWizardApi', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/review/transcript-preview', expect.objectContaining({ body: JSON.stringify({ revision: 'review-ai', page: 1, policies: [], occurrencePolicies }) }))
   })
 
+  it('sends chapter choices for transcript preview without requiring occurrence policies', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    const boundaryDecisions = [{ boundaryId: 'heading-1', action: 'chapter-start' as const }, { boundaryId: 'heading-2', action: 'not-a-boundary' as const }]
+    await new HttpWizardApi('/api').previewReviewTranscript('book-1', 'review-chapters', 1, [], undefined, boundaryDecisions)
+    expect(fetchMock).toHaveBeenCalledWith('/api/books/book-1/review/transcript-preview', expect.objectContaining({ body: JSON.stringify({ revision: 'review-chapters', page: 1, policies: [], boundaryDecisions }) }))
+  })
+
   it('normalizes the clean v2 snapshot into the frontend wizard contract', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ voiceReuseAvailable: true,
       book: {

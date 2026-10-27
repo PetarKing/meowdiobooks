@@ -73,11 +73,17 @@ class ReviewOccurrencePolicyRequest(ApiRequest):
     action: str = Field(min_length=1)
 
 
+class ReviewBoundaryDecisionRequest(ApiRequest):
+    boundaryId: str = Field(min_length=1)
+    action: Literal["chapter-start", "not-a-boundary"]
+
+
 class ReviewTranscriptPreviewRequest(ApiRequest):
     revision: str = Field(min_length=1)
     page: int = Field(ge=1)
     policies: list[ReviewTranscriptPolicyRequest] = Field(default_factory=list)
     occurrencePolicies: list[ReviewOccurrencePolicyRequest] = Field(default_factory=list)
+    boundaryDecisions: list[ReviewBoundaryDecisionRequest] = Field(default_factory=list)
 
 
 class CastingPreviewRequest(CastSettings):
