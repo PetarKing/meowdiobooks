@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import hashlib
 import os
 import platform
 import re
@@ -22,6 +23,7 @@ from scipy.io import wavfile
 from meowdiobooks.util import write_json
 
 from .audio import QWEN_GENERATION_ATTEMPTS, mix_audio_tracks
+from .audio_quality import AudioQualityError, QUALITY_CONTRACT, validate_audio
 from .generation_checkpoint import (
     CHECKPOINT_DIRECTORY,
     GenerationCheckpoint,
@@ -128,13 +130,14 @@ def render_plan_audio(
             "scipyVersion": scipy.__version__,
             "implementation": {name: file_digest(Path(__file__).with_name(name))
                                for name in ("tts_v2.py", "audio.py", "pacing.py",
-                                            "generation_checkpoint.py")},
+                                            "generation_checkpoint.py", "audio_quality.py")},
             "modelImplementation": f"{type(model).__module__}.{type(model).__qualname__}",
             "modelPath": str(asset_path(repo_root, pipeline.renderer_path)),
             "modelInstallation": model_installation_signature(
                 asset_path(repo_root, pipeline.renderer_path),
             ),
         }
+        renderer["audioQualityContract"] = QUALITY_CONTRACT
         for chapter, render_units, section_count in zip(
             chapters, units_by_chapter, section_counts, strict=True,
         ):
@@ -483,7 +486,21 @@ def _synthesize(
         recoveries = []
     for unit_index, unit in enumerate(units, 1):
         section = f"{section_prefix}-{unit_index:05d}"
-        cached = checkpoint.read(section) if checkpoint is not None else None
+        cached_quality: dict[str, Any] = {}
+        cached = checkpoint.read(section, quality=cached_quality) if checkpoint is not None else None
+        if cached is not None:
+            audio, cached_recoveries = cached
+            try:
+                if _clean_text(unit):
+                    pause = _pause_after(unit) if terminal_pause or unit_index < len(units) else 0.0
+                    speech_samples = len(audio) - int(getattr(model, "sample_rate", 24_000) * pause)
+                    receipt = _validate_unit_audio(
+                        audio[:speech_samples], int(getattr(model, "sample_rate", 24_000)),
+                        unit, cached_quality.get("calls"),
+                    )
+                    checkpoint.record_quality(section, receipt)
+            except AudioQualityError:
+                cached = None
         if cached is not None:
             audio, cached_recoveries = cached
             rendered.append(audio)
@@ -505,12 +522,46 @@ def _synthesize(
                 section_completed()
             continue
         errors: list[str] = []
+        quality_attempts: list[dict[str, Any]] = []
+        call_evidence: list[dict[str, Any]] = []
+        quality_failures = 0
         no_result_attempts = 0
         for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
             try:
                 reference_args = {"ref_audio": str(reference)}
                 if reference_mode == "transcript-conditioned":
                     reference_args["ref_text"] = reference_text
+                # The last recovery round may split a repeatedly rejected long
+                # sentence. Each child gets this one attempt, never nested retries.
+                # Source words and the accepted reference remain unchanged.
+                parts = (_recovery_parts(unit)
+                         if attempt == len(QWEN_GENERATION_ATTEMPTS) and quality_failures == 2
+                         else [])
+                if parts:
+                    split_audio = []
+                    for part_index, part in enumerate(parts, 1):
+                        before = len(quality_attempts)
+                        try:
+                            chunks, summary = _valid_chunks(model.generate(
+                                part, lang_code=language, split_pattern="",
+                                **reference_args, **settings,
+                            ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
+                                text=part, settings=settings, attempts=quality_attempts)
+                        finally:
+                            for row in quality_attempts[before:]:
+                                row.update({"round": attempt, "partIndex": part_index,
+                                            "partCount": len(parts)})
+                        if not chunks:
+                            raise RuntimeError(f"split recovery: no usable samples ({summary})")
+                        split_audio.append(np.concatenate(chunks))
+                        call_evidence.append(_call_evidence(
+                            part, split_audio[-1], quality_attempts[-1],
+                        ))
+                    rendered.append(np.concatenate(split_audio))
+                    recoveries.append({"unitIndex": unit_index,
+                                       "reason": "quality-rejected-long-unit",
+                                       "partCount": len(parts), "sourcePreserved": True})
+                    break
                 chunks, summary = _valid_chunks(
                     model.generate(
                         unit,
@@ -518,14 +569,20 @@ def _synthesize(
                         split_pattern="",
                         **reference_args,
                         **settings,
-                    )
+                    ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
+                    text=unit, settings=settings, attempts=quality_attempts,
                 )
                 if chunks:
                     rendered.append(np.concatenate(chunks))
+                    call_evidence.append(_call_evidence(unit, rendered[-1], quality_attempts[-1]))
                     break
                 no_result_attempts += summary.results == 0
                 errors.append(f"attempt {attempt}: no usable samples ({summary})")
+            except AudioQualityError as error:
+                quality_failures += 1
+                errors.append(f"attempt {attempt}: {error}")
             except Exception as error:  # local model backends expose heterogeneous failures
+                quality_attempts.append({"settings": dict(settings), "error": type(error).__name__})
                 errors.append(f"attempt {attempt}: {type(error).__name__}: {error}")
         else:
             # Some transcript-conditioned references immediately end a one-word
@@ -541,9 +598,13 @@ def _synthesize(
                         chunks, summary = _valid_chunks(model.generate(
                             unit, lang_code=language, split_pattern="",
                             ref_audio=str(reference), **settings,
-                        ))
+                        ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
+                            text=unit, settings=settings, attempts=quality_attempts)
                         if chunks:
                             rendered.append(np.concatenate(chunks))
+                            call_evidence.append(_call_evidence(
+                                unit, rendered[-1], quality_attempts[-1],
+                            ))
                             if recoveries is not None:
                                 recoveries.append({
                                     "segmentId": str(segment.get("id") or ""),
@@ -567,12 +628,16 @@ def _synthesize(
                     f"No audio for segment {segment.get('id')} unit {unit_index}: "
                     + "; ".join(errors)
                 )
+        quality = _validate_unit_audio(np.concatenate(rendered[rendered_start:]),
+                                       int(getattr(model, "sample_rate", 24_000)), unit,
+                                       call_evidence)
+        quality["attempts"] = quality_attempts
         pause = _pause_after(unit) if terminal_pause or unit_index < len(units) else 0.0
         if pause:
             rendered.append(np.zeros(int(model.sample_rate * pause), dtype=np.float32))
         if checkpoint is not None:
             checkpoint.write(section, np.concatenate(rendered[rendered_start:]),
-                             recoveries[recovery_start:])
+                             recoveries[recovery_start:], quality=quality)
             checkpoint.advance()
         if section_completed is not None:
             section_completed()
@@ -687,19 +752,112 @@ class _SampleSummary:
         return f"results={self.results}, empty={self.empty}, nonfinite={self.nonfinite}"
 
 
-def _valid_chunks(results: Any) -> tuple[list[np.ndarray], _SampleSummary]:
+def _valid_chunks(
+    results: Any, *, sample_rate: int = 24_000, text: str = "",
+    settings: Mapping[str, Any] | None = None,
+    attempts: list[dict[str, Any]] | None = None,
+) -> tuple[list[np.ndarray], _SampleSummary]:
     chunks = []
     result_count = empty_count = nonfinite_count = 0
+    token_counts = []
     for result in results:
         result_count += 1
         audio = np.asarray(result.audio, dtype=np.float32).reshape(-1)
+        count = getattr(result, "token_count", None)
+        if count is not None:
+            token_counts.append(int(count))
         if not audio.size:
             empty_count += 1
         elif not np.all(np.isfinite(audio)):
             nonfinite_count += 1
         else:
             chunks.append(audio)
-    return chunks, _SampleSummary(result_count, empty_count, nonfinite_count)
+    summary = _SampleSummary(result_count, empty_count, nonfinite_count)
+    # Dropping a broken result silently would publish only part of the source.
+    if empty_count or nonfinite_count:
+        chunks = []
+    if chunks:
+        try:
+            quality = validate_audio(np.concatenate(chunks), sample_rate, text,
+                                     token_count=max(token_counts) if token_counts else None,
+                                     max_tokens=int((settings or {}).get("max_tokens", 4096)))
+        except AudioQualityError as error:
+            if attempts is not None:
+                attempts.append({"settings": dict(settings or {}), **error.receipt})
+            raise
+        if attempts is not None:
+            attempts.append({"settings": dict(settings or {}), **quality})
+    elif attempts is not None:
+        attempts.append({"settings": dict(settings or {}), "accepted": False,
+                         "results": result_count, "empty": empty_count,
+                         "nonfinite": nonfinite_count})
+    return chunks, summary
+
+
+def _call_evidence(text: str, audio: np.ndarray, receipt: Mapping[str, Any]) -> dict[str, Any]:
+    return {"samples": len(audio), "textSha256": hashlib.sha256(text.encode()).hexdigest(),
+            "tokenCount": receipt["scores"]["tokenCount"]}
+
+
+def _validate_unit_audio(
+    audio: np.ndarray, sample_rate: int, text: str, calls: Any = None,
+) -> dict[str, Any]:
+    """Recheck real inference boundaries before exempting an assembled unit's cap.
+
+    Recovery labels and accepted flags grant no exemption. Recorded boundaries must
+    cover the exact WAV and deterministic source parts; each slice is checked anew.
+    Legacy checkpoints with no boundary evidence retain the single-call backstop.
+    """
+    if calls is None:
+        return validate_audio(audio, sample_rate, text)
+    parts = [text] if isinstance(calls, list) and len(calls) == 1 else _recovery_parts(text)
+    valid = isinstance(calls, list) and bool(calls) and len(calls) == len(parts)
+    total = 0
+    if valid:
+        for part, call in zip(parts, calls, strict=True):
+            if (not isinstance(call, dict) or type(call.get("samples")) is not int
+                    or call["samples"] <= 0
+                    or call.get("textSha256") != hashlib.sha256(part.encode()).hexdigest()
+                    or (call.get("tokenCount") is not None
+                        and (type(call["tokenCount"]) is not int or call["tokenCount"] < 0))):
+                valid = False
+                break
+            total += call["samples"]
+    if not valid or total != len(audio):
+        raise AudioQualityError({"contract": QUALITY_CONTRACT, "accepted": False,
+                                 "reasons": ["invalid-call-provenance"], "scores": {}})
+    offset = 0
+    for part, call in zip(parts, calls, strict=True):
+        end = offset + call["samples"]
+        validate_audio(audio[offset:end], sample_rate, part, token_count=call.get("tokenCount"))
+        offset = end
+    quality = validate_audio(audio, sample_rate, text, check_generation_limit=False)
+    quality["calls"] = calls
+    return quality
+
+
+def _recovery_parts(text: str) -> list[str]:
+    """Bounded word/clause fallback with exact non-whitespace source fidelity."""
+    if len(text) <= 240:
+        return []
+    parts = []
+    remaining = text
+    while len(remaining) > 180:
+        boundaries = list(re.finditer(r"[,;:，；：]\s*|\s+", remaining[:181]))
+        eligible = [match.end() for match in boundaries if match.end() >= 80]
+        if not eligible:
+            return []
+        cut = eligible[-1]
+        parts.append(remaining[:cut].strip())
+        if len(parts) >= 8:
+            return []
+        remaining = remaining[cut:].strip()
+    if remaining:
+        parts.append(remaining)
+    if len(parts) > 8 or any(not _clean_text(part) for part in parts):
+        return []
+    assert re.sub(r"\s+", "", "".join(parts)) == re.sub(r"\s+", "", text)
+    return parts
 
 
 def _render_units(segments: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:

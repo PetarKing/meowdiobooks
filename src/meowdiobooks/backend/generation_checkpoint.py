@@ -146,7 +146,8 @@ class GenerationCheckpoint:
         finally:
             temporary.unlink(missing_ok=True)
 
-    def read(self, section: str) -> tuple[np.ndarray, list[dict[str, Any]]] | None:
+    def read(self, section: str, *, quality: dict[str, Any] | None = None,
+             ) -> tuple[np.ndarray, list[dict[str, Any]]] | None:
         path = self._file(f"{section}.wav")
         metadata = self._file(f"{section}.json")
         try:
@@ -167,11 +168,14 @@ class GenerationCheckpoint:
                 not isinstance(row, dict) for row in recoveries
             ):
                 return None
+            if quality is not None and isinstance(payload.get("quality"), dict):
+                quality.update(payload["quality"])
             return audio, recoveries
         except (OSError, ValueError, KeyError, TypeError, EOFError, struct.error):
             return None
 
-    def write(self, section: str, audio: np.ndarray, recoveries: list[dict[str, Any]]) -> None:
+    def write(self, section: str, audio: np.ndarray, recoveries: list[dict[str, Any]],
+              *, quality: dict[str, Any] | None = None) -> None:
         path = self._file(f"{section}.wav")
         metadata = self._file(f"{section}.json")
         temporary = self.path / f".{uuid4().hex}.tmp"
@@ -189,9 +193,21 @@ class GenerationCheckpoint:
                 "samples": len(audio),
                 "sha256": digest,
                 "recoveries": recoveries,
+                **({"quality": quality} if quality is not None else {}),
             }))
         finally:
             temporary.unlink(missing_ok=True)
+
+    def record_quality(self, section: str, quality: dict[str, Any]) -> None:
+        """Upgrade a validated legacy section without rewriting healthy audio."""
+        metadata = self._file(f"{section}.json")
+        payload = json.loads(metadata.read_text(encoding="utf-8"))
+        previous = payload.get("quality", {})
+        # Preserve original inference evidence while refreshing waveform scores.
+        if isinstance(previous, dict) and isinstance(previous.get("attempts"), list):
+            quality = {**quality, "attempts": previous["attempts"]}
+        payload["quality"] = quality
+        self._atomic_bytes(metadata, canonical_json(payload))
 
     def advance(self, *, restored: bool = False) -> None:
         self.completed += 1

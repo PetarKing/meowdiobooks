@@ -17,6 +17,7 @@ import numpy as np
 from scipy.io import wavfile
 from scipy.signal import resample_poly
 
+from .audio_quality import validate_audio
 from .errors import WorkflowInputError
 from .model_config import asset_path, load_model_registry
 from .native_runtime import NativeModelLoader, load_native_model
@@ -24,7 +25,7 @@ from .native_runtime import NativeModelLoader, load_native_model
 
 # Qwen evaluates released checkpoints with the generation-config defaults below. Keep the
 # primary path aligned with that configuration; cooler alternatives are bounded recovery
-# attempts for empty or non-finite output. Keep the former runtime's 4096-token
+# attempts for empty, non-finite or quality-rejected output. Keep the former runtime's 4096-token
 # limit explicit: mlx-audio 0.6 inherits max_new_tokens from the checkpoint.
 QWEN_GENERATION_ATTEMPTS = (
     {"temperature": 0.9, "top_k": 50, "top_p": 1.0, "repetition_penalty": 1.05,
@@ -285,7 +286,8 @@ def _generate_preview(
                     lang_code=language,
                     split_pattern="",
                     **settings,
-                )
+                ), text=text, sample_rate=int(getattr(model, "sample_rate", 24_000)),
+                max_tokens=int(settings["max_tokens"]),
             )
             if chunks:
                 return np.concatenate(chunks)
@@ -313,7 +315,8 @@ def _generate_cloned_preview(
                     lang_code=language,
                     split_pattern="",
                     **settings,
-                )
+                ), text=text, sample_rate=int(getattr(model, "sample_rate", 24_000)),
+                max_tokens=int(settings["max_tokens"]),
             )
             if chunks:
                 return np.concatenate(chunks)
@@ -323,10 +326,19 @@ def _generate_cloned_preview(
     raise RuntimeError("; ".join(errors))
 
 
-def _valid_audio_chunks(results: Any) -> list[np.ndarray]:
+def _valid_audio_chunks(results: Any, *, text: str = "", sample_rate: int = 24_000,
+                        max_tokens: int = 4096) -> list[np.ndarray]:
     chunks: list[np.ndarray] = []
+    counts: list[int] = []
     for result in results:
         audio = np.asarray(result.audio, dtype=np.float32).reshape(-1)
-        if audio.size and np.all(np.isfinite(audio)):
-            chunks.append(audio)
+        if not audio.size or not np.all(np.isfinite(audio)):
+            raise ValueError("Model returned empty or non-finite audio")
+        chunks.append(audio)
+        count = getattr(result, "token_count", None)
+        if count is not None:
+            counts.append(int(count))
+    if chunks:
+        validate_audio(np.concatenate(chunks), sample_rate, text,
+                       token_count=max(counts) if counts else None, max_tokens=max_tokens)
     return chunks
