@@ -259,6 +259,9 @@ def render_plan_audio(
                     "renderer": dict(renderer),
                 }
                 write_json(staging / "metadata.json", receipt)
+                # Complete private checkpoint bookkeeping before publication: a failed
+                # progress write must leave the previous playable revision untouched.
+                checkpoint.progress("complete")
                 # The previous playable revision remains intact until this directory is complete.
                 final_dir.parent.mkdir(parents=True, exist_ok=True)
                 staging.replace(final_dir)
@@ -275,7 +278,6 @@ def render_plan_audio(
                         "segments": len(metadata),
                     }
                 )
-                checkpoint.progress("complete")
             except BaseException:
                 shutil.rmtree(staging, ignore_errors=True)
                 try:

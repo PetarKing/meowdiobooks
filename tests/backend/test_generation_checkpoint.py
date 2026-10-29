@@ -306,6 +306,52 @@ def test_progress_write_failure_does_not_mask_render_interruption(render_case, m
         render_case.render()
 
 
+@pytest.mark.parametrize("has_previous", [False, True])
+def test_completion_checkpoint_failure_preserves_publication_and_reuses_sections(
+    render_case, monkeypatch, has_previous,
+):
+    from meowdiobooks.backend.generation_checkpoint import GenerationCheckpoint
+    case = render_case
+    chapter = case.package / "audio/chapter-1"
+    if has_previous:
+        previous = case.render()[0]
+        expected_audio = Path(previous["artifactPath"]).read_bytes()
+        previous_pointer = (chapter / "latest.json").read_bytes()
+    else:
+        expected_audio = previous_pointer = None
+    previous_files = set(chapter.iterdir()) if chapter.exists() else set()
+    original = GenerationCheckpoint.progress
+
+    def fail_completion(self, state):
+        if state == "complete":
+            raise OSError("synthetic checkpoint completion disk full")
+        return original(self, state)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(GenerationCheckpoint, "progress", fail_completion)
+        with pytest.raises(OSError, match="synthetic checkpoint completion disk full"):
+            case.render()
+    assert set(chapter.iterdir()) == previous_files
+    if has_previous:
+        assert (chapter / "latest.json").read_bytes() == previous_pointer
+        assert Path(previous["artifactPath"]).read_bytes() == expected_audio
+    else:
+        assert not (chapter / "latest.json").exists()
+    status = json.loads(next((case.package / CHECKPOINT_DIRECTORY).glob("*/progress.json")).read_text())
+    assert status["completedSections"] == status["totalSections"] == 3
+    assert status["state"] == "interrupted"
+
+    # The failure did not publish audio, but all completed sections remain private
+    # and the following retry can publish without repeating any model inference.
+    case.model.calls.clear()
+    result = case.render()[0]
+    assert case.model.calls == []
+    assert Path(result["artifactPath"]).is_file()
+    if has_previous:
+        assert Path(result["artifactPath"]).read_bytes() == expected_audio
+        assert (chapter / "latest.json").read_bytes() != previous_pointer
+
+
 @pytest.mark.parametrize("sample", ["01-alice-explicit-dialogue.pdf",
                                    "02-pride-inferred-multispeaker.pdf",
                                    "03-ah-q-traditional-chinese-dialogue.pdf"])
