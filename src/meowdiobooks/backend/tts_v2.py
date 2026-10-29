@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import gc
 import os
+import platform
 import re
 import shutil
 import struct
@@ -15,11 +16,19 @@ from typing import Any, BinaryIO, Callable, Mapping, Sequence
 from uuid import uuid4
 
 import numpy as np
+import scipy
 from scipy.io import wavfile
 
 from meowdiobooks.util import write_json
 
 from .audio import QWEN_GENERATION_ATTEMPTS, mix_audio_tracks
+from .generation_checkpoint import (
+    CHECKPOINT_DIRECTORY,
+    GenerationCheckpoint,
+    chapter_recipe,
+    file_digest,
+    model_installation_signature,
+)
 from .model_config import asset_path, load_model_registry
 from .native_runtime import NativeModelLoader, load_native_model
 from .pacing import boundary_before_seconds, prepare_speech_audio
@@ -51,6 +60,7 @@ def render_plan_audio(
     model_id: str | None = None,
     *,
     model_loader: NativeModelLoader | None = None,
+    checkpoint_dir: Path | None = None,
 ) -> list[dict[str, Any]]:
     """Render complete chapters from a v2 plan and publish each atomically.
 
@@ -85,14 +95,56 @@ def render_plan_audio(
     try:
         sample_rate = int(model.sample_rate)
         units_by_chapter = [_render_units(list(row.get("segments", []))) for row in chapters]
-        total = max(sum(len(rows) for rows in units_by_chapter), 1)
+        section_counts = [sum(
+            len(_synthesis_units(_clean_text(str(unit[0].get("text", ""))),
+                                 target_characters=target_characters)) * len(unit)
+            if _clean_text(str(unit[0].get("text", ""))) else 1
+            for unit in rows
+        ) for rows in units_by_chapter]
+        total = max(sum(section_counts), 1)
         completed = 0
         results: list[dict[str, Any]] = []
         report(2, f"Making chapter audio from {total} passages")
-        for chapter, render_units in zip(chapters, units_by_chapter, strict=True):
+        renderer = {
+            "model": pipeline.renderer_source,
+            "modelRevision": pipeline.renderer_revision,
+            "pipelineId": pipeline.id,
+            "voiceRecipeVersion": pipeline.recipe_version,
+            "runtimeVersions": runtime_versions,
+            "requestedGenerationAttempts": [dict(row) for row in QWEN_GENERATION_ATTEMPTS],
+            "language": language,
+            "chunking": {
+                "policy": "sentence-target-ellipsis-v1",
+                "targetCharacters": target_characters,
+                "ellipsisPauseSeconds": _ELLIPSIS_PAUSE_SECONDS,
+            },
+        }
+        settings = {
+            **renderer,
+            "timing": plan.get("timing"),
+            "sampleRate": sample_rate,
+            "pythonVersion": platform.python_version(),
+            "numpyVersion": np.__version__,
+            "scipyVersion": scipy.__version__,
+            "implementation": {name: file_digest(Path(__file__).with_name(name))
+                               for name in ("tts_v2.py", "audio.py", "pacing.py",
+                                            "generation_checkpoint.py")},
+            "modelImplementation": f"{type(model).__module__}.{type(model).__qualname__}",
+            "modelPath": str(asset_path(repo_root, pipeline.renderer_path)),
+            "modelInstallation": model_installation_signature(
+                asset_path(repo_root, pipeline.renderer_path),
+            ),
+        }
+        for chapter, render_units, section_count in zip(
+            chapters, units_by_chapter, section_counts, strict=True,
+        ):
             chapter_id = str(chapter.get("chapterId", "")).strip()
             if not chapter_id:
                 raise TTSContractError("Render-plan chapter has no chapterId")
+            checkpoint = GenerationCheckpoint(
+                checkpoint_dir if checkpoint_dir is not None else package / CHECKPOINT_DIRECTORY,
+                chapter_recipe(package, book_id, chapter, settings), section_count, sample_rate,
+            )
             revision = uuid4().hex
             audio_root = package / "audio" / chapter_id
             final_dir = audio_root / revision
@@ -105,6 +157,14 @@ def render_plan_audio(
             piece_boundaries: list[float] = []
             previous_ellipsis_pause = 0.0
             previous_tail = 0.0
+
+            def section_completed() -> None:
+                nonlocal completed
+                completed += 1
+                report(2 + completed / total * 94,
+                       f"{chapter_id}: completed audio section {checkpoint.completed} "
+                       f"of {section_count}")
+
             try:
                 for index, unit in enumerate(render_units, 1):
                     segment = dict(unit[0])
@@ -118,12 +178,8 @@ def render_plan_audio(
                                 "skipped": "no-speakable-text",
                             }
                         )
-                        completed += 1
-                        report(
-                            2 + completed / total * 94,
-                            f"{chapter_id}: retained non-speech segment {index} of "
-                            f"{len(render_units)}",
-                        )
+                        checkpoint.advance()
+                        section_completed()
                         continue
                     report(
                         2 + completed / total * 94,
@@ -133,8 +189,11 @@ def render_plan_audio(
                     rendered = [
                         _synthesize(model, text, member, package, language, recoveries=recoveries,
                                     target_characters=target_characters,
-                                    terminal_pause=plan.get("timing") is None)
-                        for member in unit
+                                    terminal_pause=plan.get("timing") is None,
+                                    checkpoint=checkpoint,
+                                    section_prefix=f"{index:05d}-{member_index:05d}",
+                                    section_completed=section_completed)
+                        for member_index, member in enumerate(unit, 1)
                     ]
                     audio = mix_audio_tracks(rendered) if len(rendered) > 1 else rendered[0]
                     lead = tail = 0.0
@@ -177,7 +236,6 @@ def render_plan_audio(
                             }
                         )
                     metadata.append(metadata_row)
-                    completed += 1
                     # The segment WAV is now authoritative inside staging. Release model output
                     # before synthesizing the next passage instead of retaining a whole chapter.
                     del audio, rendered
@@ -198,22 +256,7 @@ def render_plan_audio(
                     "audioSeconds": assembled_samples / sample_rate,
                     "segments": metadata,
                     "omissions": list(chapter.get("omissions", [])),
-                    "renderer": {
-                        "model": pipeline.renderer_source,
-                        "modelRevision": pipeline.renderer_revision,
-                        "pipelineId": pipeline.id,
-                        "voiceRecipeVersion": pipeline.recipe_version,
-                        "runtimeVersions": runtime_versions,
-                        "requestedGenerationAttempts": [
-                            dict(settings) for settings in QWEN_GENERATION_ATTEMPTS
-                        ],
-                        "language": language,
-                        "chunking": {
-                            "policy": "sentence-target-ellipsis-v1",
-                            "targetCharacters": target_characters,
-                            "ellipsisPauseSeconds": _ELLIPSIS_PAUSE_SECONDS,
-                        },
-                    },
+                    "renderer": dict(renderer),
                 }
                 write_json(staging / "metadata.json", receipt)
                 # The previous playable revision remains intact until this directory is complete.
@@ -232,8 +275,14 @@ def render_plan_audio(
                         "segments": len(metadata),
                     }
                 )
-            except Exception:
+                checkpoint.progress("complete")
+            except BaseException:
                 shutil.rmtree(staging, ignore_errors=True)
+                try:
+                    checkpoint.progress("interrupted")
+                except Exception:
+                    # Disk exhaustion must not replace the original failure/cancellation.
+                    pass
                 raise
     finally:
         del model
@@ -406,6 +455,9 @@ def _synthesize(
     recoveries: list[dict[str, Any]] | None = None,
     target_characters: int = _SYNTHESIS_TARGET_CHARACTERS,
     terminal_pause: bool = True,
+    checkpoint: GenerationCheckpoint | None = None,
+    section_prefix: str = "",
+    section_completed: Callable[[], None] | None = None,
 ) -> np.ndarray:
     reference = Path(str(segment.get("referenceAudio", "")))
     if not reference.is_absolute():
@@ -425,11 +477,30 @@ def _synthesize(
         )
     rendered: list[np.ndarray] = []
     units = _synthesis_units(text, target_characters=target_characters)
+    if recoveries is None:
+        recoveries = []
     for unit_index, unit in enumerate(units, 1):
+        section = f"{section_prefix}-{unit_index:05d}"
+        cached = checkpoint.read(section) if checkpoint is not None else None
+        if cached is not None:
+            audio, cached_recoveries = cached
+            rendered.append(audio)
+            recoveries.extend(cached_recoveries)
+            checkpoint.advance(restored=True)
+            if section_completed is not None:
+                section_completed()
+            continue
+        recovery_start = len(recoveries)
+        rendered_start = len(rendered)
         # Leading/punctuation-only ellipses are pauses, never model requests.
         if not _clean_text(unit):
             rendered.append(np.zeros(int(model.sample_rate * _pause_after(unit)),
                                      dtype=np.float32))
+            if checkpoint is not None:
+                checkpoint.write(section, rendered[-1], [])
+                checkpoint.advance()
+            if section_completed is not None:
+                section_completed()
             continue
         errors: list[str] = []
         no_result_attempts = 0
@@ -497,6 +568,12 @@ def _synthesize(
         pause = _pause_after(unit) if terminal_pause or unit_index < len(units) else 0.0
         if pause:
             rendered.append(np.zeros(int(model.sample_rate * pause), dtype=np.float32))
+        if checkpoint is not None:
+            checkpoint.write(section, np.concatenate(rendered[rendered_start:]),
+                             recoveries[recovery_start:])
+            checkpoint.advance()
+        if section_completed is not None:
+            section_completed()
     if not rendered:
         raise TTSContractError(f"Render segment {segment.get('id')} produced no audio")
     return np.concatenate(rendered)
