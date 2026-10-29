@@ -275,6 +275,25 @@ a failed attempt. Its key binds the exact accepted inputs, finalized identities,
 profiler contract revision. The checkpoint is neither a candidate nor accepted workflow state; it may
 only be reused for an identical retry, and publication still remains atomic.
 
+Native chapter rendering also checkpoints completed synthesis sections under the package-private
+`.checkpoints/native-generation` directory. Each exact-recipe key binds the book, ordered chapter
+plan, reference audio content, language, model source/revision, runtime versions, native implementation,
+chunking and timing settings. Configured model paths, small configuration/tokenizer content and local
+file metadata conservatively invalidate replaced installations; the registry's pinned revision remains
+the authority and installed pinned weights are trusted. A verified float32 WAV and checksum sidecar
+must both be complete before a section can resume. Missing, incomplete or corrupt sections regenerate;
+unsafe checkpoint paths fail closed. A bounded `progress.json` snapshot records section counts,
+restored counts, state and timestamps without source text. Progress advances after every persisted
+section, including sections inside long narration and separate members of layered speech.
+
+The renderer accepts optional keyword-only `checkpoint_dir` for compositions whose output package is
+temporary. The host supplies a persistent, private, book-scoped directory, serializes native rendering
+and owns storage quotas and checkpoint retention alongside the book. Completed sections remain after
+chapter assembly because a later chapter or host publication can still fail. Retrying an identical
+recipe reconstructs the complete chapter before ordinary atomic publication; checkpoint audio never
+becomes an accepted chapter by itself. Cancellation and failure retain completed checkpoints while
+removing unpublished audio staging. Existing callers use package-private checkpoints by default.
+
 The detailed artifact rules remain canonical in [PACKAGE_CONTRACT_V2.md](PACKAGE_CONTRACT_V2.md).
 
 
