@@ -376,3 +376,26 @@ def test_public_domain_sources_resume_to_identical_audio(render_case, sample):
     after = case.render()
     assert len(case.model.calls) == len(sections) - 2
     assert Path(after[0]["artifactPath"]).read_bytes() == expected
+
+
+def test_quality_retry_exhaustion_preserves_last_playable_chapter(render_case):
+    case = render_case
+    result = case.render()
+    prior_pointer = (case.package / "audio/chapter-1/latest.json").read_bytes()
+    prior_audio = Path(result[0]["artifactPath"]).read_bytes()
+    shutil.rmtree(case.package / CHECKPOINT_DIRECTORY)
+    original_generate = case.model.generate
+
+    def exhausted(text, **kwargs):
+        return iter([SimpleNamespace(audio=row.audio, token_count=4096)
+                     for row in original_generate(text, **kwargs)])
+
+    case.model.generate = exhausted
+    case.model.calls.clear()
+    with pytest.raises(RuntimeError, match="generation-limit"):
+        case.render()
+    assert len(case.model.calls) == 3
+    assert (case.package / "audio/chapter-1/latest.json").read_bytes() == prior_pointer
+    assert Path(result[0]["artifactPath"]).read_bytes() == prior_audio
+    assert not list((case.package / "audio/chapter-1").glob(".*.staging"))
+    assert not list((case.package / CHECKPOINT_DIRECTORY).glob("*/*.wav"))
