@@ -300,7 +300,7 @@ describe("Voice design language confirmation", () => {
     const fetchPreview = vi.fn().mockResolvedValue(quote);
     const { processStage } = await openVoiceDesign(fetchPreview);
     await screen.findByText("≈ €2.94");
-    expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     fireEvent.click(screen.getByRole("combobox", { name: "Narration language" })); fireEvent.click(screen.getByRole("option", { name: "english" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Generate voices →" })).toBeEnabled());
     expect(fetchPreview).toHaveBeenCalledTimes(1);

@@ -1,0 +1,35 @@
+/* Locally bundled, unmodified Geist 1.9.0; see assets/fonts/geist/OFL.txt. */
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../assets/fonts/geist/GeistSans-Variable.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Sans";
+  src: url("../assets/fonts/geist/GeistSans-Italic.woff2") format("woff2");
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Serif";
+  src: url("../assets/fonts/geist/GeistSerif-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Serif Heart";
+  src: url("../assets/fonts/geist/GeistSerif-Heart.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
+:root {
+  --font-heading: "Geist Serif", "Iowan Old Style", Baskerville, "Times New Roman", serif;
+  --font-hero: "Geist Serif Heart", "Iowan Old Style", Baskerville, "Times New Roman", serif;
+  --font-reading: "Geist Sans", "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+}

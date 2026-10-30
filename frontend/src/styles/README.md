@@ -6,6 +6,7 @@ host selectors with equal specificity continue to win.
 
 | Source | Owns |
 | --- | --- |
+| `fonts.css` | Locally served Geist faces and separate hero, heading and manuscript role tokens |
 | `appearance.css` | Root-scoped light/dark visual tokens, host palette fallbacks and native color scheme |
 | `../styles.css` | Public legacy baseline geometry and domain controls; imports appearance defaults |
 | `../media.css` | Inherited media, transcript and recording surfaces |

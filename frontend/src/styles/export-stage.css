@@ -1,7 +1,7 @@
 /* The front page and its editable identity form a single edition preview. */
 .edition-workbench { min-width: 0; }
 .edition-intro { margin-bottom: clamp(20px, 3vw, 34px); }
-.edition-intro h1 { margin: 8px 0 7px; font: 500 clamp(36px, 4.5vw, 62px)/1.05 var(--font-display); letter-spacing: -.04em; text-wrap: balance; }
+.edition-intro h1 { margin: 8px 0 7px; font: 400 clamp(36px, 4.5vw, 62px)/1.05 var(--font-heading); letter-spacing: -.04em; text-wrap: balance; }
 .edition-intro p { max-width: 640px; margin: 0; color: var(--color-muted, var(--muted)); font-size: 14px; line-height: 1.6; }
 .edition-identity { display: grid; grid-template-columns: minmax(300px, .8fr) minmax(0, 1.2fr); align-items: start; min-width: 0; border: 0; border-radius: 12px; background: var(--color-paper, var(--paper)); overflow: hidden; }
 .edition-proof { position: relative; align-self: start; min-width: 0; padding: 0; overflow: hidden; border-radius: 0; background: var(--paper); }
@@ -46,7 +46,7 @@
 .edition-upload input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
 .edition-upload:has(input:focus-visible) { outline: 2px solid var(--color-action, var(--poppy)); outline-offset: 3px; }
 .edition-upload:hover, .edition-use-pdf:hover { background: rgb(255 255 255 / .25); }
-.edition-contents h2, .edition-format h2 { margin: 5px 0 0; font: 500 clamp(23px, 2.2vw, 29px)/1.15 var(--font-display); letter-spacing: -.025em; text-wrap: balance; }
+.edition-contents h2, .edition-format h2 { margin: 5px 0 0; font: 400 clamp(23px, 2.2vw, 29px)/1.15 var(--font-heading); letter-spacing: -.025em; text-wrap: balance; }
 .edition-output { display: flow-root; margin-top: clamp(28px, 3.5vw, 46px); }
 .edition-selections { display: grid; grid-template-columns: minmax(0, 1.32fr) minmax(300px, .85fr); align-items: start; gap: clamp(26px, 4vw, 54px); }
 .edition-contents, .edition-format { min-width: 0; }
@@ -82,7 +82,7 @@
 .edition-release-anchor { display: block; height: 0; overflow: hidden; }
 .edition-release { position: sticky; bottom: max(12px, env(safe-area-inset-bottom)); z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: clamp(28px, 3vw, 42px) auto 0; padding: 17px clamp(18px, 2.5vw, 30px); border: 1px solid var(--line-strong); border-left: 4px solid var(--color-action, var(--poppy)); border-radius: 12px; background: color-mix(in srgb, var(--color-paper, var(--paper)) 94%, transparent); box-shadow: 0 13px 40px rgb(var(--shadow-color) / .18); backdrop-filter: blur(14px); }
 .edition-release > div { min-width: 0; }
-.edition-release h2 { margin: 5px 0 4px; font: 500 clamp(23px, 2.4vw, 31px)/1.2 var(--font-display); text-wrap: balance; }
+.edition-release h2 { margin: 5px 0 4px; font: 400 clamp(23px, 2.4vw, 31px)/1.2 var(--font-heading); text-wrap: balance; }
 .edition-release p { max-width: 600px; margin: 0; color: var(--color-muted, var(--muted)); font-size: 12px; line-height: 1.5; }
 .edition-release .primary { flex: 0 0 auto; min-height: 50px; padding: 13px 20px; box-shadow: none; }
 .edition-release.is-floating { gap: 16px; padding-block: 12px; }

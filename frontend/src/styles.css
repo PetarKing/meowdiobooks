@@ -1,7 +1,8 @@
 @import "./styles/appearance.css";
+@import "./styles/fonts.css";
 
 :root {
-  --font-sans: "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
+  --font-sans: "Geist Sans", "Avenir Next", Avenir, "Segoe UI", system-ui, sans-serif;
   --font-display: Iowan Old Style, Baskerville, "Times New Roman", serif;
   font-family: var(--font-sans);
   color: var(--ink);
@@ -405,7 +406,7 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .attribution-scopes label { display:flex; align-items:flex-start; gap:9px; padding:9px; border-radius:8px; cursor:pointer; }.attribution-scopes label:hover { background:var(--surface-soft); }.attribution-scopes span, .attribution-scopes b, .attribution-scopes small { display:block; }.attribution-scopes small { margin-top:4px; color:var(--color-muted, var(--muted)); font-size:12px; line-height:1.45; }
 .attribution-scopes label.unavailable { opacity:.5; cursor:not-allowed; }.attribution-scopes label.unavailable:hover { background:transparent; }
 .attribution-scopes .scope-example { margin-top:8px; padding:7px 9px; border-left:2px solid var(--line); border-radius:0 7px 7px 0; background:var(--surface-soft); color:var(--ink-soft); font:11px/1.45 Georgia,serif; }
-.scope-example em { margin-right:7px; color:var(--color-muted, var(--muted)); font:800 8px "Avenir Next",Avenir,"Segoe UI",system-ui,sans-serif; text-transform:uppercase; letter-spacing:.08em; }
+.scope-example em { margin-right:7px; color:var(--color-muted, var(--muted)); font:800 8px var(--font-sans); text-transform:uppercase; letter-spacing:.08em; }
 .scope-intro { margin:-5px 0 14px; }
 .scope-count { display:inline !important; font-family:inherit !important; font-size:12px !important; font-weight:850 !important; }
 .scope-count.warn { color:var(--color-warning, var(--amber)); }.scope-count.good { color:var(--color-success, var(--green)); }
@@ -681,7 +682,7 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .choice:hover { border-color: var(--danger-border); transform: translateY(-2px); box-shadow: var(--shadow-sm); }
 .choice.selected { border: 2px solid var(--color-action, var(--poppy)); padding: 16px; background: var(--paper); box-shadow: 0 7px 24px rgb(var(--shadow-color) / 0.12); }
 .choice-title { font: 700 16px var(--font-display); color: var(--color-ink, var(--ink)); display: flex; align-items: center; gap: 7px; }
-.choice-title small { font: 800 9px "Avenir Next", sans-serif; text-transform: uppercase; background: var(--color-action, var(--poppy)); color: var(--action-ink); padding: 4px 6px; border-radius: 5px; letter-spacing: .05em; }
+.choice-title small { font: 800 9px var(--font-sans); text-transform: uppercase; background: var(--color-action, var(--poppy)); color: var(--action-ink); padding: 4px 6px; border-radius: 5px; letter-spacing: .05em; }
 .choice-shell.has-detail .choice { padding-right:42px; }
 .choice-info { position:absolute; z-index:4; top:14px; right:14px; }
 .choice-info-trigger { display:grid; width:18px; height:18px; place-items:center; padding:0; border:1px solid color-mix(in srgb, var(--line-strong) 30.0%, transparent); border-radius:50%; background:color-mix(in srgb, var(--paper) 92.0%, transparent); color:var(--plum); font-size:12px; font-weight:900; line-height:1; cursor:help; box-shadow:0 2px 8px rgb(var(--shadow-color) / 0.06); }
@@ -711,21 +712,21 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .extract-compare .extracted { display:flex; min-width:0; flex-direction:column; overflow:hidden; }
 .page-comparison .paper img { display:block; width:100%; height:auto; min-width:0; margin-top:12px; object-fit:contain; filter:drop-shadow(0 8px 12px rgb(var(--shadow-color) / 0.13)); }
 .paper-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.paper-heading > span { font:800 9px "Avenir Next",sans-serif; letter-spacing:.12em; color:var(--muted); }
-.pdf-zoom-controls { display:flex; align-items:center; gap:6px; font-family:"Avenir Next",sans-serif; }
+.paper-heading > span { font:800 9px var(--font-sans); letter-spacing:.12em; color:var(--muted); }
+.pdf-zoom-controls { display:flex; align-items:center; gap:6px; font-family:var(--font-sans); }
 .pdf-zoom-controls button { display:grid; width:26px; height:26px; place-items:center; padding:0; border:1px solid var(--line); border-radius:8px; background:color-mix(in srgb, var(--paper) 90.0%, transparent); color:var(--plum); font-size:15px; font-weight:850; cursor:pointer; }
 .pdf-zoom-controls button:disabled { opacity:.35; cursor:default; }
 .pdf-zoom-controls output { min-width:38px; color:var(--color-muted, var(--muted)); font-size:12px; font-weight:800; text-align:center; }
 .pdf-preview-frame { display:flex; justify-content:center; width:100%; margin-top:12px; overflow:hidden; border-radius:6px; }
 .page-comparison .paper .pdf-preview-frame img { flex:0 0 auto; max-width:none; min-width:0; margin:0; transition:width .16s ease; }
 .page-comparison-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.page-comparison-heading > span { color:var(--muted); font:800 9px "Avenir Next",sans-serif; letter-spacing:.12em; }
-.page-comparison-heading small { color:var(--color-muted, var(--muted)); font:700 9px "Avenir Next",sans-serif; }
+.page-comparison-heading > span { color:var(--muted); font:800 9px var(--font-sans); letter-spacing:.12em; }
+.page-comparison-heading small { color:var(--color-muted, var(--muted)); font:700 9px var(--font-sans); }
 .extract-compare .extracted pre { flex:1 1 0; width:100%; max-width:100%; height:0; min-width:0; min-height:0; margin:1em 0 0; padding-right:8px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit; }
 .paper, .extracted { min-height: 285px; border-radius: 12px; padding: 28px 34px; font-family: Georgia, serif; line-height: 1.8; }
 .paper { background: var(--surface-soft); box-shadow: inset 0 0 35px rgb(var(--shadow-color) / 0.09); }
 .extracted { border: 1px solid var(--line); background: var(--color-paper, var(--paper)); }
-.paper > span, .extracted > span, .script-diff > div > span { font: 800 9px "Avenir Next", sans-serif; letter-spacing: .12em; color: var(--muted); }
+.paper > span, .extracted > span, .script-diff > div > span { font: 800 9px var(--font-sans); letter-spacing: .12em; color: var(--muted); }
 .paper h3 { text-align: center; font-size: 13px; margin: 30px; }
 .extracted mark { background: var(--danger-soft); padding: 2px; }
 .two-col { display: grid; grid-template-columns: 1.25fr .75fr; gap: 18px; }
@@ -801,7 +802,7 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .review-transcript-pane .page-comparison-heading { padding-bottom:11px; border-bottom:1px solid var(--color-border, var(--line)); }
 .review-transcript-pane article { flex:1 1 0; min-height:0; padding:10px 10px 20px 1px; overflow:auto; user-select:none; -webkit-user-select:none; }
 .transcript-span { display:grid; grid-template-columns:94px minmax(0,1fr); gap:12px; margin:0; padding:10px 9px; border-left:3px solid transparent; border-bottom:1px solid color-mix(in srgb, var(--line) 58.0%, transparent); font:15px/1.58 Georgia,serif; }
-.transcript-span b { color:var(--color-muted, var(--muted)); font:800 9px/1.5 "Avenir Next",sans-serif; letter-spacing:.04em; text-transform:uppercase; }
+.transcript-span b { color:var(--color-muted, var(--muted)); font:800 9px/1.5 var(--font-sans); letter-spacing:.04em; text-transform:uppercase; }
 .transcript-span b small { font:inherit; letter-spacing:inherit; }
 .transcript-span span { white-space:pre-wrap; overflow-wrap:anywhere; }
 .transcript-span.narration { border-left-color:var(--line); }
@@ -809,7 +810,7 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .transcript-span.dialogue b { color:var(--speaker-accent, var(--poppy-dark)); }
 .transcript-span.excluded { border-left-color:var(--warning-border); background:repeating-linear-gradient(-45deg,var(--paper),var(--paper) 7px,var(--warning-soft) 7px,var(--warning-soft) 14px); color:var(--muted); }
 .transcript-span.excluded span { text-decoration:line-through; text-decoration-color:color-mix(in srgb, var(--line-strong) 45.0%, transparent); }
-.transcript-loading,.transcript-empty { flex:1; display:grid; place-content:center; justify-items:center; gap:7px; min-height:0; color:var(--color-muted, var(--muted)); text-align:center; font-family:"Avenir Next",sans-serif; }
+.transcript-loading,.transcript-empty { flex:1; display:grid; place-content:center; justify-items:center; gap:7px; min-height:0; color:var(--color-muted, var(--muted)); text-align:center; font-family:var(--font-sans); }
 .transcript-empty > span { display:grid; place-items:center; width:48px; height:48px; border-radius:50%; background:var(--blush); color:var(--plum); font-size:22px; }
 .transcript-empty b { color:var(--color-ink, var(--ink)); font:700 17px var(--font-display); }
 .transcript-empty small { max-width:260px; line-height:1.5; }

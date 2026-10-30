@@ -48,7 +48,7 @@ describe('responsive layout stylesheet guards', () => {
     const nativeVoiceSelect = rule('.voice-select-control select', supplementalMobileStyles)
     const visibleVoiceValue = rule('.voice-select-control > span', supplementalMobileStyles)
 
-    expect(workflowStyles).toMatch(/--font-sans\s*:\s*"Avenir Next",\s*Avenir,\s*"Segoe UI",\s*system-ui,\s*sans-serif/)
+    expect(workflowStyles).toMatch(/--font-sans\s*:\s*"Geist Sans",\s*"Avenir Next",\s*Avenir,\s*"Segoe UI",\s*system-ui,\s*sans-serif/)
     expect(formControls).toMatch(/font-size\s*:\s*16px\s*!important/)
     expect(normalizedFormControls).toMatch(/font-family\s*:\s*var\(--font-sans\)\s*!important/)
     expect(normalizedFormControls).toMatch(/font-weight\s*:\s*400\s*!important/)

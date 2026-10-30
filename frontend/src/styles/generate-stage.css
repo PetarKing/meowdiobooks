@@ -3,7 +3,7 @@
 .workspace main:has(> .chapter-library) { padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
 .chapter-library { margin-bottom: 0; }
 .generate-hero { grid-template-columns: 1fr; gap: 28px; padding: 6px 0 24px; margin-bottom: 16px; border: 0; }
-.generate-hero-copy h1 { font: 500 clamp(36px, 4vw, 56px)/1.08 var(--font-display); letter-spacing: -.035em; }
+.generate-hero-copy h1 { font: 400 clamp(36px, 4vw, 56px)/1.08 var(--font-heading); letter-spacing: -.035em; }
 .generate-hero-copy p { max-width: 540px; margin-top: 14px; font-size: 15px; line-height: 1.65; }
 .generate-hero-stats { gap: clamp(28px, 4vw, 64px); width: max-content; max-width: 100%; }
 .generate-hero-stats div { padding: 0; border: 0; }
@@ -34,7 +34,7 @@
 .chapter-row-target:has(input:focus-visible) { outline: 2px solid var(--poppy); outline-offset: -2px; }
 .chapter-row-target input:focus-visible { outline: 0; }
 .chapter-track-number { font: 500 23px/1 var(--font-display); color: var(--muted); }
-.chapter-card h3 { margin: 0; font: 500 24px/1.25 var(--font-display); letter-spacing: -.02em; overflow-wrap: anywhere; }
+.chapter-card h3 { margin: 0; font: 400 24px/1.25 var(--font-heading); letter-spacing: -.02em; overflow-wrap: anywhere; }
 .chapter-card-meta { gap: 12px; margin-top: 10px; align-items: center; flex-wrap: wrap; }
 .chapter-card-meta small, .track-status { font-size: 11px; }
 .chapter-stale-label { padding: 0; background: transparent; font-size: 11px; }

@@ -5,7 +5,7 @@
   background: transparent; box-shadow: none; overflow: visible;
 }
 .workflow-intro h1, .extract-hero-copy h1, .generate-hero-copy h1, .export-hero h1, .library-head-copy h1 {
-  max-width: 100%; margin: 8px 0; font: 500 clamp(34px,3.4vw,46px)/1.12 var(--font-display); letter-spacing: -.035em; text-wrap: balance;
+  max-width: 100%; margin: 8px 0; font: 400 clamp(34px,3.4vw,46px)/1.12 var(--font-heading); letter-spacing: -.035em; text-wrap: balance;
 }
 .workflow-intro { max-width: none; text-align: left; }
 .workflow-intro p, .extract-hero-copy p, .generate-hero-copy p, .export-hero p, .library-head-copy p { max-width: 760px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
@@ -14,7 +14,7 @@
 .workflow-launch { min-height: 150px; margin: 0; padding: 30px; justify-content: flex-start; border: 0; border-radius: 0; background: transparent; }
 .workflow-empty { display: flex; align-items: center; justify-content: center; flex-direction: column; padding: 48px 24px; text-align: center; border: 0; border-radius: 0; background: transparent; }
 .workflow-empty-symbol { display: grid; place-items: center; width: 48px; height: 48px; margin-bottom: 16px; color: var(--poppy); border-radius: 50%; background: var(--surface-soft); font-size: 25px; }
-.workflow-empty h2 { margin: 0 0 10px; font: 500 27px/1.2 var(--font-display); }
+.workflow-empty h2 { margin: 0 0 10px; font: 400 27px/1.2 var(--font-heading); }
 .workflow-empty p { max-width: 460px; margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .workflow-empty-action { margin-top: 20px; }
 .phase-action { display: flex; align-items: center; justify-content: space-between; margin-top: 22px; padding: 18px 0; gap: 18px; border-top: 1px solid var(--line); font-size: 12px; line-height: 1.5; }
@@ -45,7 +45,7 @@
 .page-comparison .paper img { object-fit: contain; }
 .page-comparison-heading, .paper-heading { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; margin-bottom: 14px; border-bottom: 1px solid var(--line); }
 .paper > span, .paper-heading > span, .page-comparison-heading > span { font-size: 10px; font-weight: 650; color: var(--muted); letter-spacing: .06em; }
-.page-comparison .extracted pre { min-height: 0; height: auto; overflow: visible; font: 14px/1.8 var(--font-display); white-space: pre-wrap; }
+.page-comparison .extracted pre { min-height: 0; height: auto; overflow: visible; font: 14px/1.8 var(--font-reading); white-space: pre-wrap; }
 .page-comparison .paper:focus-visible, .page-comparison .extracted:focus-visible { outline: 2px solid var(--poppy); outline-offset: 3px; }
 
 /* Dialogue separates the everyday choice from source-specific tools. */
@@ -98,7 +98,7 @@
 .dialogue-preflight .conflict-examples { background: transparent; gap: 16px; }
 .dialogue-preflight .conflict-example { padding: 8px 0 16px; background: transparent; }
 .dialogue-preflight .conflict-example-heading b, .dialogue-preflight .conflict-example-heading small { font-size: 11px; font-weight: 500; text-transform: none; }
-.dialogue-preflight .conflict-source { margin-block: 12px 20px; padding: 14px 16px; border-radius: 3px; font: 16px/1.7 var(--font-display); }
+.dialogue-preflight .conflict-source { margin-block: 12px 20px; padding: 14px 16px; border-radius: 3px; font: 16px/1.7 var(--font-reading); }
 .dialogue-preflight .conflict-result-label { font-size: 11px; font-weight: 600; text-transform: none; letter-spacing: 0; }
 .dialogue-preflight .conflict-interpretations { gap: 20px; }
 .dialogue-preflight .conflict-interpretations > div { padding: 14px 16px; border: 0; border-left: 2px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
@@ -107,7 +107,7 @@
 .dialogue-preflight .conflict-interpretations header small { font-size: 10px; font-weight: 600; text-transform: none; }
 .dialogue-preflight .conflict-interpretations dt { font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
 .dialogue-preflight .conflict-interpretations dd { font-size: 13px; font-weight: 500; }
-.dialogue-preflight .conflict-interpretations .conflict-spoken-text { font: 16px/1.6 var(--font-display); }
+.dialogue-preflight .conflict-interpretations .conflict-spoken-text { font: 16px/1.6 var(--font-reading); }
 .dialogue-preflight .conflict-help { padding: 14px 0 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--muted); line-height: 1.65; }
 @media (max-width: 750px) {
   .dialogue-preflight { padding: 20px 16px; }
@@ -133,12 +133,12 @@
 .review-workspace { display: grid; grid-template-columns: minmax(0,1fr); gap: 16px; border: 0; min-height: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
 .review-evidence { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .review-group-heading { align-items: start; margin-bottom: 16px; }
-.review-group-heading h2 { margin: 5px 0 8px; font: 500 26px/1.2 var(--font-display); letter-spacing: -.02em; }
+.review-group-heading h2 { margin: 5px 0 8px; font: 400 26px/1.2 var(--font-heading); letter-spacing: -.02em; }
 .review-group-heading p { font-size: 12px; line-height: 1.55; margin: 0; }
 .occurrence-meta { margin: 12px 0; font-size: 11px; }
 .source-window { margin: 0; padding: 22px 24px; border: 0; background: var(--paper); border-radius: 5px; }
 .context-boundary { color: var(--muted); font-size: 9px; }
-.source-window .context, .source-window .detected-span { white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px 0; font: 16px/1.7 var(--font-display); }
+.source-window .context, .source-window .detected-span { white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px 0; font: 16px/1.7 var(--font-reading); }
 .source-window .detected-span { margin: 8px 0; padding: 12px; border: 0; border-left: 2px solid var(--warning-ink); border-radius: 0; }
 .source-window .detected-span::after { display: none; }
 .context-boundary { padding: 0; }
@@ -269,7 +269,7 @@
 .library-cover-fallback circle { opacity: .35; }
 .library-book-body { grid-column: 2; grid-row: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 .library-book-copy { z-index: auto; align-self: stretch; display: grid; min-width: 0; padding: 2px 0 0; color: var(--ink); text-shadow: none; text-align: left; }
-.library-book-copy h2 { display: block; margin: 7px 0 5px; font: 500 25px/1.16 var(--font-display); letter-spacing: -.025em; -webkit-line-clamp: unset; overflow: visible; overflow-wrap: anywhere; white-space: normal; text-overflow: clip; }
+.library-book-copy h2 { display: block; margin: 7px 0 5px; font: 400 25px/1.16 var(--font-heading); letter-spacing: -.025em; -webkit-line-clamp: unset; overflow: visible; overflow-wrap: anywhere; white-space: normal; text-overflow: clip; }
 .library-format { justify-self: start; margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: var(--green); font-size: 9px; font-weight: 650; letter-spacing: .07em; }
 .library-book-copy > p { margin: 0 0 10px; overflow: visible; overflow-wrap: anywhere; white-space: normal; text-overflow: clip; color: var(--muted); font-size: 12px; font-weight: 450; line-height: 1.5; }
 .library-chapters { min-height: 0; justify-content: start; color: var(--ink); text-align: left; }
@@ -446,7 +446,7 @@
 .dialogue-result-hero { gap: 14px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; overflow: visible; }
 .dialogue-result-hero::after { display: none; }
 .dialogue-result-intro { display: block; }
-.dialogue-result-intro h1 { font: 500 32px/1.15 var(--font-display); }
+.dialogue-result-intro h1 { font: 400 32px/1.15 var(--font-heading); }
 .dialogue-result-workspace .dialogue-review-position { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .dialogue-review-position b { font: 500 13px/1.5 var(--font-sans); color: var(--muted); }
 .dialogue-review-position:focus, .dialogue-result-intro h1:focus { outline: none; }
@@ -483,7 +483,7 @@
 .dialogue-result-workspace .dialogue-floating-action { flex-direction: row; align-items: center; justify-content: space-between; }
 .dialogue-result-workspace .dialogue-floating-action > .primary { flex: 0 1 auto; min-width: 130px; }
 .dialogue-result-workspace .dialogue-floating-action button { font-weight: 500; }
-.dialogue-result-workspace .ai-source-evidence p { font: 14px/1.45 var(--font-display); color: var(--muted); }
+.dialogue-result-workspace .ai-source-evidence p { font: 14px/1.45 var(--font-reading); color: var(--muted); }
 .dialogue-result-workspace .ai-source-evidence mark { display: block; width: fit-content; margin-block: 14px; }
 
 .dialogue-bulk-label { color: var(--muted); font-size: 12px; }
