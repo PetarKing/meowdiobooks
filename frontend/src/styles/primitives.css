@@ -89,7 +89,7 @@
 .phase-help-trigger:focus-visible { outline: 2px solid var(--poppy); outline-offset: 0; }
 
 /* Evidence remains literal; emphasis must never hide the surrounding context. */
-.source-excerpt { font-family: var(--font-display); font-size: 17px; line-height: 1.7; color: var(--color-ink, var(--ink)); }
+.source-excerpt { font-family: var(--font-reading); font-size: 17px; line-height: 1.7; color: var(--color-ink, var(--ink)); }
 .source-excerpt p { margin: 0 0 12px; }
 .source-excerpt mark { padding: 2px 4px; border-radius: 3px; background: var(--highlight); color: var(--color-ink, var(--ink)); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
 .source-excerpt mark + p { margin-top: 12px; }
