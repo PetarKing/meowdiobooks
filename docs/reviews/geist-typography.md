@@ -1,7 +1,7 @@
 # Geist typography proposals
 
-Status: draft, awaiting the owner's selection. All four proposals are currently applied together.
-They are separate commits so individual choices can be dropped before review and merge.
+Status: the owner approved all four proposals on 2026-10-30 and authorized release and Alpha adoption.
+The separate commits and original comparisons are retained as the design decision record.
 The shared workflow UI and design-system typography belong in this repository.
 No host-specific CSS, credentials, operator settings, or release artifacts are changed.
 
@@ -62,9 +62,9 @@ Review, Generate, Export and Library at 1440px in light appearance; and Home, Ex
 at 390px in Simplified Chinese. Full screenshots and JSON reports are generated locally by the
 commands below; the four focused comparison sheets are retained here for review.
 
-No workflow processing logic changed, so backend/model tests and real-book audio generation
-were outside this draft's verification scope. The full canonical release visual matrix and
-Linux CI have not been run. These draft checks do not replace the merge or release gates.
+The table records the initial design-draft checks. The final release adds the full local CI
+equivalents and canonical visual matrix; exact-commit results are recorded on the pull request.
+Hosted CI remains subject to the owner-authorized October outage procedure.
 
 ## Reproduce the comparisons
 
@@ -91,7 +91,7 @@ records package version, source, individual hashes, and the bundled SIL Open Fon
 No JavaScript runtime dependency or Next.js font loader is added. The package's existing `src`
 inclusion carries the font files and license to consumers.
 
-After the owner chooses the desired proposals, remove rejected options and unused assets,
-repeat affected visual checks, and complete normal review/merge gates. Hosted adoption requires
+All four proposals were selected. Complete normal review/merge gates before publishing. Hosted adoption requires
 an immutable release from the merged public commit, verified lock/hash updates and consumer checks.
-Publication, host pin updates, and deployment are outside this draft PR.
+The owner separately authorized publication, host pin updates, and Alpha deployment on 2026-10-30;
+each follows its own verification gates.
