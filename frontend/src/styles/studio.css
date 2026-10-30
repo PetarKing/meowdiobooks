@@ -46,8 +46,9 @@ html, body { background: var(--canvas, #f4f1eb); }
 .studio-hero { display: grid; grid-template-columns: minmax(0,.85fr) minmax(0,1.15fr); gap: 56px; align-items: center; min-height: 440px; margin: 0 0 40px; padding: 0; border: 0; background: transparent; color: var(--ink); box-shadow: none; border-radius: 0; }
 .studio-hero-copy { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; padding: 24px 0; }
 .studio-kicker { display: block; font: 650 10px/1.5 var(--font-sans); color: var(--muted); letter-spacing: .17em; text-transform: uppercase; }
-.studio-hero h1 { margin: 24px 0 24px; font: 500 clamp(52px,5.6vw,78px)/1.02 var(--font-display); letter-spacing: -.045em; }
-.studio-hero h1 em { color: var(--poppy); font-weight: 450; }
+.studio-hero h1 { margin: 24px 0 24px; font: 400 clamp(52px,5.6vw,78px)/1.02 var(--font-hero); letter-spacing: -.045em; }
+/* Heart is an upright display face; keep emphasis through colour, without a fake italic. */
+.studio-hero h1 em { color: var(--poppy); font-style: normal; font-weight: 400; }
 .studio-hero-copy > p { max-width: 360px; margin: 0 0 32px; font-size: 15px; color: var(--muted); line-height: 1.65; }
 .sanctuary-art { min-width: 0; overflow: hidden; background: var(--matcha); border: 0; border-radius: 120px 2px 2px 2px; }
 .sanctuary-art > img { display: block; width: 100%; height: auto; aspect-ratio: 3/2; object-fit: cover; transition: transform 700ms ease; }
