@@ -41,7 +41,7 @@
   max-width: 590px;
   margin: 13px 0 16px;
   color: var(--ink);
-  font: 500 clamp(34px, 4vw, 58px)/1.04 var(--font-display);
+  font: 400 clamp(34px, 4vw, 58px)/1.04 var(--font-heading);
   letter-spacing: -.035em;
 }
 .review-scan-copy p { max-width: 520px; margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
