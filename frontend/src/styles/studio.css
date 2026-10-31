@@ -183,7 +183,7 @@ html, body { background: var(--canvas, #f4f1eb); }
 .brand-emblem { display: block; width: 100%; height: auto; }
 .brand-emblem-boxed { color: #fefff8; }
 .brand-emblem-boxed .brand-heart { fill: #e6bbc8; }
-.brand-tile { fill: #2d3825; }
+.brand-tile { fill: #293f33; }
 .brand-compact { display: none; width: 40px; color: var(--ink); }
 .book-mini .cover .brand-emblem { width: 28px; }
 @media (max-width: 600px) {
