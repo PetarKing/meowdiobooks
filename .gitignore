@@ -45,6 +45,7 @@ library/
 *.flac
 *.wav
 !docs/demo/*.wav
+!docs/demo/the-last-door.mp3
 
 # Generated runs, experiments and temporary output
 .bench/
