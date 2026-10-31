@@ -6,12 +6,14 @@ Matcha & Cherry is the current application design: an illustrated sanctuary with
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Canvas | `#f1f2e8` | `#15262a` |
-| Paper | `#fefff8` | `#253c3d` |
+| Canvas | `#f1f2e8` | `#293f33` |
+| Paper | `#fefff8` | `#263d30` |
 | Copy | `#2d3825` | `#faf3e6` |
 | Muted copy | `#5e684f` | `#ccd7d0` |
-| Primary action | `#a42f4d` | `#f49bb6` |
+| Primary action | `#a42f4d` | `#f7abc2` |
 | Success | `#436627` | `#b6dcac` |
+
+Dark mode uses the same forest canvas on Home, the workflow, Library, and portal surfaces. Home layers a deeper upper fade, matcha glow and faint cherry haze over that base; its import and local-book cards use the softer surface token. Canonical workflow pages echo it with a static 7% matcha wash. Light appearance and custom semantic palettes do not receive that wash.
 
 The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance for 12 hours and persists its deadline locally. Expiry resumes the current device appearance, including after reload or wake. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 
@@ -50,6 +52,7 @@ Native chapter playback publishes chapter, book and author metadata through the 
 - Wide layouts favor clear comparison with generous space. Tablet retains the stage rail; phone uses a slim connected row of evenly spaced numbered progress markers, with the current step in a cherry pill. Position remains available to assistive technology without repeating the page title. The standard six-step journey fits at 320px with 44px touch targets; longer host journeys can scroll. Accessible names retain every stage label and status.
 - Generate chapter rows use an inset mobile layout, one audio-readiness label and a separate 44px Listen target. Gold marks current generated audio or a host-confirmed current purchase scope; the label continues to describe actual audio, never payment. Ready audio says Generated, and paid audio that has not finished remains To make or Older recording.
 - Generate actions sit 16px above the viewport foot with safe-area padding. A measured spacer places short-list actions there; long lists retain a compact bottom-sticky dock, and their final row remains reachable above it.
+- On tablet and desktop, the workflow sidebar uses one subtle current-step tint and a small cherry heart in the status column. Plain green checkmarks identify completed inactive steps; upcoming steps keep their numbers. Draft-ready steps retain an amber number and status when not selected. The current stage name, status, tooltip and `aria-current="step"` remain available when collapsed. Place the collapse control inside the rail in a Workflow row above the steps, below book details when shown. Short windows scroll the rail; phone keeps its numbered progress strip.
 - On mobile, primary actions remain reachable without covering the final content. Horizontal choice rails must show more than one card edge so overflow is discoverable.
 - Desktop entrance artwork shares the screen with the import composition; phone stacks the illustration below the import action. Modal inspectors cover the complete viewport so background navigation cannot discard work. Large ensembles use search and status filtering while total acceptance requirements stay visible. Text stays live and left aligned on narrow screens.
 
@@ -140,9 +143,17 @@ Do not repeat an AI proposal in a separate correction panel or explanatory parag
 Deletion proposals mark Leave as suggested; word repairs show the exact replacement inside Apply correction,
 after Keep and Leave and before the separate bulk action.
 
-A suggested individual choice remains visually neutral and adds “(Suggested)” to its title; only an
-explicit choice uses the action tint and checkmark. Do not preselect suggestions or count them as
-decisions. Show bulk suggestions only when the action covers more than one suggestion in total;
+A suggested individual choice matches Dialogue’s reader options: an outlined sparkle and subtle
+warning tint, muted when another choice is selected. Only an explicit choice uses the selected
+action tint and checkmark, replacing the sparkle. Do not preselect suggestions or count them as
+decisions. Completed queue categories use neutral backgrounds and checkmarks. The current unfinished
+category receives the active fill; explicitly reopening a completed category also gives it the active
+fill while retaining its checkmark. Clear that manual selection on category completion, so finishing
+all categories leaves no active fill until a category is reopened. Keep keyboard focus visible and
+expose the displayed category through aria-current. All unselected queue items use surface-soft on
+hover, including completed items and the last item; hovering never replaces the active selection fill.
+
+Show bulk suggestions only when the action covers more than one suggestion in total;
 a larger review keeps its bulk action even when just one undecided suggestion remains.
 Use a full-width warning-tinted block with a nearby icon and left-aligned title, no extra help paragraph.
 On wide layouts, push this block to the bottom of the decision sidebar with flexible space above;
@@ -150,3 +161,30 @@ keep it in normal flow after the options on smaller screens or when the options 
 Explain preservation in the accessible description and tooltip. At zero, show “All suggestions decided”.
 Bulk application preserves manual choices. At zero, disable only the bulk button and explain that
 individual choices remain editable. Do not add a duplicate selection-status line below the choices.
+
+Chapter-start evidence displays all supplied bounded context so a title split across paragraphs
+and its opening passage remain visible. Only the original boundary anchor is highlighted; this
+presentation does not merge source spans or rewrite extracted text.
+
+At every viewport size, completing a category selects the next unfinished category in visible
+queue order, wrapping if needed and resuming its first undecided item. Individual choices and bulk
+actions share this progression. Completing all categories stays on the current item.
+
+On phones (up to 700px), Review navigation follows the level of work completed. A choice with more
+examples remaining scrolls to the category heading; completing a category scrolls to the decision
+queue, selecting and focusing the next unfinished category in visible order (wrapping if needed).
+Resume its first undecided item and preserve that position when its active queue card is opened. Completing all categories stays in place and reveals
+Review complete transcript, focusing it and scrolling down only if below the viewport. Hide that
+final action until every decision is complete; do not add an intermediate Continue action.
+
+Use the measured sticky-header bottom plus 12px for category and queue targets. Short categories may
+reserve minimal scroll room after the controls so their heading can align without previous content
+peeking under the header; never insert this space between choices and the final button. Apply these
+geometry changes immediately and animate only scrolling, respecting reduced motion. Desktop retains
+its existing category queue, scrolling behavior, and transcript action; category selection follows
+the same completion rule at every size.
+
+Chapter context uses compact paragraph gaps and reflows PDF line wrapping for readability; source
+characters and anchors remain unchanged. Complete-transcript preview and explicit acceptance remain
+separate steps. Entering that final check or returning to decisions resets the viewport to the page
+start and focuses main content. Loading, paging, or zooming must not repeat that reset.

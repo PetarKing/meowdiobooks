@@ -2,9 +2,29 @@ import { describe, expect, it } from 'vitest';
 import { createFixtureGateway, scenarios, snapshotFor } from './fixtures';
 import { castFor } from './castFixtures';
 import { strongConfirmationLabelsForCast } from '../src/castIdentity';
+import { buildReviewWarningDecisions } from '../src/reviewDecisions';
 import { decisionsForCast } from '../src/workflow/cast';
 
 describe('synthetic review gateway', () => {
+  it('accepts grouped review decisions through the production decision builder', async () => {
+    const gateway = createFixtureGateway('review');
+    const before = await gateway.getBookSnapshot('kit-book');
+    const job = await gateway.processStage('kit-book', 'review', {});
+    const revision = String(job.result!.revision);
+    const candidate = await gateway.getStageCandidate('kit-book', 'review', revision);
+    const warnings = candidate.warnings!;
+    const choices = Object.fromEntries(warnings.flatMap(warning => [[warning.id, 'keep'], ...warning.occurrences.map(row => [row.id, 'keep'])])) as Record<string, 'keep'>;
+    const decisions = await buildReviewWarningDecisions('kit-book', revision, warnings, choices, gateway.previewReviewBulk);
+    expect(decisions.flatMap(row => row.occurrenceIds)).toEqual(warnings.flatMap(warning => warning.occurrences.map(row => row.id)));
+    expect(decisions[0].occurrenceIds).toHaveLength(8);
+    expect(decisions[0].previewToken).toBeTruthy();
+    expect((await gateway.getBookSnapshot('kit-book')).book.completedStages).toEqual(before.book.completedStages);
+    await gateway.acceptStage('kit-book', 'review', revision, decisions);
+    const accepted = await gateway.getBookSnapshot('kit-book');
+    expect(accepted.book.completedStages).toContain('review');
+    expect(accepted.activeArtifacts.review).toBe(revision);
+    await expect(gateway.previewReviewBulk('kit-book', revision, 'missing-occurrence', 'keep')).rejects.toThrow();
+  });
   it('appends auditions chronologically without mutating earlier candidates or the accepted snapshot', async () => {
     const gateway = createFixtureGateway('cast-accepted');
     const accepted = await gateway.getBookSnapshot('kit-book');

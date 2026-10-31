@@ -92,7 +92,7 @@ export const VerseAiSuggestion: Story = {
     await expect(passage.querySelector("mark")?.textContent).toBe("two p\n ennyworth");
     await expect(passage.textContent).toContain("“Beautiful Soup! Who cares for fish,\n Game, or any other dish?");
     await expect(within(passage).queryByText(/Chorus again/)).not.toBeInTheDocument();
-    await expect(canvas.getByRole("button", { name: "Apply correction (Suggested) two pennyworth" })).toHaveClass("review-recommended");
+    await expect(canvas.getByRole("button", { name: "Apply correction two pennyworth" })).toHaveClass("review-recommended");
     await expect(canvas.queryByLabelText("Proposed correction")).not.toBeInTheDocument();
   },
 };

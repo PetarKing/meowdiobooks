@@ -125,7 +125,10 @@
 .review-strip { display: flex; flex-direction: column; gap: 6px; padding: 0; overflow: visible; border: 0; border-radius: 0; background: transparent; mask-image: none; }
 /* Cards retain all four borders, including the legacy strip's last item. */
 .review-strip > button, .review-strip > button:last-child { display: flex; flex: none; max-width: none; align-items: start; gap: 9px; width: 100%; min-width: 0; padding: 12px 10px; border: 1px solid transparent; border-radius: 5px; background: transparent; text-align: left; }
-.review-strip > button.active { background: var(--blush); border-color: var(--line); color: var(--ink); box-shadow: inset 3px 0 var(--poppy); }
+/* Completion is a checkmark, not another active-card fill from the legacy strip. */
+.review-strip > button.resolved { background: transparent; border-color: transparent; box-shadow: none; }
+.review-strip > button:not(.active):hover { background: var(--surface-soft); }
+.review-strip > button.active, .review-strip > button.resolved.active { background: var(--blush); border-color: var(--line); color: var(--ink); box-shadow: inset 3px 0 var(--poppy); }
 .review-strip > button > span:first-child { flex: 0 0 20px; width: 20px; height: 20px; border-radius: 3px; font: 600 11px var(--font-sans); color: var(--muted); background: var(--surface-soft); }
 .review-strip > button.resolved > span:first-child { color: var(--green); background: var(--green-soft); }
 .review-strip strong { font-size: 12px; line-height: 1.45; white-space: normal; }

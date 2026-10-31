@@ -381,6 +381,11 @@ describe('v2 wizard', () => {
     expect(progress).toHaveTextContent('Step 5 of 7 · Soundscape')
   })
 
+  it.each([undefined, true])('shows the header execution badge only when explicitly enabled (%s)', async (showExecutionBadge) => {
+    await open(base, undefined, undefined, undefined, { capabilities: showExecutionBadge === undefined ? undefined : { showExecutionBadge } })
+    expect(Boolean(screen.queryByText('Local-first'))).toBe(showExecutionBadge === true)
+  })
+
   it('collapses the wizard rail without changing the active stage', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })
@@ -908,7 +913,7 @@ describe('v2 wizard', () => {
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
     expect(within(dialog).getByRole('button', { name: 'Cancel audio generation' })).toHaveFocus()
     expect(within(dialog).getByRole('progressbar', { name: 'Chapter generation progress' })).toBeInTheDocument()
-    expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
     expect(within(dialog).getByText('≈ 1 min')).toBeInTheDocument()
     expect(within(dialog).getByText(/Keep Meowdiobooks open/)).toBeInTheDocument()
     expect(screen.queryByText('Synthesizing segment 4/19')).not.toBeInTheDocument()
@@ -926,7 +931,7 @@ describe('v2 wizard', () => {
     })
   })
 
-  it('keeps resumed generation status compact and updates remaining time from live progress', async () => {
+  it.each(['chapter-3: segment 1 of 2', 'Rendering chapters: 1 of 2 complete'])('shows completed chapters and measured time for %s', async (message) => {
     const snapshot: WizardSnapshot = {
       ...base,
       recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, chapters: [
@@ -942,7 +947,7 @@ describe('v2 wizard', () => {
     }
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
     vi.mocked(wizardApi.processStage).mockResolvedValue({
-      id: 'generate-job', status: 'running', progress: 50, message: 'chapter-3: segment 1 of 2',
+      id: 'generate-job', status: 'running', progress: 50, message,
       started_at: new Date(Date.now() - 120_000).toISOString(),
     })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
@@ -952,8 +957,10 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate 2 selected →' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(await within(dialog).findByText('1 of 2 ready')).toBeInTheDocument()
+    expect(await within(dialog).findByText('1 of 2 recorded')).toBeInTheDocument()
     expect(within(dialog).getByText('≈ 2 min')).toBeInTheDocument()
+    expect(within(dialog).getByText('Estimated time left')).toBeInTheDocument()
+    expect(within(dialog).getByText('Estimates update with progress and may change.')).toBeInTheDocument()
     expect(dialog.querySelectorAll('.generation-progress-facts > div')).toHaveLength(2)
 
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
@@ -1024,6 +1031,20 @@ describe('v2 wizard', () => {
     expect(within(action).getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
   })
 
+  it.each([
+    ['queued', undefined, 'Waiting to start'],
+    ['running', 'Waiting for audio capacity (queue position 2)', 'Waiting for audio capacity'],
+  ] as const)('does not offer a processing ETA while %s / %s', async (status, message, label) => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status, message, progress: 1 })
+    vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise(() => {}))
+    await open({ ...base, generatedChapters: [] })
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(await within(dialog).findByText(label)).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('≈')
+  })
+
   it('uses edition-specific estimates in generation progress while keeping them out of the action footer', async () => {
     const estimatedSeconds = 3917
     const snapshot: WizardSnapshot = {
@@ -1036,7 +1057,7 @@ describe('v2 wizard', () => {
       generatedChapters: [],
     }
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued' })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'running' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
 
     await open(snapshot, undefined, undefined, undefined, {
@@ -1075,7 +1096,7 @@ describe('v2 wizard', () => {
       result: { chapters: [{ audioSeconds: 40 }, { audioSeconds: 60 }] },
     }])
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued' })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'running' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
 
     await open(snapshot)
@@ -3105,6 +3126,68 @@ describe('v2 wizard', () => {
     expect(screen.queryByText('Same decision for every heading?')).not.toBeInTheDocument()
   })
 
+  it('leads from completed suggestions to undecided categories without changing existing choices', async () => {
+    const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-navigation', status: 'candidate' } } }
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-navigation', boundaryCandidates: [
+      { id: 'chapter-split', page: 2, source: 'MARA', reason: 'Standalone heading', contextLayout: 'continuous', contextBefore: 'The preface ends.\n\n', contextAfter: '\n\nVALE’S\n\nRECORDS\n\nThe first day began with a letter.' },
+    ], warnings: [
+      { ...cleanupWarning, occurrences: cleanupWarning.occurrences.slice(0, 2) },
+      { id: 'source-check', kind: 'suspicious-extraction', severity: 'warning', availableActions: ['keep', 'exclude'], occurrences: [{ id: 'odd-word', page: 3, source: 'STR ANGE', text: 'STR ANGE' }] },
+    ] })
+    await open(snapshot)
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    expect(await screen.findByText(/The first day began with a letter/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Manuscript context').querySelector('mark')?.textContent).toBe('MARA')
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /AI suggestions/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Apply all suggested choices/ }))
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /Chapter starts/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
+    expect(screen.getByRole('heading', { name: 'Suspicious extracted text' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    vi.mocked(window.scrollTo).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, left: 0, behavior: 'instant' })
+    expect(screen.getByRole('main')).toHaveFocus()
+    await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(window.scrollTo).toHaveBeenCalledTimes(1)
+    expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-navigation', 1,
+      [{ warningId: 'source-check', action: 'keep' }], [{ occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }], [{ boundaryId: 'chapter-split', action: 'chapter-start' }])
+    vi.mocked(window.scrollTo).mockClear()
+    fireEvent.click(screen.getByRole('button', { name: '← Back to decisions' }))
+    expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, left: 0, behavior: 'instant' })
+    expect(screen.getByRole('main')).toHaveFocus()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+  })
+
+  it('continues to remaining source checks within the mobile suggestion category after bulk application', async () => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-multiple-groups', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-multiple-groups', boundaryCandidates: [], warnings: [
+        { ...cleanupWarning, occurrences: cleanupWarning.occurrences.slice(0, 2) },
+        { ...cleanupWarning, id: 'another-ai-group', occurrences: cleanupWarning.occurrences.slice(2) },
+      ] })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      fireEvent.click(await screen.findByRole('button', { name: /^Apply all suggested choices/ }))
+      expect(document.querySelector('[data-review-group="warning-0"]')).toHaveClass('active')
+      expect(screen.queryByText('This category is complete')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Manuscript context')).toHaveTextContent('She opened the')
+      expect(screen.getByRole('heading', { name: 'Does this text match the source?' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+      fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
+      expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
+  })
+
   it('keeps preserved bracketed prose outside the decision queue without blocking review', async () => {
     const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-preserved', status: 'candidate' } } }
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-preserved', warnings: [], boundaryCandidates: [], scriptDirectionsSummary: { candidates: 30, proposals: 0, kept: 30 } })
@@ -3122,7 +3205,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
     expect(await screen.findByRole('heading', { name: 'Script directions' })).toBeInTheDocument()
     const apply = screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ })
-    expect([...apply.closest(".resolution-options")!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep original text', 'Leave out (Suggested)', 'Apply all suggested choices (3)'])
+    expect([...apply.closest(".resolution-options")!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep original text', 'Leave out', 'Apply all suggested choices (3)'])
     expect(screen.getByText('AI checked')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveClass('review-recommended')
     expect(screen.getByRole('button', { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveAttribute('aria-pressed', 'false')
@@ -3172,7 +3255,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'AI suggestions' }).closest('.review-group-heading')).not.toHaveTextContent('warning')
     expect(screen.getByRole('complementary', { name: 'Decision queue' })).not.toHaveTextContent('warning')
     expect(within(screen.getByRole('complementary', { name: 'Decision queue' })).queryByRole('button', { name: /^Apply all/ })).not.toBeInTheDocument()
-    expect([...apply.closest(".resolution-options")!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep original text', 'Leave out', 'Apply correction (Suggested)', 'Apply all suggested choices (2)'])
+    expect([...apply.closest(".resolution-options")!.querySelectorAll('button')].map((button) => button.querySelector('b')?.textContent)).toEqual(['Keep original text', 'Leave out', 'Apply correction', 'Apply all suggested choices (2)'])
     expect(screen.queryByRole('button', { name: /Try extraction again/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
     expect(screen.getByRole('button', { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveClass('review-recommended')
@@ -3236,7 +3319,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-single', warnings: [{ ...warning, occurrences: [warning.occurrences[0]] }], boundaryCandidates: [] })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    const suggested = await screen.findByRole('button', { name: /^(Apply correction|Leave out) \(Suggested\)/ })
+    const suggested = await screen.findByRole('button', { name: warning.kind === 'ai-cleanup' ? /^Apply correction/ : /^Leave out/ })
     expect(suggested).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('button', { name: /Apply all suggested choices|All suggestions decided/ })).not.toBeInTheDocument()
     fireEvent.click(suggested)
@@ -3250,9 +3333,12 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-inline', warnings: [cleanupWarning], boundaryCandidates: [] })
     await open(snapshot)
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    const correction = await screen.findByRole('button', { name: 'Apply correction (Suggested) broken' })
+    const correction = await screen.findByRole('button', { name: 'Apply correction broken' })
     expect(correction).toHaveClass('review-recommended')
     expect(correction).toHaveAttribute('aria-pressed', 'false')
+    expect(correction).toHaveAttribute('aria-description', 'Suggested choice for this passage')
+    expect(correction).toHaveTextContent('✧')
+    expect(correction).not.toHaveTextContent('✓')
     expect(screen.queryByLabelText('Proposed correction')).not.toBeInTheDocument()
     fireEvent.click(correction)
     expect(screen.getByText('Example 2 of 3')).toBeInTheDocument()
@@ -3261,7 +3347,9 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.queryByRole('button', { name: /^Apply correction/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
-    expect(screen.getByRole('button', { name: 'Apply correction (Suggested) broken' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Apply correction broken' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Apply correction broken' })).toHaveTextContent('✓')
+    expect(screen.getByRole('button', { name: 'Apply correction broken' })).not.toHaveTextContent('✧')
   })
 
   it('moves saved overlapping corrections into AI suggestions without duplicating source-only warnings', async () => {
@@ -3303,6 +3391,9 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ }))
     expect(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    expect(screen.getByText('Example 3 of 150')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
     expect(screen.getByRole('button', { name: /^Keep original text Keep the original/ })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
@@ -3450,35 +3541,181 @@ describe('v2 wizard', () => {
     expect(keep).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('scrolls the next review group into view during automatic progression', async () => {
-    const snapshot: WizardSnapshot = {
-      ...base,
-      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
-      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+  it.each([true, false])('returns to the queue after mobile category completion and preserves desktop progression (%s)', async (mobile) => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() })) as unknown as typeof window.matchMedia
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    try {
+      const snapshot: WizardSnapshot = {
+        ...base,
+        book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+        activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+      }
+      const warnings = Array.from({ length: 4 }, (_, index) => ({
+        id: `matter-${index}`,
+        kind: 'repeated-matter',
+        severity: 'warning',
+        detail: `Repeated edge text ${index + 1}`,
+        availableActions: ['keep', 'exclude'],
+        occurrences: Array.from({ length: 3 }, (_, example) => ({ id: `o${index}-${example}`, page: index + 2, source: `HEADER ${index + 1} EXAMPLE ${example + 1}` })),
+      }))
+      const scrollIntoView = vi.fn()
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+      vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-2', warnings, boundaryCandidates: [] })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+
+      await screen.findByRole('navigation', { name: 'Review groups' })
+      fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
+      if (mobile) await waitFor(() => expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus())
+      scrollIntoView.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: /Keep as is/ }))
+
+      if (mobile) {
+        expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
+        await waitFor(() => expect(document.querySelector('.review-strip > button.active')).toHaveFocus())
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+        expect(screen.getByText('Example 1 of 3')).toBeInTheDocument()
+        expect(screen.getByLabelText('Manuscript context')).toHaveTextContent('HEADER 2 EXAMPLE 1')
+        fireEvent.click(document.querySelector<HTMLButtonElement>('[data-review-group="warning-1"]')!)
+        expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }))
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus())
+      } else {
+        expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+        expect(screen.getByRole('heading', { name: 'Repeated page matter' })).not.toHaveFocus()
+      }
+    } finally {
+      window.matchMedia = originalMatchMedia
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
     }
-    const warnings = Array.from({ length: 4 }, (_, index) => ({
-      id: `matter-${index}`,
-      kind: 'repeated-matter',
-      severity: 'warning',
-      detail: `Repeated edge text ${index + 1}`,
-      availableActions: ['keep', 'exclude'],
-      occurrences: [{ id: `o${index}`, page: index + 2, source: `HEADER ${index + 1}` }],
-    }))
+  })
+
+  it.each([{ mobile: true, bulk: false }, { mobile: true, bulk: true }, { mobile: false, bulk: false }, { mobile: false, bulk: true }])('cycles unfinished categories and resumes their first undecided item (mobile=$mobile, bulk=$bulk)', async ({ mobile, bulk }) => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-cycle', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-cycle', boundaryCandidates: [
+        { id: 'first', page: 1, source: 'Chapter One', reason: 'Standalone heading' },
+        { id: 'second', page: 2, source: 'Chapter Two', reason: 'Standalone heading' },
+      ], warnings: [{ ...cleanupWarning, occurrences: cleanupWarning.occurrences.slice(0, 2) },
+        { id: 'source-check', kind: 'suspicious-extraction', severity: 'warning', availableActions: ['keep', 'exclude'], occurrences: [{ id: 'odd-word', page: 3, source: 'STR ANGE' }] },
+      ] })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      fireEvent.click(await screen.findByRole('button', { name: /^Start a new chapter/ }))
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      const groups = within(screen.getByRole('navigation', { name: 'Review groups' }))
+      fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
+      fireEvent.click(groups.getByRole('button', { name: /Suspicious extracted text/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
+      expect(screen.getByRole('heading', { name: 'AI suggestions' })).toBeInTheDocument()
+      if (mobile) await waitFor(() => expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveFocus())
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveAttribute('aria-current', 'true')
+      expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
+      fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
+      expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: bulk ? /^Apply all suggested choices/ : /^Leave out/ }))
+      expect(screen.getByRole('heading', { name: 'Chapter starts' })).toBeInTheDocument()
+      if (mobile) await waitFor(() => expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveFocus())
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      fireEvent.click(groups.getByRole('button', { name: /Chapter starts/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
+      expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+      if (mobile) await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'Chapter starts' })).toBeInTheDocument()
+      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(0)
+      expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveAttribute('aria-current', 'true')
+      fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
+      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(1)
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveClass('active', 'resolved')
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveAttribute('aria-current', 'true')
+      fireEvent.click(groups.getByRole('button', { name: /Chapter starts/ }))
+      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(1)
+      expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveClass('active', 'resolved')
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).not.toHaveClass('active')
+      expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
+  })
+
+  it.each([{ below: false, bulk: false }, { below: true, bulk: false }, { below: true, bulk: true }])('reveals mobile final review only when needed ($below, bulk=$bulk)', async ({ below, bulk }) => {
+    const originalMatchMedia = window.matchMedia
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    const originalRect = HTMLElement.prototype.getBoundingClientRect
+    const scrollIntoView = vi.fn()
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function(this: HTMLElement) {
+      if (this.classList.contains('topbar')) return new DOMRect(0, 0, 390, 100)
+      if (this.classList.contains('review-transcript-continue')) return new DOMRect(0, window.innerHeight + (below ? 30 : -30) - 48, 300, 48)
+      return originalRect.call(this)
+    })
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-final-position', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-final-position', warnings: [], boundaryCandidates: Array.from({ length: bulk ? 3 : 1 }, (_, i) => ({ id: `heading-${i}`, page: i + 1, source: `Chapter ${i + 1}`, reason: 'Standalone heading' })) })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      await screen.findByRole('heading', { name: 'Chapter starts' })
+      const next = screen.getByRole('button', { name: 'Review complete transcript →' })
+      expect(next.closest('.review-next-action')).toHaveClass('review-pending')
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /Chapter starts/ }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Chapter starts' })).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'Chapter starts' }).style.scrollMarginTop).toBe('112px')
+      scrollIntoView.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: bulk ? 'Mark all 3 as chapter starts' : /^Start a new chapter/ }))
+      await waitFor(() => expect(next).toHaveFocus())
+      expect(next).toBeEnabled()
+      expect(next.closest('.review-next-action')).not.toHaveClass('review-pending')
+      if (below) expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ behavior: 'smooth', block: 'end' })
+      else expect(scrollIntoView).not.toHaveBeenCalled()
+      expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    } finally {
+      rect.mockRestore()
+      window.matchMedia = originalMatchMedia
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
+    }
+  })
+
+  it.each([{ mobile: true, reducedMotion: false }, { mobile: true, reducedMotion: true }, { mobile: false, reducedMotion: false }])('keeps desktop heading navigation still and respects motion preferences ($mobile, $reducedMotion)', async ({ mobile, reducedMotion }) => {
+    const originalMatchMedia = window.matchMedia
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
     const scrollIntoView = vi.fn()
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" ? mobile : query === "(prefers-reduced-motion: reduce)" && reducedMotion, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
-    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-2', warnings, boundaryCandidates: [] })
-    await open(snapshot)
-    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
-    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
-
-    await screen.findByRole('navigation', { name: 'Review groups' })
-    fireEvent.click(screen.getByRole('button', { name: /Keep as is/ }))
-
-    expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
-    expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-headings', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-headings', warnings: [], boundaryCandidates: [
+        { id: 'first', page: 2, source: 'Chapter One', reason: 'Standalone heading' },
+        { id: 'second', page: 8, source: 'Chapter Two', reason: 'Standalone heading' },
+      ] })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      await screen.findByText('Heading 1 of 2')
+      for (const name of [/^Start a new chapter/, /^← Previous heading$/, /^Next heading →$/]) {
+        scrollIntoView.mockClear()
+        fireEvent.click(screen.getByRole('button', { name }))
+        if (mobile) await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }))
+        else expect(scrollIntoView).not.toHaveBeenCalled()
+      }
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      scrollIntoView.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+      if (mobile) await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
+      expect(scrollIntoView).not.toHaveBeenCalled()
+    } finally {
+      window.matchMedia = originalMatchMedia
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
+    }
   })
 
   it('reviews chapter boundaries and source warnings through a semantic queue and focused evidence workspace', async () => {
@@ -4307,7 +4544,7 @@ describe('v2 wizard', () => {
       payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1', 'chapter-1', 'unknown', 1] } },
     })
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
     expect(screen.getByLabelText('Select Down the Rabbit-Hole')).toBeChecked()
     expect(screen.getByLabelText('Select The Pool of Tears')).not.toBeChecked()
     expect(document.querySelector('.workspace')).toHaveAttribute('inert')
@@ -4340,7 +4577,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.cancelJob).mockResolvedValue({ id: 'resumed-partial', kind: 'v2:generate', status: 'running', cancel_requested_at: new Date().toISOString() })
     render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'resumed-partial' }} />)
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(within(dialog).getByText('0 of 2 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 2 recorded')).toBeInTheDocument()
     expect(screen.getByLabelText('Select A Caucus-Race')).not.toBeChecked()
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
     if (status === 'canceled') {

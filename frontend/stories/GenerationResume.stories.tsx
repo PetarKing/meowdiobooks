@@ -37,7 +37,7 @@ export const RunningOneChapter: StoryObj<typeof meta> = {
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body);
     const dialog = await page.findByRole("dialog", { name: "Making your selected chapters…" });
-    await expect(within(dialog).getByText("0 of 1 ready")).toBeVisible();
+    await expect(within(dialog).getByText("0 of 1 recorded")).toBeVisible();
     await expect(page.getByLabelText("Select Down the Rabbit-Hole")).toBeChecked();
     await expect(page.getByLabelText("Select The Pool of Tears")).not.toBeChecked();
     canvasElement.dataset.scenarioReady = "resumed-one-chapter";

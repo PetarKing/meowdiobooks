@@ -5,6 +5,7 @@ export interface SourceExcerptProps {
   className?: string;
   layout?: "separate" | "passage";
   compact?: boolean;
+  contextMode?: "nearby" | "full";
   label?: string;
 }
 
@@ -35,8 +36,25 @@ function compactLines(text: string) {
   });
 }
 
+/** Preserve source characters while treating PDF paragraph gaps as modest visual separators. */
+function chapterContext(text: string) {
+  return text.split(/(\r?\n[\t ]*\r?\n(?:[\t ]*\r?\n)*)/).map((part, index) =>
+    /^(?:\r?\n[\t ]*){2,}$/.test(part)
+      ? <span key={index} className="source-context-break">{part}</span>
+      : part);
+}
+
 /** Source offsets and review actions remain anchored to the original, unmodified target. */
-export function SourceExcerpt({ source, contextBefore = "", contextAfter = "", className, layout = "separate", compact = false, label }: SourceExcerptProps) {
+export function SourceExcerpt({ source, contextBefore = "", contextAfter = "", className, layout = "separate", compact = false, contextMode = "nearby", label }: SourceExcerptProps) {
+  if (contextMode === "full") {
+    return <div className={['source-excerpt source-passage source-chapter-context', className].filter(Boolean).join(' ')} aria-label={label}>
+      {layout === "passage" ? <p><span className="source-nearby">{chapterContext(contextBefore)}</span><mark>{chapterContext(source)}</mark><span className="source-nearby">{chapterContext(contextAfter)}</span></p> : <>
+        {contextBefore && <p className="source-nearby">{chapterContext(contextBefore)}</p>}
+        <p><mark>{chapterContext(source)}</mark></p>
+        {contextAfter && <p className="source-nearby">{chapterContext(contextAfter)}</p>}
+      </>}
+    </div>;
+  }
   if (layout === "passage" || compact) {
     const continuous = layout === "passage";
     const beforeParts = paragraphs(contextBefore);

@@ -91,6 +91,7 @@ export default function App(props: AppProps) {
   const view = productView === "create" ? createView() : LibraryPage({ model });
   const main = usePageNavigation(JSON.stringify([
     productView, home, book?.id, stage,
+    activeJourneyStep?.builtin === "review" && model.reviewFinalCheck,
     model.designingVoices, model.editingCast, model.castCandidate?.phase,
   ]));
 
@@ -113,8 +114,8 @@ export default function App(props: AppProps) {
     </header>}
     <div className={`workspace ${!showWizard ? "home-workspace" : ""} ${showWizard && sidebarCollapsed ? "rail-collapsed" : ""}`} inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       {showWizard && <aside id="wizard-sidebar" className="rail" aria-label={t("Wizard stages")}>
-        <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
         <div className="book-mini"><div className="cover"><BrandMark compact /></div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
+        <div className="rail-tools"><span className="rail-tools-label">{t("Workflow")}</span><button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button></div>
         {activeJourneyStep && <div className="mobile-progress visually-hidden" role="status" aria-label={t("Workflow progress")}>
           {t("Step {{current}} of {{total}} · {{stage}}", { current: stage + 1, total: stages.length, stage: t(activeJourneyStep.label) })}
         </div>}
@@ -134,9 +135,10 @@ export default function App(props: AppProps) {
         <h2 id="generation-progress-title">{t(processMessage === reconnectingJobMessage ? reconnectingJobMessage : progress >= 100 ? "Finishing your chapter audio…" : "Making your selected chapters…")}</h2>
         <div className={`processing-track determinate ${activeJob?.status === "running" ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Chapter generation progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div>
         <dl className="generation-progress-facts">
-          <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} ready", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
-          <div><dt>{t("Remaining")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
+          <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} recorded", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
+          <div><dt>{t("Estimated time left")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
         </dl>
+        <p className="generation-modal-note">{t("Estimates update with progress and may change.")}</p>
         <p className="generation-modal-note">{t("processing.keepOpenNotice", { ns: "edition" })}</p>
         {showCancelActiveJob && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}
       </DialogSurface>

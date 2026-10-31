@@ -184,10 +184,20 @@ export function fixtureActions(
       log(`Split the synthetic chapter into ${count} sample parts.`);
       return structuredClone(snapshot.recordingScript);
     },
-    previewReviewBulk: async () => ({
-      count: snapshot.warnings.flatMap((w) => w.occurrences ?? []).length,
-      affected: snapshot.warnings.flatMap((w) => w.occurrences ?? []),
-    }),
+    previewReviewBulk: async (_book, revision, occurrenceId, action) => {
+      const warning = snapshot.warnings.find((row) =>
+        row.occurrences.some((occurrence) => occurrence.id === occurrenceId),
+      );
+      if (!warning) throw new Error("Unknown synthetic review occurrence");
+      const affected = structuredClone(warning.occurrences);
+      return {
+        count: affected.length,
+        affected,
+        targetOccurrenceIds: affected.map((row) => row.id),
+        // Preview-only marker: no server signature or real book data is involved.
+        previewToken: `fixture:${revision}:${warning.id}:${action}`,
+      };
+    },
     transcribeVoiceSample: async () => ({
       text: "Who in the world am I? Ah, that’s the great puzzle.",
       language: "English",

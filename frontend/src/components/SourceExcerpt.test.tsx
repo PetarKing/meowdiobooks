@@ -64,3 +64,19 @@ describe('compact review passages', () => {
     expect(container.querySelector('script')).toBeNull();
   });
 });
+
+describe('chapter context', () => {
+  it('shows every title line and opening paragraph without expanding the highlighted anchor', () => {
+    const before = 'The preface ends here.\n\n   ';
+    const after = '\n\n\n\n VA LE’S\n\n\n\nRE C ORD S\n\nFor every reader\n\nThe first day began with a letter.';
+    const { container } = render(<SourceExcerpt compact contextMode="full" layout="passage" source="MARA" contextBefore={before} contextAfter={after} />);
+    expect(container.querySelector('.source-passage')?.textContent).toBe(before + 'MARA' + after);
+    expect(container.querySelector('mark')?.textContent).toBe('MARA');
+    expect(container).toHaveTextContent('The first day began with a letter.');
+  });
+  it('keeps legacy context separate when it lacks continuous source provenance', () => {
+    const { container } = render(<SourceExcerpt compact contextMode="full" source="第一章" contextBefore="序言" contextAfter={'新的故事\n\n开始了。'} />);
+    expect([...container.querySelectorAll('p')].map(p => p.textContent)).toEqual(['序言', '第一章', '新的故事\n\n开始了。']);
+    expect(container.querySelector('mark')?.textContent).toBe('第一章');
+  });
+});

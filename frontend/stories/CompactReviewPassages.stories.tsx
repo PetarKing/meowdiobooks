@@ -84,7 +84,7 @@ export const ChapterHeading: Story = {
     await enterScenario(canvasElement, "review");
     const passage = within(canvasElement).getByRole("generic", { name: "Manuscript context" });
     await expect(within(passage).getByText("Chapter I")).toBeVisible();
-    await expect(within(passage).getByText(/Alice sat beside her sister/)).toBeVisible();
-    await expect(within(passage).queryByText("Contents")).not.toBeInTheDocument();
+    await expect(passage).toHaveTextContent("Alice sat beside her sister");
+    await expect(passage).toHaveTextContent("A long later paragraph.");
   },
 };
