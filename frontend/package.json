@@ -43,7 +43,7 @@
     "react-dom": "19.1.4",
     "react-i18next": "^17.0.9",
     "three": "0.186.1",
-    "typescript": "5.8.3",
+    "typescript": "7.0.2",
     "vite": "6.4.5"
   },
   "devDependencies": {
