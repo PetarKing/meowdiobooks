@@ -31,8 +31,8 @@ import {
 } from "./workflow/navigation";
 import {
   localizeErrorMessage,
-  localizeProcessMessage,
-  } from "./workflow/presentation";
+  localizeProcessMessage
+} from "./workflow/presentation";
 export type { AppProps, GenerationPurchasePresentation, WorkflowCapabilities, WorkflowHeaderContext, WorkflowStepOverrideProps } from "./app/contracts";
 
 function ProductTabIcon({ view }: { view: ProductView; }) {
@@ -98,7 +98,7 @@ export default function App(props: AppProps) {
     {renderHeader ? renderHeader({ productView, libraryCount: libraryExports.length, navigate: navigateProduct }) : <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       <div className="topbar-inner">
         <button className="brand" aria-label={t("Go to Home")} onClick={() => { navigateProduct("create"); setHome(true); }}>
-          <BrandWordmark /><span className="brand-compact"><BrandMark boxed /></span>
+          <BrandWordmark /><span className="brand-compact"><BrandMark compact /></span>
         </button>
         <nav className="product-tabs" aria-label={t("Product areas")}>
           <button className={productView === "create" ? "active" : ""} aria-current={productView === "create" ? "page" : undefined} onClick={() => navigateProduct("create")}><ProductTabIcon view="create" /><span className="product-tab-label">{t("Create")}</span></button>
@@ -114,7 +114,7 @@ export default function App(props: AppProps) {
     <div className={`workspace ${!showWizard ? "home-workspace" : ""} ${showWizard && sidebarCollapsed ? "rail-collapsed" : ""}`} inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       {showWizard && <aside id="wizard-sidebar" className="rail" aria-label={t("Wizard stages")}>
         <button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button>
-        <div className="book-mini"><div className="cover"><BrandMark /></div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
+        <div className="book-mini"><div className="cover"><BrandMark compact /></div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
         {activeJourneyStep && <div className="mobile-progress visually-hidden" role="status" aria-label={t("Workflow progress")}>
           {t("Step {{current}} of {{total}} · {{stage}}", { current: stage + 1, total: stages.length, stage: t(activeJourneyStep.label) })}
         </div>}

@@ -620,6 +620,7 @@ const baselineScenarioMetadata = {
 
 /** Failure and recovery variants use the same real pages and in-memory gateway. */
 export const scenarioMetadata = {
+  "export-default-cover": { ...baselineScenarioMetadata.export, label: "Export · default cover", description: "Text-source export with the shared heart-brand cover." },
   "cast-reuse-review": { ...baselineScenarioMetadata["cast-review-states"], label: "Cast · prior voices and required review", description: "Mandatory and optional review labels precede prior-book provenance.", castFixture: "reuse-review" },
   ...baselineScenarioMetadata,
   "preview-home-empty": { ...baselineScenarioMetadata.home, label: "Home · empty (0)", description: "0 synthetic drafts and audiobooks for layout review.", gatewayVariant: "collection-empty" },

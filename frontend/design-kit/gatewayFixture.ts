@@ -36,6 +36,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const metadata = metadataFor(id);
   const { gatewayVariant } = metadata;
   const snapshot = snapshotFor(id);
+  if (id === "export-default-cover") snapshot.book.sourceKind = "text";
   let libraryRequests = 0;
   const shelf: LocalBook[] = [
     fixtureBook,
@@ -74,7 +75,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   );
   const implemented: WorkflowGateway = {
     ...actions,
-    sourcePageImageUrl: () => sourceImage,
+    sourcePageImageUrl: () => id === "export-default-cover" ? "/default-cover.svg" : sourceImage,
     layeredVoicePreviewUrl: () => silentWav,
     libraryCoverImageUrl: (itemId) =>
       gatewayVariant === "library-missing-cover"

@@ -99,26 +99,12 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
 
 def render_default_cover(cache_root: Path) -> Path:
     """Draw the bundled, language-neutral audiobook cover without model calls."""
-    from PIL import Image, ImageDraw
+    from shutil import copyfile
 
-    output = cache_root / "audiobook-cover-v1.png"
+    output = cache_root / "audiobook-cover-v2.png"
     if not output.is_file():
         output.parent.mkdir(parents=True, exist_ok=True)
-        cover = Image.new("RGB", (1200, 1600), "#f5eedf")
-        draw = ImageDraw.Draw(cover)
-        ink, gold = "#59394c", "#d5ad65"
-        draw.ellipse((230, 320, 970, 1060), fill="#eaddc4")
-        draw.arc((290, 340, 910, 960), 180, 360, fill=ink, width=24)
-        draw.rounded_rectangle((264, 628, 330, 822), radius=30, fill=ink)
-        draw.rounded_rectangle((870, 628, 936, 822), radius=30, fill=ink)
-        draw.polygon([(390, 630), (600, 675), (810, 630), (810, 950), (600, 995), (390, 950)], fill="#f5eedf", outline=ink, width=12)
-        draw.line((600, 680, 600, 988), fill=ink, width=10)
-        for y in (730, 795, 860):
-            draw.line((435, y, 552, y + 25), fill=gold, width=10)
-            draw.line((648, y + 25, 765, y), fill=gold, width=10)
-        draw.line((480, 1200, 720, 1200), fill=gold, width=6)
-        cover = cover.resize((600, 800), Image.Resampling.LANCZOS)
-        cover.save(output)
+        copyfile(Path(__file__).with_name("assets") / "default-cover.png", output)
     return output
 
 

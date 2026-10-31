@@ -175,15 +175,30 @@ html, body { background: var(--canvas, #f4f1eb); }
 }
 
 /* Brand signatures: the wordmark stands alone; compact headers use the M tile. */
-.brand-wordmark { display: block; width: 190px; height: auto; overflow: visible; }
+.brand-wordmark { display: block; width: max-content; font-family: "Iowan Old Style", Baskerville, "Times New Roman", serif; font-size: 30px; font-weight: 400; line-height: 1.25; letter-spacing: -.04em; white-space: nowrap; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+.brand-letter-i { display: inline-block; position: relative; }
+.brand-letter-i svg { position: absolute; width: .19em; height: .19em; top: .08em; left: 50%; transform: translateX(-45%); fill: var(--cherry, #a42f4d); }
+@media (min-width: 1200px) { .brand-wordmark { font-size: 36px; } }
 .brand-heart { fill: var(--cherry, #a42f4d); }
 .brand-emblem { display: block; width: 100%; height: auto; }
 .brand-emblem-boxed { color: #fefff8; }
 .brand-emblem-boxed .brand-heart { fill: #e6bbc8; }
 .brand-tile { fill: #2d3825; }
-.brand-compact { display: none; width: 34px; }
+.brand-compact { display: none; width: 40px; color: var(--ink); }
 .book-mini .cover .brand-emblem { width: 28px; }
 @media (max-width: 600px) {
+  .brand .brand-wordmark { font-size: 28px; }
+}
+
+/* Collapse only when the header grid leaves too little room for the wordmark. */
+.brand { container: brand-lockup / inline-size; width: 100%; min-width: 0; }
+@container brand-lockup (max-width: 220px) {
+  .brand .brand-wordmark { font-size: 26px; }
+}
+@container brand-lockup (max-width: 175px) {
+  .brand .brand-wordmark { font-size: 22px; }
+}
+@container brand-lockup (max-width: 145px) {
   .brand .brand-wordmark { display: none; }
   .brand > .brand-compact:last-child { display: block; }
 }
