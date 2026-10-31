@@ -97,17 +97,22 @@ credentials, private user data, or unredistributable material. Maintainers may r
 evidence or a narrower change before merge.
 
 
-## Skipping CI for documentation and copy
+## Skipping CI for documentation, copy and static assets
 
 A maintainer can apply the `skip-ci` PR label after confirming the change is limited to
-documentation or UI copy and does not change runtime behavior, dependencies, data, security, or
-workflow configuration. The CI jobs report **skipped**, not passed. Adding the label cancels an
+documentation, UI copy, or static visual assets (such as images, icons and their size/cache-version
+references), and does not change application logic, dependencies, data, security, or build/workflow
+configuration. For assets, inspect the rendered result and validate the relevant dimensions, format,
+transparency, file size and references. SVGs must not introduce scripts or external resources.
+Changes to rendering code, environment-based metadata logic or asset pipelines still need normal CI.
+
+The CI jobs report **skipped**, not passed. Adding the label cancels an
 older PR run; removing it triggers normal checks again. Subsequent pushes retain the skip until
-the label is removed, so remove it whenever a PR grows beyond documentation/copy.
+the label is removed, so remove it whenever a PR grows beyond this scope.
 
 The label affects pull-request runs only. Pushes to `main` and manual runs retain their normal
 checks. During an owner-authorized hosted CI outage, the same maintainer-approved label also
-waives the equivalent local full-suite rerun for documentation/copy-only PRs. Record the reason
+waives the equivalent local full-suite rerun for PRs within this scope. Record the reason
 and focused verification on the PR; do not fabricate successful checks. This does not waive
 release integrity, deployment preflights, or authorization for live changes.
 
