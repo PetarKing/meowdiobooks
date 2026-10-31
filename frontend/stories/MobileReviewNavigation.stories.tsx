@@ -30,6 +30,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 export const SplitTitle: Story = { play: async ({ canvasElement }) => { await enterScenario(canvasElement, "review"); } };
 export const Suggestions: Story = {
+  parameters: { docs: { description: { story: "Starts by opening AI suggestions for focused testing. The normal review entry is the Split title story, which starts with Chapter starts. No choices are preselected." } } },
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
@@ -40,6 +41,7 @@ export const FinishedCategory: Story = {
   play: async ({ canvasElement }) => {
     await Suggestions.play!({ canvasElement } as Parameters<NonNullable<typeof Suggestions.play>>[0]);
     await userEvent.click(within(canvasElement).getByRole("button", { name: /^Apply all suggested choices/ }));
+    await expect(within(canvasElement).getByRole("heading", { name: "Chapter starts" })).toBeVisible();
   },
 };
 export const CompleteJourney: Story = {

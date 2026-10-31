@@ -77,6 +77,8 @@ export const ConsolidatedSourceWarning: Story = {
     await userEvent.click(canvas.getByRole("button", { name: /3 AI suggestions.*2 occurrences/ }));
     await expect(canvas.getByText("broken")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ }));
+    await expect(canvas.getByText("A strange fragment.")).toBeVisible();
+    await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /AI suggestions/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled();
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },

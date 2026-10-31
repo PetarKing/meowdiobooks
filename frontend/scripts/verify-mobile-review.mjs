@@ -89,9 +89,9 @@ try {
     assert((await suggestion.textContent()).includes('✧'));
     await page.getByRole('button', { name: 'Next example →' }).click();
     await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+    assert(await page.getByRole('heading', { name: 'Chapter starts' }).isVisible(), 'Completion wraps to the next unfinished category at every viewport size');
     if (mobile) {
       await landing(page, 'queue');
-      assert(await page.getByRole('heading', { name: 'Chapter starts' }).isVisible(), 'Completion wraps to the next unfinished category in visual queue order');
       assert(await groups.getByRole('button', { name: /AI suggestions/ }).evaluate(el => el.classList.contains('resolved')));
       assert.equal(await transcript.isVisible(), false);
       if (width === 390 && theme === 'dark') await page.screenshot({ path: path.join(out, 'decision-queue-390.png') });

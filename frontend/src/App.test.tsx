@@ -3370,6 +3370,9 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ }))
     expect(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ })).toBeDisabled()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    expect(screen.getByText('Example 3 of 150')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
+    fireEvent.click(screen.getByRole('button', { name: '← Previous example' }))
     expect(screen.getByRole('button', { name: /^Keep original text Keep the original/ })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: /^(Apply all suggested choices|All suggestions decided)/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
@@ -3571,9 +3574,9 @@ describe('v2 wizard', () => {
     }
   })
 
-  it('cycles through unfinished mobile categories and resumes their first undecided item', async () => {
+  it.each([{ mobile: true, bulk: false }, { mobile: true, bulk: true }, { mobile: false, bulk: false }, { mobile: false, bulk: true }])('cycles unfinished categories and resumes their first undecided item (mobile=$mobile, bulk=$bulk)', async ({ mobile, bulk }) => {
     const originalMatchMedia = window.matchMedia
-    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
     try {
       const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-cycle', status: 'candidate' } } }
       vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-cycle', boundaryCandidates: [
@@ -3591,17 +3594,20 @@ describe('v2 wizard', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
       fireEvent.click(groups.getByRole('button', { name: /Suspicious extracted text/ }))
       fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
-      await waitFor(() => expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'AI suggestions' })).toBeInTheDocument()
+      if (mobile) await waitFor(() => expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveFocus())
       expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveAttribute('aria-current', 'true')
       expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
       fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
       expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
-      fireEvent.click(screen.getByRole('button', { name: /^Leave out/ }))
-      await waitFor(() => expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveFocus())
+      fireEvent.click(screen.getByRole('button', { name: bulk ? /^Apply all suggested choices/ : /^Leave out/ }))
+      expect(screen.getByRole('heading', { name: 'Chapter starts' })).toBeInTheDocument()
+      if (mobile) await waitFor(() => expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveFocus())
       expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
       fireEvent.click(groups.getByRole('button', { name: /Chapter starts/ }))
       fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
-      await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
+      expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+      if (mobile) await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
       expect(screen.getByRole('heading', { name: 'Chapter starts' })).toBeInTheDocument()
       expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(0)
       expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveAttribute('aria-current', 'true')

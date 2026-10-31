@@ -160,6 +160,10 @@ Chapter-start evidence displays all supplied bounded context so a title split ac
 and its opening passage remain visible. Only the original boundary anchor is highlighted; this
 presentation does not merge source spans or rewrite extracted text.
 
+At every viewport size, completing a category selects the next unfinished category in visible
+queue order, wrapping if needed and resuming its first undecided item. Individual choices and bulk
+actions share this progression. Completing all categories stays on the current item.
+
 On phones (up to 700px), Review navigation follows the level of work completed. A choice with more
 examples remaining scrolls to the category heading; completing a category scrolls to the decision
 queue, selecting and focusing the next unfinished category in visible order (wrapping if needed).
@@ -171,7 +175,8 @@ Use the measured sticky-header bottom plus 12px for category and queue targets. 
 reserve minimal scroll room after the controls so their heading can align without previous content
 peeking under the header; never insert this space between choices and the final button. Apply these
 geometry changes immediately and animate only scrolling, respecting reduced motion. Desktop retains
-its existing category queue, progression, scrolling behavior, and transcript action.
+its existing category queue, scrolling behavior, and transcript action; category selection follows
+the same completion rule at every size.
 
 Chapter context uses compact paragraph gaps and reflows PDF line wrapping for readability; source
 characters and anchors remain unchanged. Complete-transcript preview and explicit acceptance remain

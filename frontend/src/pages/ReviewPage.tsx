@@ -131,8 +131,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     });
   }
 
-  function finishMobileCategory(nextDecisions = reviewDecisions, nextBoundaries = boundaryDecisions) {
-    if (!isMobileReview()) return;
+  function finishCategory(nextDecisions = reviewDecisions, nextBoundaries = boundaryDecisions) {
     const groups = [
       ...(boundaries.length ? [{ kind: "chapters" as const, index: 0, complete: boundaries.every((row) => Boolean(nextBoundaries[row.id])) }] : []),
       ...candidateWarnings.map((row, index) => ({ kind: "warning" as const, index, complete: reviewWarningResolved(row, nextDecisions) })),
@@ -151,7 +150,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
         ? Math.max(0, row.occurrences.findIndex((item) => !reviewOccurrenceActions(row, item).includes(nextDecisions[item.id])))
         : 0);
     }
-    revealMobileReview("queue");
+    if (isMobileReview()) revealMobileReview("queue");
+    else revealReviewGroup(next.kind === "chapters" ? "chapters" : `warning-${next.index}`);
   }
 
   function openOccurrence(index: number) {
@@ -162,7 +162,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   function openWarning(index: number) {
     setActiveReviewGroup("warnings");
     setActiveWarning(index);
-    if (!isMobileReview() || activeReviewGroup !== "warnings" || activeWarning !== index) setActiveOccurrence(0);
+    if (activeReviewGroup !== "warnings" || activeWarning !== index) setActiveOccurrence(0);
     revealReviewGroup(`warning-${index}`);
   }
 
@@ -184,34 +184,20 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     const indices = [...boundaries.keys()];
     const nextBoundary = [...indices.slice(activeBoundary + 1), ...indices.slice(0, activeBoundary + 1)].find((index) => !nextDecisions[boundaries[index].id]);
     if (nextBoundary !== undefined) return openHeading(nextBoundary);
-    if (isMobileReview()) return finishMobileCategory(reviewDecisions, nextDecisions);
-    const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
-    if (nextWarning >= 0) openWarning(nextWarning);
+    finishCategory(reviewDecisions, nextDecisions);
   }
 
   function acceptAllBoundaries() {
     const nextDecisions = Object.fromEntries(boundaries.map((row) => [row.id, "chapter-start"] as const));
     setBoundaryDecisions(nextDecisions);
-    if (isMobileReview()) return finishMobileCategory(reviewDecisions, nextDecisions);
-    const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
-    if (nextWarning >= 0) openWarning(nextWarning);
+    finishCategory(reviewDecisions, nextDecisions);
   }
 
   function chooseReviewAction(warningId: string, action: ReviewCapability) {
     const nextDecisions = { ...reviewDecisions, [warningId]: action };
     setReviewDecisions(nextDecisions);
-    if (!isMobileReview()) setActiveOccurrence(0);
-
     if (reviewDecisions[warningId]) return;
-    if (isMobileReview()) return finishMobileCategory(nextDecisions);
-    const currentIndex = candidateWarnings.findIndex((row) => row.id === warningId);
-    const nextWarning = [
-      ...candidateWarnings.slice(currentIndex + 1),
-      ...candidateWarnings.slice(0, currentIndex),
-    ].find((row) => !reviewWarningResolved(row, nextDecisions));
-    if (nextWarning) return openWarning(candidateWarnings.findIndex((row) => row.id === nextWarning.id));
-    const nextBoundary = boundaries.findIndex((row) => !boundaryDecisions[row.id]);
-    if (nextBoundary >= 0) openBoundary(nextBoundary);
+    finishCategory(nextDecisions);
   }
 
   function chooseOccurrenceAction(action: ReviewCapability) {
@@ -221,14 +207,14 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (reviewDecisions[occurrence.id]) return;
     const nextIndex = [...warning.occurrences.keys()].find((index) => !next[warning.occurrences[index].id]);
     if (nextIndex !== undefined) openOccurrence(nextIndex);
-    else if (reviewWarningResolved(warning, next)) finishMobileCategory(next);
+    else if (reviewWarningResolved(warning, next)) finishCategory(next);
   }
 
   function applyAllProposals() {
     const next = candidateWarnings.filter((group) => group.kind === "ai-cleanup").reduce((choices, group) => reviewProposalDecisions(group, choices), reviewDecisions);
     setReviewDecisions(next);
     const unresolvedGroup = candidateWarnings.find((group) => group.kind === "ai-cleanup" && !reviewWarningResolved(group, next));
-    if (isMobileReview() && warning && reviewWarningResolved(warning, next)) return finishMobileCategory(next);
+    if (warning && reviewWarningResolved(warning, next)) return finishCategory(next);
     const target = unresolvedGroup ?? proposals[0]?.warning;
     if (!target) return;
     openWarning(candidateWarnings.indexOf(target));
@@ -240,12 +226,10 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (!warning) return;
     const next = reviewScriptCueDecisions(warning, reviewDecisions);
     setReviewDecisions(next);
-    if (isMobileReview()) {
-      if (reviewWarningResolved(warning, next)) finishMobileCategory(next);
-      else {
-        const unresolved = warning.occurrences.findIndex((row) => !reviewOccurrenceActions(warning, row).includes(next[row.id]));
-        if (unresolved >= 0) openOccurrence(unresolved);
-      }
+    if (reviewWarningResolved(warning, next)) finishCategory(next);
+    else {
+      const unresolved = warning.occurrences.findIndex((row) => !reviewOccurrenceActions(warning, row).includes(next[row.id]));
+      if (unresolved >= 0) openOccurrence(unresolved);
     }
   }
 
@@ -253,7 +237,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (!warning) return;
     const next = reviewPatternDecisions(warning, reviewDecisions, "exclude");
     setReviewDecisions(next);
-    if (reviewWarningResolved(warning, next)) finishMobileCategory(next);
+    if (reviewWarningResolved(warning, next)) finishCategory(next);
   }
 
   async function acceptReview() {

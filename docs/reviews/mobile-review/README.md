@@ -14,8 +14,9 @@ On phones (up to 700px), scrolling follows the level of the completed work:
 Scroll targets use the measured sticky-header bottom plus 12px, rather than a fixed phone offset.
 Short categories get only enough scroll room after the final controls to align correctly; there is
 no spacer between choices and the final action. Scrolling is smooth unless reduced motion is requested.
-Desktop retains its existing queue navigation, automatic progression, and disabled transcript action
-until all decisions are complete. These mobile transitions do not alter desktop behavior. The shared suggestion-card and completed-category
+Tablet and desktop use the same next-unfinished-category selection, including after individual or
+bulk AI choices. They retain their existing queue scrolling and disabled transcript action until
+all decisions are complete; scroll-to-category/queue and final-button reveal remain mobile-only. The shared suggestion-card and completed-category
 styles described below apply at every viewport size.
 
 Both layouts show all supplied bounded chapter context, including split title lines and opening
@@ -35,7 +36,7 @@ manuscript, screenshot, account identifier, or service data is included.
 | Desktop: suggested choices finished | ![Before desktop completion](category-desktop-before.png) | ![After desktop completion](category-desktop-after.png) |
 
 The completion comparison performs the same actions in both versions: manually keep example 1,
-then apply remaining suggestions. Before resets to example 1; the mobile draft selects the next unfinished category.
+then apply remaining suggestions. Before resets to example 1; the draft selects the next unfinished category at every viewport size.
 
 Opening “Read it once like a listener” and returning to decisions now use the existing page-entry
 scroll/focus reset on both mobile and desktop. Transcript loading, paging, and zoom do not retrigger it.
@@ -88,17 +89,19 @@ Run its Storybook on 6018 and pass `http://127.0.0.1:6018` as the second script 
 directory as the third. Separate node_modules directories avoid sharing Vite optimization caches.
 
 For interactive inspection, open `Product/Mobile review navigation/Suggestions` to start with
-undecided suggestions. `Finished category` deliberately completes the suggestions during setup;
+undecided suggestions. This story explicitly clicks the third category during setup; production
+starts at chapter starts when present. `Split title` shows that normal entry without choosing
+a category or preselecting decisions. `Finished category` deliberately completes the suggestions during setup;
 `Complete journey` is an automated interaction story rather than an untouched starting point.
 
 Results:
 
-- Frontend suite: 43 files, 592 tests passed.
+- Frontend suite: 43 files, 595 tests passed.
 - Focused real-browser stories: 5 files, 21 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
 - Browser matrix: 320×844, 390×844, 650×1400, 768×844, 834×1112, and 1440×844, light and dark. Each follows the three mobile destinations
-  or existing desktop flow, resolves every decision, opens the transcript, returns, and verifies the
+  or the shared category progression with existing desktop scrolling, resolves every decision, opens the transcript, returns, and verifies the
   manually kept choice. Before completion the final action is hidden on mobile. After completion it
   is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations. All 12 viewport/theme cases also verify Dialogue’s
   suggestion color tokens, the sparkle and muted state, and equal neutral styling across completed cards.
@@ -120,6 +123,9 @@ Results:
   calculation issue; the measurement was fixed and 650×1400 added to the passing browser matrix.
   The final automatic-selection review caught a reset when reopening the active queue card; that
   now preserves the resumed occurrence, verified independently in Chromium and a cycle regression.
+  The tablet follow-up independently verified individual and bulk AI completion at 768×1024 and
+  1440×1024, including wrapping, resuming example 2, reopening its card, and preserving a prior Keep.
+  Native cycle regressions cover both mobile and larger layouts, with individual and bulk completion.
 
 ## Scroll diagnosis
 
