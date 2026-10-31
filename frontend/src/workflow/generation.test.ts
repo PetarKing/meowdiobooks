@@ -26,6 +26,24 @@ describe('completed chapter progress', () => {
     expect(readyChapterCount(run, { ...running, message }, 50)).toBe(0);
   });
 
+  it('keeps completed counts through rendering, publishing, and terminal success', () => {
+    const updates: Array<[Job, number]> = [
+      [{ ...running, message: 'Rendering chapters: 1 of 3 complete' }, 20],
+      [{ ...running, message: 'Rendering chapters: 3 of 3 complete' }, 98],
+      [{ ...running, message: 'Publishing saved chapter audio' }, 99],
+      [{ ...running, status: 'succeeded', message: null }, 100],
+    ];
+    expect(updates.map(([job, progress]) => readyChapterCount(run, job, progress))).toEqual([1, 3, 3, 3]);
+  });
+
+  it('does not treat stale or different publishing messages as completed rendering', () => {
+    for (const status of ['queued', 'failed', 'canceled'] as const) {
+      expect(readyChapterCount(run, { ...running, status, message: 'Publishing saved chapter audio' }, 99)).toBe(0);
+    }
+    expect(readyChapterCount(run, { ...running, message: 'Publishing saved chapter audio later' }, 99)).toBe(0);
+    expect(readyChapterCount(undefined, { ...running, message: 'Publishing saved chapter audio' }, 99)).toBe(0);
+  });
+
   it('preserves sequential-renderer progress in requested chapter order', () => {
     expect(readyChapterCount(run, { ...running, message: 'body: segment 1 of 20' }, 40)).toBe(2);
     expect(readyChapterCount(run, { ...running, message: 'opening: segment 1 of 2' }, 40)).toBe(0);

@@ -97,6 +97,9 @@ export function readyChapterCount(run: GenerationRun | undefined, job: Job | und
   if (!run) return 0;
   if (job?.status === "queued") return 0;
   if (progress >= 100) return run.chapterIds.length;
+  // Publishing begins only after every requested chapter has finished rendering.
+  // These are recorded chapters, not a claim that publication has succeeded.
+  if (job?.status === "running" && job.message === "Publishing saved chapter audio") return run.chapterIds.length;
   // Parallel renderers report completed chapters in aggregate, without a current
   // chapter ID. Only trust counts for this exact requested set size.
   const aggregate = /^Rendering chapters: (\d+) of (\d+) complete$/.exec(job?.message ?? "");

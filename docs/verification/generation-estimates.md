@@ -3,7 +3,9 @@
 The generation overlay now understands parallel renderers' aggregate completion messages as well
 as sequential chapter prefixes. Counts are accepted only when the reported total matches the
 requested chapter count and the completed count is bounded. “Recorded” describes completed audio
-rendering without claiming it has already been published for playback.
+rendering without claiming it has already been published for playback. The exact running status
+“Publishing saved chapter audio” keeps all chapters recorded during final publication, preventing
+the count from returning to zero before the job succeeds.
 
 The time label explicitly says “Estimated time left,” with an uncertainty note. Queued jobs and
 running jobs reporting an audio-capacity wait show the waiting state instead of an unsupported
@@ -56,8 +58,16 @@ macOS, Node 22; no Docker VM or model service required:
 - `npm --prefix frontend run storybook:check`: passed.
 - `git diff --check`: passed.
 
+The full-suite results above were recorded at `43bbfd98a7d4e840b2f5a5d9e79264326e852c43`.
+The subsequent publishing-count correction passed
+`npm --prefix frontend test -- src/workflow/generation.test.ts src/App.test.tsx` (**226 tests**),
+ESLint on the two changed generation files, and `git diff --check`. Its two new regression tests cover
+the complete status sequence and reject stale/nonmatching publishing messages. The integrated release
+candidate must receive its own final validation.
+
 Unit and application tests cover aggregate count bounds and total mismatches, malformed messages,
-legacy sequential statuses, terminal progress, missing context, queued jobs with stale progress,
+legacy sequential statuses, the rendering-to-publishing transition, terminal progress, missing context,
+queued jobs with stale progress,
 capacity waits, observed-rate estimates, host fallback policy, and historical estimates. Independent
 review identified a queued job with stale 100% progress as an edge case; the queue guard now takes
 precedence, with a regression assertion. No other correctness issue was found in this scope.
