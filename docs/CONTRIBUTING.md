@@ -96,6 +96,24 @@ the actual findings. Repository issues, commits, and pull-request evidence must 
 credentials, private user data, or unredistributable material. Maintainers may require additional
 evidence or a narrower change before merge.
 
+
+## Skipping CI for documentation and copy
+
+A maintainer can apply the `skip-ci` PR label after confirming the change is limited to
+documentation or UI copy and does not change runtime behavior, dependencies, data, security, or
+workflow configuration. The CI jobs report **skipped**, not passed. Adding the label cancels an
+older PR run; removing it triggers normal checks again. Subsequent pushes retain the skip until
+the label is removed, so remove it whenever a PR grows beyond documentation/copy.
+
+The label affects pull-request runs only. Pushes to `main` and manual runs retain their normal
+checks. During an owner-authorized hosted CI outage, the same maintainer-approved label also
+waives the equivalent local full-suite rerun for documentation/copy-only PRs. Record the reason
+and focused verification on the PR; do not fabricate successful checks. This does not waive
+release integrity, deployment preflights, or authorization for live changes.
+
+PetarKing's owner-operated PRs do not require another person's review approval. Other
+contributors retain the repository's configured review requirements.
+
 ## Quality checks
 
 Set up the development environment using the [setup reference](SETUP.md), the source of truth for

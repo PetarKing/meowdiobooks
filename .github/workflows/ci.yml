@@ -2,6 +2,7 @@ name: CI
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review, labeled, unlabeled]
   push:
     branches: [main]
   workflow_dispatch:
@@ -15,6 +16,7 @@ concurrency:
 
 jobs:
   backend:
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     name: Backend
     runs-on: ubuntu-latest
     env:
@@ -45,6 +47,7 @@ jobs:
           -m "not uses_audio_decoder and not runs_models"
 
   frontend:
+    if: github.event_name != 'pull_request' || !contains(github.event.pull_request.labels.*.name, 'skip-ci')
     name: Frontend
     runs-on: ubuntu-latest
     defaults:
