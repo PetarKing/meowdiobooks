@@ -908,7 +908,7 @@ describe('v2 wizard', () => {
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
     expect(within(dialog).getByRole('button', { name: 'Cancel audio generation' })).toHaveFocus()
     expect(within(dialog).getByRole('progressbar', { name: 'Chapter generation progress' })).toBeInTheDocument()
-    expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
     expect(within(dialog).getByText('≈ 1 min')).toBeInTheDocument()
     expect(within(dialog).getByText(/Keep Meowdiobooks open/)).toBeInTheDocument()
     expect(screen.queryByText('Synthesizing segment 4/19')).not.toBeInTheDocument()
@@ -926,7 +926,7 @@ describe('v2 wizard', () => {
     })
   })
 
-  it('keeps resumed generation status compact and updates remaining time from live progress', async () => {
+  it.each(['chapter-3: segment 1 of 2', 'Rendering chapters: 1 of 2 complete'])('shows completed chapters and measured time for %s', async (message) => {
     const snapshot: WizardSnapshot = {
       ...base,
       recordingScript: { ...base.recordingScript!, summary: { ...faithfulSummary, chapters: [
@@ -942,7 +942,7 @@ describe('v2 wizard', () => {
     }
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
     vi.mocked(wizardApi.processStage).mockResolvedValue({
-      id: 'generate-job', status: 'running', progress: 50, message: 'chapter-3: segment 1 of 2',
+      id: 'generate-job', status: 'running', progress: 50, message,
       started_at: new Date(Date.now() - 120_000).toISOString(),
     })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
@@ -952,8 +952,10 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Generate 2 selected →' }))
 
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(await within(dialog).findByText('1 of 2 ready')).toBeInTheDocument()
+    expect(await within(dialog).findByText('1 of 2 recorded')).toBeInTheDocument()
     expect(within(dialog).getByText('≈ 2 min')).toBeInTheDocument()
+    expect(within(dialog).getByText('Estimated time left')).toBeInTheDocument()
+    expect(within(dialog).getByText('Estimates update with progress and may change.')).toBeInTheDocument()
     expect(dialog.querySelectorAll('.generation-progress-facts > div')).toHaveLength(2)
 
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('generate-job'))
@@ -1024,6 +1026,20 @@ describe('v2 wizard', () => {
     expect(within(action).getByRole('button', { name: 'Generate 1 selected →' })).toBeEnabled()
   })
 
+  it.each([
+    ['queued', undefined, 'Waiting to start'],
+    ['running', 'Waiting for audio capacity (queue position 2)', 'Waiting for audio capacity'],
+  ] as const)('does not offer a processing ETA while %s / %s', async (status, message, label) => {
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status, message, progress: 1 })
+    vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise(() => {}))
+    await open({ ...base, generatedChapters: [] })
+    fireEvent.click(screen.getByRole('button', { name: /^Generate 1 selected →$/ }))
+    const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
+    expect(await within(dialog).findByText(label)).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
+    expect(dialog).not.toHaveTextContent('≈')
+  })
+
   it('uses edition-specific estimates in generation progress while keeping them out of the action footer', async () => {
     const estimatedSeconds = 3917
     const snapshot: WizardSnapshot = {
@@ -1036,7 +1052,7 @@ describe('v2 wizard', () => {
       generatedChapters: [],
     }
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued' })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'running' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
 
     await open(snapshot, undefined, undefined, undefined, {
@@ -1075,7 +1091,7 @@ describe('v2 wizard', () => {
       result: { chapters: [{ audioSeconds: 40 }, { audioSeconds: 60 }] },
     }])
     let finishJob!: (job: { id: string; status: 'succeeded'; result: Record<string, never> }) => void
-    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'queued' })
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'generate-job', status: 'running' })
     vi.mocked(wizardApi.getJob).mockImplementation(() => new Promise((resolve) => { finishJob = resolve }))
 
     await open(snapshot)
@@ -4307,7 +4323,7 @@ describe('v2 wizard', () => {
       payload: { book_id: 'book-1', settings: { chapterIds: ['chapter-1', 'chapter-1', 'unknown', 1] } },
     })
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(within(dialog).getByText('0 of 1 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 1 recorded')).toBeInTheDocument()
     expect(screen.getByLabelText('Select Down the Rabbit-Hole')).toBeChecked()
     expect(screen.getByLabelText('Select The Pool of Tears')).not.toBeChecked()
     expect(document.querySelector('.workspace')).toHaveAttribute('inert')
@@ -4340,7 +4356,7 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.cancelJob).mockResolvedValue({ id: 'resumed-partial', kind: 'v2:generate', status: 'running', cancel_requested_at: new Date().toISOString() })
     render(<App initialWorkflowLocation={{ bookId: 'book-1', stepId: 'generate', activeJobId: 'resumed-partial' }} />)
     const dialog = await screen.findByRole('dialog', { name: 'Making your selected chapters…' })
-    expect(within(dialog).getByText('0 of 2 ready')).toBeInTheDocument()
+    expect(within(dialog).getByText('0 of 2 recorded')).toBeInTheDocument()
     expect(screen.getByLabelText('Select A Caucus-Race')).not.toBeChecked()
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
     if (status === 'canceled') {

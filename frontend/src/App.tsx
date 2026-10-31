@@ -136,9 +136,10 @@ export default function App(props: AppProps) {
         <h2 id="generation-progress-title">{t(processMessage === reconnectingJobMessage ? reconnectingJobMessage : progress >= 100 ? "Finishing your chapter audio…" : "Making your selected chapters…")}</h2>
         <div className={`processing-track determinate ${activeJob?.status === "running" ? "active" : ""}`} style={{ "--progress": `${progress}%` } as CSSProperties} role="progressbar" aria-label={t("Chapter generation progress")} aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)}><i style={{ width: `${progress}%` }} /></div>
         <dl className="generation-progress-facts">
-          <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} ready", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
-          <div><dt>{t("Remaining")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
+          <div><dt>{t("Chapters")}</dt><dd>{t("{{ready}} of {{total}} recorded", { ready: generationReady, total: generationRun?.chapterIds.length ?? 0 })}</dd></div>
+          <div><dt>{t("Estimated time left")}</dt><dd>{t(generationRemaining, { defaultValue: generationRemaining })}</dd></div>
         </dl>
+        <p className="generation-modal-note">{t("Estimates update with progress and may change.")}</p>
         <p className="generation-modal-note">{t("processing.keepOpenNotice", { ns: "edition" })}</p>
         {showCancelActiveJob && <button className="ghost" disabled={cancelRequestPending || Boolean(activeJob?.cancel_requested_at)} onClick={() => void cancelActiveStageJob()}>{cancelActiveJobLabel}</button>}
       </DialogSurface>

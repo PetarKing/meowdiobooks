@@ -95,10 +95,20 @@ export function averageGenerationMultiplier(samples: GenerationSample[]) {
 
 export function readyChapterCount(run: GenerationRun | undefined, job: Job | undefined, progress: number) {
   if (!run) return 0;
-  const completed = progress >= 100
-    ? run.chapterIds
-    : run.chapterIds.slice(0, Math.max(0, run.chapterIds.findIndex((id) => job?.message?.startsWith(`${id}:`))));
-  return completed.length;
+  if (progress >= 100) return run.chapterIds.length;
+  if (job?.status === "queued") return 0;
+  // Parallel renderers report completed chapters in aggregate, without a current
+  // chapter ID. Only trust counts for this exact requested set size.
+  const aggregate = /^Rendering chapters: (\d+) of (\d+) complete$/.exec(job?.message ?? "");
+  if (aggregate) {
+    const completed = Number(aggregate[1]);
+    const total = Number(aggregate[2]);
+    return Number.isSafeInteger(completed) && total === run.chapterIds.length && completed <= total
+      ? completed
+      : 0;
+  }
+  // Sequential renderers prefix their status with the current chapter ID.
+  return Math.max(0, run.chapterIds.findIndex((id) => job?.message?.startsWith(`${id}:`)));
 }
 
 export function remainingGenerationTime(
@@ -107,6 +117,10 @@ export function remainingGenerationTime(
   progress: number,
   policy: GenerationEstimatePolicy = publicGenerationEstimatePolicy,
 ) {
+  if (job?.status === "queued") return "Waiting to start";
+  if (job?.status === "running" && /^Waiting for audio capacity \(queue position \d+\)$/.test(job.message ?? "")) {
+    return "Waiting for audio capacity";
+  }
   if (!run) return "Estimating…";
   const parsedStartedAt = job?.started_at ? Date.parse(job.started_at) : Number.NaN;
   const startedAt = Number.isFinite(parsedStartedAt) ? parsedStartedAt : run.startedAtMs;
