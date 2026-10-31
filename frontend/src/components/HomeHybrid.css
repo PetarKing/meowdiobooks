@@ -10,6 +10,12 @@
 .home-main:has(.home-scene--hybrid) .home-flow:has(.wip-shelf) { padding: 16px 24px; background: color-mix(in srgb, var(--canvas) 18%, transparent); border-color: transparent; border-radius: 12px; }
 [data-appearance="light"] .studio-hero--hybrid .quick-upload { background: color-mix(in srgb, var(--paper) 60%, var(--surface-soft)); }
 [data-appearance="light"] .studio-hero--hybrid .quick-upload:hover { background: var(--matcha-soft); }
+.app-shell[data-appearance="dark"]:not([data-presentation-palette="custom"]) .home-main:has(.home-scene--hybrid) :is(.quick-upload, .recent-books article) {
+  background: var(--surface-soft);
+}
+.app-shell[data-appearance="dark"]:not([data-presentation-palette="custom"]) .home-main:has(.home-scene--hybrid) :is(.quick-upload, .recent-books article):hover {
+  background: color-mix(in srgb, var(--surface-soft) 92%, var(--matcha));
+}
 [data-appearance="light"] .home-main:has(.home-scene--hybrid) .home-flow:has(.wip-shelf) { background: color-mix(in srgb, var(--surface-soft) 16%, transparent); border-color: transparent; }
 .home-main:has(.home-scene--hybrid) .wip-shelf .panel-head { margin-bottom: 12px; }
 @media (max-width: 1000px) and (min-width: 751px) { .studio-hero.studio-hero--hybrid h1 { font-size: 52px; }.studio-hero.studio-hero--hybrid { gap: 28px; } }

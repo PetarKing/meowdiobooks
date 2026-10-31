@@ -2,8 +2,9 @@
 
 The approved Darker forest palette uses a slightly deeper final canvas, `#293f33`,
 with paper `#263d30`, soft surfaces `#344c3d`, and readable cherry actions `#f7abc2`.
-These are shared production tokens, not workflow-only overrides. Home retains its
-existing matcha atmosphere over the same base. Workflow content receives a faint,
+These are shared production tokens, not workflow-only overrides. Home layers a deeper upper fade, a 34% matcha glow and a faint 9% cherry haze
+over the same base. Import and local-book cards use the softer surface token
+(`#344c3d`) with a slight matcha lift on hover, avoiding heavy dark cutouts. Workflow content receives a faint,
 static 7% matcha radial wash to avoid a flat fill. It does not animate or add a
 stacking layer. The existing canopy animation still respects reduced motion.
 
@@ -15,14 +16,33 @@ Workflow decisions and acceptance are unchanged.
 
 Synthetic production Storybook scenes, with no palette overrides:
 
-- [Home with its existing glow](home.jpg)
+- [Home before softening](home-before-softening.jpg)
+- [Home with softer cards and layered glow](home.jpg)
+- [Unchanged light Home](home-light.jpg)
 - [Workflow with the subtler glow](workflow.jpg)
 - Previous blue-green baseline: [sidebar evidence before this palette change](../workflow-sidebar/README.md).
 
 `Product/Dark appearance/Home` and `Darker forest` are interactive references.
 The selected preview URL remains `product-dark-palette-options--darker-forest`.
 
-## Verification
+## Home refinement verification
+
+The Home-only follow-up changes two component stylesheets, preserving the shared
+canvas and workflow palette. Desktop light/dark and a measured 390×844 CSS-pixel
+phone viewport were visually inspected; phone scroll width remains 390px. The
+existing drifting petals/wind and reduced-motion rules are retained, with no
+new animation. The focused DarkPalette browser suite passes both stories with
+accessibility checks enabled. Build passes with the existing size advisory.
+Native tests and lint were rerun; results are recorded on the PR.
+
+```sh
+npm --prefix frontend run test-storybook -- stories/DarkPalette.stories.tsx
+npm --prefix frontend test
+npm --prefix frontend run lint
+npm --prefix frontend run build
+```
+
+## Original palette verification (`1fec96a`)
 
 macOS arm64, Node 22.23.4, locked dependencies and native Chromium. No CI VM started.
 
