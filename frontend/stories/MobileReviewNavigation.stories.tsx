@@ -47,18 +47,15 @@ export const CompleteJourney: Story = {
     await FinishedCategory.play!({ canvasElement } as Parameters<NonNullable<typeof FinishedCategory.play>>[0]);
     const canvas = within(canvasElement);
     const mobile = window.matchMedia("(max-width: 700px)").matches;
-    await expect(canvas.getByText("This category is complete")).toBeInTheDocument();
-    if (mobile) await userEvent.click(canvas.getByRole("button", { name: "Continue review: Chapter starts →" }));
-    else await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /Chapter starts/ }));
+    await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /Chapter starts/ }));
     const heading = canvas.getByRole("heading", { name: "Chapter starts" });
-    if (mobile) await waitFor(() => expect(canvasElement.querySelector(".review-strip > button.active")).toHaveFocus());
+    if (mobile) await waitFor(() => expect(heading).toHaveFocus());
     await expect(canvas.getByLabelText("Manuscript context")).toHaveTextContent("The first day began with a letter.");
     await userEvent.click(canvas.getByRole("button", { name: /^Start a new chapter/ }));
     if (mobile) {
-      await expect(heading).toBeVisible();
-      await expect(canvas.getByText("This category is complete")).toBeVisible();
-      await userEvent.click(canvas.getByRole("button", { name: "Continue review: Suspicious extracted text →" }));
+      await expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toBeVisible();
       await waitFor(() => expect(canvasElement.querySelector(".review-strip > button.active")).toHaveFocus());
+      await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /Suspicious extracted text/ }));
     }
     await userEvent.click(canvas.getByRole("button", { name: /^Keep as is/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();

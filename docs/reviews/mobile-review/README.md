@@ -1,15 +1,21 @@
 # Mobile review navigation and chapter evidence
 
-On phones (up to 700px), Review shows remaining decisions beneath the choices. Once the current
-choice is made, **Continue review: [category]** opens the first unresolved decision and brings its
-decision queue below the header, with the active category focused. Scrolling is animated unless
-reduced motion is requested. The action stays in normal document flow. An unanswered item never
-offers a button pointing back to itself.
+On phones (up to 700px), scrolling follows the level of the completed work:
 
-Completing a mobile category is a stopping point: keep its current example and do not scroll or
-switch categories until Continue is chosen. Unfinished examples within a category still advance
-and return to the queue so the active category remains clear. Desktop keeps its existing category navigation, progression,
-scroll-to-category behavior, and transcript action; within-chapter navigation does not add scrolling.
+1. Choosing an option advances to the next unresolved example in the current category and scrolls
+   to that category's heading. Clicking a category or Previous/Next example also targets the heading.
+2. Completing a category selects the next unfinished category in visible queue order, wrapping when
+   needed, and returns to the queue with that category focused. It resumes the first undecided item;
+   opening its active queue card preserves that position. There is no intermediate Continue button.
+3. Completing all categories stays in the current category and reveals **Review complete transcript**.
+   Focus moves to this final action; scroll down only if it is below the viewport. The action is hidden
+   on mobile before all decisions are complete.
+
+Scroll targets use the measured sticky-header bottom plus 12px, rather than a fixed phone offset.
+Short categories get only enough scroll room after the final controls to align correctly; there is
+no spacer between choices and the final action. Scrolling is smooth unless reduced motion is requested.
+Desktop retains its existing queue navigation, automatic progression, and disabled transcript action
+until all decisions are complete. These mobile transitions do not alter desktop behavior.
 
 Both layouts show all supplied bounded chapter context, including split title lines and opening
 passages, with compact paragraph spacing and the exact original anchor highlighted. This is display
@@ -28,12 +34,14 @@ manuscript, screenshot, account identifier, or service data is included.
 | Desktop: suggested choices finished | ![Before desktop completion](category-desktop-before.png) | ![After desktop completion](category-desktop-after.png) |
 
 The completion comparison performs the same actions in both versions: manually keep example 1,
-then apply remaining suggestions. Before resets to example 1; the mobile draft preserves example 2.
+then apply remaining suggestions. Before resets to example 1; the mobile draft selects the next unfinished category.
 
 Opening “Read it once like a listener” and returning to decisions now use the existing page-entry
 scroll/focus reset on both mobile and desktop. Transcript loading, paging, and zoom do not retrigger it.
 
-- [Mobile queue landing after animated Continue](decision-queue-390.png)
+- [Mobile next-example landing](next-example-390.png)
+- [Mobile queue landing after category completion](decision-queue-390.png)
+- [Mobile final action after all categories complete](all-complete-390.png)
 - [Mobile final-check entry](final-check-390.png)
 - [Desktop final-check entry](final-check-1440.png)
 
@@ -64,39 +72,43 @@ undecided suggestions. `Finished category` deliberately completes the suggestion
 
 Results:
 
-- Frontend suite: 43 files, 588 tests passed.
+- Frontend suite: 43 files, 592 tests passed.
 - Focused real-browser stories: 5 files, 21 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
-- Browser matrix: 320, 390, 768, and 1440px, light and dark. Each completes suggestions, uses the mobile
-  next-category action or existing desktop queue, resolves remaining decisions, opens the transcript,
-  returns, and verifies the manually kept choice. Mobile bulk and chapter completion cause no
-  scrollIntoView calls and preserve the current example/category. Unfinished examples still bring
-  the active category into focus. No horizontal overflow or axe violations in the final review state.
-  Final-check entry and return start at scrollY=0 with main-content focus; transcript paging does
-  not trigger another reset. Separate motion checks observe intermediate scroll positions for smooth
-  queue navigation and immediate movement with reduced motion.
-  [Machine-readable results](browser-report.json); null completion-scroll fields mean desktop, where
-  the mobile-only completion behavior is not applied.
-- Regression tests cover group-scoped completion from example 3, mobile explicit continuation,
-  desktop automatic progression, within-chapter navigation, final-heading completion, remaining
-  source checks after bulk application, final-check entry/return focus, reduced-motion behavior, exact source
-  anchors, Chinese/legacy snippets, and authoritative preview payload preservation.
+- Browser matrix: 320×844, 390×844, 650×1400, 768×844, and 1440×844, light and dark. Each follows the three mobile destinations
+  or existing desktop flow, resolves every decision, opens the transcript, returns, and verifies the
+  manually kept choice. Before completion the final action is hidden on mobile. After completion it
+  is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations.
+- Browser motion checks at 390×600 verify animated movement for both example and category completion,
+  plus immediate reduced-motion behavior. A synthetic 104px sticky header verifies measured alignment;
+  exact target geometry is checked after scrolling settles. The short-category case verifies that the
+  page does not clamp before the heading reaches the header offset.
+- Final-check entry and return start at scrollY=0 with main-content focus; transcript loading/paging
+  does not trigger another reset. [Machine-readable results](browser-report.json).
+- Regression tests cover group-scoped completion from example 3; individual and bulk chapter
+  completion; final-button reveal both when already visible and when below the viewport; measured
+  header offsets; desktop progression; within-category movement; reduced motion; source checks after
+  bulk application; exact source anchors; Chinese/legacy snippets; authoritative preview preservation.
 - Build and story typecheck pass. ESLint has no errors; two existing Fast Refresh warnings remain in
   LanguagePicker.tsx and main.tsx. Vite retains its existing large-chunk advisory.
-- An independent navigation review found two additional cases: mobile group completion reset its
-  example, and desktop within-chapter navigation gained scrolling. Both were fixed and covered by
-  regressions; follow-up review found no remaining issue. Its targeted run passed 242 tests across
-  4 files. An initial test cleanup scoping error was fixed before the passing full rerun.
+- Independent navigation review checked the three destination transitions, manual overrides, bulk
+  policies, and final-button lookup; its targeted 4-file run passed 244 tests before the three
+  final-button placement tests were added. Follow-up review reproduced a tall-mobile viewport-floor
+  calculation issue; the measurement was fixed and 650×1400 added to the passing browser matrix.
+  The final automatic-selection review caught a reset when reopening the active queue card; that
+  now preserves the resumed occurrence, verified independently in Chromium and a cycle regression.
 
-## Completion-scroll diagnosis
+## Scroll diagnosis
 
-The regression was in production ReviewPage, not Storybook's manager: `applyAllProposals` reopened
-the first suggestion category even after it was complete, calling the mobile evidence-scrolling
-handler. In an isolated story iframe, a user click moved scrollY from 460 to 400 and called
-scrollIntoView on “AI suggestions” with `{ behavior: "instant", block: "start" }`. The fix avoids that
-reopening after mobile completion; explicit Continue owns the next category jump. Story setup can
-also drive controls automatically, which is why the new Suggestions starting point is provided.
+The previous fixed 110px offset left a gap below the actual phone header. Short categories also hit
+the bottom of the document before their heading could reach the desired position. The current code
+measures the header and reserves minimal scroll room after the controls. It measures content beyond
+the viewport height floor before sizing that space, so very tall mobile viewports also align. That geometry is not animated:
+the app's global reduced-motion CSS would otherwise delay even these measurements by a fraction of a
+frame. Only the actual scrolling animates. Earlier full-height animation assertions were refined to
+use a short viewport where the next heading requires movement; when it is already aligned, no movement
+is needed.
 
 Backend extraction/attribution/audio evaluation suites were not rerun: no processing, model,
 artifact contract, or accepted book data changed. Relevant public-domain Alice presentation stories

@@ -3120,11 +3120,9 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /AI suggestions/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Apply all suggested choices/ }))
-    expect(screen.getByText('This category is complete')).toBeInTheDocument()
-    expect(screen.getByText('2 decisions remaining')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Continue review: Chapter starts →' }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /Chapter starts/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
     expect(screen.getByRole('heading', { name: 'Suspicious extracted text' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
@@ -3514,7 +3512,7 @@ describe('v2 wizard', () => {
     expect(keep).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it.each([true, false])('waits for Continue after mobile category completion and preserves desktop progression (%s)', async (mobile) => {
+  it.each([true, false])('returns to the queue after mobile category completion and preserves desktop progression (%s)', async (mobile) => {
     const originalMatchMedia = window.matchMedia
     window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() })) as unknown as typeof window.matchMedia
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
@@ -3543,26 +3541,101 @@ describe('v2 wizard', () => {
       await screen.findByRole('navigation', { name: 'Review groups' })
       fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
       fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
-      if (mobile) await waitFor(() => expect(document.querySelector('.review-strip > button.active')).toHaveFocus())
+      if (mobile) await waitFor(() => expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus())
       scrollIntoView.mockClear()
       fireEvent.click(screen.getByRole('button', { name: /Keep as is/ }))
 
       if (mobile) {
-        expect(document.querySelector('[data-review-group="warning-0"]')).toHaveClass('active')
-        expect(scrollIntoView).not.toHaveBeenCalled()
-        expect(screen.getByText('Example 3 of 3')).toBeInTheDocument()
-        expect(screen.getByLabelText('Manuscript context')).toHaveTextContent('HEADER 1 EXAMPLE 3')
-        expect(screen.getByText('This category is complete')).toBeInTheDocument()
-        fireEvent.click(screen.getByRole('button', { name: 'Continue review: Repeated page matter →' }))
+        expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
+        await waitFor(() => expect(document.querySelector('.review-strip > button.active')).toHaveFocus())
+        expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' })
+        expect(screen.getByText('Example 1 of 3')).toBeInTheDocument()
+        expect(screen.getByLabelText('Manuscript context')).toHaveTextContent('HEADER 2 EXAMPLE 1')
+        fireEvent.click(document.querySelector<HTMLButtonElement>('[data-review-group="warning-1"]')!)
         expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
         await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }))
-        expect(document.querySelector('.review-strip > button.active')).toHaveFocus()
+        await waitFor(() => expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus())
       } else {
         expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
         expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest', inline: 'center' })
         expect(screen.getByRole('heading', { name: 'Repeated page matter' })).not.toHaveFocus()
       }
     } finally {
+      window.matchMedia = originalMatchMedia
+      Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
+    }
+  })
+
+  it('cycles through unfinished mobile categories and resumes their first undecided item', async () => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-cycle', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-cycle', boundaryCandidates: [
+        { id: 'first', page: 1, source: 'Chapter One', reason: 'Standalone heading' },
+        { id: 'second', page: 2, source: 'Chapter Two', reason: 'Standalone heading' },
+      ], warnings: [{ ...cleanupWarning, occurrences: cleanupWarning.occurrences.slice(0, 2) },
+        { id: 'source-check', kind: 'suspicious-extraction', severity: 'warning', availableActions: ['keep', 'exclude'], occurrences: [{ id: 'odd-word', page: 3, source: 'STR ANGE' }] },
+      ] })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      fireEvent.click(await screen.findByRole('button', { name: /^Start a new chapter/ }))
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      const groups = within(screen.getByRole('navigation', { name: 'Review groups' }))
+      fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
+      fireEvent.click(groups.getByRole('button', { name: /Suspicious extracted text/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
+      await waitFor(() => expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveFocus())
+      expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
+      fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
+      expect(screen.getByText('Example 2 of 2')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /^Leave out/ }))
+      await waitFor(() => expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveFocus())
+      expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
+      fireEvent.click(groups.getByRole('button', { name: /Chapter starts/ }))
+      fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'Chapter starts' })).toBeInTheDocument()
+      expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    } finally {
+      window.matchMedia = originalMatchMedia
+    }
+  })
+
+  it.each([{ below: false, bulk: false }, { below: true, bulk: false }, { below: true, bulk: true }])('reveals mobile final review only when needed ($below, bulk=$bulk)', async ({ below, bulk }) => {
+    const originalMatchMedia = window.matchMedia
+    const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
+    const originalRect = HTMLElement.prototype.getBoundingClientRect
+    const scrollIntoView = vi.fn()
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)", media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
+    const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function(this: HTMLElement) {
+      if (this.classList.contains('topbar')) return new DOMRect(0, 0, 390, 100)
+      if (this.classList.contains('review-transcript-continue')) return new DOMRect(0, window.innerHeight + (below ? 30 : -30) - 48, 300, 48)
+      return originalRect.call(this)
+    })
+    try {
+      const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-final-position', status: 'candidate' } } }
+      vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'review-final-position', warnings: [], boundaryCandidates: Array.from({ length: bulk ? 3 : 1 }, (_, i) => ({ id: `heading-${i}`, page: i + 1, source: `Chapter ${i + 1}`, reason: 'Standalone heading' })) })
+      await open(snapshot)
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+      await screen.findByRole('heading', { name: 'Chapter starts' })
+      const next = screen.getByRole('button', { name: 'Review complete transcript →' })
+      expect(next.closest('.review-next-action')).toHaveClass('review-pending')
+      fireEvent.click(within(screen.getByRole('navigation', { name: 'Review groups' })).getByRole('button', { name: /Chapter starts/ }))
+      await waitFor(() => expect(screen.getByRole('heading', { name: 'Chapter starts' })).toHaveFocus())
+      expect(screen.getByRole('heading', { name: 'Chapter starts' }).style.scrollMarginTop).toBe('112px')
+      scrollIntoView.mockClear()
+      fireEvent.click(screen.getByRole('button', { name: bulk ? 'Mark all 3 as chapter starts' : /^Start a new chapter/ }))
+      await waitFor(() => expect(next).toHaveFocus())
+      expect(next).toBeEnabled()
+      expect(next.closest('.review-next-action')).not.toHaveClass('review-pending')
+      if (below) expect(scrollIntoView).toHaveBeenCalledExactlyOnceWith({ behavior: 'smooth', block: 'end' })
+      else expect(scrollIntoView).not.toHaveBeenCalled()
+      expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    } finally {
+      rect.mockRestore()
       window.matchMedia = originalMatchMedia
       Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
     }
@@ -3594,6 +3667,7 @@ describe('v2 wizard', () => {
       fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
       expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+      if (mobile) await waitFor(() => expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toHaveFocus())
       expect(scrollIntoView).not.toHaveBeenCalled()
     } finally {
       window.matchMedia = originalMatchMedia

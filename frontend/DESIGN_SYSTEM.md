@@ -155,18 +155,20 @@ Chapter-start evidence displays all supplied bounded context so a title split ac
 and its opening passage remain visible. Only the original boundary anchor is highlighted; this
 presentation does not merge source spans or rewrite extracted text.
 
-On phones (up to 700px), the Review action area reports remaining decisions beneath the choices
-in normal document flow. Once the current decision is made, its primary action opens the next
-unresolved heading or text decision and smoothly returns to the decision queue below the header,
-focusing the active category. Reveal that category inside the queue if its inner list is scrolled.
-Respect reduced motion with immediate movement. Do not show a
-continue action that returns to the same unanswered decision, or float a panel over source evidence.
-Completing a mobile category preserves its current example and waits for Continue; unfinished
-examples within the category can still advance automatically. Desktop retains its existing category
-queue, progression, scrolling behavior, and transcript action. Completing
-suggested choices is distinct from completing a category or the whole review. Chapter context uses
-compact paragraph gaps and reflows PDF line wrapping for readability; source characters and anchors
-remain unchanged. The complete-transcript preview and explicit acceptance remain separate steps.
+On phones (up to 700px), Review navigation follows the level of work completed. A choice with more
+examples remaining scrolls to the category heading; completing a category scrolls to the decision
+queue, selecting and focusing the next unfinished category in visible order (wrapping if needed).
+Resume its first undecided item and preserve that position when its active queue card is opened. Completing all categories stays in place and reveals
+Review complete transcript, focusing it and scrolling down only if below the viewport. Hide that
+final action until every decision is complete; do not add an intermediate Continue action.
 
-Entering the complete-transcript final check or returning to decisions resets the viewport to the
-page start and focuses main content. Loading, paging, or zooming the transcript must not repeat that reset.
+Use the measured sticky-header bottom plus 12px for category and queue targets. Short categories may
+reserve minimal scroll room after the controls so their heading can align without previous content
+peeking under the header; never insert this space between choices and the final button. Apply these
+geometry changes immediately and animate only scrolling, respecting reduced motion. Desktop retains
+its existing category queue, progression, scrolling behavior, and transcript action.
+
+Chapter context uses compact paragraph gaps and reflows PDF line wrapping for readability; source
+characters and anchors remain unchanged. Complete-transcript preview and explicit acceptance remain
+separate steps. Entering that final check or returning to decisions resets the viewport to the page
+start and focuses main content. Loading, paging, or zooming must not repeat that reset.

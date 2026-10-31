@@ -148,12 +148,11 @@
 /* Chapter evidence reads as text, with paragraph gaps rather than PDF display spacing. */
 .source-chapter-context { white-space: normal; }
 .source-chapter-context .source-context-break { display: block; height: .35em; }
-.review-mobile-next { display: none; }
-.review-desktop-next { margin-left: auto; }
+.review-transcript-continue { scroll-margin-bottom: 12px; }
+.review-scroll-tail { display: none; transition-property: none; }
 @media (max-width: 700px) {
-  .review-queue { scroll-margin-top: 110px; }
-  .review-next-action .review-desktop-next { display: none; }
-  .review-mobile-next { display: grid; width: 100%; gap: 12px; }
-  .review-mobile-next p { margin: 4px 0 0; color: var(--color-muted, var(--muted)); }
-  .review-mobile-next .primary { width: 100%; min-height: 48px; white-space: normal; }
+  .review-scroll-tail { display: block; }
+  .review-queue, .review-evidence h2 { transition-property: none; }
+  .review-next-action.review-pending { display: none; }
+  .review-next-action .primary { width: 100%; min-height: 48px; white-space: normal; }
 }
