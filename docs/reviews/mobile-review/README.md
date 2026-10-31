@@ -70,6 +70,16 @@ higher specificity than the normal card style, but the last-child rule overrode 
 
 ![Completed AI category explicitly reopened](tablet-queue-reopened.png)
 
+All unselected queue items now use the same subtle surface on hover, including completed items and
+the last item. Selected items keep their active fill. The legacy hover rule previously made the middle
+item white in light mode, while later last-child/completed rules suppressed the same hover elsewhere.
+
+| Light-mode hover | Before (`bd48344`) | Current draft |
+| --- | --- | --- |
+| Second pending item | ![Before second item hover](hover-pending-2-before.png) | ![After second item hover](hover-pending-2-after.png) |
+| Last pending item | ![Before last item hover](hover-pending-3-before.png) | ![After last item hover](hover-pending-3-after.png) |
+| Completed item | ![Before completed item hover](hover-completed-before.png) | ![After completed item hover](hover-completed-after.png) |
+
 ## Reproducible verification
 
 Environment: macOS arm64, Node 22.23.4, locked npm dependencies, Playwright Chromium. Native tests;
@@ -109,6 +119,8 @@ Results:
   is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations. All 12 viewport/theme cases also verify Dialogue’s
   suggestion color tokens, the sparkle and muted state, equal neutral styling immediately after
   completion, and the normal active fill/checkmark when reopening completed cards by mouse or keyboard.
+  Hover checks cover the middle/last pending items, every completed item, and preservation of active
+  selection in both themes.
 - Browser motion checks at 390×600 verify animated movement for both example and category completion,
   plus immediate reduced-motion behavior. A synthetic 104px sticky header verifies measured alignment;
   exact target geometry is checked after scrolling settles. The short-category case verifies that the

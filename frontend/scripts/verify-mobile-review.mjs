@@ -61,6 +61,24 @@ try {
     await page.evaluate(() => scrollTo(0, 0));
     await page.screenshot({ path: path.join(out, `chapter-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
     const groups = page.getByRole('navigation', { name: 'Review groups' });
+    let queueHoverBackground;
+    for (const name of [/Suspicious extracted text/, /AI suggestions/]) {
+      const item = groups.getByRole('button', { name });
+      await item.hover();
+      await settle(page);
+      const style = await item.evaluate(el => ({ background: getComputedStyle(el).backgroundColor, expected: getComputedStyle(el).getPropertyValue('--surface-soft').trim() }));
+      // Compare computed colors through a probe because tokens can contain color-mix or hex values.
+      queueHoverBackground = await item.evaluate(el => {
+        const probe = document.createElement('span');
+        probe.style.background = 'var(--surface-soft)'; el.append(probe);
+        const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color;
+      });
+      assert.equal(style.background, queueHoverBackground, 'Middle and last pending cards share the subtle hover surface');
+      assert.notEqual(style.background, 'rgb(255, 255, 255)');
+    }
+    await groups.getByRole('button', { name: /Chapter starts/ }).hover();
+    await settle(page);
+    assert.equal(await groups.getByRole('button', { name: /Chapter starts/ }).evaluate(el => getComputedStyle(el).backgroundColor), selectedStyle.background, 'Hover preserves the active selection');
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     if (mobile) await landing(page, 'category');
     const suggestion = page.getByRole('button', { name: /^Apply correction/ });
@@ -136,6 +154,11 @@ try {
     }));
     assert(completedStyles.every(style => style.resolved && style.background === 'rgba(0, 0, 0, 0)' && style.image === 'none' && style.shadow === 'none'), `All completed cards have the same neutral appearance: ${JSON.stringify(completedStyles)}`);
     if (width === 834 && theme === 'dark') await page.getByRole('complementary', { name: 'Decision queue' }).screenshot({ path: path.join(out, 'tablet-queue-complete.png') });
+    for (const item of await groups.getByRole('button').all()) {
+      await item.hover();
+      await settle(page);
+      assert.equal(await item.evaluate(el => getComputedStyle(el).backgroundColor), queueHoverBackground, 'All completed cards use the same hover as pending cards');
+    }
     await transcript.click();
     await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
     assert.equal(await page.evaluate(() => scrollY), 0);
@@ -172,7 +195,7 @@ try {
     const violations = await page.evaluate(async () => (await window.axe.run('[data-presentation-root]')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
-    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, completedQueueNeutral: true, reopenedCategorySelected: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
+    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, completedQueueNeutral: true, consistentQueueHover: true, reopenedCategorySelected: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
     await page.close();
   }
   for (const reducedMotion of ['no-preference', 'reduce']) {

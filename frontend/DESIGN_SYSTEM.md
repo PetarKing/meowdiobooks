@@ -147,7 +147,8 @@ decisions. Completed queue categories use neutral backgrounds and checkmarks. Th
 category receives the active fill; explicitly reopening a completed category also gives it the active
 fill while retaining its checkmark. Clear that manual selection on category completion, so finishing
 all categories leaves no active fill until a category is reopened. Keep keyboard focus visible and
-expose the displayed category through aria-current.
+expose the displayed category through aria-current. All unselected queue items use surface-soft on
+hover, including completed items and the last item; hovering never replaces the active selection fill.
 
 Show bulk suggestions only when the action covers more than one suggestion in total;
 a larger review keeps its bulk action even when just one undecided suggestion remains.
