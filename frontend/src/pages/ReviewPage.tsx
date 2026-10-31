@@ -85,18 +85,26 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   function revealReviewGroup(group: string) {
-    if (isMobileReview()) return revealReviewEvidence();
+    if (isMobileReview()) return revealReviewQueue();
     const target = reviewStripRef.current?.querySelector<HTMLElement>(`[data-review-group="${group}"]`);
     target?.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "center" });
   }
 
-  function revealReviewEvidence() {
+  function revealReviewQueue() {
     if (!isMobileReview()) return;
-    // Wait for the chosen example to render; focus its evidence, not the off-screen queue.
+    // Keep category context visible when moving through the same review workspace.
     requestAnimationFrame(() => {
-      const target = reviewStripRef.current?.closest(".review-desk")?.querySelector<HTMLElement>(".review-evidence h2");
-      target?.focus({ preventScroll: true });
-      target?.scrollIntoView?.({ behavior: "instant", block: "start" });
+      const strip = reviewStripRef.current;
+      const active = strip?.querySelector<HTMLButtonElement>("button.active");
+      if (strip && active) {
+        const container = strip.getBoundingClientRect();
+        const item = active.getBoundingClientRect();
+        if (item.top < container.top || item.bottom > container.bottom) {
+          strip.scrollTo?.({ top: strip.scrollTop + item.top - container.top, behavior: "instant" });
+        }
+        active.focus({ preventScroll: true });
+      }
+      strip?.closest(".review-queue")?.scrollIntoView?.({ behavior: window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth", block: "start" });
     });
   }
 
@@ -114,7 +122,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
 
   function openOccurrence(index: number) {
     setActiveOccurrence(index);
-    revealReviewEvidence();
+    revealReviewQueue();
   }
 
   function openWarning(index: number) {
@@ -126,7 +134,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
 
   function openHeading(index: number) {
     setActiveBoundary(index);
-    revealReviewEvidence();
+    revealReviewQueue();
   }
 
   function openBoundary(index: number) {
@@ -277,7 +285,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       <div className={["review-workspace", showingBoundary ? "chapter-workspace" : "warning-workspace"].join(" ")}>
         {showingBoundary && boundary ? <>
           <section className="review-evidence chapter-review-evidence">
-            <div className="review-group-heading"><span><h2 tabIndex={-1}>{t("Chapter starts")}</h2></span><Tag tone="good">{t("Structure")}</Tag></div>
+            <div className="review-group-heading"><span><h2>{t("Chapter starts")}</h2></span><Tag tone="good">{t("Structure")}</Tag></div>
             <div className="occurrence-meta"><b>{t("Heading {{current}} of {{total}}", { current: activeBoundary + 1, total: boundaries.length })}</b><span>{t("Page {{page}}", { page: boundary.page })}</span></div>
             <SourceExcerpt compact contextMode="full" className="review-source-excerpt" layout={boundary.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={boundary.source} contextBefore={boundary.contextBefore} contextAfter={boundary.contextAfter} />
             <p className="evidence-help">{t("The highlight marks where the chapter would begin. A title can continue across several lines. The text stays unchanged.")}</p>
@@ -291,7 +299,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           </section>
         </> : warning && occurrence && actionWarning ? <>
           <section className="review-evidence">
-            <div className="review-group-heading"><span><h2 tabIndex={-1}>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
+            <div className="review-group-heading"><span><h2>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{boundaryEvidence ? occurrence.boundaryAnchors!.map((anchor) => t("Page {{page}}", { page: anchor.page })).join(" → ") : t("Page {{page}}", { page: occurrence.page })}</span></div>
             <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => openOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => openOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>

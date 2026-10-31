@@ -51,19 +51,21 @@ export const CompleteJourney: Story = {
     if (mobile) await userEvent.click(canvas.getByRole("button", { name: "Continue review: Chapter starts →" }));
     else await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /Chapter starts/ }));
     const heading = canvas.getByRole("heading", { name: "Chapter starts" });
-    if (mobile) await waitFor(() => expect(heading).toHaveFocus());
+    if (mobile) await waitFor(() => expect(canvasElement.querySelector(".review-strip > button.active")).toHaveFocus());
     await expect(canvas.getByLabelText("Manuscript context")).toHaveTextContent("The first day began with a letter.");
     await userEvent.click(canvas.getByRole("button", { name: /^Start a new chapter/ }));
     if (mobile) {
       await expect(heading).toBeVisible();
       await expect(canvas.getByText("This category is complete")).toBeVisible();
       await userEvent.click(canvas.getByRole("button", { name: "Continue review: Suspicious extracted text →" }));
-      await waitFor(() => expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toHaveFocus());
+      await waitFor(() => expect(canvasElement.querySelector(".review-strip > button.active")).toHaveFocus());
     }
     await userEvent.click(canvas.getByRole("button", { name: /^Keep as is/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: "Review complete transcript →" }));
     await expect(await canvas.findByRole("article", { name: "Audiobook transcript page 1" })).toBeVisible();
+    await expect(canvas.getByRole("main")).toHaveFocus();
+    await expect(window.scrollY).toBe(0);
     await userEvent.click(canvas.getByRole("button", { name: "← Back to decisions" }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
   },

@@ -3129,11 +3129,18 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('heading', { name: 'Suspicious extracted text' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
+    vi.mocked(window.scrollTo).mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
+    expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, left: 0, behavior: 'instant' })
+    expect(screen.getByRole('main')).toHaveFocus()
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(window.scrollTo).toHaveBeenCalledTimes(1)
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-navigation', 1,
       [{ warningId: 'source-check', action: 'keep' }], [{ occurrenceId: 'join', action: 'keep' }, { occurrenceId: 'delete', action: 'repair' }], [{ boundaryId: 'chapter-split', action: 'chapter-start' }])
+    vi.mocked(window.scrollTo).mockClear()
     fireEvent.click(screen.getByRole('button', { name: '← Back to decisions' }))
+    expect(window.scrollTo).toHaveBeenCalledExactlyOnceWith({ top: 0, left: 0, behavior: 'instant' })
+    expect(screen.getByRole('main')).toHaveFocus()
     expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
   })
@@ -3536,7 +3543,7 @@ describe('v2 wizard', () => {
       await screen.findByRole('navigation', { name: 'Review groups' })
       fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
       fireEvent.click(screen.getByRole('button', { name: 'Next example →' }))
-      if (mobile) await waitFor(() => expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus())
+      if (mobile) await waitFor(() => expect(document.querySelector('.review-strip > button.active')).toHaveFocus())
       scrollIntoView.mockClear()
       fireEvent.click(screen.getByRole('button', { name: /Keep as is/ }))
 
@@ -3548,8 +3555,8 @@ describe('v2 wizard', () => {
         expect(screen.getByText('This category is complete')).toBeInTheDocument()
         fireEvent.click(screen.getByRole('button', { name: 'Continue review: Repeated page matter →' }))
         expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
-        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' }))
-        expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus()
+        await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }))
+        expect(document.querySelector('.review-strip > button.active')).toHaveFocus()
       } else {
         expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
         expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'smooth', block: 'nearest', inline: 'center' })
@@ -3561,11 +3568,11 @@ describe('v2 wizard', () => {
     }
   })
 
-  it.each([true, false])('keeps desktop heading navigation still and mobile final completion still (%s)', async (mobile) => {
+  it.each([{ mobile: true, reducedMotion: false }, { mobile: true, reducedMotion: true }, { mobile: false, reducedMotion: false }])('keeps desktop heading navigation still and respects motion preferences ($mobile, $reducedMotion)', async ({ mobile, reducedMotion }) => {
     const originalMatchMedia = window.matchMedia
     const originalScrollIntoView = HTMLElement.prototype.scrollIntoView
     const scrollIntoView = vi.fn()
-    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" ? mobile : query === "(prefers-reduced-motion: reduce)" && reducedMotion, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() })) as unknown as typeof window.matchMedia
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
     try {
       const snapshot: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] }, activeArtifacts: { extraction: 'e1', dialogue: 'd1' }, pendingCandidates: { review: { revision: 'review-headings', status: 'candidate' } } }
@@ -3579,7 +3586,7 @@ describe('v2 wizard', () => {
       for (const name of [/^Start a new chapter/, /^← Previous heading$/, /^Next heading →$/]) {
         scrollIntoView.mockClear()
         fireEvent.click(screen.getByRole('button', { name }))
-        if (mobile) await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' }))
+        if (mobile) await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'start' }))
         else expect(scrollIntoView).not.toHaveBeenCalled()
       }
       expect(screen.getByText('Heading 2 of 2')).toBeInTheDocument()

@@ -2,12 +2,13 @@
 
 On phones (up to 700px), Review shows remaining decisions beneath the choices. Once the current
 choice is made, **Continue review: [category]** opens the first unresolved decision and brings its
-evidence below the header. The action stays in normal document flow. An unanswered item never
+decision queue below the header, with the active category focused. Scrolling is animated unless
+reduced motion is requested. The action stays in normal document flow. An unanswered item never
 offers a button pointing back to itself.
 
 Completing a mobile category is a stopping point: keep its current example and do not scroll or
 switch categories until Continue is chosen. Unfinished examples within a category still advance
-and bring the next passage into view. Desktop keeps its existing category navigation, progression,
+and return to the queue so the active category remains clear. Desktop keeps its existing category navigation, progression,
 scroll-to-category behavior, and transcript action; within-chapter navigation does not add scrolling.
 
 Both layouts show all supplied bounded chapter context, including split title lines and opening
@@ -28,6 +29,13 @@ manuscript, screenshot, account identifier, or service data is included.
 
 The completion comparison performs the same actions in both versions: manually keep example 1,
 then apply remaining suggestions. Before resets to example 1; the mobile draft preserves example 2.
+
+Opening “Read it once like a listener” and returning to decisions now use the existing page-entry
+scroll/focus reset on both mobile and desktop. Transcript loading, paging, and zoom do not retrigger it.
+
+- [Mobile queue landing after animated Continue](decision-queue-390.png)
+- [Mobile final-check entry](final-check-390.png)
+- [Desktop final-check entry](final-check-1440.png)
 
 ## Reproducible verification
 
@@ -56,7 +64,7 @@ undecided suggestions. `Finished category` deliberately completes the suggestion
 
 Results:
 
-- Frontend suite: 43 files, 587 tests passed.
+- Frontend suite: 43 files, 588 tests passed.
 - Focused real-browser stories: 5 files, 21 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
@@ -64,12 +72,15 @@ Results:
   next-category action or existing desktop queue, resolves remaining decisions, opens the transcript,
   returns, and verifies the manually kept choice. Mobile bulk and chapter completion cause no
   scrollIntoView calls and preserve the current example/category. Unfinished examples still bring
-  evidence into focus. No horizontal overflow or axe violations in the final review state.
+  the active category into focus. No horizontal overflow or axe violations in the final review state.
+  Final-check entry and return start at scrollY=0 with main-content focus; transcript paging does
+  not trigger another reset. Separate motion checks observe intermediate scroll positions for smooth
+  queue navigation and immediate movement with reduced motion.
   [Machine-readable results](browser-report.json); null completion-scroll fields mean desktop, where
   the mobile-only completion behavior is not applied.
 - Regression tests cover group-scoped completion from example 3, mobile explicit continuation,
   desktop automatic progression, within-chapter navigation, final-heading completion, remaining
-  source checks after bulk application, exact source
+  source checks after bulk application, final-check entry/return focus, reduced-motion behavior, exact source
   anchors, Chinese/legacy snippets, and authoritative preview payload preservation.
 - Build and story typecheck pass. ESLint has no errors; two existing Fast Refresh warnings remain in
   LanguagePicker.tsx and main.tsx. Vite retains its existing large-chunk advisory.

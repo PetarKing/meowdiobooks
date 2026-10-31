@@ -92,6 +92,7 @@ export default function App(props: AppProps) {
   const view = productView === "create" ? createView() : LibraryPage({ model });
   const main = usePageNavigation(JSON.stringify([
     productView, home, book?.id, stage,
+    activeJourneyStep?.builtin === "review" && model.reviewFinalCheck,
     model.designingVoices, model.editingCast, model.castCandidate?.phase,
   ]));
 

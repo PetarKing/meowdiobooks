@@ -1,7 +1,7 @@
 {
   "synthetic": true,
   "after": "http://127.0.0.1:6017",
-  "before": "http://127.0.0.1:6018",
+  "before": "",
   "results": [
     {
       "width": 320,
@@ -9,6 +9,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
@@ -18,6 +21,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
@@ -27,6 +33,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
@@ -36,6 +45,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
@@ -45,6 +57,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
@@ -54,6 +69,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
@@ -63,6 +81,9 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
@@ -72,26 +93,23 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
+      "finalCheckStartsAtTop": true,
+      "finalCheckFocus": true,
+      "paginationDoesNotReset": true,
       "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
     {
-      "baseline": "split-title",
-      "width": 390
-    },
-    {
-      "baseline": "finished-category",
       "width": 390,
-      "disabledTranscript": true
+      "reducedMotion": "no-preference",
+      "reviewScrollBehavior": "smooth",
+      "intermediatePositions": 18
     },
     {
-      "baseline": "split-title",
-      "width": 1440
-    },
-    {
-      "baseline": "finished-category",
-      "width": 1440,
-      "disabledTranscript": true
+      "width": 390,
+      "reducedMotion": "reduce",
+      "reviewScrollBehavior": "instant",
+      "intermediatePositions": 1
     }
   ]
 }

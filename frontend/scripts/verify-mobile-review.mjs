@@ -45,7 +45,7 @@ try {
     await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
     await page.waitForFunction(() => document.querySelector('.occurrence-meta')?.textContent?.includes('Example 2 of 2'));
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    if (width <= 700) assert(await page.locator('.review-evidence h2').evaluate(el => el === document.activeElement), 'Unfinished examples still bring evidence into focus');
+    if (width <= 700) assert(await page.locator('.review-strip > button.active').evaluate(el => el === document.activeElement), 'Unfinished examples retain category context');
     await page.evaluate(() => { window.reviewScrollCalls = []; });
     await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -70,9 +70,9 @@ try {
     await page.screenshot({ path: path.join(out, `category-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
     if (width <= 700) {
       await next.click();
-      await page.waitForFunction(() => document.activeElement?.matches('.review-evidence h2'));
-      const headingBox = await page.getByRole('heading', { name: 'Chapter starts' }).boundingBox();
-      assert(headingBox.y >= 90 && headingBox.y < 700, 'New evidence is below header and in viewport');
+      await page.waitForFunction(() => document.activeElement?.matches('.review-strip > button.active') && Math.abs(document.querySelector('.review-queue').getBoundingClientRect().top - 110) < 2);
+      const queueBox = await page.getByRole('complementary', { name: 'Decision queue' }).boundingBox();
+      assert(queueBox.y >= 90 && queueBox.y < 150, 'Decision queue is below the header');
     } else {
       await groups.getByRole('button', { name: /Chapter starts/ }).click();
       assert.equal(await page.getByRole('heading', { name: 'Chapter starts' }).evaluate(el => el === document.activeElement), false, 'Desktop focus stays on navigation');
@@ -90,7 +90,20 @@ try {
     assert(await page.getByRole('button', { name: 'Review complete transcript →' }).isEnabled());
     await page.getByRole('button', { name: 'Review complete transcript →' }).click();
     await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
+    assert.equal(await page.evaluate(() => scrollY), 0, 'Final check starts at the top after loading');
+    assert(await page.getByRole('main').evaluate(el => el === document.activeElement), 'Final check receives keyboard focus');
+    if (theme === 'dark' && [390, 1440].includes(width)) await page.screenshot({ path: path.join(out, `final-check-${width}.png`), animations: 'disabled' });
+    await page.evaluate(() => {
+      window.reviewPageResets = [];
+      const original = window.scrollTo;
+      window.scrollTo = function(...args) { window.reviewPageResets.push(args); return original.apply(this, args); };
+    });
+    await page.getByRole('button', { name: 'Next transcript page' }).click();
+    await page.getByRole('article', { name: 'Audiobook transcript page 2' }).waitFor();
+    assert.deepEqual(await page.evaluate(() => window.reviewPageResets), [], 'Transcript paging must not reset the screen');
     await page.getByRole('button', { name: '← Back to decisions' }).click();
+    assert.equal(await page.evaluate(() => scrollY), 0, 'Back to decisions starts at the top');
+    assert(await page.getByRole('main').evaluate(el => el === document.activeElement));
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     assert.equal(await page.getByRole('button', { name: /^Keep original text Keep the original/ }).getAttribute('aria-pressed'), 'true');
     assert(await page.getByRole('button', { name: 'Review complete transcript →' }).isEnabled());
@@ -98,7 +111,37 @@ try {
     const violations = await page.evaluate(async () => (await window.axe.run('[data-presentation-root]')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, [], `${width}/${theme}: accessibility violations`);
     assert.deepEqual(errors, []);
-    results.push({ width, theme, overflow, completeJourney: true, manualChoicePreserved: true, categoryCompletionDoesNotScroll: width <= 700 ? true : null, violations });
+    results.push({ width, theme, overflow, completeJourney: true, manualChoicePreserved: true, finalCheckStartsAtTop: true, finalCheckFocus: true, paginationDoesNotReset: true, categoryCompletionDoesNotScroll: width <= 700 ? true : null, violations });
+    await page.close();
+  }
+  for (const reducedMotion of ['no-preference', 'reduce']) {
+    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion });
+    await page.goto(`${after}/iframe.html?id=product-mobile-review-navigation--suggestions&viewMode=story`);
+    await page.getByRole('heading', { name: 'AI suggestions' }).waitFor();
+    await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+    const next = page.getByRole('button', { name: 'Continue review: Chapter starts →' });
+    await next.scrollIntoViewIfNeeded();
+    await page.evaluate(() => {
+      window.reviewMotion = { calls: [], positions: [] };
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function(options) {
+        window.reviewMotion.calls.push(options);
+        return original.call(this, options);
+      };
+      addEventListener('scroll', () => window.reviewMotion.positions.push(scrollY));
+    });
+    await next.click();
+    await page.waitForFunction(() => {
+      const queue = document.querySelector('.review-queue');
+      const active = document.querySelector('.review-strip > button.active');
+      return active === document.activeElement && Math.abs(queue.getBoundingClientRect().top - 110) < 2;
+    });
+    const motion = await page.evaluate(() => window.reviewMotion);
+    if (reducedMotion === 'no-preference') await page.screenshot({ path: path.join(out, 'decision-queue-390.png'), animations: 'disabled' });
+    const behavior = reducedMotion === 'reduce' ? 'instant' : 'smooth';
+    assert.equal(motion.calls.at(-1).behavior, behavior);
+    if (reducedMotion === 'no-preference') assert(new Set(motion.positions).size > 2, 'Smooth navigation has intermediate scroll positions');
+    results.push({ width: 390, reducedMotion, reviewScrollBehavior: behavior, intermediatePositions: new Set(motion.positions).size });
     await page.close();
   }
   if (before) for (const width of [390, 1440]) for (const story of ['split-title', 'finished-category']) {
