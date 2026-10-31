@@ -12,7 +12,7 @@ M4B or MP3 audiobook. Voice production runs locally on Apple Silicon.
 
 **The Last Door** — a 38-second scene with a narrator, distinct character voices and a shared line.
 
-https://github.com/user-attachments/assets/e525cc6c-703a-4444-b664-9b6753a7c337
+https://github.com/user-attachments/assets/7375f0c2-0ff0-43a1-b231-1a0558330a48
 
 [Download the original WAV](docs/demo/meowdiobooks-demo.wav) · [Read the scene and see how it was made](docs/DEMO.md)
 
