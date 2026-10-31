@@ -1,0 +1,29 @@
+/* Public full-product entry. Keep these unlayered, in accepted-main order.
+   Consumers load this once before their own ordinary CSS overrides. */
+@import "./appearance.css";
+@import "../components/LanguagePicker.css";
+@import "../components/CastingChoice.css";
+@import "../components/CastIdentityReview.css";
+@import "../styles.css";
+@import "../media.css";
+@import "../components/dialog-surface.css";
+@import "./primitives.css";
+
+@import "./pages.css";
+@import "./cast-workbench.css";
+@import "./studio.css";
+@import "./workflow-sidebar.css";
+@import "./studio-empty-layout.css";
+@import "./review-extract-stage.css";
+@import "./generate-stage.css";
+@import "./export-stage.css";
+@import "./cast-stage.css";
+@import "./cast-roster.css";
+@import "./voice-create.css";
+@import "./atmosphere.css";
+@import "./roster-motion.css";
+@import "../components/book-return/book-return.css";
+
+[data-presentation-root] { color: var(--color-ink, var(--ink)); }
+/* Programmatic page-navigation focus is a reading position, not a control ring. */
+.workspace > main[tabindex="-1"]:focus { outline: none; }

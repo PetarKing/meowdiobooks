@@ -1,0 +1,547 @@
+{
+  "schema": "cleanup-review-regressions.v1",
+  "provenance": "Original synthetic examples written for this test suite; motivated by local evaluation failure categories, with no book excerpts.",
+  "cases": [
+    {
+      "id": "numbered-brand-footer",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "1\nA story begins.\nFernMTLs 1"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "2\nThe story continues.\nFernMTLs 2"
+        },
+        {
+          "id": "b3",
+          "page": 3,
+          "text": "2\nThe story continues.\nFernMTLs 3"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "numbered-edition-offset",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nNorth Lantern Editions 19"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\nNorth Lantern Editions 20"
+        },
+        {
+          "id": "b3",
+          "page": 3,
+          "text": "More story.\nNorth Lantern Editions 21"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "attached-brand-digits",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nFernMTLs1"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\nFernMTLs2"
+        },
+        {
+          "id": "b3",
+          "page": 3,
+          "text": "More story.\nFernMTLs3"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "publisher-inconsistent-offset",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nFernMTLs 19"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\nFernMTLs 27"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "single-publisher-line",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nFernMTLs 1"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "publisher-in-body",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nFernMTLs 1\nThe publisher was discussed."
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\nFernMTLs 2\nThe discussion continued."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "numbered-room-story",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "She entered.\nRoom 1"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "He entered.\nRoom 2"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "quoted-dialogue-repeat",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "“Please Come Home Tonight!”\nShe waited."
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "“Please Come Home Tonight!”\nHe waited."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "labelled-dialogue-repeat",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Guard: [----]\nShe waited."
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "Guard: [----]\nHe waited."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "story-list-heading-repeat",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "[First-year Students]\nAda"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "[First-year Students]\nBen"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "scene-separator-repeat",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\n※ ※ ※"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\n※ ※ ※"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "repeated-prose-at-page-top",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "The room was quiet.\nAda waited."
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "The room was quiet.\nBen waited."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "running-book-title",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "The Lantern Garden\nAda waited."
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "The Lantern Garden\nBen waited."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "repeated-matter",
+          "source": "The Lantern Garden"
+        },
+        {
+          "kind": "repeated-matter",
+          "source": "The Lantern Garden"
+        }
+      ]
+    },
+    {
+      "id": "credit-paragraph",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Machine Translated By:\nAda Reed\nBlueComet\n\nThe door opened."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "credit-stops-at-prose",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Proofread By:\nAda Reed\nShe opened the door."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "credit-stops-at-chapter",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Proofread By:\nAda Reed\nChapter 2\nThe Garden"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "credit-stops-at-scene",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Art Sources:\nBlueComet\n※ ※ ※\nAda waited."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "credit-multiple-headings",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Translated By:\nAda Reed\nProofread By:\nBen Stone"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "quoted-credit-is-story",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "“Translated By:\nAda Reed,” she read aloud."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "labelled-credit-is-dialogue",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Translated By:\nAda Reed"
+        }
+      ],
+      "expected": [],
+      "dialogue": true
+    },
+    {
+      "id": "prose-mentions-translation",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "The sign had been translated by a traveler."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "bare-numbered-story-schedule",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "1. Breakfast in the garden\n2. Meet the captain\n3. Return before sunset"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "bracket-footnote",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "[1] A historical garment."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "footnote",
+          "source": "[1] A historical garment."
+        }
+      ]
+    },
+    {
+      "id": "explicit-note-number",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Translation notes:\n1. A historical garment.\n2. A different spelling."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "footnote",
+          "source": "1. A historical garment."
+        },
+        {
+          "kind": "footnote",
+          "source": "2. A different spelling."
+        }
+      ]
+    },
+    {
+      "id": "split-word-review",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "She could un-\nderstand the message."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "hyphenation",
+          "source": "un-\nderstand"
+        }
+      ]
+    },
+    {
+      "id": "soft-hyphen-review",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "The frag­\nment was small."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "hyphenation",
+          "source": "frag­\nment"
+        }
+      ]
+    },
+    {
+      "id": "true-compound-remains-review-only",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "A well-\nknown traveler arrived."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "hyphenation",
+          "source": "well-\nknown"
+        }
+      ]
+    },
+    {
+      "id": "ordinary-compounds",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "A well-known traveler visited the second-year class."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "stutter-preserved",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "“I-I d-did not,” he said."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "interruption-preserved",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "“Do not--\nleave me!”"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "hyphen-blank-paragraph",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "He stopped mid-\n\nconversation."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "unicode-prose",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "她說：「別走！」\n彼女は首を振った。"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "ocr-replacement",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "The gate bore a � mark."
+        }
+      ],
+      "expected": [
+        {
+          "kind": "suspicious-extraction",
+          "source": "The gate bore a � mark."
+        }
+      ]
+    },
+    {
+      "id": "empty-page",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": ""
+        }
+      ],
+      "expected": [
+        {
+          "kind": "empty-page",
+          "source": ""
+        }
+      ]
+    },
+    {
+      "id": "credit-no-cross-block-guess",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Proofread By:\n"
+        },
+        {
+          "id": "b2",
+          "page": 1,
+          "text": "The Garden"
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "credit-stops-at-title",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Proofread By:\nRiver\nThe Long Journey\nIt began that day."
+        }
+      ],
+      "expected": []
+    },
+    {
+      "id": "press-is-prose",
+      "blocks": [
+        {
+          "id": "b1",
+          "page": 1,
+          "text": "Story.\nThe press12"
+        },
+        {
+          "id": "b2",
+          "page": 2,
+          "text": "More story.\nThe press13"
+        }
+      ],
+      "expected": []
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+[
+  {
+    "label": "Home · empty (0)",
+    "artHeight": 220,
+    "cards": 0,
+    "viewport": [
+      320,
+      740
+    ],
+    "width": 320
+  },
+  {
+    "label": "Home · few (2)",
+    "artHeight": 104,
+    "cards": 2,
+    "firstBook": 715.1875,
+    "viewport": [
+      320,
+      740
+    ],
+    "width": 320
+  },
+  {
+    "label": "Home · many (12)",
+    "artHeight": 104,
+    "cards": 12,
+    "firstBook": 715.1875,
+    "viewport": [
+      320,
+      740
+    ],
+    "width": 320
+  },
+  {
+    "label": "Home · empty (0)",
+    "artHeight": 226.1875,
+    "cards": 0,
+    "viewport": [
+      390,
+      844
+    ],
+    "width": 390
+  },
+  {
+    "label": "Home · few (2)",
+    "artHeight": 109.1875,
+    "cards": 2,
+    "firstBook": 724.25,
+    "viewport": [
+      390,
+      844
+    ],
+    "width": 390
+  },
+  {
+    "label": "Home · many (12)",
+    "artHeight": 109.1875,
+    "cards": 12,
+    "firstBook": 724.25,
+    "viewport": [
+      390,
+      844
+    ],
+    "width": 390
+  },
+  {
+    "label": "Home · empty (0)",
+    "artHeight": 340,
+    "cards": 0,
+    "viewport": [
+      750,
+      900
+    ],
+    "width": 750
+  },
+  {
+    "label": "Home · few (2)",
+    "artHeight": 150,
+    "cards": 2,
+    "firstBook": 744.015625,
+    "viewport": [
+      750,
+      900
+    ],
+    "width": 750
+  },
+  {
+    "label": "Home · many (12)",
+    "artHeight": 150,
+    "cards": 12,
+    "firstBook": 744.015625,
+    "viewport": [
+      750,
+      900
+    ],
+    "width": 750
+  }
+]

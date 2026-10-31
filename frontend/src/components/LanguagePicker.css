@@ -1,0 +1,9 @@
+.narration-language-picker { flex:0 0 220px; width:220px; max-width:100%; color:var(--color-ink, var(--ink)); }
+.narration-language-control { position:relative; }
+.narration-language-control select:not([multiple]) { display:block; width:100%; min-height:48px; padding:10px 38px 10px 49px; border:1px solid var(--color-border, var(--line)); border-radius:10px; background:var(--color-paper, var(--paper)); color:var(--color-ink, var(--ink)); cursor:pointer; appearance:none; -webkit-appearance:none; font:500 14px var(--font-sans, sans-serif); text-transform:capitalize; }
+.narration-language-control select:focus-visible { outline:2px solid var(--color-action, var(--poppy)); outline-offset:3px; }
+.narration-language-control select:disabled { cursor:default; opacity:.65; }
+.narration-language-flag { position:absolute; top:50%; left:16px; transform:translateY(-50%); font-size:21px; line-height:1; pointer-events:none; }
+.narration-language-chevron { position:absolute; top:50%; right:16px; transform:translateY(-50%); pointer-events:none; }
+.narration-language-unavailable { display:block; margin-top:8px; color:var(--color-muted, var(--muted)); font-size:12px; line-height:1.5; }
+@media (max-width:600px) { .narration-language-picker { flex-basis:auto; align-self:flex-start; } .narration-language-control select:not([multiple]) { font-size:16px; } }

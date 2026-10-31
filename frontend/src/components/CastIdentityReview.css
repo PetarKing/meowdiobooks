@@ -1,0 +1,82 @@
+.cast-drag-scroll-cue {
+  position: fixed;
+  z-index: 9;
+  left: 0;
+  right: 0;
+  display: grid;
+  height: 96px;
+  place-items: center;
+  pointer-events: none;
+}
+
+.cast-drag-scroll-cue.up {
+  top: 80px;
+  align-items: start;
+  padding-top: 14px;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--inverse-surface) 34.0%, transparent), transparent);
+}
+
+.cast-drag-scroll-cue.down {
+  bottom: 0;
+  align-items: end;
+  padding-bottom: 14px;
+  background: linear-gradient(to top, color-mix(in srgb, var(--inverse-surface) 34.0%, transparent), transparent);
+}
+
+.cast-drag-scroll-cue span {
+  padding: 7px 11px;
+  border: 1px solid color-mix(in srgb, var(--line) 62.0%, transparent);
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--inverse-surface) 86.0%, transparent);
+  color: var(--inverse-ink);
+  font-size: 13px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  box-shadow: 0 7px 20px rgb(var(--shadow-color) / 0.2);
+}
+
+.cast-merge-undo {
+  position: fixed;
+  z-index: 1200;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(420px, calc(100vw - 48px));
+  padding: 12px 13px 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--line) 20.0%, transparent);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--inverse-surface) 96.0%, transparent);
+  color: var(--inverse-ink);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 14px 38px rgb(var(--shadow-color) / 0.28);
+}
+
+.cast-merge-undo button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--line) 38.0%, transparent);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--paper) 12.0%, transparent);
+  color: var(--inverse-ink);
+  font-size: 13px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.cast-merge-undo button:hover {
+  background: color-mix(in srgb, var(--paper) 22.0%, transparent);
+}
+
+@media (max-width: 600px) {
+  .cast-drag-scroll-cue.up { top: 66px; }
+  .cast-drag-scroll-cue.down { bottom: 68px; }
+  .cast-merge-undo { right: 14px; bottom: 84px; max-width: calc(100vw - 28px); }
+}
+
+/* Match provenance uses the same plain treatment as review suggestions. */
+.previous-book-badge { display: inline-flex; align-items: baseline; gap: 4px; color: inherit; font: inherit; }
+.previous-book-badge::before { content: "↶"; }

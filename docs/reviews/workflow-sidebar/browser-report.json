@@ -1,0 +1,126 @@
+{
+  "synthetic": true,
+  "url": "http://127.0.0.1:6017",
+  "results": [
+    {
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "heart": false,
+      "phoneProgressPreserved": true,
+      "keyboardCollapse": false,
+      "navigationPreserved": true,
+      "inactiveDraftCue": false,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "heart": false,
+      "phoneProgressPreserved": true,
+      "keyboardCollapse": false,
+      "navigationPreserved": true,
+      "inactiveDraftCue": false,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "theme": "light",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "height": 1024,
+      "theme": "dark",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 834,
+      "height": 1112,
+      "theme": "light",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 834,
+      "height": 1112,
+      "theme": "dark",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 820,
+      "theme": "light",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 820,
+      "theme": "dark",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 560,
+      "theme": "light",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "height": 560,
+      "theme": "dark",
+      "heart": true,
+      "phoneProgressPreserved": false,
+      "keyboardCollapse": true,
+      "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
+      "violations": []
+    }
+  ]
+}

@@ -1,0 +1,98 @@
+schema_version = 1
+
+[defaults]
+text = "qwen-3.5-9b-q4"
+voice = "qwen-voice-design-1.7b"
+transcription = "qwen3-asr-0.6b-4bit"
+
+[voice_candidates]
+# Generate one additional take for the smallest high-volume subset that covers 80% of lines.
+enabled = true
+coverage_fraction = 0.8
+min_voices = 2
+max_voices = 4
+extra_candidates = 1
+
+[dialogue_attribution]
+default_route = "local"
+large_review_threshold = 100
+local_policy = "selective-exact-consensus"
+remote_profile = "luna-dialogue"
+
+[text_models."qwen-3.5-9b-q4"]
+label = "Qwen3.5 9B Q4_K_M"
+display_name = "Qwen"
+engine = "llama_cpp"
+runtime_path = ".local/llama.cpp/b9637/llama-server"
+model_path = ".local/models/qwen35-9b/Qwen_Qwen3.5-9B-Q4_K_M.gguf"
+context_size = 32768
+gpu_layers = 99
+source = "bartowski/Qwen_Qwen3.5-9B-GGUF"
+revision = "e3abf1f4e3c6cf7c24bf1dd17ec327cd66ba4e76"
+
+[text_models."qwen-3.5-9b-q4".dialogue_benchmark]
+sample_size = 233
+false_character_rate = 0.093
+speaker_recall = 0.205
+policy = "selective-exact-consensus"
+
+[remote_text_models."luna-dialogue"]
+display_name = "Luna"
+engine = "openai_responses"
+base_url = "https://api.openai.com/v1"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-6-luna"
+pricing_version = "openai-gpt-6-luna-fast-2026-10-07"
+reasoning_effort = "low"
+service_tier = "fast"
+policy = "dual-pass-with-tools-v1"
+# Fast USD per 1,000,000 provider-reported tokens; see docs/REMOTE-PRICING.md.
+input_usd_per_million_tokens = 0.2
+cached_input_usd_per_million_tokens = 0.02
+cache_write_input_usd_per_million_tokens = 0.25
+output_usd_per_million_tokens = 1.0
+# Responses can fall back to default processing, which costs half the Fast rates.
+default_service_tier_price_multiplier = 0.5
+long_context_input_token_threshold = 272000
+long_context_input_usd_per_million_tokens = 0.4
+long_context_cached_input_usd_per_million_tokens = 0.04
+long_context_cache_write_input_usd_per_million_tokens = 0.5
+long_context_output_usd_per_million_tokens = 1.5
+# Ordered Dialogue targets sent together inside one bounded eight-page scene.
+max_targets_per_batch = 8
+# Independent scene passes and selective adjudication share this worker ceiling.
+max_concurrent_batches = 8
+# Historical workload repriced at Luna 6 Fast: $1.61256046 / 1,903 targets, rounded up.
+# This is a planning estimate, not a newly measured Luna 6 workload or quality result.
+estimated_usd_per_target = 0.00085
+
+[voice_pipelines."qwen-voice-design-1.7b"]
+label = "Qwen3-TTS 1.7B VoiceDesign"
+engine = "mlx_audio"
+# Bump whenever the complete audition recipe changes while this selectable model ID remains stable.
+recipe_version = "2"
+audition_path = "models/qwen_1_7b_voice_design"
+renderer_path = "models/qwen_1_7b_base_8bit"
+audition_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16"
+audition_revision = "7d3824abff87e49756bb0f83fb5411de75d160c4"
+renderer_source = "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit"
+renderer_revision = "e7dd0585652209fa0d7783659aad4e8a324de11c"
+languages = [
+  "chinese",
+  "english",
+  "french",
+  "german",
+  "italian",
+  "japanese",
+  "korean",
+  "portuguese",
+  "russian",
+  "spanish",
+]
+
+[speech_models."qwen3-asr-0.6b-4bit"]
+label = "Qwen3-ASR 0.6B 4-bit"
+engine = "mlx_audio"
+model_path = "models/qwen3_asr_0_6b_4bit"
+source = "mlx-community/Qwen3-ASR-0.6B-4bit"
+revision = "313d850181767edf09f00a9c289becca70e58cd0"

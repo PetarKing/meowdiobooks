@@ -1,0 +1,701 @@
+{
+  "date": "2026-10-25",
+  "hardware": {
+    "chip": "Apple M5 Ultra",
+    "unifiedMemoryGiB": 96
+  },
+  "scope": "Short English local TTS screen; one listener; no universal quality ranking",
+  "pins": {
+    "qwen-bf16": {
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-bf16",
+      "revision": "a6eb4f68e4b056f1215157bb696209bc82a6db48"
+    },
+    "qwen-8bit": {
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit",
+      "revision": "e7dd0585652209fa0d7783659aad4e8a324de11c"
+    },
+    "cosy-8bit": {
+      "repository": "mlx-community/Fun-CosyVoice3-0.5B-2512-8bit",
+      "revision": "177baf277ac75e04e810f7db7f0d9c0ce5a17854"
+    },
+    "maya-bf16": {
+      "repository": "0xhb/maya1-mlx-bf16",
+      "revision": "dccd3ac6921708e639f6273fd4f3559ef15675e1"
+    },
+    "step-8bit": {
+      "repository": "appautomaton/step-audio-editx-8bit-mlx",
+      "revision": "37b7ba38fefe1d9bb545d1476e1c12e3eeb7930b"
+    },
+    "ming-bf16": {
+      "repository": "mlx-community/Ming-3.0-tts-0.5B-bf16",
+      "revision": "283b3c342c6fb69a7a87832c97f9799567efe05d"
+    },
+    "qwen-4bit": {
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-Base-4bit",
+      "revision": "37e955a1deb861c088ae5f3a67043185f3d1a60c"
+    },
+    "ming-tiny-8bit": {
+      "repository": "mlx-community/Ming-3.0-tts-tiny-8bit",
+      "revision": "6756d449f6aaba26a29a025e46b26d1d5a025140"
+    }
+  },
+  "initial": {
+    "clips": [
+      {
+        "id": "qwen-4bit-lighthouse-t1",
+        "model": "qwen-4bit",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 11.36,
+        "generationSeconds": 9.383397833036724,
+        "peakGpuGiB": 7.649891563691199,
+        "sha256": "e31644cf0e9fd8e48ac3889607e8ea47b32034aa3c61c398ea0f6e907fbed039"
+      },
+      {
+        "id": "qwen-4bit-lighthouse-t2",
+        "model": "qwen-4bit",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 11.12,
+        "generationSeconds": 8.063592999998946,
+        "peakGpuGiB": 7.692890950478613,
+        "sha256": "3c9e922a76b6544bd73eb57e35d64f86d2f4c9dfcfa0613c550ab1635f604672"
+      },
+      {
+        "id": "qwen-4bit-ship-t1",
+        "model": "qwen-4bit",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 12.56,
+        "generationSeconds": 8.977066833002027,
+        "peakGpuGiB": 7.950891088694334,
+        "sha256": "23f98785534f86c8c69f8a3c091cdbdfdaada86709b6ff5aa47983c85e3d2472"
+      },
+      {
+        "id": "qwen-4bit-coast-t1",
+        "model": "qwen-4bit",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 23.84,
+        "generationSeconds": 18.014390541007742,
+        "peakGpuGiB": 7.950891088694334,
+        "sha256": "e5058cc1e81e0aa4f3dccc2027822f53a8b5ea48e711478f8412d56c0960439a"
+      },
+      {
+        "id": "qwen-8bit-lighthouse-t1",
+        "model": "qwen-8bit",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 10.96,
+        "generationSeconds": 9.689036624971777,
+        "peakGpuGiB": 8.472706803120673,
+        "sha256": "1eedaa241d182589552100daf546bf6ceb8bd09abace32015b43a1c2cde4a114"
+      },
+      {
+        "id": "qwen-8bit-lighthouse-t2",
+        "model": "qwen-8bit",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 11.12,
+        "generationSeconds": 8.669060458021704,
+        "peakGpuGiB": 8.472706803120673,
+        "sha256": "dfaed2dd8a08a2f21f7cb6b38c63a8bb7c890c54670c630b7b1db018d0789900"
+      },
+      {
+        "id": "qwen-8bit-ship-t1",
+        "model": "qwen-8bit",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 12.56,
+        "generationSeconds": 9.629944040963892,
+        "peakGpuGiB": 8.580220528878272,
+        "sha256": "8dd024bab16df30c92c9b45a90186f83219d4cee4a41237712cb091b6180a417"
+      },
+      {
+        "id": "qwen-8bit-coast-t1",
+        "model": "qwen-8bit",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 22.24,
+        "generationSeconds": 18.089348250010516,
+        "peakGpuGiB": 8.580220528878272,
+        "sha256": "6a32791da29f4f413cd1c950fde72b630b4dd089546f33d6b4126c1f953c7c3b"
+      },
+      {
+        "id": "qwen-bf16-lighthouse-t1",
+        "model": "qwen-bf16",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 11.04,
+        "generationSeconds": 19.549875999975484,
+        "peakGpuGiB": 9.64195538777858,
+        "sha256": "1cd009bbe214ec2f4841f2304a00b8d866f3536e37e0b65f21a81b1f4a2f4e5b"
+      },
+      {
+        "id": "qwen-bf16-lighthouse-t2",
+        "model": "qwen-bf16",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 11.84,
+        "generationSeconds": 23.27490466699237,
+        "peakGpuGiB": 9.878443968482316,
+        "sha256": "4adee050648a47af9fec508bf43d23804fd94aabca87ce820e78a7b58cf35384"
+      },
+      {
+        "id": "qwen-bf16-ship-t1",
+        "model": "qwen-bf16",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 11.44,
+        "generationSeconds": 14.525835125008598,
+        "peakGpuGiB": 9.878443968482316,
+        "sha256": "6d8814be615612b23d650eb59df49ef66cd3843f81d4a2243ed0046d652308c5"
+      },
+      {
+        "id": "qwen-bf16-coast-t1",
+        "model": "qwen-bf16",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 22.88,
+        "generationSeconds": 24.475542542000767,
+        "peakGpuGiB": 9.878443968482316,
+        "sha256": "a73c6f131aec66477cc81fbe16ac6294705851a67b51ba551a68392d4077c70f"
+      },
+      {
+        "id": "cosy-8bit-lighthouse-t1",
+        "model": "cosy-8bit",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 14.64,
+        "generationSeconds": 36.62979400000768,
+        "peakGpuGiB": 4.039489938877523,
+        "sha256": "75854ab8ceab56b4dc48852c8716df7f38b8c80ed0b7c49a281c3938c9651fd3"
+      },
+      {
+        "id": "cosy-8bit-lighthouse-t2",
+        "model": "cosy-8bit",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 13.96,
+        "generationSeconds": 1.717487457965035,
+        "peakGpuGiB": 4.136032464914024,
+        "sha256": "5ae26a454365b0f82135109084a7febe6dcc3d2853a8b6a267363f509b4ba52c"
+      },
+      {
+        "id": "cosy-8bit-ship-t1",
+        "model": "cosy-8bit",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 19.72,
+        "generationSeconds": 2.203539207985159,
+        "peakGpuGiB": 4.250503838993609,
+        "sha256": "7b6f295b0611601f8be0cc0dc16e6c7e01fc3896cceb9563259b65b2b4a00d11"
+      },
+      {
+        "id": "cosy-8bit-coast-t1",
+        "model": "cosy-8bit",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 25.52,
+        "generationSeconds": 2.77327762497589,
+        "peakGpuGiB": 4.250503838993609,
+        "sha256": "4a3479813fe356616ee1c5a68bf5c93fa4c9abd37ae0491d472d1afbd160914d"
+      },
+      {
+        "id": "maya-bf16-lighthouse-t1",
+        "model": "maya-bf16",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 14.762666666666666,
+        "generationSeconds": 11.478670625016093,
+        "peakGpuGiB": 6.387286560609937,
+        "sha256": "412951560cf775f9e679de7bc1ec41864555627970052f99ef98c11c5ed6929b"
+      },
+      {
+        "id": "maya-bf16-lighthouse-t2",
+        "model": "maya-bf16",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 10.24,
+        "generationSeconds": 6.967906625010073,
+        "peakGpuGiB": 6.387286560609937,
+        "sha256": "37550fc876f149293ff50fcfa3da2d0f68afcfb60e29fa7eac7ceba0b82d5205"
+      },
+      {
+        "id": "maya-bf16-ship-t1",
+        "model": "maya-bf16",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 14.250666666666667,
+        "generationSeconds": 9.683185500034597,
+        "peakGpuGiB": 6.387286560609937,
+        "sha256": "04a5f1d9cb4faaea9d18672419daa5b36c5ca60120083aa861604e9525254cd1"
+      },
+      {
+        "id": "maya-bf16-coast-t1",
+        "model": "maya-bf16",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 31.190666666666665,
+        "generationSeconds": 21.5577930000145,
+        "peakGpuGiB": 6.413792913779616,
+        "sha256": "7645ba0c84c8cf7e3de00120d307c1a0e1cdfb6e021b690f32927fd97190b368"
+      },
+      {
+        "id": "ming-bf16-lighthouse-t1",
+        "model": "ming-bf16",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 11.2,
+        "generationSeconds": 13.674834790988825,
+        "peakGpuGiB": 4.093913812190294,
+        "sha256": "649b0cd31cc974789e1ae173eef584cee6b31b31755719cca1cee0263e9c6f38"
+      },
+      {
+        "id": "ming-bf16-lighthouse-t2",
+        "model": "ming-bf16",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 18.56,
+        "generationSeconds": 12.045001958031207,
+        "peakGpuGiB": 4.2001733481884,
+        "sha256": "ef80722d93bb2e0a1a39382eb40a230add5f5bccde53a1fe354f52ccbadc67e5"
+      },
+      {
+        "id": "ming-bf16-ship-t1",
+        "model": "ming-bf16",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 11.68,
+        "generationSeconds": 7.583504708018154,
+        "peakGpuGiB": 4.2001733481884,
+        "sha256": "cbf927858b72f490434fec1dae36e4601341024c49b5bfacc32dc0575b87b13f"
+      },
+      {
+        "id": "ming-bf16-coast-t1",
+        "model": "ming-bf16",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 18.08,
+        "generationSeconds": 11.759516749996692,
+        "peakGpuGiB": 4.2001733481884,
+        "sha256": "1dd583e4e5f32d11c9a96e1292c7db06f29cfb3b7ca74b2cf54e752374dc59e0"
+      },
+      {
+        "id": "ming-tiny-8bit-lighthouse-t1",
+        "model": "ming-tiny-8bit",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 9.68,
+        "generationSeconds": 9.626496957964264,
+        "peakGpuGiB": 11.168766718357801,
+        "sha256": "59603f4f10892295f2d48f54b594d9c8632ec2292d98081c5a864ffd85a1373a"
+      },
+      {
+        "id": "ming-tiny-8bit-lighthouse-t2",
+        "model": "ming-tiny-8bit",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 8.8,
+        "generationSeconds": 6.613624625024386,
+        "peakGpuGiB": 11.200199130922556,
+        "sha256": "b5e1e348002c33cac8f21f42754a86e25efb5f666769cc5388ae41913bb0b22a"
+      },
+      {
+        "id": "ming-tiny-8bit-ship-t1",
+        "model": "ming-tiny-8bit",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 9.28,
+        "generationSeconds": 6.924448833975475,
+        "peakGpuGiB": 11.200199130922556,
+        "sha256": "526e3719ac2b5478d4411d2c8e64b80f3b07975bb66ad17abb04045b4c7ecc2e"
+      },
+      {
+        "id": "ming-tiny-8bit-coast-t1",
+        "model": "ming-tiny-8bit",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 19.12,
+        "generationSeconds": 14.131071917014197,
+        "peakGpuGiB": 11.437749771401286,
+        "sha256": "841ee3cdf7a4a1dfcab07b5dd3b17517264ef5b644b9b042b141d5d2a5f62e4e"
+      },
+      {
+        "id": "step-8bit-lighthouse-t1",
+        "model": "step-8bit",
+        "passage": "lighthouse",
+        "take": 1,
+        "seconds": 9.84,
+        "generationSeconds": 12.491847458994016,
+        "peakGpuGiB": 5.732919042930007,
+        "sha256": "601e7dd6ae668a8ab0272ceb99198ae2999fcdf9003476dfbdd986d388fb30cf"
+      },
+      {
+        "id": "step-8bit-lighthouse-t2",
+        "model": "step-8bit",
+        "passage": "lighthouse",
+        "take": 2,
+        "seconds": 12.0,
+        "generationSeconds": 7.611713582999073,
+        "peakGpuGiB": 6.028136967681348,
+        "sha256": "748c0f86994556287fea48f6c54184a84817d90e6bb5a16355328d4bc764f0c9"
+      },
+      {
+        "id": "step-8bit-ship-t1",
+        "model": "step-8bit",
+        "passage": "ship",
+        "take": 1,
+        "seconds": 13.08,
+        "generationSeconds": 5.885602416994516,
+        "peakGpuGiB": 6.063642391934991,
+        "sha256": "947f5ad992373015d1740fb7dd4e3c72ce16cdd995d5e12dd37427f53201a053"
+      },
+      {
+        "id": "step-8bit-coast-t1",
+        "model": "step-8bit",
+        "passage": "coast",
+        "take": 1,
+        "seconds": 25.8,
+        "generationSeconds": 12.165848458011169,
+        "peakGpuGiB": 6.147156063467264,
+        "sha256": "541e6f2fa06557c6738e39e73e771f5733f09c0d83e63a0236ffe40afb35fc45"
+      }
+    ],
+    "ratings": [
+      {
+        "sample": "qwen-4bit-lighthouse-t1",
+        "score": 3
+      },
+      {
+        "sample": "qwen-4bit-ship-t1",
+        "score": 3
+      },
+      {
+        "sample": "qwen-4bit-coast-t1",
+        "score": 4
+      },
+      {
+        "sample": "qwen-8bit-lighthouse-t1",
+        "score": 2
+      },
+      {
+        "sample": "qwen-8bit-ship-t1",
+        "score": 3
+      },
+      {
+        "sample": "qwen-8bit-coast-t1",
+        "score": 3
+      },
+      {
+        "sample": "qwen-bf16-lighthouse-t1",
+        "score": 3
+      },
+      {
+        "sample": "qwen-bf16-ship-t1",
+        "score": null
+      },
+      {
+        "sample": "qwen-bf16-coast-t1",
+        "score": null
+      },
+      {
+        "sample": "cosy-8bit-lighthouse-t1",
+        "score": 4
+      },
+      {
+        "sample": "cosy-8bit-ship-t1",
+        "score": 4
+      },
+      {
+        "sample": "cosy-8bit-coast-t1",
+        "score": 2
+      },
+      {
+        "sample": "maya-bf16-lighthouse-t1",
+        "score": 5
+      },
+      {
+        "sample": "maya-bf16-ship-t1",
+        "score": 4
+      },
+      {
+        "sample": "maya-bf16-coast-t1",
+        "score": 3
+      },
+      {
+        "sample": "ming-bf16-lighthouse-t1",
+        "score": null
+      },
+      {
+        "sample": "ming-bf16-ship-t1",
+        "score": 3
+      },
+      {
+        "sample": "ming-bf16-coast-t1",
+        "score": 2
+      },
+      {
+        "sample": "ming-tiny-8bit-lighthouse-t1",
+        "score": 2
+      },
+      {
+        "sample": "ming-tiny-8bit-ship-t1",
+        "score": 2
+      },
+      {
+        "sample": "ming-tiny-8bit-coast-t1",
+        "score": 2
+      },
+      {
+        "sample": "step-8bit-lighthouse-t1",
+        "score": 5
+      },
+      {
+        "sample": "step-8bit-ship-t1",
+        "score": 4
+      },
+      {
+        "sample": "step-8bit-coast-t1",
+        "score": 3
+      }
+    ]
+  },
+  "followup": {
+    "clips": [
+      {
+        "id": "qwen-4bit-clara-station-t1",
+        "model": "qwen-4bit",
+        "passage": "clara-station",
+        "take": 1,
+        "seconds": 13.84,
+        "generationSeconds": 11.783094624988735,
+        "peakGpuGiB": 7.866297535598278,
+        "sha256": "eb483526ab430fcd4a293f3b74170f59e5dbb522942a02d6a5f6eb0c2553a724"
+      },
+      {
+        "id": "qwen-4bit-clara-key-t1",
+        "model": "qwen-4bit",
+        "passage": "clara-key",
+        "take": 1,
+        "seconds": 13.52,
+        "generationSeconds": 11.87734270899091,
+        "peakGpuGiB": 7.866297535598278,
+        "sha256": "2e30cf0d25082a6dee9f925adee93feccedf5285a707f303da0cf930d78cae20"
+      },
+      {
+        "id": "qwen-4bit-arthur-station-t1",
+        "model": "qwen-4bit",
+        "passage": "arthur-station",
+        "take": 1,
+        "seconds": 13.92,
+        "generationSeconds": 11.246829792042263,
+        "peakGpuGiB": 8.038462558761239,
+        "sha256": "5cfc52981a6844228d3689b2f2e6b872e1294d5df62f51d950e4b0f9b81cc57a"
+      },
+      {
+        "id": "qwen-4bit-arthur-key-t1",
+        "model": "qwen-4bit",
+        "passage": "arthur-key",
+        "take": 1,
+        "seconds": 15.04,
+        "generationSeconds": 13.201053666998632,
+        "peakGpuGiB": 8.038462558761239,
+        "sha256": "1021682afb7a776b2d468355d57d126438f6318d35076a59fa24213f3c89a2db"
+      },
+      {
+        "id": "qwen-8bit-clara-station-t1",
+        "model": "qwen-8bit",
+        "passage": "clara-station",
+        "take": 1,
+        "seconds": 13.84,
+        "generationSeconds": 12.722156292002182,
+        "peakGpuGiB": 8.517145683988929,
+        "sha256": "91411e4c0acd27ab8f5e5fae45190b73d6c7c70f5ee3f8adaf844654e6f86ff7"
+      },
+      {
+        "id": "qwen-8bit-clara-key-t1",
+        "model": "qwen-8bit",
+        "passage": "clara-key",
+        "take": 1,
+        "seconds": 12.0,
+        "generationSeconds": 11.597481375036296,
+        "peakGpuGiB": 8.517145683988929,
+        "sha256": "eed5605da8b8bfc2e8987e1ea12f510bd5d42048390257485a7797ecbad7e75f"
+      },
+      {
+        "id": "qwen-8bit-arthur-station-t1",
+        "model": "qwen-8bit",
+        "passage": "arthur-station",
+        "take": 1,
+        "seconds": 13.28,
+        "generationSeconds": 11.759851875016466,
+        "peakGpuGiB": 8.66781100537628,
+        "sha256": "85cb40b3d075520d70f9da59fad13b14afb93c0586e246f7f276055ab69454cf"
+      },
+      {
+        "id": "qwen-8bit-arthur-key-t1",
+        "model": "qwen-8bit",
+        "passage": "arthur-key",
+        "take": 1,
+        "seconds": 12.88,
+        "generationSeconds": 12.393434792000335,
+        "peakGpuGiB": 8.66781100537628,
+        "sha256": "732c65745032fc1272042b4391e0bc92aa5b58117226e319ade90d367e28d042"
+      },
+      {
+        "id": "qwen-bf16-clara-station-t1",
+        "model": "qwen-bf16",
+        "passage": "clara-station",
+        "take": 1,
+        "seconds": 13.44,
+        "generationSeconds": 25.943542541994248,
+        "peakGpuGiB": 9.83687533531338,
+        "sha256": "b2345f3bc5a9199353fb79d8346b2afe2788a2f8ea764e71185f646429b719f1"
+      },
+      {
+        "id": "qwen-bf16-clara-key-t1",
+        "model": "qwen-bf16",
+        "passage": "clara-key",
+        "take": 1,
+        "seconds": 11.76,
+        "generationSeconds": 22.40036308398703,
+        "peakGpuGiB": 9.83687533531338,
+        "sha256": "3bf5587b952d644248a1a5ad70481d675fa18fbadb7536b6c673b510c6853496"
+      },
+      {
+        "id": "qwen-bf16-arthur-station-t1",
+        "model": "qwen-bf16",
+        "passage": "arthur-station",
+        "take": 1,
+        "seconds": 13.28,
+        "generationSeconds": 23.366770833032206,
+        "peakGpuGiB": 10.073506091721356,
+        "sha256": "1c6dd6fbbf0a65732cb8c269a85127af617e3dd419d32897203fbc031605e4c9"
+      },
+      {
+        "id": "qwen-bf16-arthur-key-t1",
+        "model": "qwen-bf16",
+        "passage": "arthur-key",
+        "take": 1,
+        "seconds": 13.36,
+        "generationSeconds": 24.889419417013414,
+        "peakGpuGiB": 10.073506091721356,
+        "sha256": "7d125252364d13cb44db5798658951f2a8365fee092e65e6ec186ba7452a06c7"
+      }
+    ],
+    "ratings": [
+      {
+        "sample": "qwen-4bit-clara-station-t1",
+        "delivery": 3,
+        "fidelity": 3
+      },
+      {
+        "sample": "qwen-4bit-clara-key-t1",
+        "delivery": 3,
+        "fidelity": 3
+      },
+      {
+        "sample": "qwen-4bit-arthur-station-t1",
+        "delivery": 4,
+        "fidelity": 4
+      },
+      {
+        "sample": "qwen-4bit-arthur-key-t1",
+        "delivery": 4,
+        "fidelity": 2
+      },
+      {
+        "sample": "qwen-8bit-clara-station-t1",
+        "delivery": 4,
+        "fidelity": 4
+      },
+      {
+        "sample": "qwen-8bit-clara-key-t1",
+        "delivery": 4,
+        "fidelity": 4
+      },
+      {
+        "sample": "qwen-8bit-arthur-station-t1",
+        "delivery": 4,
+        "fidelity": 4
+      },
+      {
+        "sample": "qwen-8bit-arthur-key-t1",
+        "delivery": 3,
+        "fidelity": 3
+      },
+      {
+        "sample": "qwen-bf16-clara-station-t1",
+        "delivery": 4,
+        "fidelity": 3
+      },
+      {
+        "sample": "qwen-bf16-clara-key-t1",
+        "delivery": 3,
+        "fidelity": 4
+      },
+      {
+        "sample": "qwen-bf16-arthur-station-t1",
+        "delivery": 3,
+        "fidelity": 3
+      },
+      {
+        "sample": "qwen-bf16-arthur-key-t1",
+        "delivery": 4,
+        "fidelity": 4
+      }
+    ],
+    "voices": {
+      "clara": {
+        "description": "A woman in her early thirties with a clear, bright mid-pitched voice and a neutral American accent. Calm confidence, natural conversational rhythm, precise consonants and understated warmth. A single speaker recorded close to the microphone in a dry studio, without echo, reverberation, doubling, music or background sound.",
+        "seed": 2401,
+        "transcript": "The garden gate stood open when I arrived. Someone had left a blue umbrella beside the steps, although the morning was bright and clear. I rang the bell, waited a moment, and heard a familiar voice from inside.",
+        "referenceSha256": "de09532a6a1012765298369d389615a5210257185ca9cd0729016a5b212c741b"
+      },
+      "arthur": {
+        "description": "A man in his late sixties with a low, gently textured baritone and a light northern English accent. Thoughtful, grounded and quietly expressive, with natural conversational pacing and clear diction. A single speaker recorded close to the microphone in a dry studio, without echo, reverberation, doubling, music or background sound.",
+        "seed": 2402,
+        "transcript": "The garden gate stood open when I arrived. Someone had left a blue umbrella beside the steps, although the morning was bright and clear. I rang the bell, waited a moment, and heard a familiar voice from inside.",
+        "referenceSha256": "14e9ddde3c09b09af236fe3b92f1191ea5901b19367146e19e13bd689f0600df"
+      }
+    },
+    "passages": [
+      {
+        "id": "clara-station",
+        "voice": "clara",
+        "text": "The station clock had stopped at quarter past six. Nora checked her ticket, then looked along the empty platform. Beyond the tracks, a kitchen window glowed above the bakery, and someone was carefully watering the flowers."
+      },
+      {
+        "id": "clara-key",
+        "voice": "clara",
+        "text": "\"You kept the key?\" Daniel asked. \"Of course,\" she said. \"I thought you might come back.\" He tried to answer, but the words would not settle. For a moment, the quiet room felt larger than the whole city."
+      },
+      {
+        "id": "arthur-station",
+        "voice": "arthur",
+        "text": "The station clock had stopped at quarter past six. Nora checked her ticket, then looked along the empty platform. Beyond the tracks, a kitchen window glowed above the bakery, and someone was carefully watering the flowers."
+      },
+      {
+        "id": "arthur-key",
+        "voice": "arthur",
+        "text": "\"You kept the key?\" Daniel asked. \"Of course,\" she said. \"I thought you might come back.\" He tried to answer, but the words would not settle. For a moment, the quiet room felt larger than the whole city."
+      }
+    ],
+    "designer": {
+      "repository": "mlx-community/Qwen3-TTS-12Hz-1.7B-VoiceDesign-bf16",
+      "revision": "7d3824abff87e49756bb0f83fb5411de75d160c4"
+    },
+    "seed": 1031,
+    "settings": {
+      "temperature": 0.9,
+      "top_k": 50,
+      "top_p": 1,
+      "repetition_penalty": 1.05,
+      "kvCache": "native unquantized",
+      "chunking": "sentence boundaries"
+    },
+    "loudnessTargetLUFS": -23
+  },
+  "artifactNote": "Audio and private operator tooling are not redistributed in this public record; hashes identify measured files but do not make the original recordings publicly retrievable."
+}

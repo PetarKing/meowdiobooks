@@ -1,0 +1,10 @@
+.preview-controls { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 24px; padding:12px 24px; border-bottom:1px solid #bfc5bf; background:#202b2b; color:#eeeade; font:12px/1.4 var(--font-sans); }
+.preview-controls a { color:#eeeade; text-decoration:none; }.preview-controls label { display:flex; align-items:center; gap:12px; }.preview-controls select { width:240px; padding:7px 10px; background:#34413e; border:1px solid #63796c; border-radius:6px; color:#fff; }.preview-controls > span { color:#bdccc2; }.preview-error { padding:20px; white-space:pre-wrap; }
+@media(max-width:650px) { .preview-controls { padding:12px 16px; }.preview-controls label { flex:1; }.preview-controls select { width:100%; }.preview-controls > span { font-size:10px; } }
+.preview-controls { position: relative; z-index: 20; }
+#root:has(> .preview-controls) { min-height: 100dvh; display: flex; flex-direction: column; }
+.preview-product { --studio-preview-height: 61px; flex: 1; display: flex; flex-direction: column; }
+.preview-product > .app-shell { min-height: 0; flex: 1; }
+
+.preview-controls { min-height: 61px; box-sizing: border-box; }
+@media(max-width:650px) { .preview-controls > span { display: none; } }

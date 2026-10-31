@@ -1,0 +1,8 @@
+.agent-guide-footer { padding: 20px; text-align: center; background: var(--canvas); }
+.agent-guide-footer a { display: inline-flex; min-height: 44px; align-items: center; color: var(--muted); font-size: 12px; text-underline-offset: .25em; }
+
+/* A single full-height product shell keeps the footer stable across all page states. */
+.local-studio { min-height: 100dvh; display: flex; flex-direction: column; }
+.local-studio > .app-shell { min-height: 0; flex: 1; }
+:is(.local-studio,.preview-product) > .agent-guide-footer { padding: 6px 20px; }
+html:has(.local-studio, .preview-controls) { scrollbar-gutter: stable; }

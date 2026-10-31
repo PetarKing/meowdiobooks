@@ -1,0 +1,60 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { WorkflowScenario } from "./workflowScenario";
+import { enterScenario } from "./enterScenario";
+import { baselineContrastExceptions } from "./baselineContrastExceptions";
+import type { ScenarioId } from "../design-kit/fixtures";
+const meta = { id: "product-accepted-baseline", title: "Product/Studio", component: WorkflowScenario } satisfies Meta<typeof WorkflowScenario>;
+export default meta;
+type Story = StoryObj<typeof meta>;
+function scenario(id: ScenarioId): Story {
+  // Historical exceptions are only for immutable extraction-parity comparisons.
+  const known = new URLSearchParams(window.location.search).has("legacyMedia") ? baselineContrastExceptions[id] ?? [] : [];
+  return { parameters: { a11y: { config: { rules: [{ id: "color-contrast", selector: known.length ? `*:not(${known.join(",")})` : "*" }] } } }, args: { scenario: id }, play: async ({ canvasElement }) => { await enterScenario(canvasElement, id); canvasElement.dataset.scenarioReady = id; } };
+}
+export const Home: Story = scenario("home");
+export const Import: Story = scenario("import");
+export const HomeError: Story = scenario("home-error");
+export const DeleteDialog: Story = scenario("delete-dialog");
+export const Library: Story = scenario("library");
+export const LibraryEmpty: Story = scenario("library-empty");
+export const LibraryLoading: Story = scenario("library-loading");
+export const LibraryError: Story = scenario("library-error");
+export const Extract: Story = scenario("extract");
+export const ExtractAccepted: Story = scenario("extract-accepted");
+export const Dialogue: Story = scenario("dialogue");
+export const DialogueConflicts: Story = scenario("dialogue-conflicts");
+export const DialogueResults: Story = scenario("dialogue-results");
+export const DialogueAccepted: Story = scenario("dialogue-accepted");
+export const Review: Story = scenario("review");
+export const ReviewIntro: Story = scenario("review-intro");
+export const ReviewBoundaries: Story = scenario("review-boundaries");
+export const ReviewFinal: Story = scenario("review-final");
+export const ReviewAccepted: Story = scenario("review-accepted");
+export const CastIdentities: Story = scenario("cast-identities");
+export const CastReuseReview: Story = scenario("cast-reuse-review");
+export const CastReviewStates: Story = scenario("cast-review-states");
+export const CastDense: Story = scenario("cast-dense");
+export const CastVoices: Story = scenario("cast-voices");
+export const CastVoiceReviewStates: Story = scenario("cast-voice-review-states");
+export const CastVoicesDense: Story = scenario("cast-voices-dense");
+export const CastInspector: Story = scenario("cast-inspector");
+export const CastMissing: Story = scenario("cast-missing");
+export const CastAccepted: Story = scenario("cast-accepted");
+export const Generate: Story = scenario("generate");
+export const GenerateLongBook: Story = scenario("generate-long-book");
+export const GenerateStale: Story = scenario("generate-stale");
+export const GenerateSplit: Story = scenario("generate-split");
+export const GeneratePlayer: Story = scenario("generate-player");
+export const Export: Story = scenario("export");
+export const ExportLongBook: Story = scenario("export-long-book");
+export const PhaseHelp: Story = scenario("phase-help");
+
+export const LibraryMissingCover: Story = scenario("library-missing-cover");
+export const LibraryRefreshError: Story = scenario("library-refresh-error");
+export const DialogueRunning: Story = scenario("dialogue-running");
+export const GenerateRunning: Story = scenario("generate-running");
+export const GenerateFailed: Story = scenario("generate-failed");
+export const CastSamplePending: Story = scenario("cast-sample-pending");
+export const ReviewRecovery: Story = scenario("review-recovery");
+
+export const ExportDefaultCover: Story = scenario("export-default-cover");

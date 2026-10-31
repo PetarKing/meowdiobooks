@@ -1,0 +1,386 @@
+{
+  "executedAt": "2026-10-31T15:57:39.998Z",
+  "browser": "153.0.8010.12",
+  "scope": "Synthetic controls rendered with the production appearance and inherited styles; solid surface contrast measurements, not an end-to-end workflow audit.",
+  "sourceFiles": [
+    "frontend/src/styles/appearance.css",
+    "frontend/src/styles.css",
+    "frontend/src/media.css",
+    "frontend/src/styles/primitives.css",
+    "frontend/src/components/CastIdentityReview.css",
+    "frontend/src/components/LanguagePicker.css",
+    "frontend/src/components/CastingChoice.css"
+  ],
+  "appearances": {
+    "light": {
+      "nativeAudioColorScheme": "light",
+      "measurements": [
+        {
+          "selector": "primary",
+          "text": "Continue",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(164, 47, 77)",
+          "ratio": "6.79"
+        },
+        {
+          "selector": "danger",
+          "text": "Delete",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(172, 48, 57)",
+          "ratio": "6.49"
+        },
+        {
+          "selector": "tag good",
+          "text": "Accepted",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(67, 102, 39)",
+          "background": "color(srgb 0.915412 0.934 0.882392)",
+          "ratio": "5.61"
+        },
+        {
+          "selector": "tag warn",
+          "text": "Warning",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(118, 85, 22)",
+          "background": "color(srgb 0.937412 0.926667 0.875059)",
+          "ratio": "5.76"
+        },
+        {
+          "selector": "tag rose",
+          "text": "Selected",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(133, 35, 61)",
+          "background": "color(srgb 0.964314 0.926588 0.912196)",
+          "ratio": "7.85"
+        },
+        {
+          "selector": "error-note",
+          "text": "Source unavailable",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(172, 48, 57)",
+          "background": "color(srgb 0.967137 0.926941 0.905137)",
+          "ratio": "5.60"
+        },
+        {
+          "selector": "P",
+          "text": "Source evidence Highlighted so",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(45, 56, 37)",
+          "background": "rgba(0, 0, 0, 0)",
+          "ratio": "10.92"
+        },
+        {
+          "selector": "MARK",
+          "text": "Highlighted source",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(45, 56, 37)",
+          "background": "color(srgb 0.910745 0.893333 0.830745)",
+          "ratio": "9.67"
+        },
+        {
+          "selector": "soft-note",
+          "text": "Recovery note",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(94, 104, 79)",
+          "background": "rgb(230, 234, 216)",
+          "ratio": "4.80"
+        },
+        {
+          "selector": "SMALL",
+          "text": "Recommended",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(164, 47, 77)",
+          "ratio": "6.79"
+        },
+        {
+          "selector": "choice-tooltip visible",
+          "text": "Information tooltip",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(254, 255, 248)",
+          "background": "rgb(45, 56, 37)",
+          "ratio": "12.25"
+        },
+        {
+          "selector": "BUTTON",
+          "text": "Undo",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(254, 255, 248)",
+          "background": "color(srgb 0.996078 1 0.972549 / 0.12)",
+          "ratio": "7.58"
+        },
+        {
+          "selector": "approve",
+          "text": "Approve",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(67, 102, 39)",
+          "ratio": "6.63"
+        },
+        {
+          "selector": "theme-toggle",
+          "text": "",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(45, 56, 37)",
+          "background": "rgba(0, 0, 0, 0)",
+          "ratio": "10.92"
+        },
+        {
+          "selector": "dialogue-accepted-check",
+          "text": "✓",
+          "tokens": [
+            "#a42f4d",
+            "#a42f4d",
+            "#ac3039"
+          ],
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(67, 102, 39)",
+          "ratio": "6.63"
+        }
+      ]
+    },
+    "dark": {
+      "nativeAudioColorScheme": "dark",
+      "measurements": [
+        {
+          "selector": "primary",
+          "text": "Continue",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(41, 63, 51)",
+          "background": "rgb(247, 171, 194)",
+          "ratio": "6.24"
+        },
+        {
+          "selector": "danger",
+          "text": "Delete",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(41, 63, 51)",
+          "background": "rgb(246, 162, 156)",
+          "ratio": "5.70"
+        },
+        {
+          "selector": "tag good",
+          "text": "Accepted",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(182, 220, 172)",
+          "background": "color(srgb 0.211137 0.307804 0.241725)",
+          "ratio": "5.97"
+        },
+        {
+          "selector": "tag warn",
+          "text": "Warning",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(237, 201, 133)",
+          "background": "color(srgb 0.234863 0.299608 0.224902)",
+          "ratio": "5.82"
+        },
+        {
+          "selector": "tag rose",
+          "text": "Selected",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(255, 208, 223)",
+          "background": "color(srgb 0.222784 0.278039 0.239765)",
+          "ratio": "7.16"
+        },
+        {
+          "selector": "error-note",
+          "text": "Source unavailable",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(246, 162, 156)",
+          "background": "color(srgb 0.222431 0.274863 0.226353)",
+          "ratio": "5.01"
+        },
+        {
+          "selector": "P",
+          "text": "Source evidence Highlighted so",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(250, 243, 230)",
+          "background": "rgba(0, 0, 0, 0)",
+          "ratio": "10.27"
+        },
+        {
+          "selector": "MARK",
+          "text": "Highlighted source",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(250, 243, 230)",
+          "background": "color(srgb 0.273882 0.327059 0.241569)",
+          "ratio": "7.41"
+        },
+        {
+          "selector": "soft-note",
+          "text": "Recovery note",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(204, 215, 208)",
+          "background": "rgb(52, 76, 61)",
+          "ratio": "6.32"
+        },
+        {
+          "selector": "SMALL",
+          "text": "Recommended",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(41, 63, 51)",
+          "background": "rgb(247, 171, 194)",
+          "ratio": "6.24"
+        },
+        {
+          "selector": "choice-tooltip visible",
+          "text": "Information tooltip",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(250, 243, 230)",
+          "background": "rgb(30, 48, 37)",
+          "ratio": "12.65"
+        },
+        {
+          "selector": "BUTTON",
+          "text": "Undo",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(250, 243, 230)",
+          "background": "color(srgb 0.14902 0.239216 0.188235 / 0.12)",
+          "ratio": "12.34"
+        },
+        {
+          "selector": "approve",
+          "text": "Approve",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(41, 63, 51)",
+          "background": "rgb(182, 220, 172)",
+          "ratio": "7.46"
+        },
+        {
+          "selector": "theme-toggle",
+          "text": "",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(250, 243, 230)",
+          "background": "rgba(0, 0, 0, 0)",
+          "ratio": "10.27"
+        },
+        {
+          "selector": "dialogue-accepted-check",
+          "text": "✓",
+          "tokens": [
+            "#f7abc2",
+            "#f7abc2",
+            "#f6a29c"
+          ],
+          "foreground": "rgb(41, 63, 51)",
+          "background": "rgb(182, 220, 172)",
+          "ratio": "7.46"
+        }
+      ]
+    }
+  }
+}

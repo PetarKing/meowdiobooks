@@ -1,0 +1,70 @@
+# Local sensitive data
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Operating-system metadata
+.DS_Store
+
+# Python environments and tool caches
+.venv/
+.uv-cache/
+.hf-cache/
+.pip-cache/
+.npm-cache/
+.pytest_cache/
+.ruff_cache/
+__pycache__/
+*.pyc
+.coverage
+coverage/
+htmlcov/
+*.log
+
+# Local model runtimes and downloaded weights
+.local/
+models/
+*.gguf
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.onnx
+
+# Local application state and user exports
+.meowdiobooks/
+.meowdiobooks-v2/
+library/
+*.sqlite
+*.sqlite3
+*.db
+*.m4b
+*.mp3
+*.flac
+*.wav
+!docs/demo/*.wav
+
+# Generated runs, experiments and temporary output
+.bench/
+runs/
+results/
+output/
+dist/
+outputs/
+tmp/
+fixtures/downloaded/
+
+# Local review screenshots, recordings and generated reports
+.review-evidence/
+
+# Maintainer-only evaluation material. Only the documented public-domain set is publishable.
+internal-docs/
+audit/downloads/
+audit/extracted/
+*.pdf
+SampleBooks/*
+!SampleBooks/public-domain-evaluation/
+!SampleBooks/public-domain-evaluation/README.md
+!SampleBooks/public-domain-evaluation/*.pdf
