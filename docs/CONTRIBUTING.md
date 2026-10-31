@@ -1,6 +1,6 @@
 # Contributing
 
-Meowdiobooks is alpha software. Contributions should make the local book-to-audio path more
+Meowdiobooks is a maintained personal audiobook application. Contributions should make the local book-to-audio path more
 trustworthy without hiding uncertainty or weakening source traceability.
 
 ## Contributor agreement

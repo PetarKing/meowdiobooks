@@ -1,12 +1,12 @@
 [project]
 name = "meowdiobooks"
-version = "0.1.0"
+version = "1.0.0"
 description = "A local, dialogue-first audiobook studio for Apple Silicon Macs."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.12,<3.13"
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: MacOS X",
   "License :: Other/Proprietary License",
   "Operating System :: MacOS :: MacOS X",

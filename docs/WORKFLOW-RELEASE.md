@@ -3,6 +3,13 @@
 Use this runbook for shared workflow asset publication. Ordinary local changes do not require a
 release. Preserve unrelated work throughout; see [contributor guidance](CONTRIBUTING.md#git-and-working-state).
 
+## Initial public baseline
+
+The owner authorized a one-time V1 history reset and retirement of pre-V1 releases. Preserve a
+private backup first, validate the reviewed snapshot, and publish a signed parentless initial
+commit with the same reviewed tree. Build V1 from that exact commit. Migrate known consumers
+before retiring old tags/assets. This exception does not permit altering V1 or later releases.
+
 ## Resolve the candidate
 
 Fetch current remote state and resolve one reviewed, exact 40-character candidate commit SHA already merged
@@ -15,9 +22,9 @@ in-scope release blocker. For a “latest” request, use the snapshot at candid
 later commits; honor an explicit latest-at-completion requirement if one was requested. If the
 candidate changes, rebuild and verify its assets. Never change an already-published release.
 
-Version changes must themselves be merged before selecting the final candidate. Keep the Python and
-UI versions aligned in `release/python/pyproject.toml`, `frontend/package.json`, and both version
-fields in `frontend/package-lock.json`.
+Version changes must themselves be merged before selecting the final candidate. Keep the application and workflow versions aligned in `pyproject.toml`, `uv.lock`,
+`src/meowdiobooks/__init__.py`, `release/python/pyproject.toml`, `frontend/package.json`, and both
+version fields in `frontend/package-lock.json`. Public V1 and later use `vMAJOR.MINOR.PATCH` tags.
 
 ## Build and verify
 

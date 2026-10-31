@@ -1,6 +1,7 @@
 # Meowdiobooks package contract v2
 
-Status: canonical alpha contract. Persisted alpha data has no migration guarantee.
+Status: canonical V1 persistence contract. Accepted work and exports are preserved across supported
+upgrades; format changes require a documented, verified upgrade path.
 
 This document defines the durable boundary between wizard phases. The detailed user workflow lives
 in the [`wizard/`](wizard/README.md) specifications.
@@ -274,6 +275,10 @@ use an ambiguous “accepted-or-candidate” state.
 
 ## Compatibility
 
-Only the v2 artifact graph above is supported. Legacy `analysis`, `structure`, renderer-reparse and
-per-phase pointer contracts are not migration inputs. During alpha, incompatible persisted packages
-must be rerun from PDF intake/Extract rather than maintained through permanent compatibility fallbacks.
+V1 supports the v2 artifact graph above. The V1 version update itself changes no persisted format.
+Future changes to supported V1 data must preserve accepted work and exports through a documented,
+verified upgrade path; silently discarding a package or requiring a fresh import is not that path.
+
+Experimental pre-V1 `analysis`, `structure`, renderer-reparse and per-phase pointer formats are
+outside this baseline. They have no automatic migration; preserve the original package and source
+before creating a new v2 book. This historical limitation does not waive the V1 preservation policy.

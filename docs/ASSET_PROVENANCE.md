@@ -7,9 +7,8 @@ to third-party books, model weights or voice samples.
 ## Existing brand assets
 
 The reading-cat mark (`frontend/src/assets/brand/meowdiobooks-mark.png` and its lossless WebP),
-hero PNG, workflow-cat PNG and favicon predate the illustration records below. Their original
-creation and redistribution authorization must be confirmed by the maintainer before public
-publication; these records do not establish their origin. The showcase images use the documented
+hero PNG, workflow-cat PNG and favicon predate the illustration records below. The maintainer confirmed authorization to publish these assets during V1 launch preparation on
+31 October 2026. This records the owner's confirmation, not a claim about a particular creation tool. The showcase images use the documented
 public-domain Alice fixture. The hero PNG also appears in `docs/assets/`.
 
 ## Evaluation and demonstration

@@ -1,6 +1,6 @@
 # Architecture and release boundary
 
-Status: current alpha architecture.
+Status: V1 architecture.
 
 Meowdiobooks is a complete local application. The [source setup](SETUP.md) builds and installs the
 API, local workflow runtime, compiled browser application, model registry, and command-line entrypoint.
