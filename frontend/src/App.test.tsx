@@ -3121,14 +3121,14 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Apply all suggested choices/ }))
     expect(screen.getByText('This category is complete')).toBeInTheDocument()
-    expect(screen.getByText('1 of 3 categories complete · 2 decisions remaining')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Review complete transcript →' })).not.toBeInTheDocument()
+    expect(screen.getByText('2 decisions remaining')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: 'Continue review: Chapter starts →' }))
     fireEvent.click(screen.getByRole('button', { name: /^Start a new chapter/ }))
     expect(screen.getByRole('heading', { name: 'Suspicious extracted text' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Keep as is/ }))
-    expect(screen.getByText('All review decisions complete')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeEnabled()
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
     expect(wizardApi.previewReviewTranscript).toHaveBeenLastCalledWith('book-1', 'review-navigation', 1,
@@ -3162,7 +3162,7 @@ describe('v2 wizard', () => {
     expect(screen.queryByText(/Suggested: leave/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /narrator|extraction again/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'AI suggestions' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Continue review:/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: /^Keep original text This highlighted/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Leave out(?: \(Suggested\))? This highlighted/ }))
     expect(screen.getByText('Example 3 of 3')).toBeInTheDocument()
@@ -3216,7 +3216,7 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: /^(Apply all suggested choices|Suggested choices decided)/ })).toBeDisabled()
     expect(screen.getByRole('heading', { name: 'Does this text match the source?' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Apply correction/ })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Continue review:/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: /^Keep original text Keep the original/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
     await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
@@ -3444,7 +3444,7 @@ describe('v2 wizard', () => {
     fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
     fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
     await screen.findByRole('heading', { name: 'Repeated page text' })
-    expect(screen.getByRole('button', { name: /^Continue review:/ })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: /^Keep(?: |$)/ }))
     expect(screen.getByText('Example 2 of 400')).toBeInTheDocument()
     expect(screen.queryByText('Applies to this occurrence')).not.toBeInTheDocument()
@@ -3483,7 +3483,9 @@ describe('v2 wizard', () => {
     expect(keep).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('focuses the next evidence passage during automatic progression', async () => {
+  it.each([true, false])('only scrolls automatic review progression on mobile (%s)', async (mobile) => {
+    const originalMatchMedia = window.matchMedia
+    window.matchMedia = vi.fn((query: string) => ({ matches: query === "(max-width: 700px)" && mobile, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn(), addListener: vi.fn(), removeListener: vi.fn() })) as unknown as typeof window.matchMedia
     const snapshot: WizardSnapshot = {
       ...base,
       book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
@@ -3510,8 +3512,11 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: /Keep as is/ }))
 
     expect(document.querySelector('[data-review-group="warning-1"]')).toHaveClass('active')
-    await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' }))
-    expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus()
+    if (mobile) {
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ behavior: 'instant', block: 'start' }))
+      expect(screen.getByRole('heading', { name: 'Repeated page matter' })).toHaveFocus()
+    } else expect(scrollIntoView).not.toHaveBeenCalled()
+    window.matchMedia = originalMatchMedia
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: originalScrollIntoView })
   })
 

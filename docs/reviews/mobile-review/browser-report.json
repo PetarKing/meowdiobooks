@@ -76,10 +76,21 @@
       "violations": []
     },
     {
-      "baseline": "split-title"
+      "baseline": "split-title",
+      "width": 390
     },
     {
       "baseline": "finished-category",
+      "width": 390,
+      "disabledTranscript": true
+    },
+    {
+      "baseline": "split-title",
+      "width": 1440
+    },
+    {
+      "baseline": "finished-category",
+      "width": 1440,
       "disabledTranscript": true
     }
   ]

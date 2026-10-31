@@ -27,8 +27,10 @@ try {
     assert((await passage.textContent()).includes('RE C ORD S'));
     assert((await passage.textContent()).includes('The first day began with a letter.'));
     assert.equal(await passage.locator('mark').textContent(), 'MARA');
-    await passage.locator('mark').evaluate(el => el.scrollIntoView({ block: 'center' }));
-    await page.screenshot({ path: path.join(out, `chapter-${width}-${theme}.png`), animations: 'disabled' });
+    await page.evaluate(() => scrollTo(0, 0));
+    assert.equal(await page.locator('.review-next-action').evaluate(el => getComputedStyle(el).position), 'static');
+    assert.equal(await page.getByRole('button', { name: /^Continue review:/ }).count(), 0, 'No redundant continue action before answering');
+    await page.screenshot({ path: path.join(out, `chapter-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
     await page.getByRole('button', { name: 'View original page' }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('img').evaluate(async image => image.decode());
@@ -41,25 +43,34 @@ try {
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
     await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
-    await page.getByText('This category is complete', { exact: true }).waitFor();
+    if (width <= 700) await page.getByText('This category is complete', { exact: true }).waitFor();
     const next = page.getByRole('button', { name: 'Continue review: Chapter starts →' });
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    await page.locator('.review-bulk-area').evaluate(el => el.scrollIntoView({ block: 'center' }));
-    assert(await next.isEnabled());
-    const nextBox = await next.boundingBox();
-    assert(nextBox.y >= 0 && nextBox.y + nextBox.height <= 845, `Next action fits viewport: ${JSON.stringify(nextBox)}`);
-    assert.equal(await page.getByRole('button', { name: 'Review complete transcript →' }).count(), 0);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
     assert(overflow <= 1, `${width}/${theme}: horizontal overflow ${overflow}`);
-    await page.screenshot({ path: path.join(out, `category-${width}-${theme}.png`), animations: 'disabled' });
-    await next.click();
-    await page.waitForFunction(() => document.activeElement?.matches('.review-evidence h2'));
-    const headingBox = await page.getByRole('heading', { name: 'Chapter starts' }).boundingBox();
-    assert(headingBox.y >= 90 && headingBox.y < 700, 'New evidence is below header and in viewport');
+    if (width <= 700) {
+      await next.scrollIntoViewIfNeeded();
+      assert(await next.isEnabled());
+      assert.equal(await page.getByRole('button', { name: 'Review complete transcript →' }).isVisible(), false);
+    } else {
+      assert.equal(await next.isVisible(), false, 'Desktop retains its category navigation');
+      assert(await page.getByRole('button', { name: 'Review complete transcript →' }).isDisabled());
+    }
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: path.join(out, `category-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
+    if (width <= 700) {
+      await next.click();
+      await page.waitForFunction(() => document.activeElement?.matches('.review-evidence h2'));
+      const headingBox = await page.getByRole('heading', { name: 'Chapter starts' }).boundingBox();
+      assert(headingBox.y >= 90 && headingBox.y < 700, 'New evidence is below header and in viewport');
+    } else {
+      await groups.getByRole('button', { name: /Chapter starts/ }).click();
+      assert.equal(await page.getByRole('heading', { name: 'Chapter starts' }).evaluate(el => el === document.activeElement), false, 'Desktop focus stays on navigation');
+    }
     await page.getByRole('button', { name: /^Start a new chapter/ }).click();
     await page.getByRole('heading', { name: 'Suspicious extracted text' }).waitFor();
     await page.getByRole('button', { name: /^Keep as is/ }).click();
-    await page.getByText('All review decisions complete', { exact: true }).waitFor();
+    assert(await page.getByRole('button', { name: 'Review complete transcript →' }).isEnabled());
     await page.getByRole('button', { name: 'Review complete transcript →' }).click();
     await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
     await page.getByRole('button', { name: '← Back to decisions' }).click();
@@ -73,18 +84,17 @@ try {
     results.push({ width, theme, overflow, completeJourney: true, manualChoicePreserved: true, originalPage: true, violations });
     await page.close();
   }
-  if (before) for (const story of ['split-title', 'finished-category']) {
-    const page = await browser.newPage({ viewport: { width: 390, height: 844 }, reducedMotion: 'reduce' });
+  if (before) for (const width of [390, 1440]) for (const story of ['split-title', 'finished-category']) {
+    const page = await browser.newPage({ viewport: { width, height: 844 }, reducedMotion: 'reduce' });
     await page.goto(`${before}/iframe.html?id=product-mobile-review-navigation--${story}&viewMode=story`);
     await page.getByRole('heading', { name: story === 'split-title' ? 'Chapter starts' : 'AI suggestions' }).waitFor();
     if (story === 'finished-category') await page.getByRole('button', { name: 'All suggestions decided' }).waitFor();
     await chooseAppearance(page, 'dark');
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
-    if (story === 'split-title') await page.getByLabel('Manuscript context').locator('mark').evaluate(el => el.scrollIntoView({ block: 'center' }));
-    else await page.getByRole('button', { name: 'Review complete transcript →' }).scrollIntoViewIfNeeded();
-    await page.screenshot({ path: path.join(out, `before-${story}-390-dark.png`), fullPage: false, animations: 'disabled' });
-    results.push({ baseline: story, disabledTranscript: story === 'finished-category' ? await page.getByRole('button', { name: 'Review complete transcript →' }).isDisabled() : undefined });
+    await page.evaluate(() => scrollTo(0, 0));
+    await page.screenshot({ path: path.join(out, `before-${story}-${width}-dark.png`), fullPage: true, animations: 'disabled' });
+    results.push({ baseline: story, width, disabledTranscript: story === 'finished-category' ? await page.getByRole('button', { name: 'Review complete transcript →' }).isDisabled() : undefined });
     await page.close();
   }
 } finally { await browser.close(); }

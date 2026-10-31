@@ -39,7 +39,7 @@ export const Proposals: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await expect(canvas.getByText("broken")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: /^Continue review:/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
 export const SourceCheckAfterBulkApply: Story = {
@@ -48,7 +48,7 @@ export const SourceCheckAfterBulkApply: Story = {
     const canvas = within(canvasElement);
     await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|Suggested choices decided)/ }));
     await expect(canvas.getByRole("heading", { name: "Does this text match the source?" })).toBeVisible();
-    await expect(canvas.getByRole("button", { name: /^Continue review:/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
 export const KeptChoiceIsPreservedByBulk: Story = {
@@ -78,7 +78,7 @@ export const ConsolidatedSourceWarning: Story = {
     await expect(canvas.getByText("broken")).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: /^(Apply all suggested choices|Suggested choices decided)/ }));
     await expect(canvas.getByRole("button", { name: /^(Apply all suggested choices|Suggested choices decided)/ })).toBeDisabled();
-    await expect(canvas.getByRole("button", { name: /^Continue review:/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
 export const ManySuggestions: Story = {

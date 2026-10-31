@@ -30,7 +30,7 @@ export const Suggestions: Story = {
     await expect(canvas.queryByText(/The floorboards creaked/)).not.toBeInTheDocument();
     await expect(canvas.getByText(/MARA:/)).toBeVisible();
     await expect(canvas.getByText(/If they hear us/)).toBeVisible();
-    await expect(canvas.getByRole("button", { name: /^Continue review:/ })).toBeEnabled();
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeDisabled();
   },
 };
 export const ManualChoiceSurvivesBulk: Story = {

@@ -82,6 +82,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const currentGroupComplete = showingBoundary ? boundaries.every((row) => Boolean(boundaryDecisions[row.id])) : warning && reviewWarningResolved(warning, reviewDecisions);
 
   function revealReviewEvidence() {
+    if (!window.matchMedia?.("(max-width: 700px)").matches) return;
     // Wait for the chosen example to render; focus its evidence, not the off-screen queue.
     requestAnimationFrame(() => {
       const target = reviewStripRef.current?.closest(".review-desk")?.querySelector<HTMLElement>(".review-evidence h2");
@@ -89,6 +90,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       target?.scrollIntoView?.({ behavior: "instant", block: "start" });
     });
   }
+
+  const currentDecisionMade = showingBoundary ? Boolean(boundary && boundaryDecisions[boundary.id]) : Boolean(warning && occurrence && (perOccurrence ? reviewOccurrenceActions(warning, occurrence).includes(reviewDecisions[occurrence.id]) : reviewWarningResolved(warning, reviewDecisions)));
 
   function continueReview() {
     if (pendingBoundary >= 0) return openBoundary(pendingBoundary);
@@ -294,7 +297,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
                   <span aria-hidden="true">{pendingSuggestionCount > 0 ? "⚠" : "✓"}</span>
                   <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("Suggested choices decided")}</b>
                 </button>
-                {pendingSuggestionCount === 0 && <p className="evidence-help">{t("This covers suggested choices only. Any remaining decisions are listed below.")}</p>}
+                {pendingSuggestionCount === 0 && <p className="evidence-help">{t("This covers suggested choices only. Other review categories may still need attention.")}</p>}
               </div>}
             </div>
           </section>
@@ -303,12 +306,16 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       </div>
     </>}
     <div className="phase-action review-next-action">
-      <div role="status" aria-live="polite">
-        <b>{complete ? t("All review decisions complete") : currentGroupComplete ? t("This category is complete") : t("Review progress")}</b>
-        <p>{complete ? t("Read the complete transcript before accepting your changes.") : `${t("{{decided}} of {{total}} categories complete", { decided: decidedGroups, total: totalGroups })} · ${remainingLabel}`}</p>
-      </div>
-      {complete ? <button className="primary" disabled={busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button>
-        : <button className="primary" disabled={busy} onClick={continueReview}>{t("Continue review: {{category}}", { category: nextGroupLabel })} →</button>}
+      {complete ? <button className="primary" disabled={busy} onClick={() => { setReviewPreviewPage(1); setReviewFinalCheck(true); }}>{t("Review complete transcript")} →</button> : <>
+        <div className="review-mobile-next">
+          <div role="status" aria-live="polite"><b>{currentGroupComplete ? t("This category is complete") : remainingLabel}</b>
+            {currentGroupComplete && <p>{remainingLabel}</p>}
+          </div>
+          {currentDecisionMade ? <button className="primary" disabled={busy} onClick={continueReview}>{t("Continue review: {{category}}", { category: nextGroupLabel })} →</button>
+            : <p>{t("Choose an option above to continue.")}</p>}
+        </div>
+        <button className="primary review-desktop-next" disabled>{t("Review complete transcript")} →</button>
+      </>}
     </div>
   </>;
 

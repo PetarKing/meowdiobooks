@@ -41,16 +41,17 @@ export const CompleteJourney: Story = {
   play: async ({ canvasElement }) => {
     await FinishedCategory.play!({ canvasElement } as Parameters<NonNullable<typeof FinishedCategory.play>>[0]);
     const canvas = within(canvasElement);
-    await expect(canvas.getByText("This category is complete")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Continue review: Chapter starts →" })).toBeEnabled();
-    await userEvent.click(canvas.getByRole("button", { name: "Continue review: Chapter starts →" }));
+    const mobile = window.matchMedia("(max-width: 700px)").matches;
+    await expect(canvas.getByText("This category is complete")).toBeInTheDocument();
+    if (mobile) await userEvent.click(canvas.getByRole("button", { name: "Continue review: Chapter starts →" }));
+    else await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /Chapter starts/ }));
     const heading = canvas.getByRole("heading", { name: "Chapter starts" });
-    await waitFor(() => expect(heading).toHaveFocus());
+    if (mobile) await waitFor(() => expect(heading).toHaveFocus());
     await expect(canvas.getByLabelText("Manuscript context")).toHaveTextContent("The first day began with a letter.");
     await userEvent.click(canvas.getByRole("button", { name: /^Start a new chapter/ }));
-    await waitFor(() => expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toHaveFocus());
+    if (mobile) await waitFor(() => expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toHaveFocus());
     await userEvent.click(canvas.getByRole("button", { name: /^Keep as is/ }));
-    await expect(canvas.getByText("All review decisions complete")).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: "Review complete transcript →" }));
     await expect(await canvas.findByRole("article", { name: "Audiobook transcript page 1" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "← Back to decisions" }));
