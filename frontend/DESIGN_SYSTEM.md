@@ -153,14 +153,15 @@ individual choices remain editable. Do not add a duplicate selection-status line
 
 Chapter-start evidence displays all supplied bounded context so a title split across paragraphs
 and its opening passage remain visible. Only the original boundary anchor is highlighted; this
-presentation does not merge source spans or rewrite extracted text. PDF review offers an on-demand
-original-page dialog through the existing host media resolver, with page navigation and retry.
+presentation does not merge source spans or rewrite extracted text.
 
 On phones (up to 700px), the Review action area reports remaining decisions beneath the choices
 in normal document flow. Once the current decision is made, its primary action opens the next
 unresolved heading or text decision and focuses the evidence below the header. Do not show a
 continue action that returns to the same unanswered decision, or float a panel over source evidence.
-Desktop retains its category queue and transcript action without automatic scrolling. Completing
+Completing a mobile category preserves its current example and waits for Continue; unfinished
+examples within the category can still advance automatically. Desktop retains its existing category
+queue, progression, scrolling behavior, and transcript action. Completing
 suggested choices is distinct from completing a category or the whole review. Chapter context uses
 compact paragraph gaps and reflows PDF line wrapping for readability; source characters and anchors
 remain unchanged. The complete-transcript preview and explicit acceptance remain separate steps.

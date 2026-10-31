@@ -9,7 +9,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
     {
@@ -18,7 +18,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
     {
@@ -27,7 +27,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
     {
@@ -36,7 +36,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": true,
       "violations": []
     },
     {
@@ -45,7 +45,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
     {
@@ -54,7 +54,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
     {
@@ -63,7 +63,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
     {
@@ -72,7 +72,7 @@
       "overflow": 0,
       "completeJourney": true,
       "manualChoicePreserved": true,
-      "originalPage": true,
+      "categoryCompletionDoesNotScroll": null,
       "violations": []
     },
     {

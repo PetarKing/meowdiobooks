@@ -6,7 +6,6 @@ import type {
 import type { WorkflowModel } from "../app/useWorkflowModel";
 import { WorkflowEmpty } from "../components/WorkflowPage";
 import { Panel, Tag } from "../components/Ui";
-import { ReviewSourcePage } from "../components/ReviewSourcePage";
 import { SourceExcerpt } from "../components/SourceExcerpt";
 import { AcceptedSummary, PageTitle, ReviewTranscriptFinalCheck, StageLaunch } from "../pages/shared";
 import { buildReviewWarningDecisions } from "../reviewDecisions";
@@ -81,8 +80,18 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const nextGroupLabel = pendingBoundary >= 0 ? t("Chapter starts") : pendingWarning >= 0 ? t(reviewWarningLabel(candidateWarnings[pendingWarning].kind)) : "";
   const currentGroupComplete = showingBoundary ? boundaries.every((row) => Boolean(boundaryDecisions[row.id])) : warning && reviewWarningResolved(warning, reviewDecisions);
 
+  function isMobileReview() {
+    return Boolean(window.matchMedia?.("(max-width: 700px)").matches);
+  }
+
+  function revealReviewGroup(group: string) {
+    if (isMobileReview()) return revealReviewEvidence();
+    const target = reviewStripRef.current?.querySelector<HTMLElement>(`[data-review-group="${group}"]`);
+    target?.scrollIntoView?.({ behavior: "smooth", block: "nearest", inline: "center" });
+  }
+
   function revealReviewEvidence() {
-    if (!window.matchMedia?.("(max-width: 700px)").matches) return;
+    if (!isMobileReview()) return;
     // Wait for the chosen example to render; focus its evidence, not the off-screen queue.
     requestAnimationFrame(() => {
       const target = reviewStripRef.current?.closest(".review-desk")?.querySelector<HTMLElement>(".review-evidence h2");
@@ -112,13 +121,18 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     setActiveReviewGroup("warnings");
     setActiveWarning(index);
     setActiveOccurrence(0);
+    revealReviewGroup(`warning-${index}`);
+  }
+
+  function openHeading(index: number) {
+    setActiveBoundary(index);
     revealReviewEvidence();
   }
 
   function openBoundary(index: number) {
     setActiveReviewGroup("chapters");
     setActiveBoundary(index);
-    revealReviewEvidence();
+    revealReviewGroup("chapters");
   }
 
   function chooseBoundaryAction(boundaryId: string, action: "chapter-start" | "not-a-boundary") {
@@ -127,13 +141,15 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     if (boundaryDecisions[boundaryId]) return;
     const indices = [...boundaries.keys()];
     const nextBoundary = [...indices.slice(activeBoundary + 1), ...indices.slice(0, activeBoundary + 1)].find((index) => !nextDecisions[boundaries[index].id]);
-    if (nextBoundary !== undefined) return openBoundary(nextBoundary);
+    if (nextBoundary !== undefined) return openHeading(nextBoundary);
+    if (isMobileReview()) return;
     const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
     if (nextWarning >= 0) openWarning(nextWarning);
   }
 
   function acceptAllBoundaries() {
     setBoundaryDecisions(Object.fromEntries(boundaries.map((row) => [row.id, "chapter-start"] as const)));
+    if (isMobileReview()) return;
     const nextWarning = candidateWarnings.findIndex((row) => !reviewWarningResolved(row, reviewDecisions));
     if (nextWarning >= 0) openWarning(nextWarning);
   }
@@ -141,9 +157,9 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   function chooseReviewAction(warningId: string, action: ReviewCapability) {
     const nextDecisions = { ...reviewDecisions, [warningId]: action };
     setReviewDecisions(nextDecisions);
-    setActiveOccurrence(0);
+    if (!isMobileReview()) setActiveOccurrence(0);
 
-    if (reviewDecisions[warningId]) return;
+    if (reviewDecisions[warningId] || isMobileReview()) return;
     const currentIndex = candidateWarnings.findIndex((row) => row.id === warningId);
     const nextWarning = [
       ...candidateWarnings.slice(currentIndex + 1),
@@ -166,7 +182,10 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   function applyAllProposals() {
     const next = candidateWarnings.filter((group) => group.kind === "ai-cleanup").reduce((choices, group) => reviewProposalDecisions(group, choices), reviewDecisions);
     setReviewDecisions(next);
-    const target = candidateWarnings.find((group) => group.kind === "ai-cleanup" && !reviewWarningResolved(group, next)) ?? proposals[0]?.warning;
+    const unresolvedGroup = candidateWarnings.find((group) => group.kind === "ai-cleanup" && !reviewWarningResolved(group, next));
+    // Completing a category is a stopping point on phones; Continue owns the next jump.
+    if (isMobileReview() && warning && reviewWarningResolved(warning, next)) return;
+    const target = unresolvedGroup ?? proposals[0]?.warning;
     if (!target) return;
     openWarning(candidateWarnings.indexOf(target));
     const unresolved = target.occurrences.findIndex((row) => !next[row.id]);
@@ -262,8 +281,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <div className="occurrence-meta"><b>{t("Heading {{current}} of {{total}}", { current: activeBoundary + 1, total: boundaries.length })}</b><span>{t("Page {{page}}", { page: boundary.page })}</span></div>
             <SourceExcerpt compact contextMode="full" className="review-source-excerpt" layout={boundary.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={boundary.source} contextBefore={boundary.contextBefore} contextAfter={boundary.contextAfter} />
             <p className="evidence-help">{t("The highlight marks where the chapter would begin. A title can continue across several lines. The text stays unchanged.")}</p>
-            {book && (!book.sourceKind || book.sourceKind === "pdf") && <ReviewSourcePage key={`${book.id}:${boundary.id}`} gateway={gateway} bookId={book.id} page={boundary.page} pageCount={book.pageCount} />}
-            <div className="warning-nav"><button disabled={activeBoundary === 0} onClick={() => openBoundary(activeBoundary - 1)}>← {t("Previous heading")}</button><button disabled={activeBoundary >= boundaries.length - 1} onClick={() => openBoundary(activeBoundary + 1)}>{t("Next heading")} →</button></div>
+            <div className="warning-nav"><button disabled={activeBoundary === 0} onClick={() => openHeading(activeBoundary - 1)}>← {t("Previous heading")}</button><button disabled={activeBoundary >= boundaries.length - 1} onClick={() => openHeading(activeBoundary + 1)}>{t("Next heading")} →</button></div>
           </section>
           <section className="resolution-panel">
             <div className="review-scope"><b>{t("Applies to this heading only")}</b><small>{boundaries.length === 1 ? t("This is the only detected chapter heading.") : t("You can decide separately for the other {{count}} headings.", { count: boundaries.length - 1 })}</small></div>
@@ -276,7 +294,6 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
             <div className="review-group-heading"><span><h2 tabIndex={-1}>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{boundaryEvidence ? occurrence.boundaryAnchors!.map((anchor) => t("Page {{page}}", { page: anchor.page })).join(" → ") : t("Page {{page}}", { page: occurrence.page })}</span></div>
             <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
-            {book && (!book.sourceKind || book.sourceKind === "pdf") && <ReviewSourcePage key={`${book.id}:${occurrence.id}`} gateway={gateway} bookId={book.id} page={occurrence.page} pageCount={book.pageCount} />}
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => openOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => openOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
@@ -295,9 +312,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
               {showBulkSuggestions && <div className="review-bulk-area">
                 <button className="cleanup-bulk-warning" title={bulkHelp} aria-description={bulkHelp} disabled={pendingSuggestionCount === 0} onClick={isPatternGroup ? () => setReviewDecisions(reviewPatternDecisions(warning, reviewDecisions, "exclude")) : isScriptCue ? applyScriptSuggestions : applyAllProposals}>
                   <span aria-hidden="true">{pendingSuggestionCount > 0 ? "⚠" : "✓"}</span>
-                  <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("Suggested choices decided")}</b>
+                  <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("All suggestions decided")}</b>
                 </button>
-                {pendingSuggestionCount === 0 && <p className="evidence-help">{t("This covers suggested choices only. Other review categories may still need attention.")}</p>}
               </div>}
             </div>
           </section>

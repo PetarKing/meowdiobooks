@@ -31,18 +31,28 @@ try {
     assert.equal(await page.locator('.review-next-action').evaluate(el => getComputedStyle(el).position), 'static');
     assert.equal(await page.getByRole('button', { name: /^Continue review:/ }).count(), 0, 'No redundant continue action before answering');
     await page.screenshot({ path: path.join(out, `chapter-${width}-${theme}.png`), fullPage: true, animations: 'disabled' });
-    await page.getByRole('button', { name: 'View original page' }).click();
-    const dialog = page.getByRole('dialog');
-    await dialog.getByRole('img').evaluate(async image => image.decode());
-    await dialog.getByRole('button', { name: 'Next page →' }).click();
-    await dialog.getByRole('img', { name: 'Original PDF page 3' }).waitFor();
-    await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'View original page' }).waitFor();
-    assert(await page.getByRole('button', { name: 'View original page' }).evaluate(el => el === document.activeElement));
+    assert.equal(await page.getByRole('button', { name: 'View original page' }).count(), 0);
+    await page.evaluate(() => {
+      window.reviewScrollCalls = [];
+      const original = Element.prototype.scrollIntoView;
+      Element.prototype.scrollIntoView = function(options) {
+        window.reviewScrollCalls.push(this.textContent);
+        return original.call(this, options);
+      };
+    });
     const groups = page.getByRole('navigation', { name: 'Review groups' });
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
+    await page.waitForFunction(() => document.querySelector('.occurrence-meta')?.textContent?.includes('Example 2 of 2'));
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    if (width <= 700) assert(await page.locator('.review-evidence h2').evaluate(el => el === document.activeElement), 'Unfinished examples still bring evidence into focus');
+    await page.evaluate(() => { window.reviewScrollCalls = []; });
     await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    if (width <= 700) {
+      assert.deepEqual(await page.evaluate(() => window.reviewScrollCalls), [], 'Bulk completion must not scroll');
+      assert((await page.locator('.occurrence-meta').textContent()).includes('Example 2 of 2'), 'Bulk completion preserves the current example');
+    }
     if (width <= 700) await page.getByText('This category is complete', { exact: true }).waitFor();
     const next = page.getByRole('button', { name: 'Continue review: Chapter starts →' });
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
@@ -67,7 +77,14 @@ try {
       await groups.getByRole('button', { name: /Chapter starts/ }).click();
       assert.equal(await page.getByRole('heading', { name: 'Chapter starts' }).evaluate(el => el === document.activeElement), false, 'Desktop focus stays on navigation');
     }
+    await page.evaluate(() => { window.reviewScrollCalls = []; });
     await page.getByRole('button', { name: /^Start a new chapter/ }).click();
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    if (width <= 700) {
+      assert.deepEqual(await page.evaluate(() => window.reviewScrollCalls), [], 'Chapter completion must not scroll');
+      assert(await page.getByRole('heading', { name: 'Chapter starts' }).isVisible());
+      await page.getByRole('button', { name: 'Continue review: Suspicious extracted text →' }).click();
+    }
     await page.getByRole('heading', { name: 'Suspicious extracted text' }).waitFor();
     await page.getByRole('button', { name: /^Keep as is/ }).click();
     assert(await page.getByRole('button', { name: 'Review complete transcript →' }).isEnabled());
@@ -81,14 +98,19 @@ try {
     const violations = await page.evaluate(async () => (await window.axe.run('[data-presentation-root]')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, [], `${width}/${theme}: accessibility violations`);
     assert.deepEqual(errors, []);
-    results.push({ width, theme, overflow, completeJourney: true, manualChoicePreserved: true, originalPage: true, violations });
+    results.push({ width, theme, overflow, completeJourney: true, manualChoicePreserved: true, categoryCompletionDoesNotScroll: width <= 700 ? true : null, violations });
     await page.close();
   }
   if (before) for (const width of [390, 1440]) for (const story of ['split-title', 'finished-category']) {
     const page = await browser.newPage({ viewport: { width, height: 844 }, reducedMotion: 'reduce' });
-    await page.goto(`${before}/iframe.html?id=product-mobile-review-navigation--${story}&viewMode=story`);
-    await page.getByRole('heading', { name: story === 'split-title' ? 'Chapter starts' : 'AI suggestions' }).waitFor();
-    if (story === 'finished-category') await page.getByRole('button', { name: 'All suggestions decided' }).waitFor();
+    await page.goto(`${before}/iframe.html?id=product-mobile-review-navigation--split-title&viewMode=story`);
+    await page.getByRole('heading', { name: 'Chapter starts' }).waitFor();
+    if (story === 'finished-category') {
+      await page.getByRole('navigation', { name: 'Review groups' }).getByRole('button', { name: /AI suggestions/ }).click();
+      await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
+      await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+      await page.getByRole('button', { name: 'All suggestions decided' }).waitFor();
+    }
     await chooseAppearance(page, 'dark');
     await page.evaluate(() => document.fonts.ready);
     await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));

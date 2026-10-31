@@ -129,7 +129,6 @@
   .resolution-panel.has-bulk-choice .review-bulk-area { margin-top: auto; padding-top: 24px; }
 }
 
-.review-source-excerpt { margin-block: 1rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 /* One readable passage: context belongs inside its surface, never floating around it. */
 .source-passage { margin-block: 1rem; padding: 4px 0 4px 14px; border-left: 2px solid var(--color-action, var(--poppy)); white-space: pre-wrap; overflow-wrap: anywhere; font: 16px/1.65 var(--font-reading); color: var(--color-ink, var(--ink)); }
@@ -149,11 +148,6 @@
 /* Chapter evidence reads as text, with paragraph gaps rather than PDF display spacing. */
 .source-chapter-context { white-space: normal; }
 .source-chapter-context .source-context-break { display: block; height: .35em; }
-.review-source-button { min-height: 44px; }
-.review-source-dialog { width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; }
-.review-source-dialog img { display: block; width: 100%; height: auto; }
-.review-source-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.review-source-toolbar button, .review-source-dialog .warning-nav button { min-height: 44px; }
 .review-mobile-next { display: none; }
 .review-desktop-next { margin-left: auto; }
 @media (max-width: 700px) {

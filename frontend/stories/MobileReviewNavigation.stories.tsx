@@ -29,12 +29,17 @@ const meta = { title: "Product/Mobile review navigation", component: MobileRevie
 export default meta;
 type Story = StoryObj<typeof meta>;
 export const SplitTitle: Story = { play: async ({ canvasElement }) => { await enterScenario(canvasElement, "review"); } };
-export const FinishedCategory: Story = {
+export const Suggestions: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await userEvent.click(within(canvas.getByRole("navigation", { name: "Review groups" })).getByRole("button", { name: /AI suggestions/ }));
-    await userEvent.click(canvas.getByRole("button", { name: /^Apply all suggested choices/ }));
+  },
+};
+export const FinishedCategory: Story = {
+  play: async ({ canvasElement }) => {
+    await Suggestions.play!({ canvasElement } as Parameters<NonNullable<typeof Suggestions.play>>[0]);
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /^Apply all suggested choices/ }));
   },
 };
 export const CompleteJourney: Story = {
@@ -49,7 +54,12 @@ export const CompleteJourney: Story = {
     if (mobile) await waitFor(() => expect(heading).toHaveFocus());
     await expect(canvas.getByLabelText("Manuscript context")).toHaveTextContent("The first day began with a letter.");
     await userEvent.click(canvas.getByRole("button", { name: /^Start a new chapter/ }));
-    if (mobile) await waitFor(() => expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toHaveFocus());
+    if (mobile) {
+      await expect(heading).toBeVisible();
+      await expect(canvas.getByText("This category is complete")).toBeVisible();
+      await userEvent.click(canvas.getByRole("button", { name: "Continue review: Suspicious extracted text →" }));
+      await waitFor(() => expect(canvas.getByRole("heading", { name: "Suspicious extracted text" })).toHaveFocus());
+    }
     await userEvent.click(canvas.getByRole("button", { name: /^Keep as is/ }));
     await expect(canvas.getByRole("button", { name: "Review complete transcript →" })).toBeEnabled();
     await userEvent.click(canvas.getByRole("button", { name: "Review complete transcript →" }));
