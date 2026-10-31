@@ -46,3 +46,17 @@ Constraints: no text, lettering, logos, watermark, UI, hex codes, montage, photo
 Prompt: “Create one premium decorative bitmap asset for a Japanese-inspired fantasy audiobook studio UI. A cutout ornamental upper-right corner canopy: hand-painted deep olive pine needles and soft matcha leaves arch inward from the top right, interwoven with cherry blossoms in blush pink and wine red; two tiny warm-gold paper lanterns nestled in the foliage and a few loose petals drifting down toward the lower left. Exquisite illustrated book-cover detail, subtle gold ink accents, luminous but restrained, stylistically compatible with an opulent illustrated temple garden and a whimsical orange reading-cat mascot. Keep the majority of the bottom and left empty/transparent so the art can sit behind UI with no content obscured. No cat, no shrine symbol, no lettering, no words, no border, no scene background, no rectangular vignette. Actual transparent background, clean alpha edges. Wide landscape corner composition.”
 
 `styles/atmosphere.css` places it as a washed-out background at the upper right of canonical working stages. It carries no labels or hit targets. A slow, 8–10px position sway is decorative; `prefers-reduced-motion: reduce` stops it. A custom `PresentationRoot` semantic palette marks its visual root and excludes the fixed-color artwork. The canvas/color variables still come from the host. Reproduce appearance and layout checks with the production Storybook fixtures.
+
+## Heart brand identity — 31 October 2026
+
+Owner-selected design: capital-M Meowdiobooks wordmark, heart replacing the i dot,
+no subtitle; compact serif M with a heart, in Matcha & Cherry colours. The owner
+selected this option in the local logo exploration. Letter outlines derive from
+Iowan Old Style Roman installed on the design Mac, shaped with CoreText. No font
+file is redistributed. Heart geometry is authored vector artwork. SVG masters live
+in frontend/src/assets/brand; BrandMark renders the outlined geometry using presentation colours; the on-screen
+wordmark uses native text rendering for smooth fine strokes at UI sizes and follows
+the existing serif fallback stack on devices without Iowan. The evergreen icon tile retains cream lettering and a pink
+heart in both appearances. PNG outputs are browser-rasterized copies of these SVGs.
+The bundled 600×800 default cover is shared by preview/export rendering. New default
+covers use cache version v2; existing exports and custom covers are preserved.

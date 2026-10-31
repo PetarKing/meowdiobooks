@@ -69,3 +69,6 @@
 @media (max-width: 380px) { .agent-guide .agent-guide-brand { font-size: 19px; } }
 @media (prefers-reduced-motion: reduce) { .guide-scene * { animation: none !important; } }
 @media print { .guide-scene, .agent-guide-header, .agent-guide-tools, .agent-guide-back { display: none; } .agent-guide-main { width: 100%; margin: 0; padding: 0; border: 0; } }
+
+.agent-guide-brand .brand-wordmark { width: auto; font-size: 34px; }
+@media (max-width: 600px) { .agent-guide-brand .brand-wordmark { width: auto; font-size: 26px; } }

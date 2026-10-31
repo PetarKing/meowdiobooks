@@ -2,7 +2,7 @@
 
 [English](README.md) | 简体中文
 
-![Meowdiobooks——本地有声书工作室](docs/assets/meowdiobooks-hero.png)
+<p align="center"><img src="frontend/src/assets/brand/meowdiobooks-icon-512.png" alt="Meowdiobooks" width="96" height="96"></p>
 
 > **Alpha · macOS · Apple Silicon**——本地音频制作，云端辅助文本清理。当前版本面向愿意按照文档安装
 > 本地模型，并审核关键 AI 辅助判断的早期用户。“审核”阶段会把限定长度的书籍片段发送给 OpenAI Luna，

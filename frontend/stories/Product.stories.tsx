@@ -56,3 +56,5 @@ export const GenerateRunning: Story = scenario("generate-running");
 export const GenerateFailed: Story = scenario("generate-failed");
 export const CastSamplePending: Story = scenario("cast-sample-pending");
 export const ReviewRecovery: Story = scenario("review-recovery");
+
+export const ExportDefaultCover: Story = scenario("export-default-cover");

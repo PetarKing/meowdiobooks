@@ -1,3 +1,4 @@
+import { BrandMark } from "../components/Brand";
 import { useState } from "react";
 import { ReadingCatCompanion } from "../components/ReadingCatCompanion";
 import { libraryCoverImageUrl } from "../app/mediaUrls";
@@ -16,7 +17,7 @@ export type LibraryPageModel = Pick<WorkflowModel, "gateway" | "libraryError" | 
 function LibraryCover({ src, alt }: { src: string; alt: string }) {
   const [unavailable, setUnavailable] = useState(false);
   return <div className="library-cover" data-unavailable={unavailable || undefined}>
-    <svg className="library-cover-fallback" viewBox="0 0 80 80" fill="none" aria-hidden="true"><circle cx="40" cy="40" r="31" /><path d="M24 46V36a16 16 0 0 1 32 0v10M24 38h5v15h-5zM51 38h5v15h-5zM36 36v16M40 31v26M44 37v14" /></svg>
+    <BrandMark className="library-cover-fallback" />
     {!unavailable && <img src={src} alt={alt} loading="lazy" onError={() => setUnavailable(true)} />}
   </div>;
 }

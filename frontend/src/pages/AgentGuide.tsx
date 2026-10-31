@@ -6,7 +6,7 @@ import { ThemeToggle } from "../components/ThemeToggle";
 import { LanguageToggle } from "../components/LanguageToggle";
 import { DitherScene } from "../components/agent-guide/DitherScene";
 import "./AgentGuide.css";
-import brandMark from "../assets/brand/meowdiobooks-mark.webp";
+import { BrandWordmark } from "../components/Brand";
 
 export type AgentGuideLocale = "en" | "zh-CN";
 /** Product-facing edition policy. Keep provider and infrastructure details in the host. */
@@ -114,7 +114,7 @@ export function AgentGuide({ edition, footer, appearance: suppliedAppearance, on
   return <PresentationRoot className="agent-guide" appearance={resolvedAppearance}>
     <DitherScene paused={motionPaused} />
     <header className="agent-guide-header">
-      <a className="agent-guide-brand" href="/"><img src={brandMark} alt="" /><span>Meowdiobooks</span></a>
+      <a className="agent-guide-brand" href="/"><BrandWordmark /></a>
       <div className="agent-guide-preferences">
         <button type="button" className="theme-toggle" aria-label={motionPaused ? text.play : text.pause} title={motionPaused ? text.play : text.pause} aria-pressed={motionPaused} onClick={() => setMotionPaused(value => !value)}>
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">{motionPaused ? <path d="m9 5 11 7-11 7Z" /> : <><path d="M8 5v14M16 5v14" /></>}</svg>
