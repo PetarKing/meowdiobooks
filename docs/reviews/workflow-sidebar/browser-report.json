@@ -10,6 +10,8 @@
       "phoneProgressPreserved": true,
       "keyboardCollapse": false,
       "navigationPreserved": true,
+      "inactiveDraftCue": false,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -20,6 +22,8 @@
       "phoneProgressPreserved": true,
       "keyboardCollapse": false,
       "navigationPreserved": true,
+      "inactiveDraftCue": false,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -30,6 +34,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -40,6 +46,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -50,6 +58,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -60,6 +70,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -70,6 +82,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -80,6 +94,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -90,6 +106,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     },
     {
@@ -100,6 +118,8 @@
       "phoneProgressPreserved": false,
       "keyboardCollapse": true,
       "navigationPreserved": true,
+      "inactiveDraftCue": true,
+      "defaultBadgeHidden": true,
       "violations": []
     }
   ]

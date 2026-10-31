@@ -109,7 +109,7 @@ const dialogueScanVersion = 6;
 
 const publicWorkflowCapabilities: WorkflowCapabilities = {
   localDialogueAttribution: true,
-  showExecutionBadge: true,
+  showExecutionBadge: false,
   showProviderCostReceipts: true,
   showVoiceModelControls: true,
   advancedDialogueRules: true,

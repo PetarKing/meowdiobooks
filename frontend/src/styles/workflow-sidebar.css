@@ -22,6 +22,8 @@
   .rail nav button.active b::before { content: '♥'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--poppy); font: 400 18px/1 var(--font-sans); }
   .rail nav button small { font-size: 11px; line-height: 1.4; color: var(--muted); }
   .rail nav button.active strong { color: var(--ink); }
+  .rail nav button.revising:not(.active) b,
+  .rail nav button.revising:not(.active) small { color: var(--warning-ink); }
   .rail nav button:disabled { opacity: 1; color: var(--muted); }
   .rail nav button:not(.active):hover:not(:disabled) { background: var(--surface-soft); }
   .rail nav button:focus-visible { outline: 2px solid var(--poppy); outline-offset: 2px; }

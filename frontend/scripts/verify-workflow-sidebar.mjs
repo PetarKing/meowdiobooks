@@ -22,6 +22,7 @@ try {
     const nav = page.getByRole('navigation', { name: 'Wizard stages' });
     const review = nav.getByRole('button', { name: /^Review / });
     await review.waitFor();
+    assert.equal(await page.locator('.local-pill').count(), 0, 'Core header omits the execution badge by default');
     await chooseAppearance(page, theme);
     await page.evaluate(() => document.fonts.ready);
     await settle(page);
@@ -55,6 +56,18 @@ try {
       await extract.click();
       assert.equal(await extract.getAttribute('aria-current'), 'step');
       assert.equal(await extract.locator('b').evaluate(el => getComputedStyle(el, '::before').content), '"♥"', 'Selected completed step uses the same current-step heart');
+      await settle(page);
+      const draftColor = await marker.evaluate(el => {
+        const probe = document.createElement('span'); probe.style.color = 'var(--warning-ink)'; el.append(probe);
+        const color = getComputedStyle(probe).color; probe.remove(); return color;
+      });
+      assert.equal(await marker.evaluate(el => getComputedStyle(el).color), draftColor, 'Inactive draft retains its amber marker');
+      assert.equal(await review.locator('small').evaluate(el => getComputedStyle(el).color), draftColor);
+      assert.equal(await review.getAttribute('aria-current'), null);
+      await page.getByRole('button', { name: 'Expand sidebar' }).click();
+      await settle(page);
+      if (width === 1440 && height === 820) await page.locator('.rail').screenshot({ path: path.join(out, `draft-away-${theme}.png`) });
+      await page.getByRole('button', { name: 'Collapse sidebar' }).click();
       await review.click();
       await page.getByRole('button', { name: 'Expand sidebar' }).click();
       await settle(page);
@@ -73,7 +86,7 @@ try {
     const violations = await page.evaluate(async () => (await window.axe.run('#wizard-sidebar')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
-    results.push({ width, height, theme, heart: width > 750, phoneProgressPreserved: width <= 750, keyboardCollapse: width > 750, navigationPreserved: true, violations });
+    results.push({ width, height, theme, heart: width > 750, phoneProgressPreserved: width <= 750, keyboardCollapse: width > 750, navigationPreserved: true, inactiveDraftCue: width > 750, defaultBadgeHidden: true, violations });
     await page.close();
   }
 } finally { await browser.close(); }

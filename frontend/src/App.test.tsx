@@ -381,6 +381,11 @@ describe('v2 wizard', () => {
     expect(progress).toHaveTextContent('Step 5 of 7 · Soundscape')
   })
 
+  it.each([undefined, true])('shows the header execution badge only when explicitly enabled (%s)', async (showExecutionBadge) => {
+    await open(base, undefined, undefined, undefined, { capabilities: showExecutionBadge === undefined ? undefined : { showExecutionBadge } })
+    expect(Boolean(screen.queryByText('Local-first'))).toBe(showExecutionBadge === true)
+  })
+
   it('collapses the wizard rail without changing the active stage', async () => {
     await open()
     const nav = screen.getByRole('navigation', { name: 'Wizard stages' })

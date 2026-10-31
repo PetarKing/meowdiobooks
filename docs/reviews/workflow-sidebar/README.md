@@ -3,7 +3,8 @@
 The selected step uses a small heart (18px glyph) and one subtle row tint, replacing nested status boxes and
 conflicting selected/draft background colors. Completed inactive steps keep plain green checkmarks;
 upcoming steps keep numbers. The step label and status still distinguish current, completed, draft,
-and locked states. The collapse control sits inside a Workflow row above the steps, below the book
+and locked states. Inactive draft-ready steps retain amber numbers and status text, including when
+collapsed, so navigating back does not erase the pending-work cue. The collapse control sits inside a Workflow row above the steps, below the book
 header when it is visible. The Chinese label is localized. A short window scrolls the sidebar.
 
 This changes tablet and desktop (751px and wider). The phone progress strip, numbered current marker,
@@ -27,6 +28,12 @@ Collapsed, with keyboard focus on the expand control:
 [desktop dark](collapsed-1440-dark.png), [desktop light](collapsed-1440-light.png),
 [tablet dark](collapsed-834-dark.png), [tablet light](collapsed-834-light.png).
 
+When viewing a previous step, Review retains its draft cue:
+[draft ready · dark](draft-away-dark.png), [draft ready · light](draft-away-light.png).
+
+The default Core header no longer shows “Local-first”. The existing execution-badge capability remains
+available for hosts that explicitly opt in; no host API or edition-copy key is removed.
+
 ## Reproducible verification
 
 Interactive starting point: `Product/Workflow sidebar/Playground`. It enters Review but makes no review
@@ -46,11 +53,11 @@ node frontend/scripts/verify-mobile-review.mjs http://127.0.0.1:6017
 
 macOS arm64, Node 22.23.4, locked dependencies, native Playwright Chromium; no CI VM started.
 
-- 595 frontend tests across 43 files pass. 23 browser stories across 6 files pass.
+- 597 frontend tests across 43 files pass. 23 browser stories across 6 files pass.
 - 10 sidebar viewport/theme cases pass: 390×844, 768×1024, 834×1112, 1440×820, 1440×560,
   each in light/dark. Checks cover the current marker, locked stages, internal toggle geometry,
   keyboard collapse, preference persistence, navigating to a completed step and back while collapsed,
-  restored expanded state, unchanged phone marker/control visibility, and no horizontal overflow.
+  restored expanded state, inactive draft accent, absent default header badge, unchanged phone marker/control visibility, and no horizontal overflow.
 - Tablet checks also exercise Chinese labels. Axe reports no sidebar violations in either language.
 - [Machine-readable browser results](browser-report.json). Existing review queue/navigation checks
   and their results remain in [the review evidence](../mobile-review/README.md).

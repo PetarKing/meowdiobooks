@@ -109,7 +109,7 @@ a category or preselecting decisions. `Finished category` deliberately completes
 
 Results:
 
-- Frontend suite: 43 files, 595 tests passed.
+- Frontend suite: 43 files, 597 tests passed.
 - Focused real-browser stories: 6 files, 23 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
