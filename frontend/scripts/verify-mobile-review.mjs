@@ -47,6 +47,10 @@ try {
     await chooseAppearance(page, theme);
     await page.evaluate(() => document.fonts.ready);
     await settle(page);
+    const selectedStyle = await page.locator('.review-strip > button.active').evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, shadow: style.boxShadow, border: style.borderTopColor };
+    });
     const passage = page.getByLabel('Manuscript context');
     assert((await passage.textContent()).includes('RE C ORD S'));
     assert((await passage.textContent()).includes('The first day began with a letter.'));
@@ -150,11 +154,25 @@ try {
     assert(await page.getByRole('main').evaluate(el => el === document.activeElement));
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     assert.equal(await page.getByRole('button', { name: /^Keep original text Keep the original/ }).getAttribute('aria-pressed'), 'true');
+    await settle(page);
+    const reopened = groups.getByRole('button', { name: /AI suggestions/ });
+    assert.equal(await groups.locator('button.active').count(), 1);
+    assert(await reopened.evaluate(el => el.classList.contains('active') && el.classList.contains('resolved')));
+    assert.deepEqual(await reopened.evaluate(el => {
+      const style = getComputedStyle(el);
+      return { background: style.backgroundColor, shadow: style.boxShadow, border: style.borderTopColor };
+    }), selectedStyle, 'Reopened completed category uses the normal selection appearance');
+    if (width === 834 && theme === 'dark') await page.getByRole('complementary', { name: 'Decision queue' }).screenshot({ path: path.join(out, 'tablet-queue-reopened.png') });
+    await groups.getByRole('button', { name: /Chapter starts/ }).focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await groups.locator('button.active').count(), 1);
+    assert(await groups.getByRole('button', { name: /Chapter starts/ }).evaluate(el => el.classList.contains('active') && el.classList.contains('resolved')));
+    assert.equal(await reopened.evaluate(el => el.classList.contains('active')), false);
     await page.addScriptTag({ path: fileURLToPath(new URL('../node_modules/axe-core/axe.min.js', import.meta.url)) });
     const violations = await page.evaluate(async () => (await window.axe.run('[data-presentation-root]')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
-    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, completedQueueNeutral: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
+    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, completedQueueNeutral: true, reopenedCategorySelected: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
     await page.close();
   }
   for (const reducedMotion of ['no-preference', 'reduce']) {

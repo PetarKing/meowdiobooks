@@ -3612,8 +3612,13 @@ describe('v2 wizard', () => {
       expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(0)
       expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveAttribute('aria-current', 'true')
       fireEvent.click(groups.getByRole('button', { name: /AI suggestions/ }))
-      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(0)
+      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(1)
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveClass('active', 'resolved')
       expect(groups.getByRole('button', { name: /AI suggestions/ })).toHaveAttribute('aria-current', 'true')
+      fireEvent.click(groups.getByRole('button', { name: /Chapter starts/ }))
+      expect(document.querySelectorAll('.review-strip > button.active')).toHaveLength(1)
+      expect(groups.getByRole('button', { name: /Chapter starts/ })).toHaveClass('active', 'resolved')
+      expect(groups.getByRole('button', { name: /AI suggestions/ })).not.toHaveClass('active')
       expect(wizardApi.acceptStage).not.toHaveBeenCalled()
     } finally {
       window.matchMedia = originalMatchMedia

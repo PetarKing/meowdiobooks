@@ -33,10 +33,10 @@ import {
   reviewSuggestedAction,
 } from "../workflow/review";
 
-export type ReviewPageModel = Pick<WorkflowModel, "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
+export type ReviewPageModel = Pick<WorkflowModel, "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
 
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
-  const { acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const { reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
   const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
   const reviewDecisions = reviewDefaultDecisions(candidateWarnings, selectedReviewDecisions);
   const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
@@ -70,6 +70,11 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const complete = candidateWarnings.every((row) => reviewWarningResolved(row, reviewDecisions)) && boundaries.every((row) => Boolean(boundaryDecisions[row.id]));
   const totalGroups = candidateWarnings.length + (boundaries.length ? 1 : 0);
   const decidedGroups = candidateWarnings.filter((row) => reviewWarningResolved(row, reviewDecisions)).length + (boundaries.length && boundaries.every((row) => Boolean(boundaryDecisions[row.id])) ? 1 : 0);
+
+  // Keep a manually reopened completed category selected without carrying it into another review.
+  function reviewQueueKey(group: string) {
+    return JSON.stringify([book?.id, reviewCandidate?.revision, group]);
+  }
 
   function isMobileReview() {
     return Boolean(window.matchMedia?.("(max-width: 700px)").matches);
@@ -132,6 +137,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   function finishCategory(nextDecisions = reviewDecisions, nextBoundaries = boundaryDecisions) {
+    setReviewQueueSelection(null);
     const groups = [
       ...(boundaries.length ? [{ kind: "chapters" as const, index: 0, complete: boundaries.every((row) => Boolean(nextBoundaries[row.id])) }] : []),
       ...candidateWarnings.map((row, index) => ({ kind: "warning" as const, index, complete: reviewWarningResolved(row, nextDecisions) })),
@@ -160,6 +166,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   function openWarning(index: number) {
+    setReviewQueueSelection(reviewQueueKey(`warning-${index}`));
     setActiveReviewGroup("warnings");
     setActiveWarning(index);
     if (activeReviewGroup !== "warnings" || activeWarning !== index) setActiveOccurrence(0);
@@ -172,6 +179,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   function openBoundary(index: number) {
+    setReviewQueueSelection(reviewQueueKey("chapters"));
     setActiveReviewGroup("chapters");
     setActiveBoundary(index);
     revealReviewGroup("chapters");
@@ -312,8 +320,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       <aside className="review-queue" aria-label={t("Decision queue")}>
         <div className="review-queue-heading"><span className="eyebrow">{t("Decision queue")}</span><b>{t("{{decided}} / {{total}} decided", { decided: decidedGroups, total: totalGroups })}</b></div>
         <nav className="review-strip" aria-label={t("Review groups")} ref={reviewStripRef}>
-          {boundaries.length > 0 && <button data-review-group="chapters" aria-current={showingBoundary ? "true" : undefined} className={[showingBoundary && !boundaries.every((row) => boundaryDecisions[row.id]) ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
-          {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} aria-current={!showingBoundary && index === activeWarning ? "true" : undefined} className={[!showingBoundary && index === activeWarning && !reviewWarningResolved(row, reviewDecisions) ? "active" : "", reviewWarningResolved(row, reviewDecisions) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewWarningResolved(row, reviewDecisions) ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t(row.occurrences.length === 1 ? "1 occurrence" : "{{count}} occurrences", { count: row.occurrences.length })}{row.severity === "blocking" && ` · ${t("blocking")}`}</small></span></button>)}
+          {boundaries.length > 0 && <button data-review-group="chapters" aria-current={showingBoundary ? "true" : undefined} className={[showingBoundary && (!boundaries.every((row) => boundaryDecisions[row.id]) || reviewQueueSelection === reviewQueueKey("chapters")) ? "active" : "", boundaries.every((row) => boundaryDecisions[row.id]) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openBoundary(activeBoundary)}><span>{boundaries.every((row) => boundaryDecisions[row.id]) ? "✓" : 1}</span><span><strong>{t("Chapter starts")}</strong><small>{t("{{count}} headings · structure", { count: boundaries.length })}</small></span></button>}
+          {candidateWarnings.map((row, index) => <button key={row.id} data-review-group={`warning-${index}`} aria-current={!showingBoundary && index === activeWarning ? "true" : undefined} className={[!showingBoundary && index === activeWarning && (!reviewWarningResolved(row, reviewDecisions) || reviewQueueSelection === reviewQueueKey(`warning-${index}`)) ? "active" : "", reviewWarningResolved(row, reviewDecisions) ? "resolved" : ""].filter(Boolean).join(" ")} onClick={() => openWarning(index)}><span>{reviewWarningResolved(row, reviewDecisions) ? "✓" : index + (boundaries.length ? 2 : 1)}</span><span><strong>{t(reviewWarningLabel(row.kind))}</strong><small>{t(row.occurrences.length === 1 ? "1 occurrence" : "{{count}} occurrences", { count: row.occurrences.length })}{row.severity === "blocking" && ` · ${t("blocking")}`}</small></span></button>)}
         </nav>
 
       </aside>

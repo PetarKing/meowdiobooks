@@ -54,9 +54,10 @@ warning-soft background, and warning-border tokens. Choosing another option mute
 choosing the suggestion replaces its sparkle with a checkmark and the existing Review selection tint.
 Suggestions remain undecided until explicitly selected. The accessible suggestion description remains.
 
-Completed queue cards now consistently have a neutral background and a green checkmark. Only the
-current unfinished category has an active highlight. When all categories are complete, none has an
-active fill. `aria-current` still identifies the displayed category, and keyboard focus keeps its
+Completed queue cards now consistently have a neutral background and a green checkmark. The
+current unfinished category has an active highlight. Explicitly reopening a completed category
+also highlights it while retaining the checkmark; selecting a different category moves that highlight.
+Immediately after completing all categories, none has an active fill until manually reopened. `aria-current` still identifies the displayed category, and keyboard focus keeps its
 existing visible outline. This fixes a shared cascade conflict: legacy completed-card gradients had
 higher specificity than the normal card style, but the last-child rule overrode only the last card.
 
@@ -66,6 +67,8 @@ higher specificity than the normal card style, but the last-child rule overrode 
 | All categories complete | ![Before complete queue](tablet-queue-complete-before.png) | ![After complete queue](tablet-queue-complete-after.png) |
 
 ![Suggested correction with Dialogue sparkle and tint](tablet-suggestion.png)
+
+![Completed AI category explicitly reopened](tablet-queue-reopened.png)
 
 ## Reproducible verification
 
@@ -104,7 +107,8 @@ Results:
   or the shared category progression with existing desktop scrolling, resolves every decision, opens the transcript, returns, and verifies the
   manually kept choice. Before completion the final action is hidden on mobile. After completion it
   is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations. All 12 viewport/theme cases also verify Dialogue’s
-  suggestion color tokens, the sparkle and muted state, and equal neutral styling across completed cards.
+  suggestion color tokens, the sparkle and muted state, equal neutral styling immediately after
+  completion, and the normal active fill/checkmark when reopening completed cards by mouse or keyboard.
 - Browser motion checks at 390×600 verify animated movement for both example and category completion,
   plus immediate reduced-motion behavior. A synthetic 104px sticky header verifies measured alignment;
   exact target geometry is checked after scrolling settles. The short-category case verifies that the
