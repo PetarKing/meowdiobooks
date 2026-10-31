@@ -70,7 +70,7 @@
     "playwright": "1.63.0",
     "pngjs": "^7.0.0",
     "storybook": "10.6.3",
-    "typescript-eslint": "8.32.1",
+    "typescript-eslint": "8.72.1",
     "vitest": "4.1.12"
   },
   "license": "PolyForm-Noncommercial-1.0.0"
