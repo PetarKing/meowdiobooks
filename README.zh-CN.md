@@ -1,5 +1,13 @@
 <p align="center"><img src="frontend/src/assets/brand/meowdiobooks-social.png" alt="Meowdiobooks" width="100%"></p>
 
+<p align="center">
+  <a href="https://discord.gg/JAfaNUc9yB"><img src="https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&amp;logoColor=white" alt="Discord community"></a>
+  <a href="https://discord.gg/wfrjrvgSNH"><img src="https://img.shields.io/badge/Discord-Support%20%26%20bugs-5865F2?logo=discord&amp;logoColor=white" alt="Support and bugs on Discord"></a>
+  <a href="https://github.com/PetarKing/meowdiobooks/releases/latest"><img src="https://img.shields.io/github/v/release/PetarKing/meowdiobooks?color=40634A" alt="Latest release"></a>
+  <a href="#安装"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-40634A?logo=apple&amp;logoColor=white" alt="macOS on Apple Silicon"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-40634A" alt="License: PolyForm Noncommercial"></a>
+</p>
+
 <p align="center"><strong>让书中的角色，拥有自己的声音。</strong><br>在 Mac 上，将 PDF、EPUB 和文本制作成多角色有声书。</p>
 
 <p align="center"><a href="README.md">English</a> · 简体中文<br><a href="#试听">试听</a> · <a href="#看看界面">界面</a> · <a href="#按你的喜好配置">模型</a> · <a href="#安装">安装</a> · <a href="docs/README.md">文档</a> · <a href="#一起改进">社区</a></p>
