@@ -9,11 +9,11 @@ Meowdiobooks 识别书中的对话，协助你整理角色，并为每个角色�
 
 ## 试听
 
-**The Last Door**——一段 38 秒的场景，包含旁白、不同角色的声音和共同说出的台词。
+**The Last Door**——一段 36 秒的场景，包含旁白、不同角色的声音和共同说出的台词。
 
-https://github.com/user-attachments/assets/7375f0c2-0ff0-43a1-b231-1a0558330a48
+https://github.com/user-attachments/assets/465134c0-cbe0-45bc-a1d1-16fab52ff70f
 
-[下载原始 WAV](docs/demo/meowdiobooks-demo.wav) · [阅读台词和制作说明](docs/DEMO.md)
+[下载音频](docs/demo/the-last-door.mp3) · [阅读台词](docs/demo/README.md)
 
 ## 看看界面
 
