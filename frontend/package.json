@@ -38,7 +38,7 @@
   "dependencies": {
     "@types/three": "0.186.0",
     "@vitejs/plugin-react": "4.4.1",
-    "i18next": "^26.3.6",
+    "i18next": "^26.5.11",
     "react": "19.1.4",
     "react-dom": "19.1.4",
     "react-i18next": "^17.0.9",
