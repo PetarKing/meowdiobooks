@@ -2,10 +2,14 @@
 
 English | [简体中文](README.zh-CN.md)
 
-<p align="center"><img src="frontend/src/assets/brand/meowdiobooks-icon-512.png" alt="Meowdiobooks heart mark" width="96" height="96"></p>
+<p align="center"><img src="frontend/src/assets/brand/meowdiobooks-social.png" alt="Meowdiobooks — a studio for stories" width="100%"></p>
 
-> **Alpha · macOS · Apple Silicon** — local audio production with cloud-assisted cleanup. This release
-> is for early adopters comfortable installing the documented local model stack and reviewing key
+<p align="center"><strong>Read it. Cast it. Hear it.</strong><br>Personal audiobook production, with every important decision in your hands.</p>
+
+<p align="center"><a href="#run-locally">Get started</a> · <a href="docs/COMMUNITY.md">Our commitment</a> · <a href="https://github.com/PetarKing/meowdiobooks/releases/latest">V1.0 release</a></p>
+
+> **V1.0 · macOS · Apple Silicon** — local audio production with cloud-assisted cleanup. This release
+> is for people comfortable installing the documented local model stack and reviewing key
 > AI-assisted decisions. Review sends bounded book passages to OpenAI Luna and requires an API key.
 
 **Transform a PDF, EPUB, or text file into a dynamic cast audiobook with an AI-native workflow that keeps you in control.**
@@ -49,8 +53,10 @@ source or making every decision on the user's behalf.
   </tr>
 </table>
 
-The screenshots use the repository's short, public-domain *Alice's Adventures in Wonderland*
-evaluation fixture. The same guided workflow scales from a four-page proof to a complete book.
+The screenshots show the V1 interface using public-domain Alice passages and synthetic demonstration
+fixtures, with the current forest palette and heart identity. No private books or customer data appear.
+
+<p align="center"><img src="docs/assets/showcase/studio-dark.jpg" alt="The Meowdiobooks V1 studio in its forest dark appearance" width="100%"></p>
 
 ## Built for real books
 
@@ -99,26 +105,34 @@ PDF / EPUB / text → source text → dialogue attribution → character reconci
   editable transcript draft, and a generated audition of the same line used to compare designed voices.
 - Prepares one faithful final recording script from the accepted upstream revisions when Generate first needs it.
 - Publishes complete versioned WAV chapters atomically, packages current chapters as M4B or MP3, and keeps completed exports in a local Library.
-- Keeps the book and model inference on the Mac by default. When the user selects remote Dialogue,
-  bounded eight-page scenes and on-demand evidence excerpts are sent to the configured provider;
-  across a complete run, those excerpts may cover text from anywhere in the book.
+- Stores source books, accepted work, voice samples and generated audio on your Mac. Voice generation
+  runs locally. Review sends bounded passages to OpenAI; optional remote Dialogue also sends scenes
+  and evidence excerpts. These excerpts may cover text from anywhere in the book.
 
 After local PDF intake, the guided workflow is **Extract → Dialogue → Review → Cast & Voices →
 Generate → Export**. See the
 [workflow guide](docs/wizard/README.md) for the exact phase behavior.
 
-## Alpha scope
+## V1 scope
 
 Meowdiobooks supports local PDF, EPUB, UTF-8 TXT, and Markdown files on Apple Silicon Macs.
 PDFs can be up to 500 MB; text files up to 20 MiB. EPUB archives are bounded to 2,000 entries,
 8 MiB per entry, 64 MiB expanded, and 20 MiB of readable text. PDF extraction,
 attribution, identity reconciliation, voice design and cloning, chapter generation, and audiobook export
-work. The alpha is intended for testing and refinement, not unattended production: results are probabilistic,
-persisted alpha data may break between versions, and there is no supported model installer yet.
+work. AI results require your review. V1 establishes a supported baseline: preserving your accepted work
+and exports is a release requirement. Any future format change must include a documented upgrade
+path; keep a backup before upgrading. Model installation remains manual.
 
 **Coming next:** easier setup and review, broader source and hardware support, and measured improvements
 to dialogue and audio quality. A hosted companion and richer character-aware listening experience are
 planned directions. See the [roadmap](docs/ROADMAP.md).
+
+## Built to remain yours
+
+As long as we offer Meowdiobooks commercially, we commit to maintaining this personal, self-hosted
+edition and sharing improvements to the common audiobook workflow. We will not turn it into a
+subscription-only shell or require a Meowdiobooks account to use it. Community fixes and improvements
+can benefit personal and paying users alike. Read [our support and quality commitment](docs/COMMUNITY.md).
 
 ## Models
 
@@ -139,6 +153,11 @@ Voice cloning does not use a separate synthesis model: Qwen3-ASR proposes editab
 same Qwen3-TTS Base renderer used for chapters clones the corrected audio/text reference. VoiceDesign,
 Base TTS and STT remain local. The optional remote Dialogue route sends bounded scene and evidence
 text externally and may inspect any part of the book while resolving a difficult speaker.
+
+A fully local Review adapter is a supported direction for community development, not a V1 feature.
+The current Review policy requires `gpt-6-luna` and both Decisions and Responses APIs. Changing
+`base_url` to a chat-completions-compatible server alone is insufficient. See
+[provider compatibility](docs/COMMUNITY.md#your-models-and-your-data).
 
 ## Run locally
 
@@ -189,7 +208,8 @@ an active generation remains owned by the original backend process.
 - Image-only, malformed, multi-column, or layout-heavy PDFs may extract poorly or fail.
 - Dialogue attribution, character reconciliation, and voice design require review.
 - Heavy work is serialized for one local user and can take substantially longer than playback.
-- Interrupted jobs restart the current stage rather than resuming within it.
+- Chapter generation can reuse validated checkpoints when accepted inputs and the render recipe
+  still match. Other interrupted work may need a retry; recovery never bypasses review.
 - There is no installer, updater, authentication, LAN mode, built-in player, or phone connection.
 - Meowdiobooks does not bypass DRM. You are solely responsible for ensuring that you have the
   rights and permissions required for every book and output you process, generate, share, or use.

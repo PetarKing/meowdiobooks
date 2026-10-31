@@ -1,7 +1,7 @@
 # Documentation
 
 Meowdiobooks documentation is divided by audience. Product-facing references describe what the
-current alpha does; architecture contracts preserve the behavior contributors must not accidentally
+current application does; architecture contracts preserve the behavior contributors must not accidentally
 change; proposed plans are clearly marked as unimplemented.
 
 ## Start here
@@ -42,3 +42,6 @@ change; proposed plans are clearly marked as unimplemented.
 ## Future design notes
 
 - [Selective artifact storage and materialization](future/ARTIFACT_STORAGE_AND_MATERIALIZATION.md)
+
+- [Our commitment to personal users](COMMUNITY.md)
+- [V1.0 release](RELEASE-V1.md)

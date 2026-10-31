@@ -37,7 +37,9 @@ Use the [latest release entry](https://github.com/PetarKing/meowdiobooks/release
 discovery, then pin an exact verified tag, commit, filenames and checksums. These packages are not
 an application installer or a model bundle; see [release assets](../release/README.md).
 
-Published immutable releases, tags and asset hashes remain unchanged. Consolidate release
+V1 establishes a new public baseline under the owner's one-time reset authorization, with pre-V1
+records preserved privately and consumers migrated before old releases are retired.
+After that transition, published immutable releases, tags and asset hashes remain unchanged. Consolidate release
 navigation and future release cadence rather than deleting or replacing historical assets.
 Do not remove a legacy mutable release without first checking consumer pins and receiving explicit
 authorization. A cleanup of source files cannot sanitize old release payloads or source archives.

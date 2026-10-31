@@ -22,13 +22,18 @@ books and computers without losing its source-linked workflow.
 
 ## More books and hardware
 
-- Extend intake beyond PDF, beginning with source formats such as EPUB and plain text while preserving
-  traceability from the accepted source to generated audio.
+- Refine the existing PDF, EPUB and text intake paths while preserving source traceability.
 - Improve OCR and reading-order recovery for image-only, multi-column and layout-heavy documents.
 - Investigate a supported Linux path, including a voice runtime that preserves the existing audition
   and generation contracts. Consider Windows after that path is stable.
 - Continue improving English and Chinese handling, then validate additional languages supported by the
   selected voice pipeline.
+
+## Provider choice
+
+- Implement and evaluate a fully local Review adapter against the same source anchors, typed
+  decisions, repair validation and cancellation contracts. Generic chat API compatibility alone
+  does not satisfy the current Decisions/Responses policy.
 
 ## Hosted companion
 

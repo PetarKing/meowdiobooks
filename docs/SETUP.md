@@ -1,6 +1,6 @@
 # Setup reference
 
-Meowdiobooks alpha currently supports macOS on Apple Silicon (`arm64`) only.
+Meowdiobooks V1 supports macOS on Apple Silicon (`arm64`) only.
 
 ## Prerequisites
 
@@ -31,7 +31,7 @@ tested Apple Silicon setup; users who already manage these tools elsewhere may u
 
 ## Model assets
 
-The alpha deliberately does not install AI runtimes or model weights automatically. The default
+V1 deliberately does not install AI runtimes or model weights automatically. The default
 [`models.toml`](../models.toml) expects these assets relative to the repository root:
 
 | Purpose | Asset | Expected path |
