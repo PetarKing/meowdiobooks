@@ -1,0 +1,86 @@
+{
+  "synthetic": true,
+  "after": "http://127.0.0.1:6017",
+  "before": "http://127.0.0.1:6018",
+  "results": [
+    {
+      "width": 320,
+      "theme": "light",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 320,
+      "theme": "dark",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "light",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 390,
+      "theme": "dark",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "light",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 768,
+      "theme": "dark",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "theme": "light",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "width": 1440,
+      "theme": "dark",
+      "overflow": 0,
+      "completeJourney": true,
+      "manualChoicePreserved": true,
+      "originalPage": true,
+      "violations": []
+    },
+    {
+      "baseline": "split-title"
+    },
+    {
+      "baseline": "finished-category",
+      "disabledTranscript": true
+    }
+  ]
+}

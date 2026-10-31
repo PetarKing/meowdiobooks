@@ -150,3 +150,14 @@ keep it in normal flow after the options on smaller screens or when the options 
 Explain preservation in the accessible description and tooltip. At zero, show “All suggestions decided”.
 Bulk application preserves manual choices. At zero, disable only the bulk button and explain that
 individual choices remain editable. Do not add a duplicate selection-status line below the choices.
+
+Chapter-start evidence displays all supplied bounded context so a title split across paragraphs
+and its opening passage remain visible. Only the original boundary anchor is highlighted; this
+presentation does not merge source spans or rewrite extracted text. PDF review offers an on-demand
+original-page dialog through the existing host media resolver, with page navigation and retry.
+
+The Review action area reports completion across all categories. While decisions remain, its primary
+action opens the first unresolved heading or text decision and focuses the evidence below the header.
+Completing suggested choices is distinct from completing a category or the whole review. On phones
+the action area stays at the viewport foot while reading; the final controls remain scrollable above
+it. The complete-transcript preview and explicit acceptance remain separate steps.

@@ -5,6 +5,7 @@ export interface SourceExcerptProps {
   className?: string;
   layout?: "separate" | "passage";
   compact?: boolean;
+  contextMode?: "nearby" | "full";
   label?: string;
 }
 
@@ -36,7 +37,16 @@ function compactLines(text: string) {
 }
 
 /** Source offsets and review actions remain anchored to the original, unmodified target. */
-export function SourceExcerpt({ source, contextBefore = "", contextAfter = "", className, layout = "separate", compact = false, label }: SourceExcerptProps) {
+export function SourceExcerpt({ source, contextBefore = "", contextAfter = "", className, layout = "separate", compact = false, contextMode = "nearby", label }: SourceExcerptProps) {
+  if (contextMode === "full") {
+    return <div className={['source-excerpt source-passage', className].filter(Boolean).join(' ')} aria-label={label}>
+      {layout === "passage" ? <p><span className="source-nearby">{compactLines(contextBefore)}</span><mark>{compactLines(source)}</mark><span className="source-nearby">{compactLines(contextAfter)}</span></p> : <>
+        {contextBefore && <p className="source-nearby">{compactLines(contextBefore)}</p>}
+        <p><mark>{compactLines(source)}</mark></p>
+        {contextAfter && <p className="source-nearby">{compactLines(contextAfter)}</p>}
+      </>}
+    </div>;
+  }
   if (layout === "passage" || compact) {
     const continuous = layout === "passage";
     const beforeParts = paragraphs(contextBefore);

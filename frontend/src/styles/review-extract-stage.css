@@ -145,3 +145,20 @@
 .review-pattern-exceptions { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
 .review-pattern-exceptions > summary { cursor: pointer; font-size: 12px; font-weight: 600; }
 .review-pattern-exceptions[open] > summary { margin-bottom: 16px; }
+
+/* Keep the next unresolved decision reachable after the current category is finished. */
+.review-next-action { align-items: center; }
+.review-next-action > div { min-width: 0; }
+.review-next-action p { margin: 5px 0 0; color: var(--color-muted, var(--muted)); }
+.review-next-action > .primary { flex-shrink: 0; max-width: 100%; white-space: normal; }
+.review-evidence h2 { scroll-margin-top: 110px; }
+.review-source-button { min-height: 44px; }
+.review-source-dialog { width: min(900px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); overflow: auto; }
+.review-source-dialog img { display: block; width: 100%; height: auto; }
+.review-source-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.review-source-toolbar button, .review-source-dialog .warning-nav button { min-height: 44px; }
+@media (max-width: 700px) {
+  .review-next-action { position: sticky; bottom: 0; z-index: 3; gap: 10px; padding: 12px 0 max(12px, env(safe-area-inset-bottom)); background: var(--color-paper, var(--paper)); }
+  .review-next-action > div { width: 100%; }
+  .review-next-action > .primary { min-height: 48px; }
+}
