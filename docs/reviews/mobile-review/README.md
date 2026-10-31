@@ -28,7 +28,7 @@ transcript preview, and explicit acceptance remain unchanged.
 All screenshots use synthetic text and the production App with a fixture gateway. No customer
 manuscript, screenshot, account identifier, or service data is included.
 
-| State | Before (`fde4f82`) | Current draft |
+| State | Before (`fde4f82`) | Review changes before sidebar follow-up |
 | --- | --- | --- |
 | Mobile: split chapter title | ![Before mobile chapter](chapter-before.png) | ![After mobile chapter](chapter-after.png) |
 | Mobile: suggested choices finished | ![Before mobile completion](category-before.png) | ![After mobile completion](category-after.png) |
@@ -91,7 +91,7 @@ npm --prefix frontend test -- --run
 npm --prefix frontend run lint
 npm --prefix frontend run build
 npm --prefix frontend run storybook:check
-npm --prefix frontend run test-storybook -- stories/MobileReviewNavigation.stories.tsx stories/CompactReviewPassages.stories.tsx stories/CleanupReview.stories.tsx stories/AliceReviewPassages.stories.tsx stories/ScriptDirections.stories.tsx
+npm --prefix frontend run test-storybook -- stories/WorkflowSidebar.stories.tsx stories/MobileReviewNavigation.stories.tsx stories/CompactReviewPassages.stories.tsx stories/CleanupReview.stories.tsx stories/AliceReviewPassages.stories.tsx stories/ScriptDirections.stories.tsx
 npm --prefix frontend run storybook -- --port 6017
 node frontend/scripts/verify-mobile-review.mjs http://127.0.0.1:6017
 ```
@@ -110,7 +110,7 @@ a category or preselecting decisions. `Finished category` deliberately completes
 Results:
 
 - Frontend suite: 43 files, 595 tests passed.
-- Focused real-browser stories: 5 files, 21 tests passed, including existing public-domain Alice
+- Focused real-browser stories: 6 files, 23 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
 - Browser matrix: 320×844, 390×844, 650×1400, 768×844, 834×1112, and 1440×844, light and dark. Each follows the three mobile destinations
@@ -159,3 +159,8 @@ artifact contract, or accepted book data changed. Relevant public-domain Alice p
 ran; synthetic multiline and Chinese source tests extend presentation coverage. These fixtures prove
 UI behavior, not new inference accuracy. A shared release and downstream pin update are required
 before Alpha can adopt this change. No deployment is included in this draft.
+
+## Workflow sidebar follow-up
+
+The approved small-heart sidebar and internal collapse control apply to tablet/desktop only.
+[Before/after captures and dedicated interaction checks](../workflow-sidebar/README.md).

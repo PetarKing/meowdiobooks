@@ -413,6 +413,7 @@ const zhCN: Record<string, string> = {
   "Collapse sidebar": "收起侧栏",
   "Wizard stages": "制作流程",
   "Workflow progress": "制作进度",
+  "Workflow": "制作流程",
   "Step {{current}} of {{total}} · {{stage}}": "第 {{current}} / {{total}} 步 · {{stage}}",
   "Extract": "提取",
   "Dialogue": "对话",
