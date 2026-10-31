@@ -69,3 +69,10 @@ inference backend; it does not download llama.cpp or any model weights. The supp
 registry installation is documented. The separately published `meowdiobooks-workflow` wheel is an
 integration asset, not the complete local application or its Apple Silicon runtime. See
 [shared release assets](../release/README.md) for its scope.
+
+## Repository branding assets
+
+The README uses `frontend/src/assets/brand/meowdiobooks-icon-512.png`. For a GitHub
+repository social preview, upload `frontend/src/assets/brand/meowdiobooks-social.png`
+in the repository General settings. The browser uses `frontend/public/favicon.svg`,
+whose larger heart is designed for small sizes. These assets contain no subtitle.
