@@ -60,7 +60,7 @@ describe("ChapterAudioPlayer", () => {
     fireEvent.play(audio);
     expect(session.metadata).toMatchObject({
       title: chapter.title, album: chapter.bookTitle, artist: chapter.author,
-      artwork: [{ src: expect.stringContaining("meowdiobooks-mark.png"), sizes: "512x512", type: "image/png" }],
+      artwork: [{ src: expect.stringContaining("meowdiobooks-icon-512.png"), sizes: "512x512", type: "image/png" }],
     });
     fireEvent.pause(audio);
     expect(session.metadata?.title).toBe(chapter.title);

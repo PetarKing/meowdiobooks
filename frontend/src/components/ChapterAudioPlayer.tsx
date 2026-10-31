@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import chapterArtwork from "../assets/brand/meowdiobooks-mark.png";
+import chapterArtwork from "../assets/brand/meowdiobooks-icon-512.png";
 
 export interface ChapterAudioPlayerProps {
   src: string;

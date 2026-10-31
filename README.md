@@ -2,7 +2,7 @@
 
 English | [简体中文](README.zh-CN.md)
 
-![Meowdiobooks — a local audiobook studio](docs/assets/meowdiobooks-hero.png)
+<p align="center"><img src="frontend/src/assets/brand/meowdiobooks-icon-512.png" alt="Meowdiobooks heart mark" width="96" height="96"></p>
 
 > **Alpha · macOS · Apple Silicon** — local audio production with cloud-assisted cleanup. This release
 > is for early adopters comfortable installing the documented local model stack and reviewing key

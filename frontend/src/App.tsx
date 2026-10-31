@@ -6,7 +6,7 @@ import { ThemeToggle } from "./components/ThemeToggle";
 import { useWorkflowModel } from "./app/useWorkflowModel";
 import { usePageNavigation } from "./app/usePageNavigation";
 import { hasGenerationAction } from "./workflow/generation";
-import brandMark from "./assets/brand/meowdiobooks-mark.webp";
+import { BrandMark, BrandWordmark } from "./components/Brand";
 import { DialogSurface } from "./components/DialogSurface";
 import { DialogueRoutingChoice } from "./components/DialogueRoutingChoice";
 import { LanguageToggle } from "./components/LanguageToggle";
@@ -31,8 +31,7 @@ import {
 } from "./workflow/navigation";
 import {
   localizeErrorMessage,
-  localizeProcessMessage,
-  monogram
+  localizeProcessMessage
 } from "./workflow/presentation";
 export type { AppProps, GenerationPurchasePresentation, WorkflowCapabilities, WorkflowHeaderContext, WorkflowStepOverrideProps } from "./app/contracts";
 
@@ -100,8 +99,7 @@ export default function App(props: AppProps) {
     {renderHeader ? renderHeader({ productView, libraryCount: libraryExports.length, navigate: navigateProduct }) : <header className="topbar" inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       <div className="topbar-inner">
         <button className="brand" aria-label={t("Go to Home")} onClick={() => { navigateProduct("create"); setHome(true); }}>
-          <span className="cat-mark"><img src={brandMark} alt="" /></span>
-          <span>Meowdiobooks<small>{t("Books, finding their voice.")}</small></span>
+          <BrandWordmark /><span className="brand-compact"><BrandMark compact /></span>
         </button>
         <nav className="product-tabs" aria-label={t("Product areas")}>
           <button className={productView === "create" ? "active" : ""} aria-current={productView === "create" ? "page" : undefined} onClick={() => navigateProduct("create")}><ProductTabIcon view="create" /><span className="product-tab-label">{t("Create")}</span></button>
@@ -116,7 +114,7 @@ export default function App(props: AppProps) {
     </header>}
     <div className={`workspace ${!showWizard ? "home-workspace" : ""} ${showWizard && sidebarCollapsed ? "rail-collapsed" : ""}`} inert={generationInProgress || uploadingCharacterId ? true : undefined}>
       {showWizard && <aside id="wizard-sidebar" className="rail" aria-label={t("Wizard stages")}>
-        <div className="book-mini"><div className="cover">{monogram(book?.title ?? "?")}</div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
+        <div className="book-mini"><div className="cover"><BrandMark compact /></div><div><strong>{book?.title}</strong><span>{book?.filename}</span></div></div>
         <div className="rail-tools"><span className="rail-tools-label">{t("Workflow")}</span><button type="button" className="rail-toggle" aria-controls="wizard-sidebar" aria-expanded={!sidebarCollapsed} aria-label={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} title={t(sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar")} onClick={toggleSidebar}><span aria-hidden="true">{sidebarCollapsed ? "›" : "‹"}</span></button></div>
         {activeJourneyStep && <div className="mobile-progress visually-hidden" role="status" aria-label={t("Workflow progress")}>
           {t("Step {{current}} of {{total}} · {{stage}}", { current: stage + 1, total: stages.length, stage: t(activeJourneyStep.label) })}
