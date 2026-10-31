@@ -23,6 +23,13 @@ Keep companion-specific credentials, operations, and product policy out of this 
 - Remove task-created branches/worktrees only after proving their work is preserved; report
   unrelated or unique state instead of discarding it.
 
+## Focused verification for static changes
+
+Maintainer-approved `skip-ci` is available for documentation, copy and static visual assets,
+including icons, under the repository's documented skip policy. Inspect changed assets and their
+references; do not run full CI solely for those changes. Changes to application logic, build
+configuration or asset pipelines retain normal checks.
+
 ## Workflow releases
 
 Read [the release runbook](docs/WORKFLOW-RELEASE.md) when publishing shared workflow assets. Select
