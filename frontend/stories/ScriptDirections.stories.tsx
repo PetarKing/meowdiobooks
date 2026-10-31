@@ -38,7 +38,7 @@ export const ManualChoiceSurvivesBulk: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     const apply = canvas.getByRole("button", { name: /^(Apply all suggested choices|All suggestions decided)/ });
-    await expect([...apply.closest(".resolution-options")!.querySelectorAll("button")].map((button) => button.querySelector("b")?.textContent)).toEqual(["Keep original text", "Leave out (Suggested)", "Apply all suggested choices (3)"]);
+    await expect([...apply.closest(".resolution-options")!.querySelectorAll("button")].map((button) => button.querySelector("b")?.textContent)).toEqual(["Keep original text", "Leave out", "Apply all suggested choices (3)"]);
     await userEvent.click(canvas.getByRole("button", { name: /^Keep original text This highlighted/ }));
     await userEvent.click(apply);
     await expect(apply).toBeDisabled();

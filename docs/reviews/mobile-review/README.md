@@ -15,7 +15,8 @@ Scroll targets use the measured sticky-header bottom plus 12px, rather than a fi
 Short categories get only enough scroll room after the final controls to align correctly; there is
 no spacer between choices and the final action. Scrolling is smooth unless reduced motion is requested.
 Desktop retains its existing queue navigation, automatic progression, and disabled transcript action
-until all decisions are complete. These mobile transitions do not alter desktop behavior.
+until all decisions are complete. These mobile transitions do not alter desktop behavior. The shared suggestion-card and completed-category
+styles described below apply at every viewport size.
 
 Both layouts show all supplied bounded chapter context, including split title lines and opening
 passages, with compact paragraph spacing and the exact original anchor highlighted. This is display
@@ -44,6 +45,26 @@ scroll/focus reset on both mobile and desktop. Transcript loading, paging, and z
 - [Mobile final action after all categories complete](all-complete-390.png)
 - [Mobile final-check entry](final-check-390.png)
 - [Desktop final-check entry](final-check-1440.png)
+
+## Suggestion cards and tablet category states
+
+Suggested choices now match Dialogue’s “Who reads this line?” options: the same outlined sparkle,
+warning-soft background, and warning-border tokens. Choosing another option mutes the suggestion;
+choosing the suggestion replaces its sparkle with a checkmark and the existing Review selection tint.
+Suggestions remain undecided until explicitly selected. The accessible suggestion description remains.
+
+Completed queue cards now consistently have a neutral background and a green checkmark. Only the
+current unfinished category has an active highlight. When all categories are complete, none has an
+active fill. `aria-current` still identifies the displayed category, and keyboard focus keeps its
+existing visible outline. This fixes a shared cascade conflict: legacy completed-card gradients had
+higher specificity than the normal card style, but the last-child rule overrode only the last card.
+
+| Tablet state | Before this follow-up (`379c74f`) | Current draft |
+| --- | --- | --- |
+| Two categories complete | ![Before partial queue](tablet-queue-partial-before.png) | ![After partial queue](tablet-queue-partial-after.png) |
+| All categories complete | ![Before complete queue](tablet-queue-complete-before.png) | ![After complete queue](tablet-queue-complete-after.png) |
+
+![Suggested correction with Dialogue sparkle and tint](tablet-suggestion.png)
 
 ## Reproducible verification
 
@@ -76,10 +97,11 @@ Results:
 - Focused real-browser stories: 5 files, 21 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
   source-check-after-bulk, and manual-choice preservation.
-- Browser matrix: 320×844, 390×844, 650×1400, 768×844, and 1440×844, light and dark. Each follows the three mobile destinations
+- Browser matrix: 320×844, 390×844, 650×1400, 768×844, 834×1112, and 1440×844, light and dark. Each follows the three mobile destinations
   or existing desktop flow, resolves every decision, opens the transcript, returns, and verifies the
   manually kept choice. Before completion the final action is hidden on mobile. After completion it
-  is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations.
+  is visible/focused, and scrolling never moves upward. No horizontal overflow or axe violations. All 12 viewport/theme cases also verify Dialogue’s
+  suggestion color tokens, the sparkle and muted state, and equal neutral styling across completed cards.
 - Browser motion checks at 390×600 verify animated movement for both example and category completion,
   plus immediate reduced-motion behavior. A synthetic 104px sticky header verifies measured alignment;
   exact target geometry is checked after scrolling settles. The short-category case verifies that the

@@ -36,7 +36,7 @@ async function startTrace(page) {
   });
 }
 try {
-  for (const [width, height] of [[320, 844], [390, 844], [650, 1400], [768, 844], [1440, 844]]) for (const theme of ['light', 'dark']) {
+  for (const [width, height] of [[320, 844], [390, 844], [650, 1400], [768, 844], [834, 1112], [1440, 844]]) for (const theme of ['light', 'dark']) {
     const mobile = width <= 700;
     const page = await browser.newPage({ viewport: { width, height }, reducedMotion: 'reduce', recordVideo: width === 390 && theme === 'dark' ? { dir: out } : undefined });
     const errors = [];
@@ -59,6 +59,24 @@ try {
     const groups = page.getByRole('navigation', { name: 'Review groups' });
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
     if (mobile) await landing(page, 'category');
+    const suggestion = page.getByRole('button', { name: /^Apply correction/ });
+    assert.equal(await suggestion.getAttribute('aria-pressed'), 'false');
+    assert.equal(await suggestion.getAttribute('aria-description'), 'Suggested choice for this passage');
+    assert((await suggestion.textContent()).includes('✧'));
+    const suggestionStyles = await suggestion.evaluate(el => {
+      const actual = getComputedStyle(el);
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--warning-soft)';
+      probe.style.borderColor = 'var(--warning-border)';
+      el.append(probe);
+      const expected = getComputedStyle(probe);
+      const result = { background: actual.backgroundColor, border: actual.borderTopColor, expectedBackground: expected.backgroundColor, expectedBorder: expected.borderTopColor };
+      probe.remove();
+      return result;
+    });
+    assert.equal(suggestionStyles.background, suggestionStyles.expectedBackground, 'Suggestion matches Dialogue tint');
+    assert.equal(suggestionStyles.border, suggestionStyles.expectedBorder, 'Suggestion matches Dialogue border');
+    if (width === 834 && theme === 'dark') await suggestion.screenshot({ path: path.join(out, 'tablet-suggestion.png') });
     await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
     await page.waitForFunction(() => document.querySelector('.occurrence-meta')?.textContent?.includes('Example 2 of 2'));
     if (mobile) {
@@ -66,6 +84,10 @@ try {
       assert.equal(await transcript.isVisible(), false);
       if (width === 390 && theme === 'dark') await page.screenshot({ path: path.join(out, 'next-example-390.png') });
     }
+    await page.getByRole('button', { name: '← Previous example' }).click();
+    assert(await suggestion.evaluate(el => el.classList.contains('review-recommended-muted')), 'Declined suggestion is muted');
+    assert((await suggestion.textContent()).includes('✧'));
+    await page.getByRole('button', { name: 'Next example →' }).click();
     await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
     if (mobile) {
       await landing(page, 'queue');
@@ -101,6 +123,15 @@ try {
       assert(await page.evaluate(() => scrollY) >= beforeCompletion - 1, 'Final completion never scrolls back up');
       if (width === 390 && theme === 'dark') await page.screenshot({ path: path.join(out, 'all-complete-390.png') });
     }
+    assert.equal(await groups.locator('button.active').count(), 0, 'Completed categories have no active fill');
+    assert.equal(await groups.locator('button[aria-current="true"]').count(), 1, 'Displayed category is accessible independently of completion');
+    await settle(page);
+    const completedStyles = await groups.locator('button').evaluateAll(nodes => nodes.map(el => {
+      const style = getComputedStyle(el);
+      return { resolved: el.classList.contains('resolved'), background: style.backgroundColor, image: style.backgroundImage, shadow: style.boxShadow };
+    }));
+    assert(completedStyles.every(style => style.resolved && style.background === 'rgba(0, 0, 0, 0)' && style.image === 'none' && style.shadow === 'none'), `All completed cards have the same neutral appearance: ${JSON.stringify(completedStyles)}`);
+    if (width === 834 && theme === 'dark') await page.getByRole('complementary', { name: 'Decision queue' }).screenshot({ path: path.join(out, 'tablet-queue-complete.png') });
     await transcript.click();
     await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
     assert.equal(await page.evaluate(() => scrollY), 0);
@@ -123,7 +154,7 @@ try {
     const violations = await page.evaluate(async () => (await window.axe.run('[data-presentation-root]')).violations.map(({ id, nodes }) => ({ id, targets: nodes.map(node => node.target) })));
     assert.deepEqual(violations, []);
     assert.deepEqual(errors, []);
-    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
+    results.push({ width, height, theme, overflow, completeJourney: true, manualChoicePreserved: true, completedQueueNeutral: true, finalCheckStartsAtTop: true, paginationDoesNotReset: true, mobileHierarchy: mobile ? 'example → category; category → queue; final → button only' : null, violations });
     await page.close();
   }
   for (const reducedMotion of ['no-preference', 'reduce']) {

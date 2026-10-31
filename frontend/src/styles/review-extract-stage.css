@@ -114,6 +114,10 @@
 /* Suggestions, user selections, and bulk actions have separate visual meanings. */
 .review-choice-title { display: flex; align-items: center; justify-content: space-between; gap: .75rem; }
 .resolution-options .cleanup-replacement { font-size: 16px; color: var(--color-ink, var(--ink)); }
+/* Match Dialogue's AI options while reserving selected styling for a user choice. */
+.resolution-options button.review-recommended:not(.selected) { background: var(--warning-soft); border-color: var(--warning-border); color: var(--ink); }
+.resolution-options button.review-recommended-muted:not(.selected) { background: color-mix(in srgb, var(--amber) 5%, var(--paper)); border-color: var(--line); color: var(--muted); }
+.review-choice-suggestion { font-size: 15px; font-weight: 400; }
 .review-choice-check { color: var(--color-action, var(--poppy)); }
 .review-bulk-area { grid-column: 1 / -1; padding-top: 14px; }
 .resolution-options .cleanup-bulk-warning { display: flex; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 64px; padding: 16px; border: 1px solid var(--warning-border); border-left: 3px solid var(--warning-ink); border-radius: 4px; background: var(--warning-soft); box-shadow: none; text-align: left; color: var(--warning-ink); }
