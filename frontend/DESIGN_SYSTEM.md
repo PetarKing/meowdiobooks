@@ -9,7 +9,7 @@ Matcha & Cherry is the current application design: an illustrated sanctuary with
 | Canvas | `#f1f2e8` | `#293f33` |
 | Paper | `#fefff8` | `#263d30` |
 | Copy | `#2d3825` | `#faf3e6` |
-| Muted copy | `#5e684f` | `#ccd7d0` |
+| Muted copy | `#5e684f` | `#d2d8c9` |
 | Primary action | `#a42f4d` | `#f7abc2` |
 | Success | `#436627` | `#b6dcac` |
 
