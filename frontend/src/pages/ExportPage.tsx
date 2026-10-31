@@ -1,3 +1,4 @@
+import { BrandMark } from "../components/Brand";
 import type {
   AudioExportPreset
 } from "../api/contracts";
@@ -46,7 +47,7 @@ export function ExportPage({ model }: { model: ExportPageModel; }) {
         <section className="edition-proof" aria-label={t("Audiobook preview")}>
           <div className="edition-cover-stage">
             <div className="edition-cover-frame">
-              <div className="edition-cover">{coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}</div>
+              <div className="edition-cover"><BrandMark className="edition-cover-fallback" />{coverUrl && <img src={coverUrl} alt={t("Current audiobook cover")} />}</div>
               <div className="edition-cover-tools">
                 <div className="edition-cover-top">
                   <div className="edition-cover-source"><span className="eyebrow">{t("Front page")}</span><span>{exportCover?.name ?? (isPdf && exportCoverPage > 0 ? t("PDF page {{page}} of {{count}}", { page: exportCoverPage, count: pageCount }) : t("Default cover"))}</span></div>

@@ -18,3 +18,5 @@ export { CollectionToolbar } from "./components/CollectionToolbar";
 export { ThemeToggle } from './components/ThemeToggle';
 export { useAppearance } from './app/useAppearance';
 export type { Appearance, ResolvedAppearance } from './app/useAppearance';
+
+export { BrandMark, BrandWordmark } from "./components/Brand";

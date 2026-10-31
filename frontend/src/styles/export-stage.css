@@ -139,3 +139,7 @@
 }
 .edition-chapters input:focus-visible, .edition-format input:focus-visible,
 .edition-field:has(input:focus-visible), .edition-page-picker:has(input:focus-visible) { outline: 0; }
+
+.edition-cover { position: relative; }
+.edition-cover-fallback { position: absolute; width: 45%; left: 27.5%; top: 30%; color: var(--ink); }
+.edition-cover > img { position: relative; }
