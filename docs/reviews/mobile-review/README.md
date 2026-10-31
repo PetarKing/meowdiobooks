@@ -30,7 +30,7 @@ npm --prefix frontend test -- --run
 npm --prefix frontend run lint
 npm --prefix frontend run build
 npm --prefix frontend run storybook:check
-npm --prefix frontend run test-storybook -- stories/MobileReviewNavigation.stories.tsx stories/CompactReviewPassages.stories.tsx stories/CleanupReview.stories.tsx stories/AliceReviewPassages.stories.tsx stories/ScriptDirections.stories.tsx
+npm --prefix frontend run test-storybook -- stories/MobileReviewNavigation.stories.tsx stories/CompactReviewPassages.stories.tsx stories/CleanupReview.stories.tsx stories/AliceReviewPassages.stories.tsx stories/ScriptDirections.stories.tsx stories/ReviewSourcePage.stories.tsx
 npm --prefix frontend run storybook -- --port 6017
 node frontend/scripts/verify-mobile-review.mjs http://127.0.0.1:6017
 ```
@@ -43,9 +43,9 @@ directory as the third. Separate node_modules directories avoid sharing Vite opt
 Results:
 
 - Frontend suite: 44 files, 585 tests passed.
-- Focused real-browser stories: 5 files, 20 tests passed, including existing public-domain Alice
+- Focused real-browser stories: 6 files, 22 tests passed, including existing public-domain Alice
   URL, credits, and verse passages; synthetic split-title, legacy context, script directions,
-  source-check-after-bulk, and manual-choice preservation cases.
+  source-check-after-bulk, manual-choice preservation, and isolated original-page/error cases.
 - Browser matrix: 320, 390, 768, and 1440px, light and dark. Each completes suggestions, follows the
   next category action, resolves the remaining decisions, opens the transcript, returns, and verifies
   the manually kept choice. Each opens a PDF page, browses to the next page, closes with Escape,
