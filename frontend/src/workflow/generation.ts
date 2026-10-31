@@ -95,8 +95,8 @@ export function averageGenerationMultiplier(samples: GenerationSample[]) {
 
 export function readyChapterCount(run: GenerationRun | undefined, job: Job | undefined, progress: number) {
   if (!run) return 0;
-  if (progress >= 100) return run.chapterIds.length;
   if (job?.status === "queued") return 0;
+  if (progress >= 100) return run.chapterIds.length;
   // Parallel renderers report completed chapters in aggregate, without a current
   // chapter ID. Only trust counts for this exact requested set size.
   const aggregate = /^Rendering chapters: (\d+) of (\d+) complete$/.exec(job?.message ?? "");

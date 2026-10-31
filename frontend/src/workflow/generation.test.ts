@@ -37,7 +37,9 @@ describe('completed chapter progress', () => {
     expect(readyChapterCount(run, running, 100)).toBe(3);
     expect(readyChapterCount(undefined, running, 100)).toBe(0);
     expect(readyChapterCount(run, undefined, 50)).toBe(0);
-    expect(readyChapterCount(run, { ...running, status: 'queued', message: 'body: old progress' }, 20)).toBe(0);
+    for (const staleProgress of [20, 100]) {
+      expect(readyChapterCount(run, { ...running, status: 'queued', message: 'body: old progress' }, staleProgress)).toBe(0);
+    }
   });
 });
 

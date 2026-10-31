@@ -58,8 +58,9 @@ macOS, Node 22; no Docker VM or model service required:
 
 Unit and application tests cover aggregate count bounds and total mismatches, malformed messages,
 legacy sequential statuses, terminal progress, missing context, queued jobs with stale progress,
-capacity waits, observed-rate estimates, host fallback policy, and historical estimates. An independent
-agent reviewed the production diff and found no correctness issue in this scope.
+capacity waits, observed-rate estimates, host fallback policy, and historical estimates. Independent
+review identified a queued job with stale 100% progress as an edge case; the queue guard now takes
+precedence, with a regression assertion. No other correctness issue was found in this scope.
 
 The public-domain PDF extraction/dialogue attribution matrix is not applicable: this changes only
 presentation of existing job state, with no changes to book processing, chapter splitting, synthesis,
