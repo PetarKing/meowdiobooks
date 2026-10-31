@@ -6,12 +6,14 @@ Matcha & Cherry is the current application design: an illustrated sanctuary with
 
 | Role | Light | Dark |
 | --- | --- | --- |
-| Canvas | `#f1f2e8` | `#15262a` |
-| Paper | `#fefff8` | `#253c3d` |
+| Canvas | `#f1f2e8` | `#293f33` |
+| Paper | `#fefff8` | `#263d30` |
 | Copy | `#2d3825` | `#faf3e6` |
 | Muted copy | `#5e684f` | `#ccd7d0` |
-| Primary action | `#a42f4d` | `#f49bb6` |
+| Primary action | `#a42f4d` | `#f7abc2` |
 | Success | `#436627` | `#b6dcac` |
+
+Dark mode uses the same forest canvas on Home, the workflow, Library, and portal surfaces. Home retains its matcha atmosphere; canonical workflow pages echo it with a static 7% matcha wash. Light appearance and custom semantic palettes do not receive that wash.
 
 The authoritative tokens live in `src/styles/appearance.css`. Status colors have matching foreground/background tokens in each appearance. The header has one icon button for appearance. With no preference it follows the OS; clicking sets the opposite explicit appearance for 12 hours and persists its deadline locally. Expiry resumes the current device appearance, including after reload or wake. Its accessible name and pressed state remain available to assistive technology. Hosts can control appearance without changing workflow data. See [the appearance contract](../docs/APPEARANCE.md) for controlled properties, sibling palettes and portal propagation.
 

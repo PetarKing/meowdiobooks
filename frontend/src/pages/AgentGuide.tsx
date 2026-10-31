@@ -83,8 +83,8 @@ export function AgentGuide({ edition, footer, appearance: suppliedAppearance, on
   useEffect(() => {
     document.title = `${text.title} · Meowdiobooks`;
     document.documentElement.lang = language;
-    document.documentElement.style.backgroundColor = resolvedAppearance === "dark" ? "#15262a" : "#f1f2e8";
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolvedAppearance === "dark" ? "#15262a" : "#f1f2e8");
+    document.documentElement.style.backgroundColor = resolvedAppearance === "dark" ? "#293f33" : "#f1f2e8";
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", resolvedAppearance === "dark" ? "#293f33" : "#f1f2e8");
   }, [language, resolvedAppearance, text.title]);
   useEffect(() => {
     const revealTopic = () => {
