@@ -1,6 +1,6 @@
 # Workflow sidebar: small heart and internal collapse control
 
-The selected step uses a small heart (18px glyph) and one subtle row tint, replacing nested status boxes and
+The selected step uses a small heart (16px glyph) and one subtle row tint, replacing nested status boxes and
 conflicting selected/draft background colors. Completed inactive steps keep plain green checkmarks;
 upcoming steps keep numbers. The step label and status still distinguish current, completed, draft,
 and locked states. Inactive draft-ready steps retain amber numbers and status text, including when
@@ -53,7 +53,7 @@ node frontend/scripts/verify-mobile-review.mjs http://127.0.0.1:6017
 
 macOS arm64, Node 22.23.4, locked dependencies, native Playwright Chromium; no CI VM started.
 
-- 597 frontend tests across 43 files pass. 23 browser stories across 6 files pass.
+- 598 frontend tests across 43 files pass. 24 browser stories across 6 files pass.
 - 10 sidebar viewport/theme cases pass: 390×844, 768×1024, 834×1112, 1440×820, 1440×560,
   each in light/dark. Checks cover the current marker, locked stages, internal toggle geometry,
   keyboard collapse, preference persistence, navigating to a completed step and back while collapsed,
@@ -66,3 +66,19 @@ macOS arm64, Node 22.23.4, locked dependencies, native Playwright Chromium; no C
 
 Frontend presentation only; no extraction, inference, artifact schema or acceptance behavior changes.
 No backend/model run, release, downstream pin update or deployment is part of this draft.
+
+## Storybook acceptance follow-up
+
+The sidebar Playground previously failed at **Accept review and continue** because its synthetic
+bulk-preview response omitted `targetOccurrenceIds` and `previewToken`. The regression test failed
+with `Bulk preview did not include its requested warning occurrence` before the fixture fix.
+The fixture now returns only the requested warning group's occurrences and a clearly synthetic
+preview marker; unknown occurrence IDs fail. Production acceptance validation is unchanged.
+
+`Accept review and continue` now drives both category choices, opens the final transcript, accepts,
+and verifies Review Complete plus the active Cast & voices stage. This also passed manually in the
+user's Storybook tab. The native regression verifies no accepted state changes before acceptance.
+
+Follow-up checks: 598 native tests, 24 focused browser stories, story typecheck, lint and build pass;
+10 sidebar viewport/theme checks pass with the final 16px heart. The earlier two lint warnings and
+bundle-size advisory remain. No backend, inference, release or deployment changes.

@@ -36,7 +36,7 @@ try {
       assert(!await marker.evaluate(el => getComputedStyle(el, '::before').content.includes('♥')));
     } else {
       assert.equal(await marker.evaluate(el => getComputedStyle(el, '::before').content), '"♥"');
-      assert.equal(await marker.evaluate(el => getComputedStyle(el, '::before').fontSize), '18px');
+      assert.equal(await marker.evaluate(el => getComputedStyle(el, '::before').fontSize), '16px');
       assert.equal(await marker.evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
       await page.locator('.rail').screenshot({ path: path.join(out, `sidebar-${width}-${height}-${theme}.png`) });
       const beforeName = await review.getAttribute('aria-label');

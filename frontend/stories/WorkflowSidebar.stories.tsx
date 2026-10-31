@@ -14,6 +14,22 @@ type Story = StoryObj<typeof meta>;
 export const Playground: Story = {
   play: async ({ canvasElement }) => { await enterScenario(canvasElement, "review"); },
 };
+export const AcceptReviewAndContinue: Story = {
+  play: async ({ canvasElement }) => {
+    await enterScenario(canvasElement, "review");
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByRole("button", { name: /^Leave out All 8/ }));
+    await userEvent.click(canvas.getByRole("button", { name: /^Keep with narrator This highlighted/ }));
+    await userEvent.click(canvas.getByRole("button", { name: "Review complete transcript →" }));
+    await expect(await canvas.findByRole("article", { name: "Audiobook transcript page 1" })).toBeVisible();
+    await userEvent.click(canvas.getByRole("button", { name: "Accept review and continue →" }));
+    await expect(await canvas.findByRole("heading", { name: "Voices" })).toBeVisible();
+    const nav = within(canvas.getByRole("navigation", { name: "Wizard stages" }));
+    await expect(nav.getByRole("button", { name: "Review Complete" })).toBeEnabled();
+    await expect(nav.getByRole("button", { name: /^Cast & voices / })).toHaveAttribute("aria-current", "step");
+    await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
+  },
+};
 export const CollapseAndNavigate: Story = {
   play: async ({ canvasElement }) => {
     await enterScenario(canvasElement, "review");

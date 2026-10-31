@@ -19,7 +19,7 @@
   /* The marker is decorative; aria-current, the stage name and status remain authoritative. */
   .rail nav button.active b,
   .rail nav button.active.done b { position: relative; font-size: 0; }
-  .rail nav button.active b::before { content: '♥'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--poppy); font: 400 18px/1 var(--font-sans); }
+  .rail nav button.active b::before { content: '♥'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: var(--poppy); font: 400 16px/1 var(--font-sans); }
   .rail nav button small { font-size: 11px; line-height: 1.4; color: var(--muted); }
   .rail nav button.active strong { color: var(--ink); }
   .rail nav button.revising:not(.active) b,
