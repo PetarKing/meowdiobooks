@@ -40,7 +40,7 @@
   --folio-paper: #263d30;
   --folio-soft: #344c3d;
   --folio-ink: #faf3e6;
-  --folio-muted: #ccd7d0;
+  --folio-muted: #d2d8c9;
   --folio-action: #f7abc2;
   --folio-action-hover: #ffd0df;
   --folio-border: #738a78;
@@ -54,7 +54,7 @@
   --danger-action-ink: var(--folio-canvas);
   --inverse-surface: #1e3025;
   --inverse-ink: #faf3e6;
-  --inverse-muted: #ccd7d0;
+  --inverse-muted: #d2d8c9;
   --cover-start: #4b6652;
   --cover-end: var(--folio-paper);
   --matcha: #b6dcac;
