@@ -122,34 +122,36 @@ can have the same structure. A valid contextual repair proposal still requires u
 Chapter names and explicit note-section rules still contain language-specific vocabulary; this
 change does not claim to remove every English heuristic in the workflow.
 
-## Repeated numbered page matter
+## Repeated numbered footers
 
-A repeated numbered footer forms a candidate family only when the same normalized label and
-number-to-page offset occur on at least three distinct pages. Exact source ranges must fit within
-accepted narrator speech. The cleanup scan isolates each footer target from adjacent prose; dialogue,
-cross-span fragments and mixed or unrecognized patterns keep the ordinary individual path.
+The detector groups compact physical-page tails by their repeated static text and one changing
+page number with a consistent offset from PDF page indexes. Labels and links can appear before or
+after the number. A footer can wrap onto two lines within one extraction block. Digits inside a
+static URL remain literal evidence; they are never generalized as page numbers. At least three
+distinct pages must agree. The rule is language-neutral and has no publisher or book allowlist.
+Logical text/EPUB chunks, inconsistent folios, multiple changing numbers and targets crossing source
+blocks or spoken ranges do not qualify for this family path.
 
-Each instance still receives its own contextual Decisions assessment. Only production=`review` and
-word-damage=`clean` instances qualify for the family. A single bounded Luna call assesses the first,
-middle and last qualifying examples separately. All must classify as non-story page furniture before
-the system proposes omitting any qualifying member. A negative, uncertain, incomplete or malformed
-family assessment preserves the family without running individual repair calls for every member.
-Fewer than three qualifying instances also remain spoken. Actual word-damage findings retain the
-ordinary individually validated correction path.
+One Decisions family screen and one Luna preservation check assess first/middle/last examples plus
+additional indentation, separation and line-count layouts, with at most six examples per request.
+An unrepresented layout stays spoken. A negative, uncertain, malformed or incomplete family answer
+preserves the family. Repetition, numeric progression and links are strong candidate evidence, not
+proof that a line is outside the story: meaningful room labels, chapter counters, signs, lists and
+spoken URLs must remain.
 
-This saves repeated repair calls, not the per-instance contextual checks. A 400-instance family can
-use one representative verification call instead of 400 repair calls; separate defects still incur
-their own work. Sampling and two uses of the same model do not prove that every proposed omission is
-correct. All changes remain explicit review choices. A numbered room or chapter label can share the
-same structure and must be preserved when context does not support a footer interpretation.
+A standalone link-bearing footer can be accidentally included in an accepted quote continuing over
+a physical page end. It qualifies only with matching source-validated quote/speaker evidence before
+and after that page end and at least three narration-owned footer anchors. Each such quoted footer
+gets its own preservation assessment, in batches of at most six; it never inherits an unassessed
+narrator verdict. Any uncertain batch remains spoken. Reader assignments are preserved.
 
-Each proposed member retains its exact source, distinct evidence key, and individual keep/omit
-choice. Group controls must expand into individual decisions and retain manual exceptions; normalized
-pattern similarity does not grant the existing identical-evidence bulk permission. Admission checks
-bind each proposal to its own contextual answer, family membership and representative verdict.
-The candidate and accepted review retain `cleanupPatternEvidence`: family verdicts and their member
-assessments only, without duplicating the unrelated full-book scan. Uncertain and vetoed members are
-recorded there rather than silently reported as clean.
+Verified proposals cover the complete exact footer, including its page label and link. Contained
+link/folio warnings move into that complete suggestion instead of asking for a second decision.
+Each proposed member retains its source offsets and individual keep/omit choice. Group controls
+expand into individual decisions and retain manual exceptions. Nothing is removed until the user
+accepts the suggestion. The candidate and accepted review retain source-bound family and quote
+proofs in `cleanupPatternEvidence`; admission replays membership and the proofs before using them.
+Saved Review revisions retain their existing decisions; rerun Review to obtain new suggestions.
 
 ## Runtime contract
 
