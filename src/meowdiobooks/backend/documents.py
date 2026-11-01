@@ -113,6 +113,25 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
     return result
 
 
+def _image_screen_stats(command, command_runner):
+    if command_runner is not None:
+        result = command_runner(command, check=False, capture_output=True, timeout=60)
+        payload = result.stdout
+    else:
+        # LiteParse exits before large piped JSON is fully flushed. A regular
+        # file preserves every physical page in a long document's screen.
+        with tempfile.TemporaryFile() as output:
+            result = subprocess.run(command, check=False, stdout=output,
+                                    stderr=subprocess.PIPE, timeout=60)
+            if output.tell() > 32 * 1024**2:
+                raise ValueError("Image screening output exceeds its limit")
+            output.seek(0)
+            payload = output.read()
+    if result.returncode not in {0, 1}:
+        raise ValueError("Image screening failed")
+    return json.loads(payload)
+
+
 def extraction_sample_pages(
     source: Path, cache_root: Path, page_count: int, *, command_runner=None,
 ) -> list[dict[str, Any]]:
@@ -131,13 +150,11 @@ def extraction_sample_pages(
     if cached is not None:
         return cached["pages"]
     try:
-        result = (command_runner if command_runner is not None else subprocess.run)(
+        stats = _image_screen_stats(
             ["liteparse", "is-complex", str(source), "--compact", "--quiet",
-             "--max-pages", str(page_count)],
-            check=False, capture_output=True, timeout=60,
+             "--max-pages", str(page_count)], command_runner,
         )
-        stats = json.loads(result.stdout)
-        if result.returncode not in {0, 1} or not isinstance(stats, list) or [
+        if not isinstance(stats, list) or [
             row.get("pageNumber") for row in stats
         ] != list(range(1, page_count + 1)):
             return ordinary
@@ -204,6 +221,46 @@ def _flag_possible_image_text(source, cache_root, pages, command_runner, *, page
     return [{**row, "ocrCandidate": True, "warnings": [*row.get("warnings", []), {
         "code": "possible-image-text", "label": "This image may contain unextracted text.",
     }]} if row["page"] in suspects and row.get("method") != "ocr" else {**row, "ocrCandidate": False} for row in pages]
+
+
+def _flag_preview_image_text(source, cache_root, row, command_runner):
+    """Screen only the opened physical page; whole-book screening belongs to extraction."""
+    count = len(PdfReader(source).pages)
+    whole = _read_image_screen_cache(cache_root / "extraction" / "ocr-samples-v2.json", count)
+    cache = cache_root / "extraction" / f"ocr-screen-page-{row['page']:04d}-v1.json"
+    candidate = None
+    if whole is not None:
+        candidate = row["page"] in whole["imagePages"]
+    else:
+        try:
+            cached = json.loads(cache.read_text(encoding="utf-8"))
+            if cached.get("page") == row["page"] and type(cached.get("candidate")) is bool:
+                candidate = cached["candidate"]
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    if candidate is None:
+        try:
+            stats = _image_screen_stats(
+                ["liteparse", "is-complex", str(source), "--compact", "--quiet",
+                 "--target-pages", str(row["page"]), "--max-pages", str(count)], command_runner,
+            )
+            if (not isinstance(stats, list)
+                    or len(stats) != 1 or stats[0].get("pageNumber") != row["page"]):
+                return row
+            stat = stats[0]
+            candidate = bool(stat.get("textLength", 1000) < 200 and (
+                stat.get("fullPageImage") or stat.get("imageCoverage", 0) >= .15
+                or stat.get("largestImageCoverage", 0) >= .15))
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            _write_extraction_cache(cache, {"page": row["page"], "candidate": candidate})
+        except (OSError, ValueError, TypeError, AttributeError, RuntimeError, subprocess.SubprocessError):
+            # A missing optional screen must not prevent the selected-page fallback.
+            return row
+    if candidate:
+        return {**row, "ocrCandidate": True, "warnings": [*row.get("warnings", []), {
+            "code": "possible-image-text", "label": "This image may contain unextracted text.",
+        }]}
+    return {**row, "ocrCandidate": False}
 
 
 def auto_recover_pdf_pages(
@@ -322,26 +379,31 @@ def render_pdf_page(source: Path, cache_root: Path, page: int, *, command_runner
     if output.is_file():
         return output
     output.parent.mkdir(parents=True, exist_ok=True)
-    (command_runner if command_runner is not None else subprocess.run)(
-        [
-            "pdftoppm",
-            "-f",
-            str(page),
-            "-l",
-            str(page),
-            "-singlefile",
-            "-png",
-            "-r",
-            "145",
-            str(source),
-            str(output.with_suffix("")),
-        ],
-        check=True,
-        capture_output=True,
-        timeout=60,
-    )
-    if not output.is_file():
-        raise RuntimeError(f"Page renderer produced no image for page {page}")
+    pending = output.with_name(f"{output.stem}-{uuid4().hex}.pending.png")
+    try:
+        (command_runner if command_runner is not None else subprocess.run)(
+            [
+                "pdftoppm",
+                "-f",
+                str(page),
+                "-l",
+                str(page),
+                "-singlefile",
+                "-png",
+                "-r",
+                "145",
+                str(source),
+                str(pending.with_suffix("")),
+            ],
+            check=True,
+            capture_output=True,
+            timeout=60,
+        )
+        if not pending.is_file():
+            raise RuntimeError(f"Page renderer produced no image for page {page}")
+        pending.replace(output)
+    finally:
+        pending.unlink(missing_ok=True)
     return output
 
 
@@ -409,8 +471,7 @@ def extract_pdf_page(
     if cache.is_file():
         result = json.loads(cache.read_text(encoding="utf-8"))
         result["cached"] = True
-        return (_flag_possible_image_text(source, cache_root, [result], command_runner,
-                                         page_count=len(PdfReader(source).pages))[0]
+        return (_flag_preview_image_text(source, cache_root, result, command_runner)
                 if method == "liteparse" else result)
     cache.parent.mkdir(parents=True, exist_ok=True)
     if method in {"liteparse", "ocr"}:
@@ -490,8 +551,7 @@ def extract_pdf_page(
         "cached": False,
     }
     _write_extraction_cache(cache, result)
-    return (_flag_possible_image_text(source, cache_root, [result], command_runner,
-                                     page_count=len(PdfReader(source).pages))[0]
+    return (_flag_preview_image_text(source, cache_root, result, command_runner)
             if method == "liteparse" else result)
 
 

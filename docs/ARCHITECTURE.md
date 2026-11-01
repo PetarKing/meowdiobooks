@@ -178,16 +178,19 @@ default remains unchanged. The host owns process isolation, deadlines, resource 
 of untrusted worker results; this interface alone is not a sandbox. A metadata failure rejects a new
 import and removes its newly written source, just like inspection failure.
 
-A processor may additionally implement `extraction_sample_pages(source, cache_root,
-page_count)` to choose preview pages using a cheap whole-PDF text/image screen.
-It returns ordinary representative-page rows with optional `ocrCandidate: true`
-for at most two pages. Hosts without this optional method retain the fixed
-representative pages; Core never bypasses a host processor to inspect a PDF.
-The screen never runs OCR. Standard extraction uses its sparse-image signals
-(including footer-only pages) to recover text through the processor's `ocr` method
-before building Dialogue blocks. Sparse preview pages use the same recovery helper.
-A successful screen marks blank digital pages as non-candidates. When screening is
-unavailable, empty extracted pages still receive a recovery attempt.
+Extraction sample navigation uses the fixed representative pages and performs no
+PDF parsing or OCR. Opening a Standard preview screens only that physical page
+for sparse text plus raster content; cached full-document screening may be reused.
+The original page loads independently from extracted text. Preview requests are
+cached per book, method and page in the browser, and stale responses cannot replace
+a newer selection. Other sample pages are not extracted until opened.
+
+Full Standard extraction still screens every page for sparse-image signals
+(including footer-only pages), then recovers qualifying pages through the
+processor's `ocr` method before building Dialogue blocks. Core never bypasses a
+host processor to inspect a PDF. The screen itself never runs OCR. A successful
+screen marks blank digital pages as non-candidates. When screening is unavailable,
+empty extracted pages still receive a recovery attempt.
 
 Recovery retains the original page when OCR is empty, unchanged or adds no useful
 text. Errors and cancellation propagate before the Extraction candidate is written.

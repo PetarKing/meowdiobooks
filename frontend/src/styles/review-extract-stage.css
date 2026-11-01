@@ -6,7 +6,12 @@
   min-height: 0;
 }
 .extract-page-comparison .paper {
+  position: relative;
   overflow: visible;
+}
+.extract-page-comparison .paper:has(.review-source-placeholder),
+.extract-page-comparison .extracted:has(.review-preview-skeleton) {
+  min-height: clamp(400px, 55vw, 680px);
 }
 .extract-page-comparison .paper img {
   display: block;

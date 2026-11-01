@@ -66,7 +66,7 @@ export function PageComparison({ sourceText, imageUrl, imageAlt, imageZoom, imag
   </div>;
 }
 
-function ReviewPreviewSkeleton({ source = false }: { source?: boolean }) {
+export function ReviewPreviewSkeleton({ source = false }: { source?: boolean }) {
   return <div className={`review-preview-skeleton ${source ? "source" : "transcript"}`} aria-hidden="true">
     {source ? <>
       <span className="skeleton-line preview-skeleton-title" />
