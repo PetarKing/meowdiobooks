@@ -7,7 +7,8 @@ order. Extraction progress appears in the existing loader.
 
 There is no Review OCR action, empty-page confirmation, separate recovery
 acceptance or recovery-specific workflow. The extraction choices are Standard, Full OCR, Embedded text and Complex layout.
-Full OCR reads image text throughout the book and is slower. The last two retain
+Full OCR uses the description **Reads each page as an image. Slower.**
+The comparison panel is labeled **Extracted text** for every method. The last two retain
 their existing parser behavior and carry a muted **Specialized** label. The short Standard description is **Fast extraction with
 OCR recovery.**
 
@@ -43,7 +44,7 @@ Hosted CI, release publication and deployment remain separate gates.
 
 ## Backend verification
 
-- `PYTHONPATH=src python -m pytest -q -m 'not runs_models and not uses_audio_decoder'`: 1,657 passed, three deselected.
+- `PYTHONPATH=src MEOWDIOBOOKS_TEST_RASTER_OCR=1 python -m pytest -q -m 'not runs_models and not uses_audio_decoder'`: 1,677 passed, three deselected (including the opt-in real raster OCR probe).
 - `python -m ruff check src/meowdiobooks tests`: passed.
 - `python scripts/check_publication.py`: passed.
 - A real local LiteParse/Tesseract check used a synthetic three-page PDF: native
@@ -58,5 +59,14 @@ Hosted CI, release publication and deployment remain separate gates.
   require a hidden decision.
 
 The sparse-image screen is a heuristic, not a guarantee that every visible word
-will be recognized. Full OCR enables recognition throughout the book; the local
-LiteParse engine can also retain existing PDF text.
+will be recognized. Full OCR reads rendered pages, even when the PDF has a conflicting saved text
+layer. A real synthetic test verifies that visible words are recovered and the
+invisible text layer is excluded.
+
+Copy follow-up verification: 223 App tests passed, Storybook types/build passed,
+and two focused desktop/phone extraction visual/accessibility checks passed.
+The screenshots above were regenerated from this follow-up.
+
+Command-stub file access is confined to the trusted test directory. Regression
+tests reject absolute, traversal, sibling-prefix and symlink escapes without
+suppressing the CodeQL path-injection checks.

@@ -422,7 +422,7 @@ describe('v2 wizard', () => {
     const comparison = screen.getByText('ORIGINAL PAGE').closest('.compare')
     expect(comparison).toHaveClass('extract-compare')
     expect(comparison).toHaveClass('page-comparison')
-    expect(within(comparison as HTMLElement).getByText('Standard TEXT')).toBeInTheDocument()
+    expect(within(comparison as HTMLElement).getByText('Extracted text')).toBeInTheDocument()
   })
 
   it('keeps Standard recommended with automatic recovery and offers explicit full OCR', async () => {
@@ -437,7 +437,7 @@ describe('v2 wizard', () => {
     expect(within(methods as HTMLElement).getAllByText('Specialized').every(badge => badge.classList.contains('choice-badge-muted'))).toBe(true)
     expect(screen.queryByRole('button', { name: /Recover this page|Recover all|Confirm this page/ })).not.toBeInTheDocument()
     vi.mocked(wizardApi.previewExtraction).mockResolvedValueOnce({ page: 1, pageCount: 120, method: 'ocr', text: 'Recovered printed image text.', warnings: [], elapsedSeconds: .1, cached: false })
-    fireEvent.click(screen.getByRole('button', { name: /Full OCR Reads image text throughout the book. Slower./ }))
+    fireEvent.click(screen.getByRole('button', { name: /Full OCR Reads each page as an image. Slower./ }))
     await screen.findByText('Recovered printed image text.')
     expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 1, 'ocr')
     vi.mocked(wizardApi.processStage).mockRejectedValueOnce(new Error('Synthetic stop after dispatch'))

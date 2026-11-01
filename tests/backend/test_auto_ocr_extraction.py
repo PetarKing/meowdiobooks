@@ -1,9 +1,9 @@
 """Standard extraction recovers missing image text before Dialogue or Review."""
 from copy import deepcopy
-from pathlib import Path
 import pytest
 
 from meowdiobooks.backend.documents import auto_recover_pdf_pages
+from tests.backend.ocr_stub_files import write_stub_text
 
 
 def page(number, text, *, candidate=None, flagged=False, **extra):
@@ -144,7 +144,7 @@ def _screened_raw_fixture(tmp_path):
         selected = rows
         if "--target-pages" in arguments:
             selected = [rows[int(arguments[arguments.index("--target-pages") + 1]) - 1]]
-        Path(arguments[-1]).write_text(json.dumps({"pages": selected}))
+        write_stub_text(tmp_path, arguments[-1], json.dumps({"pages": selected}))
         return subprocess.CompletedProcess(arguments, 0)
 
     return source, rows, calls, command

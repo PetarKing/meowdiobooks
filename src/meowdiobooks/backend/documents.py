@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tempfile
 import time
 from uuid import uuid4
 from collections.abc import Callable, Mapping
@@ -24,7 +25,7 @@ from .text_documents import TEXT_SUFFIXES, read_text_document
 SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
 EXTRACTION_METHOD_VERSION = "documents-v4"
 _LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
-_OCR_CACHE_KEY = "liteparse-ocr-eng-v1"
+_OCR_CACHE_KEY = "liteparse-ocr-eng-v2"
 
 
 def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
@@ -371,17 +372,39 @@ def extract_pdf_page(
     cache.parent.mkdir(parents=True, exist_ok=True)
     if method in {"liteparse", "ocr"}:
         raw = cache.with_name(f"{cache.stem}-{uuid4().hex}.raw.json")
+        raster_work = None
         try:
+            parser_source, parser_page = source, page
+            if method == "ocr":
+                from PIL import Image
+
+                # OCR must read the visible page, even when the PDF carries a
+                # conflicting/incomplete saved text layer. Keep no native text
+                # in the one-page parser input and map its page 1 back below.
+                raster_work = tempfile.TemporaryDirectory(prefix="ocr-render-", dir=cache.parent)
+                raster_root = Path(raster_work.name)
+                cached_image = cache_root / "pages" / f"page-{page:04d}.png"
+                render_cache = cache_root if cached_image.is_file() else raster_root
+                image_path = render_pdf_page(source, render_cache, page, command_runner=command_runner)
+                parser_source, parser_page = raster_root / "visible-page.pdf", 1
+                try:
+                    with Image.open(image_path) as image:
+                        if image.format != "PNG" or image.width * image.height > 16_000_000:
+                            raise ValueError("OCR page image exceeds safe processing limits")
+                        with image.convert("RGB") as rgb:
+                            rgb.save(parser_source, "PDF", resolution=145.0, quality=100, subsampling=0)
+                except Image.DecompressionBombError as error:
+                    raise ValueError("OCR page image exceeds safe processing limits") from error
             (command_runner if command_runner is not None else subprocess.run)(
                 [
                     "liteparse",
                     "parse",
-                    str(source),
+                    str(parser_source),
                     "--format",
                     "json",
                     "--target-pages",
-                    str(page),
-                    *(["--no-ocr"] if method == "liteparse" else ["--ocr-language", "eng", "--max-pages", str(page)]),
+                    str(parser_page),
+                    *(["--no-ocr"] if method == "liteparse" else ["--ocr-language", "eng", "--max-pages", "1"]),
                     "--quiet",
                     "-o",
                     str(raw),
@@ -391,14 +414,18 @@ def extract_pdf_page(
                 timeout=90,
             )
             parsed = json.loads(raw.read_text(encoding="utf-8"))
-            if method == "ocr" and (
-                len(parsed.get("pages", [])) != 1
-                or parsed["pages"][0].get("page", parsed["pages"][0].get("pageNum")) != page
-            ):
-                raise ValueError("OCR did not return the requested page")
+            if method == "ocr":
+                pages = parsed.get("pages", [])
+                number = (pages[0].get("page", pages[0].get("pageNum"))
+                          if isinstance(pages, list) and len(pages) == 1 and isinstance(pages[0], dict)
+                          else None)
+                if type(number) is not int or number != 1:
+                    raise ValueError("OCR did not return the requested page")
             text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
         finally:
             raw.unlink(missing_ok=True)
+            if raster_work is not None:
+                raster_work.cleanup()
     elif method == "native":
         pdf_page = PdfReader(source).pages[page - 1]
         try:
