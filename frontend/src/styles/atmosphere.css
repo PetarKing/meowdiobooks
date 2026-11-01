@@ -1,18 +1,26 @@
-/* The canvas gradient fades the sanctuary vignette before working content.
-   Background layers do not create a stacking context or cover modal controls. */
-.app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
+/* Paint the entire content column, including the gutters around centered main.
+   Keep the canopy aligned with main without creating a modal-trapping context. */
+.app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) {
+  --workflow-content-width: calc(100% - var(--workspace-rail-width));
+  --workflow-art-inset: max(0px, calc((100vw - var(--workspace-rail-width) - 1440px) / 2));
   background-image: var(--workflow-wash, none), linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 32%, transparent), var(--canvas) 225px), url("../assets/brand/sanctuary-canopy.webp");
-  background-size: 100% 100%, 100% 100%, clamp(330px, 40vw, 580px) auto;
-  background-position: 0 0, 0 0, right 0 top 0;
+  background-size: var(--workflow-content-width) 100%, var(--workflow-content-width) 100%, clamp(330px, 40vw, 580px) auto;
+  background-position: right 0 top 0, right 0 top 0, right var(--workflow-art-inset) top 0;
   background-repeat: no-repeat;
 }
 /* A quiet echo of Home's matcha glow; the shared canvas remains the base. */
-.app-shell[data-appearance="dark"]:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
+.app-shell[data-appearance="dark"]:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) {
   --workflow-wash: radial-gradient(ellipse at 18% 70%, color-mix(in srgb, var(--matcha) 7%, transparent), transparent 68%);
 }
 @media (max-width: 750px) {
+  .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) {
+    background-image: none;
+  }
+  /* Phone main already fills the width and begins below its progress strip. */
   .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
     background-image: var(--workflow-wash, none), linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 66%, transparent), var(--canvas) 145px), url("../assets/brand/sanctuary-canopy.webp");
     background-size: 100% 100%, 100% 100%, min(270px, 100%) auto;
+    background-position: 0 0, 0 0, right 0 top 0;
+    background-repeat: no-repeat;
   }
 }
