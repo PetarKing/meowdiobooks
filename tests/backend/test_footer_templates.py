@@ -262,3 +262,22 @@ def test_failure_during_quote_verification_publishes_no_partial_result(monkeypat
     with pytest.raises(RuntimeError, match='provider unavailable'):
         cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
     assert (extraction, dialogue) == unchanged
+
+
+@pytest.mark.parametrize("digits", ["٠١٢٣٤٥٦٧٨٩", "۰۱۲۳۴۵۶۷۸۹", "०१२३४५६७८९", "０１２３４５６７８９"])
+@pytest.mark.parametrize("with_url", [False, True])
+def test_unicode_decimal_folios_retain_legacy_and_complete_footer_support(monkeypatch, digits, with_url):
+    template = "دار النشر {folio}" + (" | https://books2.example/volume7" if with_url else "")
+    extraction, dialogue = footer_artifacts(6, template=template)
+    table = str.maketrans("0123456789", digits)
+    for block, span in zip(extraction["blocks"], dialogue["spans"]):
+        text = block["text"].replace(str(block["page"] + 7), str(block["page"] + 7).translate(table))
+        block["text"] = text
+        span.update(source=text, text=text, sourceEnd=len(text))
+    rows = numbered_edge_candidates(extraction["blocks"])
+    assert len(rows) == 6 and len({r["patternGroupId"] for r in rows}) == 1
+    assert all(r["patternEvidence"]["folioOffset"] == 7 for r in rows)
+    mocks(monkeypatch)
+    result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)
+    assert len(result["occurrences"]) == 6
+    add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)

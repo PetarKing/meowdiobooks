@@ -5,7 +5,7 @@ import re
 from collections import defaultdict
 
 _URL = re.compile(r"(?:https?://|www\.)[^\s]+", re.IGNORECASE)
-_FOLIO = re.compile(r"(?<!\d)[0-9]{1,4}(?!\d)")
+_FOLIO = re.compile(r"(?<!\d)\d{1,4}(?!\d)")
 
 
 def _template(source):
