@@ -8,6 +8,7 @@ import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
+from contextlib import contextmanager
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, TypedDict
@@ -36,11 +37,34 @@ class RemoteRequestMetadata(TypedDict):
 
 
 # Versioned capability for hosted compositions consuming immutable releases.
-REMOTE_REQUEST_COMPLETION_VERSION = 1
+REMOTE_REQUEST_COMPLETION_VERSION = 2
 RemoteRequestCompletion = Callable[[Mapping[str, Any]], None]
 RemoteRequestAdmission = Callable[
     [RemoteTextModelConfig, RemoteRequestMetadata], RemoteRequestCompletion | None
 ]
+
+
+@contextmanager
+def _request_completion_guard(config, observer, completion, attempt):
+    """Every admitted physical request finishes once, including unexpected exits."""
+    finished = False
+
+    def finish(event):
+        nonlocal finished
+        if finished:
+            return
+        finished = True
+        if completion is not None:
+            completion(event)
+
+    try:
+        yield finish
+    finally:
+        if not finished:
+            _observe_remote_call(
+                config, observer, completion=finish, outcome="transport-error",
+                attempt=attempt, ambiguous_billable=True,
+            )
 
 
 def admit_remote_request(
@@ -164,91 +188,98 @@ def remote_chat_completion(
             max_output_tokens=max_completion_tokens,
             attempt=attempt,
         )
-        try:
-            raw_response = urllib.request.urlopen(request, timeout=600).read()
-        except urllib.error.HTTPError as error:
-            detail = error.read().decode("utf-8", errors="replace")[:1000]
-            last_error = f"HTTP {error.code}: {detail}"
-            _observe_remote_call(
-                config,
-                usage_observer,
-                completion=completion,
-                outcome="http-error",
-                attempt=attempt,
-                ambiguous_billable=error.code in {408, 500, 502, 503, 504},
-                http_status=error.code,
-            )
-            if error.code not in {429, 500, 502, 503, 504} or not delay:
-                break
-        except (OSError, urllib.error.URLError) as error:
-            last_error = f"{type(error).__name__}: {error}"
-            _observe_remote_call(
-                config,
-                usage_observer,
-                completion=completion,
-                outcome="transport-error",
-                attempt=attempt,
-                ambiguous_billable=True,
-            )
-            if not delay:
-                break
-        else:
+        with _request_completion_guard(config, usage_observer, completion, attempt) as completion:
             try:
-                response = json.loads(raw_response)
-            except (json.JSONDecodeError, TypeError) as error:
+                raw_response = urllib.request.urlopen(request, timeout=600).read()
+            except urllib.error.HTTPError as error:
+                detail = error.read().decode("utf-8", errors="replace")[:1000]
+                last_error = f"HTTP {error.code}: {detail}"
+                _observe_remote_call(
+                    config,
+                    usage_observer,
+                    completion=completion,
+                    outcome="http-error",
+                    attempt=attempt,
+                    ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                    http_status=error.code,
+                )
+                if error.code not in {429, 500, 502, 503, 504} or not delay:
+                    break
+            except (OSError, urllib.error.URLError) as error:
                 last_error = f"{type(error).__name__}: {error}"
                 _observe_remote_call(
                     config,
                     usage_observer,
                     completion=completion,
-                    outcome="invalid-response",
+                    outcome="transport-error",
                     attempt=attempt,
                     ambiguous_billable=True,
                 )
                 if not delay:
                     break
-                time.sleep(delay)
-                continue
-            usage = response.get("usage", {}) if isinstance(response, Mapping) else {}
-            model = (
-                str(response.get("model") or config.model)
-                if isinstance(response, Mapping)
-                else config.model
-            )
-            _observe_remote_call(
-                config,
-                usage_observer,
-                completion=completion,
-                outcome="response",
-                attempt=attempt,
-                ambiguous_billable=not bool(usage),
-                model=model,
-                reported_model=response.get("model") if isinstance(response, Mapping) else None,
-                service_tier=response.get("service_tier") if isinstance(response, Mapping) else None,
-                usage=usage if isinstance(usage, Mapping) else {},
-            )
-            try:
-                content = (
-                    _responses_output_text(response)
-                    if config.engine == "openai_responses"
-                    else str(response["choices"][0]["message"]["content"] or "").strip()
+            except BaseException:
+                _observe_remote_call(
+                    config, usage_observer, completion=completion, outcome="transport-error",
+                    attempt=attempt, ambiguous_billable=True,
                 )
-                if not content:
-                    raise ValueError("response was empty")
-            except (KeyError, TypeError, ValueError) as error:
-                last_error = f"{type(error).__name__}: {error}"
-                if not delay:
-                    break
+                raise
             else:
-                return {
-                    "text": content,
-                    "usage": dict(usage),
-                    "model": model,
-                    "attempts": attempt,
-                    "serviceTier": response.get("service_tier"),
-                    "responseStatus": response.get("status"),
-                }
-        time.sleep(delay)
+                try:
+                    response = json.loads(raw_response)
+                except (ValueError, TypeError) as error:
+                    last_error = f"{type(error).__name__}: {error}"
+                    _observe_remote_call(
+                        config,
+                        usage_observer,
+                        completion=completion,
+                        outcome="invalid-response",
+                        attempt=attempt,
+                        ambiguous_billable=True,
+                    )
+                    if not delay:
+                        break
+                    time.sleep(delay)
+                    continue
+                usage = response.get("usage", {}) if isinstance(response, Mapping) else {}
+                model = (
+                    str(response.get("model") or config.model)
+                    if isinstance(response, Mapping)
+                    else config.model
+                )
+                _observe_remote_call(
+                    config,
+                    usage_observer,
+                    completion=completion,
+                    outcome="response",
+                    attempt=attempt,
+                    ambiguous_billable=not bool(usage),
+                    model=model,
+                    reported_model=response.get("model") if isinstance(response, Mapping) else None,
+                    service_tier=response.get("service_tier") if isinstance(response, Mapping) else None,
+                    usage=usage if isinstance(usage, Mapping) else {},
+                )
+                try:
+                    content = (
+                        _responses_output_text(response)
+                        if config.engine == "openai_responses"
+                        else str(response["choices"][0]["message"]["content"] or "").strip()
+                    )
+                    if not content:
+                        raise ValueError("response was empty")
+                except (KeyError, TypeError, ValueError) as error:
+                    last_error = f"{type(error).__name__}: {error}"
+                    if not delay:
+                        break
+                else:
+                    return {
+                        "text": content,
+                        "usage": dict(usage),
+                        "model": model,
+                        "attempts": attempt,
+                        "serviceTier": response.get("service_tier"),
+                        "responseStatus": response.get("status"),
+                    }
+            time.sleep(delay)
     raise RemoteModelUnavailableError(
         f"{config.display_name} could not complete this speaker check. {last_error}",
         public_message=(
@@ -401,52 +432,53 @@ def remote_decisions_completion(
             config, request_admission, payload_bytes=len(encoded), max_output_tokens=1,
             attempt=attempt,
         )
-        request = urllib.request.Request(
-            f"{config.base_url}/decisions", data=encoded,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
-            method="POST",
-        )
-        try:
-            raw = urllib.request.urlopen(request, timeout=90).read()
-        except urllib.error.HTTPError as error:
-            _observe_remote_call(
-                config, usage_observer, completion=completion, outcome="http-error",
-                attempt=attempt, ambiguous_billable=error.code in {408, 500, 502, 503, 504},
-                http_status=error.code,
+        with _request_completion_guard(config, usage_observer, completion, attempt) as completion:
+            request = urllib.request.Request(
+                f"{config.base_url}/decisions", data=encoded,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+                method="POST",
             )
-            if error.code not in {429, 500, 502, 503, 504} or not delay:
-                break
-        except (OSError, urllib.error.URLError):
-            _observe_remote_call(
-                config, usage_observer, completion=completion, outcome="transport-error",
-                attempt=attempt, ambiguous_billable=True,
-            )
-            if not delay:
-                break
-        else:
             try:
-                response = json.loads(raw)
-                if not isinstance(response, dict):
-                    raise ValueError("Expected an object")
-            except (ValueError, TypeError):
+                raw = urllib.request.urlopen(request, timeout=90).read()
+            except urllib.error.HTTPError as error:
                 _observe_remote_call(
-                    config, usage_observer, completion=completion, outcome="invalid-response",
+                    config, usage_observer, completion=completion, outcome="http-error",
+                    attempt=attempt, ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                    http_status=error.code,
+                )
+                if error.code not in {429, 500, 502, 503, 504} or not delay:
+                    break
+            except (OSError, urllib.error.URLError):
+                _observe_remote_call(
+                    config, usage_observer, completion=completion, outcome="transport-error",
                     attempt=attempt, ambiguous_billable=True,
                 )
-                # A malformed successful response might have been billed. Fail explicitly rather
-                # than charging again for a schema error that retrying cannot reliably resolve.
-                break
-            usage = response.get("usage")
-            _observe_remote_call(
-                config, usage_observer, completion=completion, outcome="response",
-                attempt=attempt, ambiguous_billable=not isinstance(usage, Mapping) or not usage,
-                model=str(response.get("model") or config.model),
-                reported_model=response.get("model"), service_tier=response.get("service_tier"),
-                usage=usage if isinstance(usage, Mapping) else {},
-            )
-            return response
-        if delay:
-            time.sleep(delay)
+                if not delay:
+                    break
+            else:
+                try:
+                    response = json.loads(raw)
+                    if not isinstance(response, dict):
+                        raise ValueError("Expected an object")
+                except (ValueError, TypeError):
+                    _observe_remote_call(
+                        config, usage_observer, completion=completion, outcome="invalid-response",
+                        attempt=attempt, ambiguous_billable=True,
+                    )
+                    # A malformed successful response might have been billed. Fail explicitly rather
+                    # than charging again for a schema error that retrying cannot reliably resolve.
+                    break
+                usage = response.get("usage")
+                _observe_remote_call(
+                    config, usage_observer, completion=completion, outcome="response",
+                    attempt=attempt, ambiguous_billable=not isinstance(usage, Mapping) or not usage,
+                    model=str(response.get("model") or config.model),
+                    reported_model=response.get("model"), service_tier=response.get("service_tier"),
+                    usage=usage if isinstance(usage, Mapping) else {},
+                )
+                return response
+            if delay:
+                time.sleep(delay)
     raise RemoteModelUnavailableError(
         "The cleanup Decisions check was interrupted. Try again; accepted work is unchanged."
     )

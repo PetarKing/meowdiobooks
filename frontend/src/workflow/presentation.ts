@@ -133,6 +133,8 @@ export function localizeProcessMessage(value: string, t: TFunction) {
   if (/^Checking speaker assignments with .+$/.test(value)) return t("Checking who speaks each line");
   if (/^Checking \d+ text windows with .+$/.test(value)) return t("Checking the text for possible corrections");
   const patterns: Array<[RegExp, string, string[]]> = [
+    [/^Checked (\d+) of (\d+) independent speaker checks$/, "Checked {{current}} of {{count}} speaker checks", ["current", "count"]],
+    [/^Resolved (\d+) of (\d+) speaker conflict groups$/, "Resolved {{current}} of {{count}} speaker conflicts", ["current", "count"]],
     [/^Extracted (\d+) pages$/, "Extracted {{count}} pages", ["count"]],
     [/^Extracted page (\d+) of (\d+)$/, "Extracted page {{page}} of {{count}}", ["page", "count"]],
     [/^Auditioning (.+) \((\d+) of (\d+)\)$/, "Auditioning {{name}} ({{current}} of {{count}})", ["name", "current", "count"]],

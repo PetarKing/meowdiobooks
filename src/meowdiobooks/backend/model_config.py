@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,6 +68,7 @@ class RemoteTextModelConfig:
     long_context_cached_input_usd_per_million_tokens: float | None = None
     long_context_cache_write_input_usd_per_million_tokens: float | None = None
     long_context_output_usd_per_million_tokens: float | None = None
+    estimated_seconds_per_batch: float | None = None
 
     @property
     def domain(self) -> str:
@@ -267,6 +269,11 @@ def dialogue_routing_preview(repo_root: Path, target_count: int) -> dict[str, An
                 "estimatedCostUsd": round(
                     max(0, target_count) * remote.estimated_usd_per_target, 2
                 ),
+                **({"estimatedDurationSeconds": round(
+                        2 * math.ceil(max(0, target_count) / remote.max_targets_per_batch)
+                        * remote.estimated_seconds_per_batch / remote.max_concurrent_batches
+                        * 1.25
+                    )} if remote.estimated_seconds_per_batch is not None else {}),
                 "falseNamesReductionPercent": false_reduction,
                 "speakerRecallImprovementPercent": recall_improvement,
             }
@@ -360,6 +367,7 @@ def _remote_text_model(model_id: str, value: Any) -> RemoteTextModelConfig:
         max_targets_per_batch=_positive_int(row, "max_targets_per_batch"),
         max_concurrent_batches=_positive_int(row, "max_concurrent_batches"),
         estimated_usd_per_target=_non_negative_number(row, "estimated_usd_per_target"),
+        estimated_seconds_per_batch=_duration_hint(row),
         dialogue_benchmark=_dialogue_benchmark(row.get("dialogue_benchmark")),
     )
 
@@ -469,6 +477,15 @@ def _positive_int(row: dict[str, Any], key: str) -> int:
     value = row.get(key)
     if not isinstance(value, int) or isinstance(value, bool) or value < 1:
         raise ModelConfigError(f"models.toml requires a positive integer {key}")
+    return value
+
+
+def _duration_hint(row: dict[str, Any]) -> float | None:
+    if "estimated_seconds_per_batch" not in row:
+        return None
+    value = _non_negative_number(row, "estimated_seconds_per_batch")
+    if not math.isfinite(value) or value <= 0:
+        raise ModelConfigError("estimated_seconds_per_batch must be positive and finite")
     return value
 
 

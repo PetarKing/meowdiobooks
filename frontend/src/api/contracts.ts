@@ -164,6 +164,7 @@ export interface DialogueRoutingPreview {
     credentialConfigured: boolean;
     apiKeyEnvironmentVariable: string;
     estimatedCostUsd: number;
+    estimatedDurationSeconds?: number;
     falseNamesReductionPercent?: number;
     speakerRecallImprovementPercent?: number;
   } | null;

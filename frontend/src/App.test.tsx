@@ -1827,7 +1827,7 @@ describe('v2 wizard', () => {
           local: { displayName: 'Qwen', apiCostUsd: 0 },
           remote: {
             displayName: 'Luna', domain: 'api.openai.com', credentialConfigured: true,
-            apiKeyEnvironmentVariable: 'OPENAI_API_KEY', estimatedCostUsd: .68,
+            apiKeyEnvironmentVariable: 'OPENAI_API_KEY', estimatedCostUsd: .68, estimatedDurationSeconds: 600,
             falseNamesReductionPercent: 85, speakerRecallImprovementPercent: 272,
           },
         },
@@ -1875,6 +1875,8 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('dialog', { name: '938 dialogue lines need a speaker check' })).not.toBeInTheDocument()
     const processing = screen.getByRole('dialog', { name: 'Remote processing' })
     expect(processing).toHaveClass('dialogue-processing-modal')
+    expect(within(processing).getByText('Estimated time left')).toBeInTheDocument()
+    expect(within(processing).getByText('≈ 8 min–15 min')).toBeInTheDocument()
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'dialogue', expect.objectContaining({ attributionRoute: 'remote' })))
     finishRemoteLaunch({ id: 'job-dialogue', kind: 'v2:dialogue', status: 'queued' })
     await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('job-dialogue'))

@@ -514,6 +514,7 @@ main { width: 100%; max-width: 1480px; padding: 44px clamp(24px,4vw,64px) 48px; 
 .generation-overlay { background:color-mix(in srgb, var(--inverse-surface) 38.0%, transparent); backdrop-filter:blur(14px) saturate(.8); -webkit-backdrop-filter:blur(14px) saturate(.8); }
 .generation-modal { width:min(560px,100%); }
 .generation-progress-facts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; margin:18px 0 0; overflow:hidden; border:1px solid var(--color-border, var(--line)); border-radius:13px; background:var(--color-border, var(--line)); }
+.dialogue-processing-modal .generation-progress-facts { grid-template-columns:1fr; }
 .generation-progress-facts > div { display:grid; gap:4px; padding:13px 15px; background:color-mix(in srgb, var(--paper) 98.0%, transparent); }
 .generation-progress-facts dt { color:var(--color-muted, var(--muted)); font-size:12px; font-weight:850; letter-spacing:.08em; text-transform:uppercase; }
 .generation-progress-facts dd { margin:0; color:var(--color-ink, var(--ink)); font:700 16px var(--font-display); }
