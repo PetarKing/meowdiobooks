@@ -185,11 +185,22 @@ for at most two pages. Hosts without this optional method retain the fixed
 representative pages; Core never bypasses a host processor to inspect a PDF.
 The screen never runs OCR. Standard stays recommended; all sparse-image page
 signals survive in extraction warnings so Review can offer physical-page recovery.
-`ExtractionSettings` accepts `ocrPages` with `baseExtractionRevision` only for the
-OCR method. Targeted recovery copies untouched accepted pages and writes a new
-unpublished extraction candidate. Acceptance rejects a stale base revision before
-normal downstream invalidation. Empty and suspected image-text pages require
-individual confirmations; one illustration cannot confirm the whole group.
+`ReviewSettings` optionally accepts `ocrPages`, `baseExtractionRevision`, and
+`baseDialogueRevision`. A single-page or bulk OCR choice prepares replacement
+source pages, preserves accepted readers on unchanged blocks, and narrates newly
+recovered text. The ordinary Review workspace and cleanup finish before a commit
+atomically publishes related Extraction/Dialogue revisions and invalidates later
+artifacts. Stale input revisions, technical failures and cancellation cannot
+publish partial recovery. Empty/unchanged OCR pages retain their saved text and
+are reported alongside successful peers; a wholly unchanged batch creates only a
+normal Review candidate. There is no additional source-acceptance screen.
+
+Continuation artifacts are marked as owned by Review and cannot reopen as
+standalone pending Extraction/Dialogue after a crash. Acceptance checks upstream
+revisions inside the publication lock. Existing per-page Review decisions carry
+only if their exact source evidence is unchanged; a chosen OCR outcome can be
+inspected in the normal transcript review. The separate targeted Extraction API
+retains its existing candidate/acceptance contract for programmatic callers.
 Explicit OCR uses a distinct cache identity and the same per-page algorithm for
 preview and complete extraction; failed pages do not publish a partial candidate.
 

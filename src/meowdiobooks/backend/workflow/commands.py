@@ -55,7 +55,21 @@ class DialogueSettings(CommandModel):
 
 
 class ReviewSettings(CommandModel):
-    pass
+    ocrPages: list[Annotated[int, Field(strict=True, ge=1, le=10000)]] | None = Field(
+        default=None, min_length=1, max_length=10000,
+    )
+    baseExtractionRevision: str | None = Field(default=None, min_length=1, max_length=128)
+    baseDialogueRevision: str | None = Field(default=None, min_length=1, max_length=128)
+
+    @model_validator(mode="after")
+    def targeted_ocr_requires_upstream_revisions(self):
+        fields = (self.ocrPages, self.baseExtractionRevision, self.baseDialogueRevision)
+        if any(value is not None for value in fields):
+            if any(value is None for value in fields):
+                raise ValueError("Review OCR requires pages and accepted extraction/dialogue revisions")
+            if len(set(self.ocrPages)) != len(self.ocrPages):
+                raise ValueError("Review OCR pages must be unique")
+        return self
 
 
 class SourceVoiceSelection(CommandModel):

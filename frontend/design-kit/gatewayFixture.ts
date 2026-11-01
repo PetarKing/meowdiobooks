@@ -35,6 +35,8 @@ const library: LibraryExport[] = [false, true].map((partial, i) => ({
 export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const metadata = metadataFor(id);
   const { gatewayVariant } = metadata;
+  const sourcePagePreview = (page: number) => metadata.snapshotVariant === "review-missing-pages"
+    ? sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)) : sourceImage;
   const snapshot = snapshotFor(id);
   if (id === "export-default-cover") snapshot.book.sourceKind = "text";
   if (gatewayVariant === "dialogue-running" && snapshot.dialogue) {
@@ -63,6 +65,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const canceledJobs = new Set<string>();
   let castCandidate: CastArtifact | undefined;
   let auditionSequence = 0;
+  let ocrOutcome: import("../src/api/contracts").OcrRecoveryResult | undefined;
   const exports = collectionSize !== undefined ? collectionBooks.slice(0, collectionSize).map((book, i): LibraryExport => ({
     ...library[i % library.length], id: `collection-export-${i}`, bookId: book.id, title: book.title,
     author: ["Lewis Carroll", "Hana Mori", "Antoine de Saint-Exupéry", "M. A. Rivers", "夏野 みどり", "Frances Hodgson Burnett"][i % 6],
@@ -181,6 +184,15 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
           })),
         ];
       }
+      if (stage === "review" && "ocrPages" in settings && Array.isArray(settings.ocrPages)) {
+        const pages = settings.ocrPages as number[];
+        ocrOutcome = { requestedPages: [...pages], recoveredPages: [...pages], emptyPages: [], unchangedPages: [] };
+        snapshot.activeArtifacts.extraction = "extraction-ocr";
+        snapshot.activeArtifacts.dialogue = "dialogue-ocr";
+        snapshot.warnings = snapshot.warnings.map((row) => ({ ...row,
+          occurrences: row.occurrences.filter((occurrence) => !pages.includes(occurrence.page)),
+        })).filter((row) => row.occurrences.length > 0);
+      }
       return {
         id: `fixture-job-${stage}`,
         kind: `v2:${stage}`,
@@ -232,6 +244,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
               revision,
               warnings: snapshot.warnings,
               boundaryCandidates: snapshot.boundaryCandidates,
+              ...(ocrOutcome ? { ocrRecovery: ocrOutcome } : {}),
               ...(metadata.snapshotVariant === "review-recovery"
                 ? {
                     recovery: {
@@ -276,14 +289,13 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       ],
       elapsedSeconds: 0.24,
       cached: true,
-      imageUrl: metadata.snapshotVariant === "review-missing-pages"
-        ? sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)) : sourceImage,
+      imageUrl: sourcePagePreview(page),
     }),
     previewDialogue: async () => structuredClone(snapshot.dialogue!),
     previewReviewTranscript: async (_book, _revision, page) => ({
       page,
       pageCount: 120,
-      imageUrl: sourceImage,
+      imageUrl: sourcePagePreview(page),
       published: false,
       summary: { spoken: 2, dialogue: 1, excluded: 0 },
       spans: [

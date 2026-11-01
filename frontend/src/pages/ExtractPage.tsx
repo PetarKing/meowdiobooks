@@ -11,20 +11,7 @@ export type ExtractPageModel = Pick<WorkflowModel, "book" | "busy" | "completed"
 export function ExtractPage({ model }: { model: ExtractPageModel; }) {
   const { book, busy, completed, extractionCandidate, extractionPreview, method, previewPage, processAndPublishExtraction, representatives, revisingStages, setMethod, setRevisingStages, snapshot, t } = model;
   const page = extractionPreview?.page ?? 1;
-  if (extractionCandidate) {
-    const recoveryScope = extractionCandidate.recoveredPages ?? extractionCandidate.ocrPages;
-    const recoveredPages = Array.isArray(recoveryScope) ? recoveryScope as number[] : [];
-    const pages = Array.isArray(extractionCandidate.pages) ? extractionCandidate.pages as Array<{ page: number; text: string }> : [];
-    const recovered = pages.find((row) => row.page === (extractionPreview && recoveredPages.includes(extractionPreview.page) ? extractionPreview.page : recoveredPages[0]));
-    return <><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><Panel title={t(recoveredPages.length ? "OCR recovery is ready" : "Full extraction is ready")}>
-      <p>{t(recoveredPages.length ? "Compare the recovered text before accepting. Other pages keep their saved text. Dialogue and Review will need rebuilding." : "Use the saved result to continue without extracting again.")}</p>
-      {recoveredPages.length > 0 && <>
-        <div className="sample-reasons">{recoveredPages.map((number) => <button key={number} onClick={() => void previewPage(number, "native")}>{t("p. {{page}}", { page: number })}</button>)}</div>
-        <PageComparison imageUrl={extractionPreview && recoveredPages.includes(extractionPreview.page) ? extractionPreview.imageUrl : undefined} imageAlt={t("Original page {{page}}", { page: recovered?.page ?? recoveredPages[0] })} rightLabel={t("OCR TEXT")}><pre>{recovered?.text}</pre></PageComparison>
-      </>}
-      <button className="primary" disabled={busy} onClick={() => void processAndPublishExtraction()}>{t(recoveredPages.length ? "Use recovered text" : "Accept completed extraction")} →</button>
-    </Panel></>;
-  }
+  if (extractionCandidate) return <><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><Panel title={t("Full extraction is ready")}><p>{t("Use the saved result to continue without extracting again.")}</p><button className="primary" disabled={busy} onClick={() => void processAndPublishExtraction()}>{t("Accept completed extraction")} →</button></Panel></>;
   if (completed.includes("extract") && !revisingStages.includes("extract")) return <AcceptedSummary stage="extract" step={t("Step 1")} title={t("Extraction complete")} revision={snapshot?.activeArtifacts.extraction} onRevise={() => setRevisingStages([...new Set([...revisingStages, "extract"])])}><span><b>{book?.pageCount ?? "—"}</b><small>{t("Pages extracted")}</small></span><span><b>{t(methodLabel(method))}</b><small>{t("Reading method")}</small></span></AcceptedSummary>;
   return <><section className="extract-hero">
     <div className="extract-hero-copy"><StepEyebrow stage="extract">{t("Step 1 · Extract")}</StepEyebrow><h1>{t("Check the extracted text")}</h1><p>{t("Compare the sample pages, choose how to read the text, then process the full book.")}</p></div>

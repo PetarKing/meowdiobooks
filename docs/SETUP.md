@@ -48,12 +48,19 @@ inspection and flags all such pages for Review, including footer-only extraction
 It does not run OCR. Blank digital pages do not qualify; an illustration or blank
 scan can qualify because metadata cannot establish whether it contains useful text.
 
-Review shows each suspect original page. Choose **Recover this page with OCR**
-to create an unpublished extraction candidate for that physical page only. Compare
-it before accepting. Untouched pages retain their saved extraction; acceptance
-rebuilds source blocks and invalidates Dialogue and Review (and later work).
-A blank or unchanged OCR result leaves the accepted extraction intact. Confirming
-an intentionally blank or visual-only page applies to that page only.
+Review shows each suspect original page. Choose **Recover this page with OCR** or
+**Recover all flagged pages with OCR** for all remaining missing-text pages. This
+choice applies the best OCR result automatically and returns to ordinary transcript
+review; there is no separate OCR acceptance screen. Untouched pages and their
+accepted reader assignments remain unchanged. New text initially uses the narrator.
+
+Empty or unchanged OCR results keep their saved text and appear in the result
+summary. They do not fail a bulk batch containing successful pages. Technical
+failures or cancellation publish nothing. Changed Extraction/Dialogue revisions
+publish together after complete preparation; later artifacts are invalidated.
+Review choices carry only when their exact source evidence is unchanged. Choosing
+OCR already chooses its best-effort outcome; the user checks it in the normal
+transcript review. OCR outcome counts never claim complete visual text coverage.
 
 The separate OCR extraction option can read an entire scanned book when explicitly
 selected. No whole-book OCR runs proactively.

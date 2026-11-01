@@ -19,7 +19,8 @@ export type WorkflowScenarioAction =
   | "open-player"
   | "open-split"
   | "phase-help"
-  | "scan-review";
+  | "scan-review"
+  | "recover-missing-pages";
 
 export type ScenarioStoryAction = HomeScenarioAction | WorkflowScenarioAction;
 
@@ -638,6 +639,7 @@ export const scenarioMetadata = {
   "generate-running": { ...baselineScenarioMetadata.generate, label: "Generate · running", description: "Chapter progress with saved audio retained.", gatewayVariant: "generate-running", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
   "generate-failed": { ...baselineScenarioMetadata.generate, label: "Generate · failed", description: "Generation failure preserves chapters and offers recovery.", gatewayVariant: "generate-failed", story: { ...baselineScenarioMetadata.generate.story, actions: ["generate-selected"] } },
   "cast-sample-pending": { ...baselineScenarioMetadata["cast-inspector"], label: "Cast · sample upload", description: "Sample upload stays pending; unavailable confirmation cannot proceed.", gatewayVariant: "sample-upload-pending", story: { ...baselineScenarioMetadata["cast-inspector"].story, actions: ["open-alice-voice", "configure-sample", "create-sample"] } },
+  "review-ocr-bulk": { ...baselineScenarioMetadata.review, label: "Review · OCR applied", description: "Bulk OCR continues directly into transcript review without another approval.", snapshotVariant: "review-missing-pages", story: { ...baselineScenarioMetadata.review.story, actions: ["scan-review", "recover-missing-pages"], heading: "Read it once like a listener." } },
   "review-missing-pages": { ...baselineScenarioMetadata.review, label: "Review · missing text", description: "Original PDF page shown before per-page confirmation or OCR recovery.", snapshotVariant: "review-missing-pages", story: { ...baselineScenarioMetadata.review.story, actions: ["scan-review"], heading: "Review your manuscript" } },
   "review-recovery": { ...baselineScenarioMetadata.review, label: "Review · recovery", description: "Unsafe source coverage requires rebuilding Dialogue before acceptance.", snapshotVariant: "review-recovery", story: { ...baselineScenarioMetadata.review.story, actions: [], heading: "Dialogue needs rebuilding" } },
 } as const satisfies Record<string, ScenarioMetadata>;
