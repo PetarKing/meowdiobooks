@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -113,7 +114,19 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
     return result
 
 
-def _image_screen_stats(command, command_runner):
+def _image_screen_stats(source, page_count, command_runner, *, target_page=None):
+    if type(page_count) is not int or page_count < 1:
+        raise ValueError("Invalid page count for image screening")
+    if target_page is not None and (type(target_page) is not int or not 1 <= target_page <= page_count):
+        raise ValueError("Invalid page for image screening")
+    # An absolute filename cannot be interpreted as a CLI option. Never accept
+    # an executable or arbitrary argument list across this helper boundary.
+    source_path = os.path.abspath(source)
+    if not source_path.startswith(os.sep):
+        raise ValueError("Image screening requires an absolute source path")
+    target = [] if target_page is None else ["--target-pages", str(int(target_page))]
+    command = ["liteparse", "is-complex", source_path, "--compact", "--quiet",
+               *target, "--max-pages", str(int(page_count))]
     if command_runner is not None:
         result = command_runner(command, check=False, capture_output=True, timeout=60)
         payload = result.stdout
@@ -121,8 +134,11 @@ def _image_screen_stats(command, command_runner):
         # LiteParse exits before large piped JSON is fully flushed. A regular
         # file preserves every physical page in a long document's screen.
         with tempfile.TemporaryFile() as output:
-            result = subprocess.run(command, check=False, stdout=output,
-                                    stderr=subprocess.PIPE, timeout=60)
+            result = subprocess.run(
+                ["liteparse", "is-complex", source_path, "--compact", "--quiet",
+                 *target, "--max-pages", str(int(page_count))],
+                check=False, stdout=output, stderr=subprocess.PIPE, timeout=60,
+            )
             if output.tell() > 32 * 1024**2:
                 raise ValueError("Image screening output exceeds its limit")
             output.seek(0)
@@ -150,10 +166,7 @@ def extraction_sample_pages(
     if cached is not None:
         return cached["pages"]
     try:
-        stats = _image_screen_stats(
-            ["liteparse", "is-complex", str(source), "--compact", "--quiet",
-             "--max-pages", str(page_count)], command_runner,
-        )
+        stats = _image_screen_stats(source, page_count, command_runner)
         if not isinstance(stats, list) or [
             row.get("pageNumber") for row in stats
         ] != list(range(1, page_count + 1)):
@@ -240,10 +253,7 @@ def _flag_preview_image_text(source, cache_root, row, command_runner):
             pass
     if candidate is None:
         try:
-            stats = _image_screen_stats(
-                ["liteparse", "is-complex", str(source), "--compact", "--quiet",
-                 "--target-pages", str(row["page"]), "--max-pages", str(count)], command_runner,
-            )
+            stats = _image_screen_stats(source, count, command_runner, target_page=row["page"])
             if (not isinstance(stats, list)
                     or len(stats) != 1 or stats[0].get("pageNumber") != row["page"]):
                 return row
@@ -375,7 +385,13 @@ def render_default_cover(cache_root: Path) -> Path:
 def render_pdf_page(source: Path, cache_root: Path, page: int, *, command_runner=None) -> Path:
     if source.suffix.lower() in TEXT_SUFFIXES:
         return render_default_cover(cache_root)
-    output = cache_root / "pages" / f"page-{page:04d}.png"
+    if type(page) is not int or page < 1:
+        raise ValueError("Invalid page for rendering")
+    trusted_root = os.path.realpath(cache_root)
+    resolved_output = os.path.realpath(cache_root / "pages" / f"page-{page:04d}.png")
+    if not resolved_output.startswith(trusted_root + os.sep):
+        raise ValueError("Rendered page is outside the cache directory")
+    output = Path(resolved_output)
     if output.is_file():
         return output
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -399,11 +415,19 @@ def render_pdf_page(source: Path, cache_root: Path, page: int, *, command_runner
             capture_output=True,
             timeout=60,
         )
-        if not pending.is_file():
+        rendered = os.path.realpath(pending)
+        destination = os.path.realpath(output)
+        if (not rendered.startswith(trusted_root + os.sep)
+                or not destination.startswith(trusted_root + os.sep)):
+            raise ValueError("Rendered page is outside the cache directory")
+        if not Path(rendered).is_file():
             raise RuntimeError(f"Page renderer produced no image for page {page}")
-        pending.replace(output)
+        Path(rendered).replace(destination)
     finally:
-        pending.unlink(missing_ok=True)
+        rendered = os.path.realpath(pending)
+        if not rendered.startswith(trusted_root + os.sep):
+            raise ValueError("Rendered page is outside the cache directory")
+        Path(rendered).unlink(missing_ok=True)
     return output
 
 

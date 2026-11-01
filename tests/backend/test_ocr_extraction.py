@@ -501,3 +501,76 @@ def test_failed_page_render_cleans_partial_image_and_can_retry(tmp_path):
     output = render_pdf_page(pdf, cache, 1, command_runner=runner([], root=tmp_path))
     with Image.open(output) as image:
         image.verify()
+
+
+@pytest.mark.parametrize('page_count,target', [(True, None), (0, None), (-1, None),
+                                              ('3', None), (3, True), (3, 4), (3, '--help')])
+def test_image_screen_rejects_non_numeric_or_out_of_range_cli_values(tmp_path, page_count, target):
+    from meowdiobooks.backend.documents import _image_screen_stats
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail('Invalid CLI values reached the command runner')
+
+    with pytest.raises(ValueError):
+        _image_screen_stats(tmp_path / 'source.pdf', page_count, forbidden, target_page=target)
+
+
+def test_native_image_screen_keeps_option_looking_filename_as_absolute_argument(tmp_path, monkeypatch):
+    from meowdiobooks.backend.documents import _image_screen_stats
+    monkeypatch.chdir(tmp_path)
+    commands = []
+
+    def run(command, **options):
+        commands.append(command)
+        assert command == ['liteparse', 'is-complex', str(tmp_path / '--config=other.json'),
+                           '--compact', '--quiet', '--target-pages', '2', '--max-pages', '3']
+        assert not options.get('shell', False)
+        options['stdout'].write(b'[]')
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, 'run', run)
+    assert _image_screen_stats(Path('--config=other.json'), 3, None, target_page=2) == []
+    assert len(commands) == 1
+
+
+@pytest.mark.parametrize('escape', ['directory', 'file'])
+def test_page_renderer_rejects_cache_symlink_escape_before_running(tmp_path, escape):
+    from meowdiobooks.backend.documents import render_pdf_page
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+    outside = tmp_path / 'cache-other'
+    outside.mkdir()
+    outside_image = outside / 'page-0001.png'
+    outside_image.write_bytes(b'untouched')
+    cache.mkdir()
+    if escape == 'directory':
+        (cache / 'pages').symlink_to(outside, target_is_directory=True)
+    else:
+        (cache / 'pages').mkdir()
+        (cache / 'pages/page-0001.png').symlink_to(outside_image)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail('An escaping cache reached the renderer')
+
+    with pytest.raises(ValueError, match='outside the cache'):
+        render_pdf_page(pdf, cache, 1, command_runner=forbidden)
+    assert outside_image.read_bytes() == b'untouched'
+
+
+def test_renderer_cannot_publish_or_clean_up_a_symlink_target_outside_cache(tmp_path):
+    import os
+    from meowdiobooks.backend.documents import render_pdf_page
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+    outside = tmp_path / 'untouched.png'
+    outside.write_bytes(b'untouched')
+
+    def renderer(command, **_options):
+        candidate = os.path.realpath(command[-1] + '.png')
+        if not candidate.startswith(os.path.realpath(cache) + os.sep):
+            raise ValueError('Test output escaped the cache')
+        Path(candidate).symlink_to(outside)
+        return subprocess.CompletedProcess(command, 0)
+
+    with pytest.raises(ValueError, match='outside the cache'):
+        render_pdf_page(pdf, cache, 1, command_runner=renderer)
+    assert outside.read_bytes() == b'untouched'
+    assert not (cache / 'pages/page-0001.png').exists()
