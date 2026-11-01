@@ -71,9 +71,11 @@ export const MergeUndo: Story = {
     const toast = message.closest<HTMLElement>("[role=status]")!;
     const checkPosition = () => {
       const rect = toast.getBoundingClientRect();
-      expect(Math.abs(rect.x + rect.width / 2 - innerWidth / 2)).toBeLessThan(1);
+      // Fixed percentages use the layout viewport, excluding a classic scrollbar.
+      const viewportWidth = document.documentElement.clientWidth;
+      expect(Math.abs(rect.x + rect.width / 2 - viewportWidth / 2)).toBeLessThan(1);
       expect(innerHeight - rect.bottom).toBeLessThan(50);
-      expect(rect.right).toBeLessThanOrEqual(innerWidth);
+      expect(rect.right).toBeLessThanOrEqual(viewportWidth);
     };
     await expect(toast.parentElement).toBe(document.body);
     checkPosition();
