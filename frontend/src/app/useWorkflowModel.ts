@@ -244,6 +244,8 @@ export function useWorkflowModel({
   const [method, setMethod] = useState<ExtractionMethod>("liteparse");
 
   const [extractionCandidate, setExtractionCandidate] = useState<ArtifactCandidate>();
+  const extractionContinuation = useRef<symbol | undefined>(undefined);
+  const extractionAutoAttempt = useRef<{ gateway: typeof gateway; key: string } | undefined>(undefined);
   const [extractionPreview, setExtractionPreview] = useState<ExtractionPreview>();
   const extractionPreviewRequest = useRef(0);
   const [extractionPreviewPage, setExtractionPreviewPage] = useState(1);
@@ -651,6 +653,21 @@ export function useWorkflowModel({
     } satisfies WorkflowLocation));
   }, [book, home, locationKey, productView, restoringLocation, returnLocation, stage, stages]);
 
+  // A completed extraction has no review decisions. Finish the existing command
+  // when its Extract view returns, after restoration and any attached job settle.
+  useEffect(() => {
+    if (!book || home || productView !== "create" || stages[stage]?.builtin !== "extract"
+      || stepOverrides[stages[stage]?.id] || !extractionCandidate?.revision || busy || extractionTransition || restoringLocation
+      || returnLocation || error || (activeJob && ["queued", "running"].includes(activeJob.status))) return;
+    const key = `${workflowPersistenceNamespace}:${book.id}:${extractionCandidate.revision}:${navigationVersion.current}`;
+    if (extractionAutoAttempt.current?.gateway === gateway && extractionAutoAttempt.current.key === key) return;
+    extractionAutoAttempt.current = { gateway, key };
+    void processAndPublishExtraction();
+    // This resumes one saved revision, not a new extraction on every model update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [book, home, productView, stage, extractionCandidate, busy, extractionTransition, restoringLocation,
+    returnLocation, error, activeJob, gateway, workflowPersistenceNamespace, stepOverrides]);
+
   // Extraction preview is a separate, lazy UI concern. A later-stage return must not
   // depend on PDF preview availability (including historical books without a filename).
   useEffect(() => {
@@ -934,28 +951,43 @@ export function useWorkflowModel({
   }
 
   async function processAndPublishExtraction() {
-    if (!book) return;
+    if (!book || extractionContinuation.current) return;
+    const operation = Symbol("extraction-continuation");
+    extractionContinuation.current = operation;
+    const version = navigationVersion.current;
+    const current = () => mounted.current && navigationVersion.current === version
+      && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway;
+    setBusy(true);
+    setError(undefined);
     setExtractionTransition(true);
-    setProcessMessage("Preparing complete extraction");
-    setProgress(0);
+    setProcessMessage(extractionCandidate ? "Saving extracted text" : "Preparing complete extraction");
+    setProgress(extractionCandidate ? 100 : 0);
     try {
       const candidate = extractionCandidate ?? await processCandidate("extract", { method });
+      if (!current()) return;
       if (!candidate.revision) throw new Error("extract did not return a candidate revision");
+      // Keep a completed result available if acceptance fails; retry never reruns OCR.
+      setExtractionCandidate(candidate);
       setBusy(true);
       setProcessMessage("Saving extracted text");
       setProgress(100);
       await gateway.acceptStage(book.id, "extract", String(candidate.revision), []);
-      const next = await hydrate(book.id);
-      setRevisingStages((current) => current.filter((row) => row !== "extract"));
+      if (!current()) return;
+      const next = await hydrate(book.id, current);
+      if (!current()) return;
+      setRevisingStages((previous) => previous.filter((row) => row !== "extract"));
       setStage(routeStage(
         Math.min(stageIndex("generate"), nextStage(next.book.completedStages)),
         next,
       ));
     } catch (reason) {
-      setError(message(reason));
+      if (current()) setError(message(reason));
     } finally {
-      setBusy(false);
-      setExtractionTransition(false);
+      if (extractionContinuation.current === operation) {
+        extractionContinuation.current = undefined;
+        if (current()) setBusy(false);
+        setExtractionTransition(false);
+      }
     }
   }
 
