@@ -5,6 +5,7 @@ import type {
   LibraryExport,
   LocalBook,
   StageCandidate,
+  ReviewTranscriptSpan,
   WorkflowGateway,
 } from "../src/api/contracts";
 import { metadataFor, type ScenarioId } from "./scenarioRegistry";
@@ -16,6 +17,7 @@ import {
   sourcePageHeading,
   sourcePageNarration,
   sourcePageThought,
+  sourcePageThoughtParts,
   libraryCoverImage,
   silentWav,
   text,
@@ -295,12 +297,27 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       imageUrl: sourcePagePreview(page),
     }),
     previewDialogue: async () => structuredClone(snapshot.dialogue!),
-    previewReviewTranscript: async (_book, _revision, page) => ({
+    previewReviewTranscript: async (_book, _revision, page) => {
+      const recovered = ocrOutcome?.recoveredPages.includes(page);
+      let offset = 0;
+      const thoughtSpans: ReviewTranscriptSpan[] = recovered ? [{
+        id: "recovered-thought", kind: "narration", reader: "Narrator", text: sourcePageThought,
+        blockId: "p2", sourceStart: 0, sourceEnd: sourcePageThought.length,
+      }] : sourcePageThoughtParts.map((part, index) => {
+        const sourceStart = offset;
+        offset += part.length + 1;
+        return {
+          id: `thought-${index}`, kind: index === 1 ? "narration" : "dialogue",
+          reader: index === 1 ? "Narrator" : "Alice", text: part, blockId: "p2",
+          sourceStart, sourceEnd: sourceStart + part.length,
+        };
+      });
+      return {
       page,
       pageCount: 120,
       imageUrl: sourcePagePreview(page),
       published: false,
-      summary: { spoken: 3, dialogue: 1, excluded: 0 },
+      summary: { spoken: 2 + thoughtSpans.length, dialogue: recovered ? 0 : 2, excluded: 0 },
       spans: [
         {
           id: "heading", kind: "narration", reader: "Narrator", text: sourcePageHeading,
@@ -315,17 +332,9 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
           sourceStart: 0,
           sourceEnd: sourcePageNarration.length,
         },
-        {
-          id: "d1",
-          kind: "dialogue",
-          reader: "Alice",
-          text: sourcePageThought,
-          blockId: "p2",
-          sourceStart: 0,
-          sourceEnd: sourcePageThought.length,
-        },
+        ...thoughtSpans,
       ],
-    }),
+    }; },
     previewCasting: async (_book, settings) => ({
       fingerprint: "fixture-quote",
       sources: [

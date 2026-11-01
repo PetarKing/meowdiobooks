@@ -8,7 +8,18 @@ export const fixtureBook: LocalBook = {
 };
 export const text =
   "Alice was beginning to get very tired of sitting by her sister on the bank. “What is the use of a book,” thought Alice, “without pictures or conversations?”";
-export const sourcePageLines = ["Alice was beginning to get very tired of sitting", "by her sister on the bank, and of having nothing", "to do: once or twice she had peeped into the book", "her sister was reading, but it had no pictures", "or conversations in it.", "“What is the use of a book,” thought Alice,", "“without pictures or conversations?”"];
+export const sourcePageThoughtParts = [
+  "“What is the use of a book,”", "thought Alice,", "“without pictures or conversations?”",
+] as const;
+export const sourcePageLines = [
+  "Alice was beginning to get very tired of sitting",
+  "by her sister on the bank, and of having nothing",
+  "to do: once or twice she had peeped into the book",
+  "her sister was reading, but it had no pictures",
+  "or conversations in it.",
+  `${sourcePageThoughtParts[0]} ${sourcePageThoughtParts[1]}`,
+  sourcePageThoughtParts[2],
+];
 export const sourcePageHeading = "Down the Rabbit-Hole";
 export const sourcePageNarration = sourcePageLines.slice(0, 5).join(" ");
 export const sourcePageThought = sourcePageLines.slice(5).join(" ");
