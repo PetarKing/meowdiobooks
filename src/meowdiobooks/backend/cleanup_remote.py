@@ -36,7 +36,7 @@ from .chapter_semantic import confirm_chapter_candidates
 from .cleanup_patterns import (
     PATTERN_VERIFY_SCHEMA, PATTERN_VERIFY_SYSTEM, pattern_prompt,
     representative_windows, split_pattern_windows, FAMILY_RULE_MODE, FAMILY_QUESTIONS,
-    numbered_family_manifest, family_screen, rule_group, rule_windows,
+    numbered_family_manifest, family_screen, rule_group, rule_windows, quote_batches,
 )
 
 POLICY_ID = "focused-decisions-luna-cleanup-v1"
@@ -191,7 +191,7 @@ def cleanup_windows(extraction: Mapping[str, Any], dialogue: Mapping[str, Any]) 
         candidates.setdefault(candidate["blockId"], []).append(candidate)
     for window in windows:
         evidence = [{
-            "kind": "repeated_numbered_last_line",
+            "kind": "repeated_numbered_page_tail",
             "targetStart": row["sourceStart"] - window["sourceStart"],
             "targetEnd": row["sourceEnd"] - window["sourceStart"],
             **row["patternEvidence"],
@@ -415,12 +415,27 @@ def run_cleanup_review(
                 except (KeyError, ValueError, TypeError):
                     verification_response = None
         group = rule_group(family, screen_response, verification_response)
+        quote_proofs = []
+        if group["verdict"] == "verified":
+            for batch in quote_batches(family):
+                with request_slot("repair", poll_cancelled):
+                    checked = remote_chat_completion(
+                        repo_root, repair_config, PATTERN_VERIFY_SYSTEM, pattern_prompt(batch),
+                        max_completion_tokens=1400, response_schema=PATTERN_VERIFY_SCHEMA,
+                        usage_observer=usage_observer, request_admission=admission)
+                try:
+                    response = json.loads(checked["text"])
+                except (KeyError, ValueError, TypeError):
+                    response = None
+                quote_proofs.append({"windowIds": [r["windowId"] for r in batch],
+                                     "examples": batch, "verification": response})
+            group = rule_group(family, screen_response, verification_response, quote_proofs)
         pattern_groups.append(group)
         footer_evidence.extend(rule_windows(family, group))
         if group["verdict"] == "verified":
             footer_occurrences.extend({**row, "replacement": "", "reason": group["reason"],
                 "proposalStatus": "proposed", "patternVerification": "verified",
-                "model": repair_config.model, "policy": POLICY_ID} for row in family["eligible"])
+                "model": repair_config.model, "policy": POLICY_ID} for row in family["members"] if row["windowId"] in group["eligibleWindowIds"])
     chapter_review = confirm_chapter_candidates(
         repo_root, extraction, dialogue, repair_config,
         usage_observer=usage_observer, request_admission=admission,

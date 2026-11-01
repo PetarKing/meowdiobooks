@@ -309,7 +309,7 @@ def add_cleanup_proposals(
     rows = []
     pattern_candidates = {(row["blockId"], row["sourceStart"], row["sourceEnd"]): row
                           for row in numbered_edge_candidates(blocks)}
-    family_rule_mode = result.get("patternAssessmentMode") == "numbered-footer-rule-v1"
+    family_rule_mode = result.get("patternAssessmentMode") == "numbered-footer-rule-v2"
     if family_rule_mode:
         from .cleanup_patterns import validate_family_rule_evidence
         try:
@@ -388,11 +388,11 @@ def add_cleanup_proposals(
                     or replacement != "" or proposal.get("patternVerification") != "verified"
                     or proposal["patternGroupId"] != candidate["patternGroupId"]
                     or not any(str(span.get("blockId")) == str(block["id"])
-                               and span.get("renderRole") == "narration"
+                               and (family_rule_mode or span.get("renderRole") == "narration")
                                and span.get("spokenStart", span.get("sourceStart", 0)) <= start
                                and end <= span.get("spokenEnd", span.get("sourceEnd", 0))
                                for span in dialogue.get("spans", []))):
-                raise ReviewContractError("Pattern proposal requires exact verified narrator footer evidence")
+                raise ReviewContractError("Pattern proposal requires exact verified footer ownership evidence")
             row.update(patternGroupId=candidate["patternGroupId"], patternVerification="verified")
         # Even identical source strings can have different suggested replacements.
         row["matchKey"] = _digest([row.get("boundarySource", row["source"]), replacement])
@@ -410,6 +410,16 @@ def add_cleanup_proposals(
     # Preserve deterministic IDs and evidence. Repairable findings move into the AI
     # category, so the same defect never asks for two decisions.
     warnings = deepcopy(list(workspace.get("warnings", [])))
+    # A verified complete footer owns its contained link/folio warnings. Keep the
+    # complete replacement instead of separately removing only the URL again.
+    footer_rows = [r for r in rows if r.get("patternVerification") == "verified"
+                   and r.get("replacement") == "" and r.get("patternGroupId", "").startswith("numbered-edge:")]
+    for warning in warnings:
+        if warning.get("kind") in {"page-number", "web-address", "repeated-matter"}:
+            warning["occurrences"] = [r for r in warning["occurrences"] if not any(
+                r["blockId"] == footer["blockId"]
+                and footer["sourceStart"] <= r["sourceStart"] < r["sourceEnd"] <= footer["sourceEnd"]
+                for footer in footer_rows)]
     if header_evidence is not None:
         header_members = [r for family in header_evidence["families"] for r in family["members"]]
         for warning in warnings:
@@ -1538,51 +1548,31 @@ def _text_occurrences(
 
 
 def numbered_edge_candidates(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Return exact model candidates from repeated last-line labels and changing folios.
+    """Return exact model candidates from repeated page-tail templates and changing folios.
 
     This language-neutral structural signal is not proof of a publisher/footer role.
-    Three distinct pages must share a label and folio offset. Candidates remain
+    Three distinct pages must share static text and a folio offset. Candidates remain
     model evidence only and never create deterministic review items or omissions.
     This pure helper also supports candidate-recall benchmarks without model calls.
     """
-    pages: dict[int, list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
-    for block in blocks:
-        pages[int(block["page"])].extend(
-            (block, match) for match in re.finditer(r"[^\n]+", str(block["text"]))
-            if match.group().strip()
-        )
-    candidates: dict[tuple[str, int], list[tuple[Mapping[str, Any], re.Match[str]]]] = defaultdict(list)
-    for page, lines in pages.items():
-        if not lines:
-            continue
-        # A numbered publisher footer is a stronger signal than an isolated
-        # numeral at the top of a page (often a chapter/section number).
-        block, match = lines[-1]
-        label = re.fullmatch(r"\s*(?P<label>[^\d\n]{3,60}?)\s*(?P<number>\d{1,4})\s*", match.group())
-        if label is None:
-            continue
-        name = label["label"].strip()
-        if not any(char.isalpha() for char in name) or any(
-            not (char.isalpha() or char.isspace() or char in "-–—&") for char in name
-        ):
-            continue
-        key = (" ".join(name.casefold().split()), int(label["number"]) - page)
-        candidates[key].append((block, match))
+    from .footer_candidates import physical_footer_templates
     result = []
-    for (label_key, folio_offset), rows in candidates.items():
-        repeated_pages = sorted({int(block["page"]) for block, _ in rows})
-        if len(repeated_pages) < 3:
-            continue
-        for block, match in rows:
-            occurrence = _from_match(
-                "page-number", block, match,
-                "Last-line label repeats on at least three pages with a consistent folio offset; verify its role.",
+    for label_key, folio_offset, rows in physical_footer_templates(blocks):
+        repeated_pages = sorted({int(row["block"]["page"]) for row in rows})
+        for row in rows:
+            block, start, end = row["block"], row["start"], row["end"]
+            occurrence = _occurrence(
+                "page-number", str(block["id"]), start, end,
+                str(block["text"])[start:end], int(block["page"]),
+                "Compact page-tail template repeats with a consistent folio offset; verify its role.",
+                block_text=str(block["text"]),
             )
             occurrence["detectionRule"] = "repeated-numbered-edge"
             occurrence["patternGroupId"] = "numbered-edge:" + _digest([label_key, folio_offset])
             occurrence["patternEvidence"] = {
                 "distinctPageCount": len(repeated_pages), "folioOffset": folio_offset,
                 "firstPage": repeated_pages[0], "lastPage": repeated_pages[-1],
+                "lineCount": row["lineCount"], "hasUrl": row["hasUrl"],
             }
             result.append(occurrence)
     return result
