@@ -169,9 +169,13 @@ def remote_chat_completion(
         endpoint = f"{config.base_url}/chat/completions"
     if config.service_tier:
         payload["service_tier"] = config.service_tier
-    encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    if type(max_completion_tokens) is not int or max_completion_tokens <= 0:
+        raise ValueError("Remote requests require a positive integer maximum output token count")
+    output_budget = max_completion_tokens
+    maximum_output_budget = max(max_completion_tokens, 2_048)
     last_error = ""
     for attempt, delay in enumerate((2, 5, 10, 0), 1):
+        encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         request = urllib.request.Request(
             endpoint,
             data=encoded,
@@ -185,7 +189,7 @@ def remote_chat_completion(
             config,
             request_admission,
             payload_bytes=len(encoded),
-            max_output_tokens=max_completion_tokens,
+            max_output_tokens=output_budget,
             attempt=attempt,
         )
         with _request_completion_guard(config, usage_observer, completion, attempt) as completion:
@@ -259,6 +263,24 @@ def remote_chat_completion(
                     usage=usage if isinstance(usage, Mapping) else {},
                 )
                 try:
+                    if config.engine == "openai_responses" and response.get("status") == "incomplete":
+                        details = response.get("incomplete_details")
+                        reason = details.get("reason") if isinstance(details, Mapping) else None
+                        # Reasoning shares the output allowance. Only the provider's
+                        # explicit limit signal permits a larger, newly admitted retry.
+                        # Never publish partial structured output, even if it parses.
+                        refused = any(
+                            isinstance(part, Mapping) and part.get("type") == "refusal"
+                            for item in response.get("output", [])
+                            if isinstance(item, Mapping)
+                            for part in item.get("content", [])
+                        )
+                        if reason == "max_output_tokens" and not refused and delay:
+                            output_budget = min(
+                                maximum_output_budget, max(1_024, output_budget * 2)
+                            )
+                            payload["max_output_tokens"] = output_budget
+                        raise ValueError(f"response was incomplete (reason={reason})")
                     content = (
                         _responses_output_text(response)
                         if config.engine == "openai_responses"

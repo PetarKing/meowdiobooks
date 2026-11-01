@@ -301,3 +301,118 @@ def test_existing_profiles_without_service_tier_do_not_send_one(engine, monkeypa
     monkeypatch.setattr("urllib.request.urlopen", transport)
     assert remote_chat_completion(REPO_ROOT, config, "system", "prompt")["text"] == "ok"
     assert "service_tier" not in captured[0]
+
+
+@pytest.mark.parametrize("partial_text", ["", '{"relationship":"same"}'])
+def test_output_limit_retries_with_reasoning_headroom_and_new_admission(monkeypatch, partial_text):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    requests, admitted, observed = [], [], []
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.configured_api_key", lambda *_: "test-key")
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda _: None)
+
+    def open_response(request, timeout):
+        requests.append(json.loads(request.data))
+        limited = len(requests) == 1
+        return _Response({
+            "model": config.model,
+            "status": "incomplete" if limited else "completed",
+            "incomplete_details": {"reason": "max_output_tokens"} if limited else None,
+            "output": [{"type": "message", "content": [{
+                "type": "output_text", "text": partial_text if limited else "final decision",
+            }]}],
+            "usage": {"input_tokens": 100, "output_tokens": 384 if limited else 500},
+        })
+
+    monkeypatch.setattr("urllib.request.urlopen", open_response)
+    result = remote_chat_completion(
+        REPO_ROOT, config, "system", "prompt", max_completion_tokens=384,
+        request_admission=lambda _, metadata: admitted.append(metadata),
+        usage_observer=lambda _, event: observed.append(event),
+    )
+    assert result["text"] == "final decision"
+    assert result["attempts"] == 2
+    assert [request["max_output_tokens"] for request in requests] == [384, 1024]
+    assert [metadata["maximumOutputTokens"] for metadata in admitted] == [384, 1024]
+    assert [metadata["attempt"] for metadata in admitted] == [1, 2]
+    assert [event["usage"]["output_tokens"] for event in observed] == [384, 500]
+
+
+@pytest.mark.parametrize("status, reason, refusal", [
+    ("completed", None, False),
+    ("completed", None, True),
+    ("incomplete", "content_filter", False),
+    ("incomplete", "max_output_tokens", True),
+])
+def test_empty_refused_and_other_incomplete_responses_never_raise_budget(monkeypatch, status, reason, refusal):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    budgets = []
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.configured_api_key", lambda *_: "test-key")
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda _: None)
+
+    def open_response(request, timeout):
+        budgets.append(json.loads(request.data)["max_output_tokens"])
+        return _Response({
+            "status": status, "incomplete_details": {"reason": reason},
+            "output": [{"type": "message", "content": [
+                {"type": "refusal", "refusal": "Cannot decide"} if refusal else
+                {"type": "output_text", "text": ""},
+            ]}],
+        })
+
+    monkeypatch.setattr("urllib.request.urlopen", open_response)
+    with pytest.raises(RemoteModelUnavailableError):
+        remote_chat_completion(REPO_ROOT, config, "system", "prompt", max_completion_tokens=384)
+    assert budgets == [384] * 4
+
+
+@pytest.mark.parametrize("initial, expected", [(384, [384, 1024, 2048, 2048]), (4096, [4096] * 4)])
+def test_output_limit_exhaustion_keeps_attempt_and_budget_bounds(monkeypatch, initial, expected):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    admitted = []
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.configured_api_key", lambda *_: "test-key")
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda _: None)
+    monkeypatch.setattr("urllib.request.urlopen", lambda *_args, **_kwargs: _Response({
+        "status": "incomplete", "incomplete_details": {"reason": "max_output_tokens"},
+        "output": [],
+    }))
+    with pytest.raises(RemoteModelUnavailableError, match="incomplete.*max_output_tokens") as caught:
+        remote_chat_completion(
+            REPO_ROOT, config, "system", "prompt", max_completion_tokens=initial,
+            request_admission=lambda _, metadata: admitted.append(metadata["maximumOutputTokens"]),
+        )
+    assert admitted == expected
+    assert caught.value.public_message == (
+        "The hosted speaker check was interrupted. Try again; accepted work is unchanged."
+    )
+
+
+def test_larger_output_retry_requires_new_admission_before_network(monkeypatch):
+    config = load_model_registry(REPO_ROOT).remote_dialogue_model()
+    requests, admitted, completed = [], [], []
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.configured_api_key", lambda *_: "test-key")
+    monkeypatch.setattr("meowdiobooks.backend.remote_llm.time.sleep", lambda _: None)
+
+    def admit(_, metadata):
+        admitted.append(metadata["maximumOutputTokens"])
+        if len(admitted) == 2:
+            raise RuntimeError("Larger request denied")
+        return completed.append
+
+    def open_response(request, timeout):
+        requests.append(json.loads(request.data))
+        return _Response({
+            "model": config.model, "status": "incomplete",
+            "incomplete_details": {"reason": "max_output_tokens"}, "output": [],
+            "usage": {"input_tokens": 100, "output_tokens": 384},
+        })
+
+    monkeypatch.setattr("urllib.request.urlopen", open_response)
+    with pytest.raises(RuntimeError, match="Larger request denied"):
+        remote_chat_completion(
+            REPO_ROOT, config, "system", "prompt", max_completion_tokens=384,
+            request_admission=admit,
+        )
+    assert admitted == [384, 1024]
+    assert len(requests) == 1
+    assert len(completed) == 1
+    assert completed[0]["usage"]["output_tokens"] == 384
