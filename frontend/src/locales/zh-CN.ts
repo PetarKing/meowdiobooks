@@ -1,4 +1,7 @@
 const zhCN: Record<string, string> = {
+  "Your account has reached its monthly processing limit. Your saved work is still available. You can continue next month, or contact support.": "您的账户已达到本月处理限额。已保存的工作仍然可用。您可以下个月继续，或联系支持。",
+  "Audiobook processing has reached the service’s weekly limit. Your saved work is still available. Please try again later or contact support.": "有声书处理已达到服务的每周限额。已保存的工作仍然可用。请稍后重试或联系支持。",
+  "Audiobook processing has reached the service’s monthly limit. Your saved work is still available. Please try again next month or contact support.": "有声书处理已达到服务的每月限额。已保存的工作仍然可用。请下个月重试或联系支持。",
   "Ready for their voices?": "准备好生成声音了吗？",
   "Generation method": "生成方式",
   "Cancel voice setup": "取消声音设置",

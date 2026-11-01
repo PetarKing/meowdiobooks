@@ -213,3 +213,8 @@ it("retranslates an existing import-limit error after changing language", async 
   await changeAppLocale("en");
   expect(localizeErrorMessage(error, i18n.t)).toBe(error);
 });
+
+it.each(["Your account has reached its monthly processing limit. Your saved work is still available. You can continue next month, or contact support.", "Audiobook processing has reached the service’s weekly limit. Your saved work is still available. Please try again later or contact support.", "Audiobook processing has reached the service’s monthly limit. Your saved work is still available. Please try again next month or contact support."])('preserves reviewed processing-limit guidance without exposing arbitrary diagnostics: %s', raw => {
+  expect(message(new Error(raw))).toBe(raw);
+  expect(message(new Error(raw + ' secret provider diagnostics'))).toBe('Something went wrong while completing this step. Try again; your accepted work is unchanged.');
+});
