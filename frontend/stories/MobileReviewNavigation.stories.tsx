@@ -40,7 +40,7 @@ export const Suggestions: Story = {
 export const FinishedCategory: Story = {
   play: async ({ canvasElement }) => {
     await Suggestions.play!({ canvasElement } as Parameters<NonNullable<typeof Suggestions.play>>[0]);
-    await userEvent.click(within(canvasElement).getByRole("button", { name: /^Apply all suggested choices/ }));
+    await userEvent.click(within(canvasElement).getByRole("button", { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ }));
     await expect(within(canvasElement).getByRole("heading", { name: "Chapter starts" })).toBeVisible();
   },
 };

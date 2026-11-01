@@ -99,7 +99,7 @@ try {
     assert.equal(suggestionStyles.background, suggestionStyles.expectedBackground, 'Suggestion matches Dialogue tint');
     assert.equal(suggestionStyles.border, suggestionStyles.expectedBorder, 'Suggestion matches Dialogue border');
     if (width === 834 && theme === 'dark') await suggestion.screenshot({ path: path.join(out, 'tablet-suggestion.png') });
-    await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
+    await page.getByRole('button', { name: /^Keep original text/ }).click();
     await page.waitForFunction(() => document.querySelector('.occurrence-meta')?.textContent?.includes('Example 2 of 2'));
     if (mobile) {
       await landing(page, 'category');
@@ -110,7 +110,7 @@ try {
     assert(await suggestion.evaluate(el => el.classList.contains('review-recommended-muted')), 'Declined suggestion is muted');
     assert((await suggestion.textContent()).includes('✧'));
     await page.getByRole('button', { name: 'Next example →' }).click();
-    await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+    await page.getByRole('button', { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ }).click();
     assert(await page.getByRole('heading', { name: 'Chapter starts' }).isVisible(), 'Completion wraps to the next unfinished category at every viewport size');
     if (mobile) {
       await landing(page, 'queue');
@@ -176,7 +176,7 @@ try {
     assert.equal(await page.evaluate(() => scrollY), 0);
     assert(await page.getByRole('main').evaluate(el => el === document.activeElement));
     await groups.getByRole('button', { name: /AI suggestions/ }).click();
-    assert.equal(await page.getByRole('button', { name: /^Keep original text Keep the original/ }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.getByRole('button', { name: /^Keep original text/ }).getAttribute('aria-pressed'), 'true');
     await settle(page);
     const reopened = groups.getByRole('button', { name: /AI suggestions/ });
     assert.equal(await groups.locator('button.active').count(), 1);
@@ -205,14 +205,14 @@ try {
     await landing(page, 'category');
     // A taller header verifies that alignment is measured, not a fixed phone offset.
     await page.locator('.topbar').evaluate(el => { el.style.height = '104px'; });
-    await page.getByRole('button', { name: /^Keep original text Keep the original/ }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await page.getByRole('button', { name: /^Keep original text/ }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await startTrace(page);
-    await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
+    await page.getByRole('button', { name: /^Keep original text/ }).click();
     await landing(page, 'category');
     const exampleTrace = await page.evaluate(() => window.reviewTrace);
-    await page.getByRole('button', { name: /^Apply all suggested choices/ }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+    await page.getByRole('button', { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ }).evaluate(el => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
     await startTrace(page);
-    await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+    await page.getByRole('button', { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ }).click();
     await landing(page, 'queue');
     const categoryTrace = await page.evaluate(() => window.reviewTrace);
     const behavior = reducedMotion === 'reduce' ? 'instant' : 'smooth';
@@ -232,8 +232,8 @@ try {
     await page.getByRole('heading', { name: 'Chapter starts' }).waitFor();
     if (story === 'finished-category') {
       await page.getByRole('navigation', { name: 'Review groups' }).getByRole('button', { name: /AI suggestions/ }).click();
-      await page.getByRole('button', { name: /^Keep original text Keep the original/ }).click();
-      await page.getByRole('button', { name: /^Apply all suggested choices/ }).click();
+      await page.getByRole('button', { name: /^Keep original text/ }).click();
+      await page.getByRole('button', { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ }).click();
     }
     await chooseAppearance(page, 'dark');
     await page.evaluate(() => document.fonts.ready);

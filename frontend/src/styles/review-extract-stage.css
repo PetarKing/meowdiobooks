@@ -206,3 +206,7 @@
 @media (prefers-reduced-motion: reduce) {
   .review-preview-skeleton .skeleton-line::after { animation: none; }
 }
+
+.review-decision-reason, .review-bulk-help { color: var(--color-muted, var(--muted)); font-size: 13px; line-height: 1.6; }
+.review-bulk-summary { margin: 0 0 10px; font-size: 13px; line-height: 1.6; font-weight: 600; }
+.review-bulk-help { margin: 10px 0 0; }
