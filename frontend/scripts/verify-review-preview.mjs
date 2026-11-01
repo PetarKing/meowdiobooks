@@ -5,6 +5,12 @@ import { chromium } from 'playwright';
 const url = process.argv[2] ?? 'http://127.0.0.1:5194';
 const out = process.argv[3] ?? '/tmp/meowdiobooks-review-preview';
 await mkdir(out, { recursive: true });
+async function scrollPage(page, bottom) {
+  await page.evaluate(async bottom => {
+    scrollTo({ top: bottom ? document.documentElement.scrollHeight : 0, behavior: 'instant' });
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  }, bottom);
+}
 const browser = await chromium.launch();
 const results = [];
 try {
@@ -59,11 +65,11 @@ try {
       assert.ok(actionBounds.y >= 0 && actionBounds.y + actionBounds.height <= 901, 'Continue stays in the viewport');
       if (mode === 'pending') {
         await page.screenshot({ path: `${out}/viewport-top-${width}-${appearance}.png` });
-        await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
+        await scrollPage(page, true);
         const scrolledAction = await accept.boundingBox();
         assert.ok(scrolledAction.y >= 0 && scrolledAction.y + scrolledAction.height <= 901);
         await page.screenshot({ path: `${out}/viewport-bottom-${width}-${appearance}.png` });
-        await page.evaluate(() => scrollTo(0, 0));
+        await scrollPage(page, false);
       }
       if (mode === 'pending' || mode === 'transition') {
         assert.equal(await page.locator('.review-preview-skeleton').count(), 2);
@@ -75,11 +81,17 @@ try {
         const desk = page.locator('.review-transcript-compare');
         const before = await desk.boundingBox();
         await page.screenshot({ path: `${out}/skeleton-${width}-${appearance}.png`, fullPage: true });
+        await scrollPage(page, true);
+        await page.screenshot({ path: `${out}/viewport-skeleton-bottom-${width}-${appearance}.png` });
+        await scrollPage(page, false);
         await page.evaluate(() => window.proof.finishPreview());
         await page.getByRole('article', { name: 'Audiobook transcript page 1' }).waitFor();
         const after = await desk.boundingBox();
         geometry = { before, after };
         assert.deepEqual(after, before, 'Preview geometry stays fixed when skeleton becomes text');
+        await scrollPage(page, true);
+        await page.screenshot({ path: `${out}/viewport-loaded-bottom-${width}-${appearance}.png` });
+        await scrollPage(page, false);
       }
       if (mode === 'failed') await page.getByRole('button', { name: 'Retry page preview' }).waitFor();
       if (mode === 'image') {
@@ -92,6 +104,7 @@ try {
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
       assert.ok(overflow <= 1);
       await accept.scrollIntoViewIfNeeded();
+      await page.screenshot({ path: `${out}/viewport-${mode}-${width}-${appearance}.png` });
       await page.screenshot({ path: `${out}/${mode}-${width}-${appearance}.png`, fullPage: true });
       await accept.click();
       await page.waitForFunction(() => window.proof.accepted.length === 1);

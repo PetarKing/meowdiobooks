@@ -23,6 +23,15 @@ Keep companion-specific credentials, operations, and product policy out of this 
 - Remove task-created branches/worktrees only after proving their work is preserved; report
   unrelated or unique state instead of discarding it.
 
+## Pull request visual evidence
+
+Every PR must include relevant visual evidence uploaded directly into its description or a PR
+comment with the GitHub CLI's `--attach` flag. Local file links, prose-only verification claims,
+and unattached CI artifacts do not satisfy this requirement. Follow the examples and evidence
+selection guidance in [Contributing](docs/CONTRIBUTING.md#visual-evidence-attachments).
+Inspect the attachments, identify their tested revision and scenario, and verify that GitHub renders
+them before calling the PR ready. Keep public attachments free of secrets and private user data.
+
 ## Focused verification for static changes
 
 Maintainer-approved `skip-ci` is available for documentation, copy and static visual assets,

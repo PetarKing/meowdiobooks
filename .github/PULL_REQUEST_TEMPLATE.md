@@ -13,6 +13,7 @@ For regression-sensitive book processing, include the public-domain sample matri
 comparisons. Write "Not applicable" only with a reason.
 -->
 
+- [ ] I attached relevant screenshots or a recording directly to this PR with GitHub CLI `--attach`, inspected them, and verified they render inline.
 - [ ] I reviewed and understand every submitted change, including generated code and tests.
 - [ ] I accurately reported completed, failed, and untested verification; attached evidence contains
       no private, secret, or unredistributable material.
