@@ -130,7 +130,7 @@ def numbered_family_manifest(extraction, dialogue):
     """Recompute bounded representatives and exact local membership; no model-generated rules."""
     from .review import numbered_edge_candidates
     physical = (extraction.get("sourcePagination") == "original PDF extraction page indexes"
-                or extraction.get("method") in {"native", "layout", "liteparse"})
+                or extraction.get("method") in {"native", "layout", "liteparse", "ocr"})
     if not physical:
         return []
     blocks = list(extraction.get("blocks", []))

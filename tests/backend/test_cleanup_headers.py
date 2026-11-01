@@ -25,8 +25,10 @@ def evidence(extraction, dialogue, chapter=None):
     return {"policy": POLICY, "families": families, "proofs": proofs, "occurrences": rows}
 
 
-def test_exact_family_keeps_first_and_uses_bounded_examples():
+@pytest.mark.parametrize("method", ["native", "layout", "liteparse", "ocr"])
+def test_exact_family_keeps_first_and_uses_bounded_examples(method):
     extraction, dialogue = artifacts(40)
+    extraction["method"] = method
     result = evidence(extraction, dialogue)
     assert len(result["families"]) == 1
     assert len(result["families"][0]["representatives"]) == 3

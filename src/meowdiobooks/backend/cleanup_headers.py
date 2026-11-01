@@ -30,7 +30,7 @@ QUESTIONS = [{"name": "family", "type": "choice", "instructions": SYSTEM,
 
 def header_manifest(extraction, dialogue, chapter_review):
     if not (extraction.get("sourcePagination") == "original PDF extraction page indexes"
-            or extraction.get("method") in {"native", "layout", "liteparse"}):
+            or extraction.get("method") in {"native", "layout", "liteparse", "ocr"}):
         return []
     from .cleanup_candidates import editorial_candidates
     editorial = editorial_candidates(extraction, dialogue)["candidates"]
