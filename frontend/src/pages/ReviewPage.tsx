@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import type {
   AcceptanceDecision,
   ReviewCapability,
@@ -33,10 +34,29 @@ import {
   reviewSuggestedAction,
 } from "../workflow/review";
 
-export type ReviewPageModel = Pick<WorkflowModel, "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
+export type ReviewPageModel = Pick<WorkflowModel, "recoverExtractionPage" | "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
+
+function MissingTextSourceImage({ bookId, page, gateway, t, onError }: {
+  bookId: string; page: number; gateway: WorkflowModel["gateway"];
+  t: WorkflowModel["t"]; onError: WorkflowModel["setError"];
+}) {
+  const [sourceImage, setSourceImage] = useState<{ bookId: string; page: number; url: string }>();
+  useEffect(() => {
+    if (!bookId || !page) return;
+    let disposed = false;
+    void gateway.previewExtraction(bookId, page, "native").then((preview) => {
+      if (!disposed && preview.imageUrl) setSourceImage({ bookId, page, url: preview.imageUrl });
+    }).catch((reason) => { if (!disposed) onError(message(reason)); });
+    return () => { disposed = true; };
+  }, [bookId, page, gateway, onError]);
+  const url = sourceImage?.bookId === bookId && sourceImage?.page === page ? sourceImage.url : undefined;
+  return <div className="review-missing-page-preview">{url
+    ? <img src={url} alt={t("Original page {{page}}", { page })} />
+    : <p role="status">{t("Loading original page…")}</p>}</div>;
+}
 
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
-  const { reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const { recoverExtractionPage, reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
   const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
   const reviewDecisions = reviewDefaultDecisions(candidateWarnings, selectedReviewDecisions);
   const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
@@ -44,6 +64,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
+  const missingText = warning && ["empty-page", "missing-image-text"].includes(warning.kind)
+    && !["epub", "text"].includes(book?.sourceKind ?? "pdf");
   const boundaryEvidence = occurrence && reviewHasBoundaryEvidence(occurrence);
   const isPatternGroup = warning && reviewIsPatternGroup(warning);
   const pendingPatternCount = isPatternGroup ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined).length : 0;
@@ -344,13 +366,16 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           <section className="review-evidence">
             <div className="review-group-heading"><span><h2 tabIndex={-1}>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{boundaryEvidence ? occurrence.boundaryAnchors!.map((anchor) => t("Page {{page}}", { page: anchor.page })).join(" → ") : t("Page {{page}}", { page: occurrence.page })}</span></div>
-            <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
+            {missingText ? <MissingTextSourceImage bookId={book?.id ?? ""} page={occurrence.page} gateway={gateway} t={t} onError={setError} /> : <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />}
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => openOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => openOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
             {!isPatternGroup && <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>}
             <h3>{t(hasCleanupSuggestion && occurrence.cueVerification !== "verified" && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
             <div className="resolution-options">
+              {missingText && <button disabled={busy} onClick={() => void recoverExtractionPage(occurrence.page)}>
+                <b>{t("Recover this page with OCR")}</b><small>{t("Read only page {{page}} again. Compare the recovered text before accepting; Dialogue and Review will need rebuilding.", { page: occurrence.page })}</small>
+              </button>}
               {visibleActions.map((action) => {
                 const recommended = ((isScriptCue || isAiCleanup) && occurrence.recommendedAction === action)
                   || (hasCleanupSuggestion && (deletionSuggestion ? action === "exclude" : action === "repair"));

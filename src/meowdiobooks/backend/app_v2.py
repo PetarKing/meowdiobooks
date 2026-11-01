@@ -648,14 +648,74 @@ def create_app_v2(
                 public_message="Import the source document again before continuing.",
             )
         method = command.settings.method if book.source_kind == "pdf" else "text"
-        report(2, "Extracting the complete document")
         package = package_for(book.id)
-        pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
-            source,
-            package / "preview",
-            method,
-            report,
-        )
+        repair_provenance: dict[str, Any] = {}
+        if command.settings.ocrPages is not None:
+            if book.source_kind != "pdf":
+                raise WorkflowInputError("Targeted OCR requires a PDF source.")
+            base = extraction_payload(book.id)
+            if base.get("revision") != command.settings.baseExtractionRevision:
+                raise WorkflowInputError(
+                    "The extracted text changed. Open the current review before recovering pages.",
+                )
+            if base.get("sourceHash") != book.source_hash:
+                raise WorkflowInputError(
+                    "The accepted extraction does not match this source. Extract the document again.",
+                )
+            original_pages = base.get("pages")
+            expected_pages = list(range(1, (book.page_count or 0) + 1))
+            if (not expected_pages or not isinstance(original_pages, list)
+                    or base.get("pageCount") != len(expected_pages)
+                    or any(not isinstance(row, dict) or type(row.get("page")) is not int
+                           or not isinstance(row.get("text"), str) for row in original_pages)
+                    or [row["page"] for row in original_pages] != expected_pages):
+                raise WorkflowInputError(
+                    "The accepted extraction is missing source pages. Extract the document again.",
+                )
+            requested = command.settings.ocrPages
+            expected_page_set = set(expected_pages)
+            if any(page not in expected_page_set for page in requested):
+                raise WorkflowInputError("An OCR page is outside this document.")
+            pages = deepcopy(original_pages)
+            report(2, "Recovering selected pages with OCR")
+            extract_page = file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page
+            for index, page_number in enumerate(requested, 1):
+                recovered = extract_page(source, package / "preview", page_number, "ocr")
+                text = recovered.get("text")
+                if (type(recovered.get("page")) is not int or recovered["page"] != page_number
+                        or not isinstance(text, str)):
+                    raise WorkflowInputError("OCR returned an invalid page. Please try again.")
+                if not text.strip():
+                    raise WorkflowInputError(
+                        f"OCR found no text on page {page_number}",
+                        public_message="OCR found no text on the selected page. Check the source before confirming it is empty.",
+                    )
+                if " ".join(text.split()) == " ".join(pages[page_number - 1]["text"].split()):
+                    raise WorkflowInputError(
+                        f"OCR found no additional text on page {page_number}",
+                        public_message="OCR found no additional text on the selected page. Compare the source or try another reading method.",
+                    )
+                pages[page_number - 1] = {
+                    **pages[page_number - 1], **recovered, "page": page_number,
+                    "text": text, "method": "ocr", "warnings": recovered.get("warnings", []),
+                }
+                report(5 + index / len(requested) * 85, f"Recovered page {page_number}")
+            method = str(base.get("method", "liteparse"))
+            prior_ocr_pages = [page for page in base.get("ocrPages", [])
+                               if type(page) is int and page in expected_page_set]
+            repair_provenance = {
+                "baseExtractionRevision": base["revision"],
+                "ocrPages": sorted(set(prior_ocr_pages) | set(requested)),
+                "recoveredPages": sorted(requested),
+            }
+        else:
+            report(2, "Extracting the complete document")
+            pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
+                source,
+                package / "preview",
+                method,
+                report,
+            )
         blocks = pages_to_dialogue_blocks(pages)
         boundary_candidates = detect_chapter_candidates(blocks)
         revision = uuid4().hex
@@ -667,6 +727,7 @@ def create_app_v2(
                 "method": method,
                 "methodVersion": "text-v1" if method == "text" else EXTRACTION_METHOD_VERSION,
                 "sourceHash": book.source_hash,
+                **repair_provenance,
                 "pageCount": len(pages),
                 "pages": pages,
                 "blocks": blocks,
@@ -1940,7 +2001,15 @@ def create_app_v2(
             book = require_book(book_id)
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        return representative_pages(book.page_count or 1)
+        source = source_path(root, book.id, book.source_name or "original.pdf")
+        if file_processor is not None:
+            sampler = getattr(file_processor, "extraction_sample_pages", None)
+            if sampler is None:
+                return representative_pages(book.page_count or 1)
+        else:
+            from .documents import extraction_sample_pages
+            sampler = extraction_sample_pages
+        return sampler(source, package_for(book.id) / "preview", book.page_count or 1)
 
     @app.post("/api/books/{book_id}/extraction/preview")
     def extraction_preview(book_id: str, body: ExtractionPreviewRequest) -> dict[str, Any]:
@@ -2814,6 +2883,15 @@ def create_app_v2(
         if candidate is None:
             raise HTTPException(status_code=404, detail=f"{stage.title()} candidate not found")
         try:
+            if parsed == WizardStage.EXTRACT and candidate.get("baseExtractionRevision"):
+                extraction = read_artifact(package_for(book_id), "extraction")
+                if candidate["baseExtractionRevision"] != extraction.get("revision"):
+                    raise WorkflowInputError(
+                        "The extracted text changed. Recover the pages again from the current review.",
+                    )
+                if (book.source_kind != "pdf" or candidate.get("sourceHash") != book.source_hash
+                        or extraction.get("sourceHash") != book.source_hash):
+                    raise WorkflowInputError("The OCR recovery does not match the current source.")
             if parsed == WizardStage.DIALOGUE:
                 extraction = read_artifact(package_for(book_id), "extraction")
                 if candidate.get("extractionRevision") != extraction.get("revision"):

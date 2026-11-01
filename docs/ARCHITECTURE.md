@@ -178,6 +178,21 @@ default remains unchanged. The host owns process isolation, deadlines, resource 
 of untrusted worker results; this interface alone is not a sandbox. A metadata failure rejects a new
 import and removes its newly written source, just like inspection failure.
 
+A processor may additionally implement `extraction_sample_pages(source, cache_root,
+page_count)` to choose preview pages using a cheap whole-PDF text/image screen.
+It returns ordinary representative-page rows with optional `ocrCandidate: true`
+for at most two pages. Hosts without this optional method retain the fixed
+representative pages; Core never bypasses a host processor to inspect a PDF.
+The screen never runs OCR. Standard stays recommended; all sparse-image page
+signals survive in extraction warnings so Review can offer physical-page recovery.
+`ExtractionSettings` accepts `ocrPages` with `baseExtractionRevision` only for the
+OCR method. Targeted recovery copies untouched accepted pages and writes a new
+unpublished extraction candidate. Acceptance rejects a stale base revision before
+normal downstream invalidation. Empty and suspected image-text pages require
+individual confirmations; one illustration cannot confirm the whole group.
+Explicit OCR uses a distinct cache identity and the same per-page algorithm for
+preview and complete extraction; failed pages do not publish a partial candidate.
+
 The document rendering/LiteParse and audio packaging helpers also accept an optional keyword-only
 `command_runner`. Hosts can supply a callable compatible with `subprocess.run` to execute the
 existing command arguments, capture/check options and deadlines through a separate execution

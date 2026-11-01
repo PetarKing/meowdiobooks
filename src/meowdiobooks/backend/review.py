@@ -40,6 +40,7 @@ WARNING_CONFIG: dict[str, dict[str, Any]] = {
         "severity": "blocking",
         "actions": ("keep",),
     },
+    "missing-image-text": {"severity": "warning", "actions": ("keep",)},
     "suspicious-extraction": {
         "severity": "warning",
         "actions": ("keep", "narrate", "exclude"),
@@ -113,6 +114,7 @@ def build_review_workspace(
     occurrences: list[dict[str, Any]] = []
     coverage_failures = _coverage_occurrences(blocks, spans)
     occurrences.extend(_empty_occurrences(blocks))
+    occurrences.extend(_image_text_occurrences(extraction, blocks))
     occurrences.extend(_text_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
@@ -1082,7 +1084,7 @@ def preview_review_transcript_page(
         warning = warnings.get(warning_id)
         if warning is None:
             raise ReviewContractError(f"Unknown Review warning group: {warning_id}")
-        if warning.get("decisionScope") == "occurrence" or warning.get("kind") == "ai-cleanup":
+        if warning.get("decisionScope") == "occurrence" or warning.get("kind") in {"ai-cleanup", "empty-page", "missing-image-text"}:
             raise ReviewContractError("Occurrence-scoped warnings require individual preview policies")
         for occurrence in warning.get("occurrences", []):
             _validate_action(occurrence, action)
@@ -1090,7 +1092,7 @@ def preview_review_transcript_page(
 
     occurrence_groups = {key for key, warning in warnings.items()
                          if warning.get("decisionScope") == "occurrence"
-                         or warning.get("kind") == "ai-cleanup"}
+                         or warning.get("kind") in {"ai-cleanup", "empty-page", "missing-image-text"}}
     ai_occurrences = {str(row["id"]): row for key in occurrence_groups
                       for row in warnings[key].get("occurrences", [])}
     ai_chosen: dict[str, str] = {}
@@ -1355,6 +1357,22 @@ def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, An
         for page, page_blocks in by_page.items()
         if not any(str(block["text"]).strip() for block in page_blocks)
     ]
+
+
+
+def _image_text_occurrences(extraction, blocks):
+    by_page = defaultdict(list)
+    for block in blocks:
+        by_page[int(block["page"])].append(block)
+    result = []
+    for page in extraction.get("pages", []):
+        rows = by_page.get(int(page["page"]), [])
+        if (rows and any(str(row["text"]).strip() for row in rows)
+                and any(w.get("code") == "possible-image-text" for w in page.get("warnings", []))):
+            result.append(_occurrence("missing-image-text", str(rows[0]["id"]), 0, 0, "",
+                                      int(page["page"]),
+                                      "A large image may contain text missing from extraction."))
+    return result
 
 
 def _text_occurrences(
@@ -1876,7 +1894,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
-                        "occurrence" if kind in {"ai-cleanup", "hyphenation"} or all(_is_verified_cue(row) for row in evidence_group) else
+                        "occurrence" if kind in {"ai-cleanup", "hyphenation", "empty-page", "missing-image-text"} or all(_is_verified_cue(row) for row in evidence_group) else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"

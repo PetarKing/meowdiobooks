@@ -19,7 +19,12 @@ _OPERATIONS = ['render', 'page', 'full', 'm4b', 'mp3']
 @pytest.fixture
 def operation(tmp_path):
     source = tmp_path / 'book.pdf'
-    source.write_bytes(b'%PDF-synthetic-source')
+    from reportlab.pdfgen.canvas import Canvas
+    canvas = Canvas(str(source))
+    for page in range(2):
+        canvas.drawString(50, 700, f'Source page {page + 1}')
+        canvas.showPage()
+    canvas.save()
     cover = tmp_path / 'cover.png'
     cover.write_bytes(b'synthetic-cover')
     audio = tmp_path / 'chapter.wav'
@@ -47,10 +52,12 @@ def operation(tmp_path):
 
 
 def _successful_command(command, **options):
-    assert options['check'] is True and options['capture_output'] is True
+    assert options['check'] is (command[1] != 'is-complex') and options['capture_output'] is True
     assert options['timeout'] > 0
     if command[0] == 'pdftoppm':
         Path(command[-1] + '.png').write_bytes(b'host-rendered-png')
+    elif command[0] == 'liteparse' and command[1] == 'is-complex':
+        return subprocess.CompletedProcess(command, 0, stdout=b'[]', stderr=b'')
     elif command[0] == 'liteparse':
         pages = [{'page': 2, 'text': 'The second page.'}] if '--target-pages' in command else [
             {'page': 1, 'text': 'The first page.'}, {'page': 2, 'text': 'The second page.'},
@@ -91,8 +98,13 @@ def test_injected_runner_retains_default_arguments_without_subprocess_fallback(
 
     monkeypatch.setattr(subprocess, 'run', forbidden)
     result = invoke(name, command_runner=Runner())
-    assert host_calls == default_calls
-    assert len(host_calls) == (2 if name == 'mp3' else 1)
+    # Parser output paths are unique per invocation to avoid preview races.
+    def stable_calls(calls):
+        return [(command[:-1] + ["<parser-output>"] if command[0] == 'liteparse' else command,
+                 options) for command, options in calls]
+
+    assert stable_calls(host_calls) == stable_calls(default_calls)
+    assert len(host_calls) == (2 if name in {'mp3', 'full'} else 1)
     if name == 'render':
         assert result.read_bytes() == b'host-rendered-png'
     elif name == 'page':

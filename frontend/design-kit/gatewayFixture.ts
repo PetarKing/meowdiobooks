@@ -276,7 +276,8 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       ],
       elapsedSeconds: 0.24,
       cached: true,
-      imageUrl: sourceImage,
+      imageUrl: metadata.snapshotVariant === "review-missing-pages"
+        ? sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)) : sourceImage,
     }),
     previewDialogue: async () => structuredClone(snapshot.dialogue!),
     previewReviewTranscript: async (_book, _revision, page) => ({

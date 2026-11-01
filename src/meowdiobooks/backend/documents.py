@@ -6,6 +6,7 @@ import json
 import re
 import subprocess
 import time
+from uuid import uuid4
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from .text_documents import TEXT_SUFFIXES, read_text_document
 SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
 EXTRACTION_METHOD_VERSION = "documents-v3"
 _LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
+_OCR_CACHE_KEY = "liteparse-ocr-eng-v1"
 
 
 def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
@@ -107,6 +109,99 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
             result.append({"page": page, "reason": reason})
             seen.add(page)
     return result
+
+
+def extraction_sample_pages(
+    source: Path, cache_root: Path, page_count: int, *, command_runner=None,
+) -> list[dict[str, Any]]:
+    """Screen every text layer cheaply; offer at most two image-page examples.
+
+    Complexity's generic verdict also includes vector decorations on normal
+    prose pages. Only sparse text plus substantial raster content is evidence
+    for an image-text probe. Blank digital pages never qualify. A blank scan or
+    illustration can qualify; users inspect the page before choosing recovery.
+    """
+    ordinary = representative_pages(page_count)
+    if source.suffix.lower() in TEXT_SUFFIXES:
+        return ordinary
+    cache = cache_root / "extraction" / "ocr-samples-v2.json"
+    cached = _read_image_screen_cache(cache, page_count)
+    if cached is not None:
+        return cached["pages"]
+    try:
+        result = (command_runner if command_runner is not None else subprocess.run)(
+            ["liteparse", "is-complex", str(source), "--compact", "--quiet",
+             "--max-pages", str(page_count)],
+            check=False, capture_output=True, timeout=60,
+        )
+        stats = json.loads(result.stdout)
+        if result.returncode not in {0, 1} or not isinstance(stats, list) or [
+            row.get("pageNumber") for row in stats
+        ] != list(range(1, page_count + 1)):
+            return ordinary
+        candidates = [row for row in stats if row.get("textLength", 1000) < 200 and (
+            row.get("fullPageImage") or row.get("imageCoverage", 0) >= .15
+            or row.get("largestImageCoverage", 0) >= .15
+        )]
+        # Prefer strong image coverage with little saved text, then choose a
+        # distant second page rather than probing adjacent front-matter scans.
+        def interior(row):
+            return page_count * .05 < row["pageNumber"] < page_count * .95
+
+        candidates.sort(key=lambda row: (
+            interior(row), bool(row.get("fullPageImage")), row.get("imageCoverage", 0),
+            -row.get("textLength", 0), -abs(row["pageNumber"] - page_count / 2),
+        ), reverse=True)
+        selected = candidates[:1]
+        if len(candidates) > 1:
+            selected.append(max(candidates[1:], key=lambda row: (
+                interior(row), abs(row["pageNumber"] - selected[0]["pageNumber"]),
+            )))
+        probes = [{"page": row["pageNumber"], "reason": "image text check", "ocrCandidate": True}
+                  for row in selected]
+        probe_pages = {row["page"] for row in probes}
+        pages = probes + [row for row in ordinary if row["page"] not in probe_pages]
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        _write_extraction_cache(cache, {"pages": pages,
+                                        "imagePages": [row["pageNumber"] for row in candidates]})
+        return pages
+    except (OSError, ValueError, TypeError, AttributeError, RuntimeError, subprocess.SubprocessError):
+        # Older/missing tools must not prevent manual preview or extraction.
+        return ordinary
+
+
+
+
+def _read_image_screen_cache(cache, page_count):
+    try:
+        result = json.loads(cache.read_text(encoding="utf-8"))
+        pages, suspects = result["pages"], result["imagePages"]
+        if (not isinstance(pages, list) or not 1 <= len(pages) <= 7
+                or any(not isinstance(row, dict) or type(row.get("page")) is not int
+                       or not 1 <= row["page"] <= page_count
+                       or not isinstance(row.get("reason"), str) for row in pages)
+                or len({row["page"] for row in pages}) != len(pages)
+                or not isinstance(suspects, list)
+                or any(type(page) is not int or not 1 <= page <= page_count for page in suspects)
+                or len(set(suspects)) != len(suspects)):
+            return None
+        return result
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _flag_possible_image_text(source, cache_root, pages, command_runner):
+    # The screen is cheap; this never OCRs a complete book. Persist suspect
+    # physical pages in extraction so Review can inspect even footer-only misses.
+    extraction_sample_pages(source, cache_root, len(pages), command_runner=command_runner)
+    cache = cache_root / "extraction" / "ocr-samples-v2.json"
+    cached = _read_image_screen_cache(cache, len(pages))
+    if cached is None:
+        return pages
+    suspects = set(cached["imagePages"])
+    return [{**row, "warnings": [*row.get("warnings", []), {
+        "code": "possible-image-text", "label": "This image may contain unextracted text.",
+    }]} if row["page"] in suspects and row.get("method") != "ocr" else row for row in pages]
 
 
 def render_default_cover(cache_root: Path) -> Path:
@@ -208,36 +303,44 @@ def extract_pdf_page(
     if method == "text":
         raise ValueError("Use a PDF extraction method for PDF sources")
     started = time.perf_counter()
-    cache_method = _LITEPARSE_CACHE_KEY if method == "liteparse" else method
+    cache_method = (_LITEPARSE_CACHE_KEY if method == "liteparse" else
+                    _OCR_CACHE_KEY if method == "ocr" else method)
     cache = cache_root / "extraction" / cache_method / f"page-{page:04d}.json"
     if cache.is_file():
         result = json.loads(cache.read_text(encoding="utf-8"))
         result["cached"] = True
         return result
     cache.parent.mkdir(parents=True, exist_ok=True)
-    if method == "liteparse":
-        raw = cache.with_suffix(".raw.json")
-        (command_runner if command_runner is not None else subprocess.run)(
-            [
-                "liteparse",
-                "parse",
-                str(source),
-                "--format",
-                "json",
-                "--target-pages",
-                str(page),
-                "--no-ocr",
-                "--quiet",
-                "-o",
-                str(raw),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=90,
-        )
-        parsed = json.loads(raw.read_text(encoding="utf-8"))
-        text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
-        raw.unlink(missing_ok=True)
+    if method in {"liteparse", "ocr"}:
+        raw = cache.with_name(f"{cache.stem}-{uuid4().hex}.raw.json")
+        try:
+            (command_runner if command_runner is not None else subprocess.run)(
+                [
+                    "liteparse",
+                    "parse",
+                    str(source),
+                    "--format",
+                    "json",
+                    "--target-pages",
+                    str(page),
+                    *(["--no-ocr"] if method == "liteparse" else ["--ocr-language", "eng", "--max-pages", str(page)]),
+                    "--quiet",
+                    "-o",
+                    str(raw),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=90,
+            )
+            parsed = json.loads(raw.read_text(encoding="utf-8"))
+            if method == "ocr" and (
+                len(parsed.get("pages", [])) != 1
+                or parsed["pages"][0].get("page", parsed["pages"][0].get("pageNum")) != page
+            ):
+                raise ValueError("OCR did not return the requested page")
+            text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
+        finally:
+            raw.unlink(missing_ok=True)
     elif method == "native":
         pdf_page = PdfReader(source).pages[page - 1]
         try:
@@ -258,33 +361,52 @@ def extract_pdf_page(
         "elapsedSeconds": round(time.perf_counter() - started, 3),
         "cached": False,
     }
-    cache.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    _write_extraction_cache(cache, result)
     return result
+
+
+def _write_extraction_cache(path: Path, result: dict[str, Any]) -> None:
+    pending = path.with_name(f"{path.stem}-{uuid4().hex}.pending.json")
+    try:
+        pending.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        pending.replace(path)
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def extract_full_liteparse(
     source: Path, cache_root: Path, *, command_runner=None,
 ) -> list[dict[str, Any]]:
     cache = cache_root / "extraction" / _LITEPARSE_CACHE_KEY / "full.json"
-    if not cache.is_file():
-        cache.parent.mkdir(parents=True, exist_ok=True)
+    page_count = len(PdfReader(source).pages)
+
+    def complete(parsed):
+        rows = parsed.get("pages")
+        return isinstance(rows, list) and [row.get("page", row.get("pageNum")) for row in rows] == list(
+            range(1, page_count + 1))
+
+    if cache.is_file():
+        try:
+            parsed = json.loads(cache.read_text(encoding="utf-8"))
+            if complete(parsed):
+                return parsed["pages"]
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    pending = cache.with_name(f"{cache.stem}-{uuid4().hex}.pending.json")
+    try:
         (command_runner if command_runner is not None else subprocess.run)(
-            [
-                "liteparse",
-                "parse",
-                str(source),
-                "--format",
-                "json",
-                "--no-ocr",
-                "--quiet",
-                "-o",
-                str(cache),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=300,
+            ["liteparse", "parse", str(source), "--format", "json", "--no-ocr",
+             "--max-pages", str(page_count), "--quiet", "-o", str(pending)],
+            check=True, capture_output=True, timeout=300,
         )
-    return json.loads(cache.read_text(encoding="utf-8"))["pages"]
+        parsed = json.loads(pending.read_text(encoding="utf-8"))
+        if not complete(parsed):
+            raise ValueError("Extraction did not return every source page in order")
+        pending.replace(cache)
+        return parsed["pages"]
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def extract_full_document(
@@ -317,10 +439,10 @@ def extract_full_document(
                 "page": int(page.get("page", index)),
                 "text": text,
                 "warnings": list(page.get("warnings") or _warnings(text)),
-                "method": "liteparse",
+                "method": method,
             })
         notify(90, f"Extracted {len(pages)} pages")
-        return pages
+        return _flag_possible_image_text(source, cache_root, pages, command_runner)
 
     reader = PdfReader(source)
     pages: list[dict[str, Any]] = []
@@ -340,7 +462,8 @@ def extract_full_document(
             5 + page_number / len(reader.pages) * 90,
             f"Extracted page {page_number} of {len(reader.pages)}",
         )
-    return pages
+    return (_flag_possible_image_text(source, cache_root, pages, command_runner)
+            if method != "ocr" else pages)
 
 
 def _warnings(text: str) -> list[dict[str, str]]:

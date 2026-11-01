@@ -75,7 +75,7 @@ const base: WizardSnapshot = {
 async function open(
   snapshot: WizardSnapshot = base,
   localBooks = [{ id: 'book-1', title: 'Alice', source_name: 'alice.pdf', source_kind: 'pdf', page_count: 120 }],
-  representativePages = [{ page: 1, reason: 'opening' }],
+  representativePages: import('./api/contracts').RepresentativePage[] = [{ page: 1, reason: 'opening' }],
   snapshotAfterPreparation?: WizardSnapshot,
   appProps?: AppProps,
 ) {
@@ -423,6 +423,22 @@ describe('v2 wizard', () => {
     expect(comparison).toHaveClass('extract-compare')
     expect(comparison).toHaveClass('page-comparison')
     expect(within(comparison as HTMLElement).getByText('Standard TEXT')).toBeInTheDocument()
+  })
+
+  it('keeps Standard recommended and never proactively OCRs image candidates', async () => {
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] } }, undefined,
+      [{ page: 1, reason: 'opening' }, { page: 60, reason: 'image text check', ocrCandidate: true }])
+    expect(screen.getByRole('button', { name: /Standard Recommended Works well for most books/ })).toHaveClass('selected')
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(1)
+    expect(wizardApi.previewExtraction).toHaveBeenCalledWith('book-1', 1, 'liteparse')
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValueOnce({ page: 60, pageCount: 120, method: 'ocr', text: 'Recovered printed image text.', warnings: [], elapsedSeconds: .1, cached: false })
+    fireEvent.click(screen.getByRole('button', { name: /OCR Reads text inside images/ }))
+    await screen.findByText('Recovered printed image text.')
+    expect(screen.getByRole('button', { name: /Standard Recommended/ })).not.toHaveClass('selected')
+    expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 1, 'ocr')
+    vi.mocked(wizardApi.processStage).mockRejectedValueOnce(new Error('Synthetic stop after dispatch'))
+    fireEvent.click(screen.getByRole('button', { name: /Process complete book/ }))
+    await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'extract', { method: 'ocr' }))
   })
 
   it('explains extraction methods without changing the selected parser', async () => {
@@ -3869,6 +3885,48 @@ describe('v2 wizard', () => {
     expect(screen.getByRole('button', { name: /Leave out/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Use narrator instead/ })).not.toBeInTheDocument()
     expect(screen.getByText('This highlighted text will be read by the narrator.')).toBeInTheDocument()
+  })
+
+  it('shows each original empty page and recovers only the displayed physical page before acceptance', async () => {
+    const snapshot: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import', 'extract', 'dialogue'] },
+      activeArtifacts: { extraction: 'e1', dialogue: 'd1' },
+    }
+    vi.mocked(wizardApi.processStage).mockResolvedValueOnce({ id: 'review-job', status: 'succeeded', result: { revision: 'review-2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValueOnce({ revision: 'review-2', boundaryCandidates: [], warnings: [{
+      id: 'empty', kind: 'empty-page', severity: 'blocking', detail: 'No text extracted',
+      availableActions: ['keep'], occurrences: [{ id: 'empty-7', page: 7, source: '' }, { id: 'empty-115', page: 115, source: '' }],
+    }] })
+    await open(snapshot)
+    vi.mocked(wizardApi.previewExtraction).mockImplementation(async (_book, page, method) => ({ page, pageCount: 120, method, text: '', warnings: [], elapsedSeconds: .1, cached: true, imageUrl: `/original-${page}.png` }))
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Wizard stages' })).getByText('Review'))
+    fireEvent.click(screen.getByRole('button', { name: 'Scan for issues →' }))
+    expect(await screen.findByAltText('Original page 7')).toHaveAttribute('src', '/original-7.png')
+    expect(screen.queryByText('No text was extracted here')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Confirm this page is intentionally empty/ }))
+    expect(await screen.findByAltText('Original page 115')).toHaveAttribute('src', '/original-115.png')
+    expect(screen.getByRole('button', { name: 'Review complete transcript →' })).toBeDisabled()
+
+    vi.mocked(wizardApi.processStage).mockResolvedValueOnce({ id: 'recovery-job', status: 'succeeded', result: { revision: 'e2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValueOnce({ revision: 'e2', method: 'liteparse',
+      ocrPages: [115], recoveredPages: [115], baseExtractionRevision: 'e1',
+      pages: [{ page: 115, text: 'Recovered student evaluation.' }],
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Recover this page with OCR/ }))
+    await screen.findByRole('heading', { name: 'OCR recovery is ready' })
+    expect(wizardApi.processStage).toHaveBeenLastCalledWith('book-1', 'extract', {
+      method: 'ocr', ocrPages: [115], baseExtractionRevision: 'e1',
+    })
+    expect(await screen.findByAltText('Original page 115')).toHaveAttribute('src', '/original-115.png')
+    expect(screen.getByText('Recovered student evaluation.')).toBeInTheDocument()
+    expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 115, 'native')
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...snapshot,
+      book: { ...snapshot.book, completedStages: ['import', 'extract'] },
+      activeArtifacts: { extraction: 'e2' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: /Use recovered text/ }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'extract', 'e2', []))
   })
 
   it('routes a source-coverage invariant failure to recovery instead of a warning decision', async () => {

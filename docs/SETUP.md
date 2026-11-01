@@ -29,6 +29,35 @@ npm install --global @llamaindex/liteparse
 Meowdiobooks does not install system packages or change Homebrew/npm state. The commands above are the
 tested Apple Silicon setup; users who already manage these tools elsewhere may use compatible paths.
 
+## OCR for image text
+
+Standard, Embedded text and Complex layout read the PDF's saved text. The explicit
+OCR option also recognizes printed English text in images using LiteParse's
+bundled Tesseract engine. Compare its preview for recognition mistakes before
+processing a complete book. English OCR does not imply scanned-language support
+for every language the ordinary text extractor can read.
+
+Tesseract needs English language data. LiteParse can download it on first use;
+prepare it before offline use. Restricted hosts must provision and grant access
+to language data outside the document parser instead of allowing parser network
+access. See [LiteParse's OCR guide](https://github.com/run-llama/liteparse/blob/main/docs/src/content/docs/liteparse/guides/ocr.md).
+
+Standard remains the recommended method. A cheap scan of the complete PDF's
+native text and raster coverage selects up to two sparse-text image pages for
+inspection and flags all such pages for Review, including footer-only extraction.
+It does not run OCR. Blank digital pages do not qualify; an illustration or blank
+scan can qualify because metadata cannot establish whether it contains useful text.
+
+Review shows each suspect original page. Choose **Recover this page with OCR**
+to create an unpublished extraction candidate for that physical page only. Compare
+it before accepting. Untouched pages retain their saved extraction; acceptance
+rebuilds source blocks and invalidates Dialogue and Review (and later work).
+A blank or unchanged OCR result leaves the accepted extraction intact. Confirming
+an intentionally blank or visual-only page applies to that page only.
+
+The separate OCR extraction option can read an entire scanned book when explicitly
+selected. No whole-book OCR runs proactively.
+
 ## Model assets
 
 V1 deliberately does not install AI runtimes or model weights automatically. The default

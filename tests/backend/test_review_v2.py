@@ -756,3 +756,26 @@ def test_parentheticals_require_verified_suggestions_even_in_script_dialogue():
 def test_parenthetical_prose_is_not_a_script_direction():
     extraction, dialogue = _artifacts([{'id': 'b1', 'page': 1, 'text': 'He waited (as he always did).'}])
     assert not any(row['kind'] == 'stage-direction' for row in build_review_workspace(extraction, dialogue)['warnings'])
+
+
+def test_empty_page_confirmations_are_independent_and_footer_only_images_are_reviewable():
+    extraction, dialogue = _artifacts([
+        {'id': 'p1', 'page': 1, 'text': ''},
+        {'id': 'p2', 'page': 2, 'text': ''},
+        {'id': 'p3', 'page': 3, 'text': 'Page 115 Publisher'},
+        {'id': 'p4', 'page': 4, 'text': 'Ordinary readable story.'},
+    ])
+    extraction['pages'] = [
+        {'page': 1, 'text': '', 'warnings': [{'code': 'possible-image-text'}]},
+        {'page': 2, 'text': '', 'warnings': []},
+        {'page': 3, 'text': 'Page 115 Publisher', 'warnings': [{'code': 'possible-image-text'}]},
+        {'page': 4, 'text': 'Ordinary readable story.', 'warnings': []},
+    ]
+    workspace = build_review_workspace(extraction, dialogue)
+    empty = _warning(workspace, 'empty-page')
+    images = _warning(workspace, 'missing-image-text')
+    assert empty['decisionScope'] == 'occurrence'
+    assert [row['page'] for row in empty['occurrences']] == [1, 2]
+    assert images['decisionScope'] == 'occurrence'
+    assert [row['page'] for row in images['occurrences']] == [3]
+    assert images['occurrences'][0]['sourceStart'] == images['occurrences'][0]['sourceEnd'] == 0

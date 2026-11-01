@@ -106,6 +106,11 @@ export async function enterScenario(
   await expect(
     canvas.getByRole("navigation", { name: t("Wizard stages") }),
   ).toBeVisible();
+  if (metadata.snapshotVariant === "review-missing-pages") {
+    await expect(await canvas.findByRole("img", { name: t("Original page {{page}}", { page: 7 }) })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: prefix("Recover this page with OCR") })).toBeEnabled();
+    await expect(canvas.queryByText(t("No text was extracted here"))).not.toBeInTheDocument();
+  }
   if (metadata.snapshotVariant === "review-recovery") {
     await expect(canvas.getByRole("button", { name: prefix("Rebuild Dialogue") })).toBeEnabled();
     await expect(canvas.queryByRole("button", { name: prefix("Accept preview and continue") })).not.toBeInTheDocument();

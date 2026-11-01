@@ -63,6 +63,7 @@ export function reviewActionTitle(action: ReviewCapability, warning: ReviewWarni
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "keep") return "Keep original text";
   if ((kind === "ai-cleanup" || reviewIsVerifiedScriptGroup(warning)) && action === "exclude") return "Leave out";
   if (kind === "ai-cleanup" && action === "repair") return "Apply correction";
+  if (kind === "missing-image-text" && action === "keep") return "The extracted text is complete";
   if (kind === "empty-page" && action === "keep") return "Confirm this page is intentionally empty";
   if (kind === "empty-page" && action === "rerun-extraction") return "Try extraction again";
   if (kind === "reading-order" && action === "keep") return "Accept this reading order";
@@ -86,7 +87,8 @@ export function reviewConsequence(action: ReviewCapability, warning: ReviewWarni
     : reviewText(t, "All {{count}} highlighted sections", { count });
   if (kind === "hyphenation") return warning.occurrences[0]?.hyphenChoices?.[action] ?? "";
   if (kind === "ai-cleanup" && action === "keep") return reviewText(t, "Keep the original text for this suggestion.");
-  if (kind === "empty-page" && action === "keep") return reviewText(t, "Confirm that all {{count}} pages are intentionally empty; nothing is removed.", { count });
+  if (kind === "empty-page" && action === "keep") return reviewText(t, "Confirm only this source page is intentionally blank or visual-only.");
+  if (kind === "missing-image-text" && action === "keep") return reviewText(t, "Confirm this page has no useful image text missing from extraction.");
   if (kind === "reading-order" && action === "keep") return reviewText(t, "Accept the extracted order for all {{count}} highlighted locations.", { count });
   if (action === "keep" && readerState === "narrator") return reviewText(t, "{{subject}} will be read by the narrator.", { subject });
   return ({
@@ -104,6 +106,7 @@ export function reviewQuestion(kind: string) {
   if (kind === "hyphenation") return "How should this word be written?";
   if (kind === "ai-cleanup") return "What should happen to this text?";
   if (kind === "empty-page") return "Is this page intentionally empty?";
+  if (kind === "missing-image-text") return "Is any text missing from this image?";
   if (kind === "suspicious-extraction") return "Does this text match the source?";
   if (kind === "reading-order") return "Is this in the right reading order?";
   if (kind === "repeated-matter") return "Should listeners hear this repeated text?";
@@ -120,6 +123,7 @@ export function reviewGuidance(warning: ReviewWarning) {
   const guidance: Partial<Record<string, string>> = {
     hyphenation: "Choose the spelling that matches the source. Both choices remove the line break; your source and reader stay unchanged.",
     "ai-cleanup": "Check each suggested correction against the source document before applying it.",
+    "missing-image-text": "This page has little saved text and a large image. Compare the original page and try OCR if useful words are missing.",
     "empty-page": "No text was extracted from this page. Confirm it only when the source page is intentionally blank or visual-only.",
     "suspicious-extraction": "Check whether the highlighted words match the source. Keep correct text or leave out debris.",
     "reading-order": "The text may be in the wrong order. Keep it only if it follows the order a listener should hear.",
@@ -134,11 +138,11 @@ export function reviewGuidance(warning: ReviewWarning) {
 }
 
 export function reviewWarningLabel(kind: string) {
-  return ({ hyphenation: "Check hyphens", "repeated-page-text": "Repeated page text", "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
+  return ({ hyphenation: "Check hyphens", "repeated-page-text": "Repeated page text", "ai-cleanup": "AI suggestions", "stage-direction": "Script directions", "empty-page": "Empty extracted page", "missing-image-text": "Possible text inside images", "suspicious-extraction": "Suspicious extracted text", "reading-order": "Reading order", "repeated-matter": "Repeated page matter", "page-number": "Page number", "web-address": "Web address", footnote: "Footnote", "front-back-matter": "Front or back matter" } as Record<string, string>)[kind] ?? "Text to review";
 }
 
 export function reviewUsesOccurrenceDecisions(warning: ReviewWarning) {
-  return warning.decisionScope === "occurrence" || warning.kind === "ai-cleanup";
+  return warning.decisionScope === "occurrence" || ["ai-cleanup", "empty-page", "missing-image-text"].includes(warning.kind);
 }
 
 export function reviewIsVerifiedScriptGroup(warning: ReviewWarning) {
