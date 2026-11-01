@@ -26,6 +26,19 @@ its exact source range and replacement. A deletion can remove real story content
 is exact, so users should inspect proposals before accepting them. The transcript preview includes
 selected repairs before publication.
 
+## Running titles across quoted page breaks
+
+Exact repeated page-top titles can be suggested for removal after two model checks; the first
+occurrence remains. A standalone title accidentally included in a quote that continues across a
+physical page break can also be reviewed when the same family has at least two narrator-owned
+occurrences. Each quoted occurrence needs its own surrounding quote evidence and verification;
+ordinary spoken titles, inline prose, chapter headings and ambiguous cases stay protected. Checks
+are bounded to six examples per family, so additional unverified quoted occurrences remain spoken.
+
+Nothing is removed until a user accepts the exact source-linked suggestion. Saved Review revisions
+keep their existing decisions; rerun Review to obtain the updated running-title suggestions. Joining
+a split word across intervening headers or footnotes remains outside this rule.
+
 ## Surrounding source context
 
 All Review warning categories and chapter starts include nearby source sentences, including adjacent
