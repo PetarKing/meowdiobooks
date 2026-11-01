@@ -447,9 +447,27 @@ describe('v2 wizard', () => {
 
   it('keeps extraction choices concise without clipped information controls', async () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
+    await screen.findByText('Alice', { selector: 'pre' })
     expect(screen.queryByRole('button', { name: /^About (Standard|Full OCR|Embedded text|Complex layout)$/ })).not.toBeInTheDocument()
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValueOnce({ page: 1, pageCount: 120, method: 'native', text: 'Embedded source text', warnings: [], elapsedSeconds: .1, cached: false })
     fireEvent.click(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ }))
     expect(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ })).toHaveClass('selected')
+    expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 1, 'native')
+    await screen.findByText('Embedded source text', { selector: 'pre' })
+  })
+
+  it('keeps a method chosen while the initial Standard preview is still loading', async () => {
+    let finishInitial!: (value: Awaited<ReturnType<typeof wizardApi.previewExtraction>>) => void
+    vi.mocked(wizardApi.previewExtraction).mockImplementationOnce(() => new Promise(resolve => { finishInitial = resolve }))
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
+    await waitFor(() => expect(wizardApi.previewExtraction).toHaveBeenCalledExactlyOnceWith('book-1', 1, 'liteparse'))
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValueOnce({ page: 1, pageCount: 120, method: 'native', text: 'Chosen embedded text', warnings: [], elapsedSeconds: .1, cached: false })
+    fireEvent.click(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ }))
+    await screen.findByText('Chosen embedded text', { selector: 'pre' })
+    await act(async () => finishInitial({ page: 1, pageCount: 120, method: 'liteparse', text: 'Late Standard text', warnings: [], elapsedSeconds: .1, cached: false }))
+    expect(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ })).toHaveClass('selected')
+    expect(screen.getByText('Chosen embedded text', { selector: 'pre' })).toBeInTheDocument()
+    expect(screen.queryByText('Late Standard text')).not.toBeInTheDocument()
     expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 1, 'native')
   })
 
@@ -892,6 +910,30 @@ describe('v2 wizard', () => {
     await act(async () => { await result.current.hydrate('book-1') })
     expect(result.current.chapterFilter).toBe('pending')
     expect(result.current.selectedChapters).toEqual(['chapter-1', 'chapter-2'])
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('waits for a running extraction and accepts its latest result instead of an older candidate', async () => {
+    persistWorkflowReturn('book-1', 'extract', { activeJobId: 'new-extraction' })
+    const pending: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockImplementation(async (_book, _stage, revision) => ({ revision }))
+    let finish!: (job: Job) => void
+    const waiting = new Promise<Job>(resolve => { finish = resolve })
+    vi.mocked(wizardApi.getJob).mockResolvedValueOnce({ id: 'new-extraction', kind: 'v2:extract', status: 'running', payload: { book_id: 'book-1' } }).mockReturnValueOnce(waiting)
+    render(<App />)
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledTimes(2))
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...pending,
+      pendingCandidates: { extraction: { revision: 'latest-result', status: 'candidate' } } })
+    vi.mocked(wizardApi.acceptStage).mockImplementationOnce(async () => {
+      vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...pending,
+        book: { ...pending.book, completedStages: ['import', 'extract'] }, pendingCandidates: undefined })
+    })
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
+    await act(async () => { finish({ id: 'new-extraction', kind: 'v2:extract', status: 'succeeded', payload: { book_id: 'book-1' }, result: { revision: 'latest-result' } }) })
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'latest-result', []))
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
@@ -1659,6 +1701,23 @@ describe('v2 wizard', () => {
 
     await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'extract', 'extract-2', []))
     expect(screen.queryByText('Complete-book extraction candidate')).not.toBeInTheDocument()
+  })
+
+  it('retries acceptance of a newly processed extraction without running the parser twice', async () => {
+    const imported: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import'] },
+      activeArtifacts: {}, dialogue: undefined, cast: undefined, recordingScript: undefined, generatedChapters: [] }
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'extract-job', status: 'succeeded', result: { revision: 'extract-2' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-2', pageCount: 120, warnings: [] })
+    vi.mocked(wizardApi.acceptStage).mockRejectedValueOnce(new Error('Saving interrupted'))
+    await open(imported)
+    fireEvent.click(screen.getByRole('button', { name: 'Process complete book →' }))
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    fireEvent.click(retry)
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledTimes(2))
+    expect(wizardApi.acceptStage).toHaveBeenLastCalledWith('book-1', 'extract', 'extract-2', [])
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
   })
 
   it('gates AI behind a kind group-level regex conflict review', async () => {
@@ -5020,8 +5079,8 @@ describe('v2 wizard', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
-  it('returns to a completed Extraction candidate after reload and accepts it without rerunning the parser', async () => {
-    persistWorkflowReturn('book-1', 'extract', { activeJobId: 'extraction-finished' })
+  it.each([false, true])('continues completed Extraction on return without rerunning the parser (job marker: %s)', async (withJob) => {
+    persistWorkflowReturn('book-1', 'extract', withJob ? { activeJobId: 'extraction-finished' } : {})
     const pending: WizardSnapshot = { ...base,
       book: { ...base.book, completedStages: ['import'] },
       pendingCandidates: { extraction: { revision: 'extract-ready', status: 'candidate' } },
@@ -5029,20 +5088,182 @@ describe('v2 wizard', () => {
     vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
     vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-ready', method: 'native' })
     vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'extraction-finished', kind: 'v2:extract', status: 'succeeded', payload: { book_id: 'book-1' }, result: { revision: 'extract-ready' } })
-    const first = render(<App />)
-    expect(await screen.findByRole('button', { name: 'Accept completed extraction →' })).toBeInTheDocument()
-    await waitFor(() => expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull())
-    first.unmount()
+    vi.mocked(wizardApi.acceptStage).mockImplementationOnce(async () => {
+      vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...pending,
+        book: { ...pending.book, completedStages: ['import', 'extract'] }, pendingCandidates: undefined,
+      })
+    })
+    vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
     render(<App />)
-    const accept = await screen.findByRole('button', { name: 'Accept completed extraction →' })
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'extract-ready', []))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Dialogue In progress' })).toHaveAttribute('aria-current', 'step'))
+    expect(screen.queryByText('Full extraction is ready')).not.toBeInTheDocument()
     expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('leaves a host-owned extraction view in control of its saved candidate', async () => {
+    persistWorkflowReturn('book-1', 'extract')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'extract-ready', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-ready' })
+    render(<App stepOverrides={{ extract: () => <p>Host extraction controls</p> }} />)
+    await screen.findByText('Host extraction controls')
     expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('retries saving a completed Extraction without rerunning extraction', async () => {
+    persistWorkflowReturn('book-1', 'extract')
+    const pending: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'extract-ready', status: 'candidate' } },
+    }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-ready', method: 'native' })
+    vi.mocked(wizardApi.acceptStage).mockRejectedValueOnce(new Error('Temporarily unavailable'))
+    render(<App />)
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(wizardApi.acceptStage).toHaveBeenCalledTimes(1)
     vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...pending,
       book: { ...pending.book, completedStages: ['import', 'extract'] }, pendingCandidates: undefined,
     })
     vi.mocked(wizardApi.previewDialogue).mockResolvedValue(base.dialogue!)
-    fireEvent.click(accept)
-    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledWith('book-1', 'extract', 'extract-ready', []))
+    fireEvent.click(retry)
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledTimes(2))
+    await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument())
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(wizardApi.previewExtraction).not.toHaveBeenCalled()
+  })
+
+  it.each(['failed', 'canceled'] as const)('does not publish an older extraction after Retry or reload of a restored job %s', async (status) => {
+    persistWorkflowReturn('book-1', 'extract', { activeJobId: 'new-extraction' })
+    const pending: WizardSnapshot = { ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } },
+    }
+    const failedJob: Job = { id: 'new-extraction', kind: 'v2:extract', status, payload: { book_id: 'book-1' } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'older-result', method: 'native' })
+    vi.mocked(wizardApi.getJob).mockResolvedValue(failedJob)
+    vi.mocked(wizardApi.listBookJobs).mockResolvedValue([failedJob])
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([])
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValue({ page: 1, text: 'Source', method: 'native', pageCount: 1, warnings: [], elapsedSeconds: 0, cached: true })
+    const first = render(<App />)
+    await screen.findByRole('alert')
+    expect(screen.getAllByRole('button', { name: 'Retry' })).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByRole('button', { name: 'Process complete book →' })
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+    first.unmount()
+    render(<App />)
+    await screen.findByRole('button', { name: 'Process complete book →' })
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    // A deliberate new extraction remains available and uses only its new result.
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'retry-extraction', kind: 'v2:extract', status: 'succeeded', result: { revision: 'new-result' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'new-result' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    fireEvent.click(screen.getByRole('button', { name: 'Process complete book →' }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'new-result', []))
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['failed', 'canceled'] as const)('consumes a terminal host job hint so Retry can recover a %s extraction', async (status) => {
+    const initialWorkflowLocation = Object.freeze({ bookId: 'book-1', stepId: 'extract', activeJobId: 'host-extraction' })
+    const pending: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } } }
+    const failedJob: Job = { id: 'host-extraction', kind: 'v2:extract', status, payload: { book_id: 'book-1' } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'older-result' })
+    vi.mocked(wizardApi.getJob).mockResolvedValue(failedJob)
+    vi.mocked(wizardApi.listBookJobs).mockResolvedValue([failedJob])
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([])
+    render(<App initialWorkflowLocation={initialWorkflowLocation} />)
+    await screen.findByRole('alert')
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await screen.findByRole('button', { name: 'Process complete book →' })
+    expect(wizardApi.getJob).toHaveBeenCalledTimes(1)
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(initialWorkflowLocation.activeJobId).toBe('host-extraction')
+    vi.mocked(wizardApi.processStage).mockResolvedValue({ id: 'retry-extraction', kind: 'v2:extract', status: 'succeeded', result: { revision: 'new-result' } })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'new-result' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    fireEvent.click(screen.getByRole('button', { name: 'Process complete book →' }))
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'new-result', []))
+    expect(wizardApi.processStage).toHaveBeenCalledTimes(1)
+  })
+
+  it('checks book job history when another book has overwritten the failed extraction marker', async () => {
+    persistWorkflowReturn('book-1', 'extract', { activeJobId: 'other-book-job' })
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'older-result' })
+    vi.mocked(wizardApi.getJob).mockResolvedValue({ id: 'other-book-job', kind: 'v2:generate', status: 'succeeded', payload: { book_id: 'another-book' } })
+    vi.mocked(wizardApi.listBookJobs).mockResolvedValue([{ id: 'failed-extraction', kind: 'v2:extract', status: 'failed', payload: { book_id: 'book-1' } }])
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([])
+    render(<App />)
+    await screen.findByRole('button', { name: 'Process complete book →' })
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    expect(localStorage.getItem('meowdiobooks.activeJob')).toBeNull()
+  })
+
+  it('does not accept an older candidate when job history identifies a different successful result', async () => {
+    persistWorkflowReturn('book-1', 'extract')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'older-result' })
+    vi.mocked(wizardApi.listBookJobs).mockResolvedValue([{ id: 'new-extraction', kind: 'v2:extract', status: 'succeeded', result: { revision: 'different-result' } }])
+    vi.mocked(wizardApi.getRepresentativePages).mockResolvedValue([])
+    render(<App />)
+    await screen.findByRole('button', { name: 'Process complete book →' })
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('reattaches a newer extraction found in job history without launching duplicate work', async () => {
+    persistWorkflowReturn('book-1', 'extract')
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue({ ...base,
+      book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'older-result', status: 'candidate' } },
+    })
+    vi.mocked(wizardApi.getStageCandidate).mockImplementation(async (_book, _stage, revision) => ({ revision }))
+    vi.mocked(wizardApi.listBookJobs).mockResolvedValue([{ id: 'new-extraction', kind: 'v2:extract', status: 'running', payload: { book_id: 'book-1' } }])
+    let finish!: (job: Job) => void
+    vi.mocked(wizardApi.getJob).mockReturnValueOnce(new Promise<Job>(resolve => { finish = resolve }))
+    render(<App />)
+    await waitFor(() => expect(wizardApi.getJob).toHaveBeenCalledWith('new-extraction'))
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    await act(async () => { finish({ id: 'new-extraction', kind: 'v2:extract', status: 'succeeded', result: { revision: 'latest-result' } }) })
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'latest-result', []))
+    expect(wizardApi.processStage).not.toHaveBeenCalled()
+  })
+
+  it('keeps a saved extraction retryable when job history is temporarily unavailable', async () => {
+    persistWorkflowReturn('book-1', 'extract')
+    const pending: WizardSnapshot = { ...base, book: { ...base.book, completedStages: ['import'] },
+      pendingCandidates: { extraction: { revision: 'extract-ready', status: 'candidate' } } }
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(pending)
+    vi.mocked(wizardApi.getStageCandidate).mockResolvedValue({ revision: 'extract-ready' })
+    vi.mocked(wizardApi.listBookJobs).mockRejectedValueOnce(new Error('History unavailable'))
+      .mockResolvedValue([{ id: 'done', kind: 'v2:extract', status: 'succeeded', result: { revision: 'extract-ready' } }])
+    render(<App />)
+    const retry = await screen.findByRole('button', { name: 'Retry' })
+    expect(wizardApi.acceptStage).not.toHaveBeenCalled()
+    vi.mocked(wizardApi.getBookSnapshot).mockResolvedValue(base)
+    fireEvent.click(retry)
+    await waitFor(() => expect(wizardApi.acceptStage).toHaveBeenCalledExactlyOnceWith('book-1', 'extract', 'extract-ready', []))
     expect(wizardApi.processStage).not.toHaveBeenCalled()
   })
 
