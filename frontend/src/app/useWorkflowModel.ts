@@ -597,6 +597,13 @@ export function useWorkflowModel({
         setRestoringJobScope(false);
         await runJob(job, async (settled) => {
           if (!current()) return;
+          // The host hint is a one-time reattachment, just like browser storage.
+          // Consume terminal jobs so Retry can refresh the book instead of
+          // repeatedly restoring the same failed or canceled command.
+          if (initialLocation.current.namespace === workflowPersistenceNamespace
+            && initialLocation.current.value?.activeJobId === settled.id) {
+            initialLocation.current.value = { ...initialLocation.current.value, activeJobId: undefined };
+          }
           const target = restored?.book.id ?? bookId;
           if (!target) return;
           const next = await restoreBookView(target, saved?.stepId, current);
