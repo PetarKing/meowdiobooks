@@ -70,12 +70,22 @@ export const MergeUndo: Story = {
     const message = await within(document.body).findByText("Merged Mara into Eli.");
     const toast = message.closest<HTMLElement>("[role=status]")!;
     const checkPosition = () => {
-      const rect = toast.getBoundingClientRect();
-      // Fixed percentages use the layout viewport, excluding a classic scrollbar.
-      const viewportWidth = document.documentElement.clientWidth;
-      expect(Math.abs(rect.x + rect.width / 2 - viewportWidth / 2)).toBeLessThan(1);
-      expect(innerHeight - rect.bottom).toBeLessThan(50);
-      expect(rect.right).toBeLessThanOrEqual(viewportWidth);
+      // Measure the fixed viewport itself: stable scrollbar gutters can differ
+      // from both innerWidth and clientWidth on platforms with classic scrollbars.
+      const viewport = document.createElement("div");
+      viewport.style.cssText = "position:fixed;inset:0;visibility:hidden;pointer-events:none";
+      document.body.append(viewport);
+      try {
+        const rect = toast.getBoundingClientRect();
+        const bounds = viewport.getBoundingClientRect();
+        expect(getComputedStyle(toast).position).toBe("fixed");
+        expect(Math.abs(rect.x + rect.width / 2 - (bounds.x + bounds.width / 2))).toBeLessThan(1);
+        expect(bounds.bottom - rect.bottom).toBeGreaterThanOrEqual(0);
+        expect(bounds.bottom - rect.bottom).toBeLessThan(50);
+        expect(rect.right).toBeLessThanOrEqual(bounds.right);
+      } finally {
+        viewport.remove();
+      }
     };
     await expect(toast.parentElement).toBe(document.body);
     checkPosition();
