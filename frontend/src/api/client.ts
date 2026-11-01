@@ -193,11 +193,22 @@ export class HttpWizardApi implements WorkflowGateway {
     return this.request(`/books/${bookId}/review/bulk-preview`, { method: 'POST', body: JSON.stringify({ revision, occurrenceId, action }) });
   }
 
-  previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[], occurrencePolicies?: import('./contracts').ReviewTranscriptOccurrencePolicy[], boundaryDecisions?: import('./contracts').BoundaryDecision[]): Promise<import('./contracts').ReviewTranscriptPreview> {
-    return this.request(`/books/${bookId}/review/transcript-preview`, {
-      method: 'POST',
-      body: JSON.stringify({ revision, page, policies, ...(occurrencePolicies?.length ? { occurrencePolicies } : {}), ...(boundaryDecisions ? { boundaryDecisions } : {}) }),
-    });
+  async previewReviewTranscript(bookId: string, revision: string, page: number, policies: import('./contracts').ReviewTranscriptPolicy[], occurrencePolicies?: import('./contracts').ReviewTranscriptOccurrencePolicy[], boundaryDecisions?: import('./contracts').BoundaryDecision[], signal?: AbortSignal): Promise<import('./contracts').ReviewTranscriptPreview> {
+    const controller = new AbortController();
+    const abort = () => controller.abort();
+    if (signal?.aborted) abort();
+    else signal?.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(abort, 30_000);
+    try {
+      return await this.request(`/books/${bookId}/review/transcript-preview`, {
+        method: 'POST',
+        signal: controller.signal,
+        body: JSON.stringify({ revision, page, policies, ...(occurrencePolicies?.length ? { occurrencePolicies } : {}), ...(boundaryDecisions ? { boundaryDecisions } : {}) }),
+      });
+    } finally {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+    }
   }
 
   async processStage<S extends ProcessableStage>(bookId: string, stage: S, settings: StageSettings[S]): Promise<Job> {
