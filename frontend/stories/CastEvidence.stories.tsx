@@ -64,9 +64,9 @@ export const MergeUndo: Story = {
     const source = canvas.getByRole("button", { name: "Inspect Mara" });
     const target = canvas.getByRole("button", { name: "Inspect Eli" });
     const dataTransfer = new DataTransfer();
-    fireEvent.dragStart(source, { dataTransfer });
-    fireEvent.dragOver(target, { dataTransfer });
-    fireEvent.drop(target, { dataTransfer });
+    await fireEvent.dragStart(source, { dataTransfer });
+    await fireEvent.dragOver(target, { dataTransfer });
+    await fireEvent.drop(target, { dataTransfer });
     const message = await within(document.body).findByText("Merged Mara into Eli.");
     const toast = message.closest<HTMLElement>("[role=status]")!;
     const checkPosition = () => {

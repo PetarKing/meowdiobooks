@@ -36,7 +36,8 @@
   box-shadow: 0 7px 20px rgb(var(--shadow-color) / 0.2);
 }
 
-.cast-merge-undo {
+.cast-merge-undo,
+.cast-merge-undo[data-presentation-root] {
   position: fixed;
   z-index: 1200;
   left: 50%;

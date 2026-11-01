@@ -573,7 +573,7 @@ export function CastIdentityReview({
     {mergeUndo && createPortal(<div {...presentation} className="cast-merge-undo" role="status"><span>{mergeUndo.message}</span><button type="button" onClick={undoLastMerge}>{t("Undo")}</button></div>, document.body)}
 
     {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
-      <header className="cast-inspector-head">
+      <header className="cast-inspector-head narrator-review-head">
         <div><span className={`cast-status-dot ${narratorAssignments?.needsReview ? "needs-review" : "ready"}`} /> <small>{t(narratorAssignments?.needsReview ? "Confirmation required" : "Always available")}</small><h2>{t("Narrator")}</h2>{(narratorAssignments?.occurrenceCount ?? 0) > 0 && <p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p>}</div>
         <div className="cast-inspector-actions">{narratorAssignments?.needsReview && <button type="button" className="primary" onClick={() => resolve(narratorAssignments.labels)}>{t("Confirm Narrator assignments")}</button>}<button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button></div>
       </header>
