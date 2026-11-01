@@ -254,6 +254,19 @@ empty shelf.
 
 ## Authority and publication
 
+Remote Dialogue admits a bounded worker window and checkpoints completed independent checks and
+conflict groups under a package-private exact-input fingerprint. A retry reuses validated results
+only for the same source partition, target set, model, prompts and policy. These checkpoints do not
+publish or accept workflow state. Malformed decisions retry within their batch, then split into
+smaller target groups. A persistently unusable single-target answer remains explicitly unresolved
+for human review and narrator fallback; it never creates a guessed speaker or removes source text.
+Cancellation, denied admission and unrecoverable transport failures stop new work and drain active
+requests. Every admitted request completes its lifecycle even on unexpected transport failures.
+
+Hosts may provide an initial `estimated_seconds_per_batch` duration hint. The Dialogue loader shows
+a range accounting for both independent passes, configured worker count and conflict headroom,
+then refines the estimate from measured progress. An estimate is not a completion guarantee.
+
 Review combines deterministic warnings with a Luna Decisions scan and bounded Luna correction
 proposals. The shared implementation and source-linked acceptance contract live in core; hosts supply
 credentials, request admission and separate Review usage observers. Every edition uses Luna for this

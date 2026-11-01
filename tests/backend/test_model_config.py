@@ -13,6 +13,23 @@ from meowdiobooks.backend.model_config import (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
+def test_dialogue_duration_hint_accounts_for_two_passes_workers_and_conflict_headroom(tmp_path):
+    text = (REPO_ROOT / "models.toml").read_text()
+    text = text.replace('max_concurrent_batches = 8', 'max_concurrent_batches = 16\nestimated_seconds_per_batch = 6')
+    (tmp_path / 'models.toml').write_text(text)
+    routing = dialogue_routing_preview(tmp_path, 5955)
+    assert routing['remote']['estimatedDurationSeconds'] == round(2 * 745 * 6 / 16 * 1.25)
+
+
+@pytest.mark.parametrize('value', ['0', '-1', 'nan', 'inf'])
+def test_dialogue_duration_hint_rejects_unusable_calibration(tmp_path, value):
+    text = (REPO_ROOT / "models.toml").read_text()
+    (tmp_path / 'models.toml').write_text(text.replace(
+        'max_concurrent_batches = 8', f'max_concurrent_batches = 8\nestimated_seconds_per_batch = {value}'))
+    with pytest.raises(ModelConfigError):
+        load_model_registry(tmp_path)
+
+
 def test_default_registry_preserves_current_models_and_all_supported_languages():
     registry = load_model_registry(REPO_ROOT)
 

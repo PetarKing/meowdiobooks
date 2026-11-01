@@ -37,6 +37,14 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const { gatewayVariant } = metadata;
   const snapshot = snapshotFor(id);
   if (id === "export-default-cover") snapshot.book.sourceKind = "text";
+  if (gatewayVariant === "dialogue-running" && snapshot.dialogue) {
+    snapshot.dialogue.routing = {
+      targetCount: 1600, largeReviewThreshold: 100, shouldPrompt: false, defaultRoute: "remote",
+      local: { displayName: "Local", apiCostUsd: 0 },
+      remote: { displayName: "Remote", domain: "api.example.invalid", credentialConfigured: true,
+        apiKeyEnvironmentVariable: "SYNTHETIC_KEY", estimatedCostUsd: 0, estimatedDurationSeconds: 600 },
+    };
+  }
   let libraryRequests = 0;
   const shelf: LocalBook[] = [
     fixtureBook,
@@ -188,7 +196,7 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
         message:
           stage === "generate"
             ? "Generating chapter 4 of 6"
-            : "Checking dialogue speakers",
+            : "Checked 500 of 1600 independent speaker checks",
         error:
           gatewayVariant === "generate-failed"
             ? "We couldn’t create the audio. Please try again. Reference: 0123456789abcdef0123456789abcdef."
@@ -211,9 +219,10 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
         kind: jobId.includes("generate") ? "v2:generate" : "v2:dialogue",
         status: canceledJobs.has(jobId) ? "canceled" : "running",
         progress: 36,
+        started_at: new Date(Date.now() - 120_000).toISOString(),
         message: jobId.includes("generate")
           ? "Generating chapter 4 of 6"
-          : "Checking dialogue speakers",
+          : "Checked 500 of 1600 independent speaker checks",
       };
     },
     getStageCandidate: async (_book, stage, revision) => {

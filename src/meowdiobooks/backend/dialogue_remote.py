@@ -9,20 +9,29 @@ meaningful disagreements.
 from __future__ import annotations
 
 import json
+import hashlib
+import math
 import os
+import random
 import re
 import time
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from dataclasses import dataclass
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
+from threading import Event, Lock
 from typing import Any
+
+from meowdiobooks.util import canonical_json, write_json
 
 from .dialogue import DialogueContractError
 from .dialogue_ai import (
     _selected_attribution_statuses,
+    parse_attribution_answer,
     resolve_dialogue,
 )
 from .dialogue_attribution import (
@@ -31,7 +40,11 @@ from .dialogue_attribution import (
 )
 from .model_config import RemoteTextModelConfig, load_model_registry
 from .remote_llm import (
-    RemoteRequestAdmission, _observe_remote_call, admit_remote_request, remote_usage_cost,
+    RemoteRequestAdmission,
+    _observe_remote_call,
+    admit_remote_request,
+    remote_usage_cost,
+    _request_completion_guard,
 )
 
 
@@ -419,7 +432,9 @@ class BookEvidence:
         selected: set[int] = set()
         for target_id in target_ids:
             center = positions[target_id]
-            selected.update(range(max(0, center - radius), min(len(partition), center + radius + 1)))
+            selected.update(
+                range(max(0, center - radius), min(len(partition), center + radius + 1))
+            )
         lines = ["LOCAL TURN INSPECTION", f"Targets: {', '.join(target_ids)}"]
         pages: set[int] = set()
         target_set = set(target_ids)
@@ -428,7 +443,9 @@ class BookEvidence:
             page = int(span.get("page", 0))
             pages.add(page)
             span_id = str(span["id"])
-            marker = "TARGET" if span_id in target_set else str(span.get("renderRole") or "span").upper()
+            marker = (
+                "TARGET" if span_id in target_set else str(span.get("renderRole") or "span").upper()
+            )
             explicit = str(span.get("sourceSpeakerLabel") or "").strip()
             suffix = f" | explicit source label: {explicit}" if explicit else ""
             lines.extend(
@@ -450,7 +467,9 @@ class BookEvidence:
         partition = {str(span["id"]): span for span in self.window["partition"]}
         invalid = [target_id for target_id in target_ids if target_id not in partition]
         if not target_ids or invalid or context_characters not in {400, 800, 1400}:
-            return ToolResult("TOOL ERROR: invalid target IDs or context size.", error="invalid request")
+            return ToolResult(
+                "TOOL ERROR: invalid target IDs or context size.", error="invalid request"
+            )
         lines = ["RETRIEVED TARGET CONTEXT"]
         pages: set[int] = set()
         for target_id in target_ids:
@@ -469,8 +488,9 @@ class BookEvidence:
                 (
                     f"[{target_id} | page {source_page}]",
                     page_text[
-                        max(0, offset - context_characters) :
-                        offset + len(needle) + context_characters
+                        max(0, offset - context_characters) : offset
+                        + len(needle)
+                        + context_characters
                     ],
                 )
             )
@@ -519,10 +539,14 @@ class BookEvidence:
 
     def read_beyond_scene(self, direction: str, page_count: int) -> ToolResult:
         if direction not in {"before", "after"}:
-            return ToolResult("TOOL ERROR: direction must be before or after.", error="invalid direction")
+            return ToolResult(
+                "TOOL ERROR: direction must be before or after.", error="invalid direction"
+            )
         page_count = max(1, min(4, page_count))
         if direction == "before":
-            selected = list(range(max(1, min(self.scene_pages) - page_count), min(self.scene_pages)))
+            selected = list(
+                range(max(1, min(self.scene_pages) - page_count), min(self.scene_pages))
+            )
         else:
             selected = list(
                 range(
@@ -561,6 +585,7 @@ def run_dialogue_remote(
     attribution_targets: Sequence[str] = ("open-speakers", "unlabelled-candidates"),
     usage_observer: UsageObserver | None = None,
     request_admission: RemoteRequestAdmission | None = None,
+    checkpoint_dir: Path | None = None,
 ) -> dict[str, Any]:
     """Run the selected dialogue policy and return the shared Dialogue artifact contract."""
 
@@ -580,13 +605,35 @@ def run_dialogue_remote(
         max_targets_per_batch=config.max_targets_per_batch,
         max_workers=config.max_concurrent_batches,
     )
+    notify = report or (lambda _progress, _message=None: None)
+    stopped = Event()
+    progress_lock = Lock()
+    progress = 15.0
+    message = "Running Dual pass with tools"
+
+    def checkpoint(percent, text):
+        nonlocal progress, message
+        with progress_lock:
+            progress = max(progress, percent)
+            message = text
+            notify(progress, message)
+
+    def check_cancelled():
+        if stopped.is_set():
+            raise DialogueContractError("Dialogue checks stopped after an incomplete batch")
+        with progress_lock:
+            notify(progress, message)
+
     calls = {
         effort: _responses_api_call(
-            config, effort, usage_observer, request_admission=request_admission
+            config,
+            effort,
+            usage_observer,
+            request_admission=request_admission,
+            check_cancelled=check_cancelled,
         )
         for effort in ("low", "medium", "high")
     }
-    notify = report or (lambda _progress, _message=None: None)
     windows = _dialogue_windows(
         scan.get("partition", []),
         targets,
@@ -594,33 +641,46 @@ def run_dialogue_remote(
         max_targets=resolved_policy.max_targets_per_batch,
     )
     pages = _book_pages(scan.get("partition", []))
-    notify(15, "Running Dual pass with tools")
+    cache_root = None
+    if checkpoint_dir is not None:
+        fingerprint = hashlib.sha256(canonical_json({
+            "version": 1, "policy": POLICY_ID, "partition": scan.get("partition", []),
+            "targets": targets, "model": config.model, "endpoint": config.base_url,
+            "serviceTier": config.service_tier, "batchSize": config.max_targets_per_batch,
+            "policySettings": {key: value for key, value in asdict(resolved_policy).items()
+                               if key != "max_workers"},
+            "prompts": [_FAST_SYSTEM, _STRONG_SYSTEM],
+            "schemas": [_FAST_SCHEMA, _STRONG_SCHEMA],
+            "tools": [_FAST_TOOLS, _STRONG_TOOLS],
+        })).hexdigest()
+        cache_root = Path(checkpoint_dir) / fingerprint
+    checkpoint(15, "Running Dual pass with tools")
 
     pass_results: dict[tuple[str, str], dict[str, Any]] = {}
-    jobs = [
-        (stage, window)
-        for window in windows
-        for stage in ("fast", "strong")
-    ]
-    with ThreadPoolExecutor(max_workers=resolved_policy.max_workers) as executor:
-        futures = {
-            executor.submit(
-                _run_stage,
-                stage,
-                window,
-                pages,
-                calls["low" if stage == "fast" else "medium"],
-                resolved_policy,
-            ): (stage, window)
-            for stage, window in jobs
-        }
-        for completed, future in enumerate(as_completed(futures), 1):
-            stage, window = futures[future]
-            pass_results[(stage, str(window["batchId"]))] = future.result()
-            notify(
-                15 + completed / max(1, len(futures)) * 65,
-                "Checking speakers from two independent perspectives",
-            )
+    jobs = [(stage, window) for window in windows for stage in ("fast", "strong")]
+
+    def run_pass(job):
+        stage, window = job
+        return _cached_batch(
+            cache_root, stage, window,
+            lambda: _run_stage(stage, window, pages,
+                               calls["low" if stage == "fast" else "medium"], resolved_policy),
+        )
+
+    for job, result in _bounded_batches(
+        jobs,
+        run_pass,
+        resolved_policy.max_workers,
+        stopped,
+        checkpoint,
+    ):
+        stage, window = job
+        pass_results[(stage, str(window["batchId"]))] = result
+        completed = len(pass_results)
+        checkpoint(
+            15 + completed / len(jobs) * 65,
+            f"Checked {completed} of {len(jobs)} independent speaker checks",
+        )
 
     fast: dict[str, dict[str, Any]] = {}
     strong: dict[str, dict[str, Any]] = {}
@@ -639,30 +699,29 @@ def run_dialogue_remote(
 
     adjudication_windows = _adjudication_windows(windows, disagreements)
     if adjudication_windows:
-        notify(82, "Adjudicating the remaining speaker conflicts")
-        with ThreadPoolExecutor(max_workers=resolved_policy.max_workers) as executor:
-            futures = [
-                executor.submit(
-                    _run_adjudicator,
-                    window,
-                    pages,
-                    calls["high"],
-                    resolved_policy,
-                )
-                for window in adjudication_windows
-            ]
-            for future in as_completed(futures):
-                run = future.result()
-                all_runs.append(run)
-                final_decisions.update(
-                    {str(row["targetId"]): row for row in run["decisions"]}
-                )
+        checkpoint(82, "Adjudicating the remaining speaker conflicts")
+        for completed, (_window, run) in enumerate(
+            _bounded_batches(
+                adjudication_windows,
+                lambda window: _cached_batch(cache_root, "adjudicate", window,
+                    lambda: _run_adjudicator(window, pages, calls["high"], resolved_policy)),
+                resolved_policy.max_workers,
+                stopped,
+                checkpoint,
+            ),
+            1,
+        ):
+            all_runs.append(run)
+            final_decisions.update({str(row["targetId"]): row for row in run["decisions"]})
+            checkpoint(
+                82 + completed / len(adjudication_windows) * 13,
+                f"Resolved {completed} of {len(adjudication_windows)} speaker conflict groups",
+            )
 
     predictions: dict[str, str] = {}
     checks: list[dict[str, Any]] = []
     full_context = "".join(
-        str(span.get("source", span.get("text", "")))
-        for span in scan.get("partition", [])
+        str(span.get("source", span.get("text", ""))) for span in scan.get("partition", [])
     )
     for target_id in targets:
         final = _prediction(final_decisions[target_id])
@@ -693,12 +752,19 @@ def run_dialogue_remote(
         validate_focused_evidence=False,
     )
     requests = [request for run in all_runs for request in run["requests"]]
+    unavailable = {target for run in all_runs for target in run.get("unavailableTargets", [])}
+    for check in checks:
+        if check["spanId"] in unavailable and check["final"] == "?":
+            check["resolution"] = "provider-output-unavailable"
     usage = _sum_usage(requests)
     try:
-        estimated_cost = round(sum(
-            remote_usage_cost(config, request["usage"], service_tier=request.get("serviceTier"))
-            for request in requests
-        ), 4)
+        estimated_cost = round(
+            sum(
+                remote_usage_cost(config, request["usage"], service_tier=request.get("serviceTier"))
+                for request in requests
+            ),
+            4,
+        )
     except ValueError:
         # Preserve successful attribution when a future provider tier has no known price.
         estimated_cost = None
@@ -713,20 +779,101 @@ def run_dialogue_remote(
         "modelProfile": config.id,
         "modelDisplayName": config.display_name,
         "providerModels": sorted(
-            {
-                str(request.get("model"))
-                for request in requests
-                if request.get("model")
-            }
+            {str(request.get("model")) for request in requests if request.get("model")}
         ),
         "policy": POLICY_ID,
         "physicalRequests": len(requests),
+        **({"unavailableTargetCount": sum(check.get("resolution") == "provider-output-unavailable"
+                                         for check in checks)} if unavailable else {}),
         "toolCalls": sum(int(run["toolCalls"]) for run in all_runs),
         "adjudicatedTargets": len(disagreements),
     }
     result["resultSummary"].update(attribution_summary(checks, len(requests)))
     notify(100, "Dialogue speaker attribution complete")
     return result
+
+
+def _cached_batch(root, stage, window, run):
+    """Private exact-input checkpoints never become accepted workflow artifacts."""
+    if root is None:
+        return run()
+    key = hashlib.sha256(canonical_json({"stage": stage, "window": window})).hexdigest()
+    path = root / f"{key}.json"
+    try:
+        if path.is_symlink() or path.stat().st_size > 4_000_000:
+            raise ValueError("Unsafe dialogue checkpoint")
+        saved = json.loads(path.read_text())
+        if not isinstance(saved, Mapping) or not isinstance(saved.get("result"), Mapping):
+            raise ValueError("Invalid dialogue checkpoint")
+        result = saved["result"]
+        if result.get("unavailableTargets"):
+            raise ValueError("Retry unresolved provider output instead of caching its absence")
+        if saved["sha256"] != hashlib.sha256(canonical_json(result)).hexdigest():
+            raise ValueError("Changed dialogue checkpoint")
+        _validate_decisions({"decisions": result["decisions"]}, window["ownerIds"],
+                            strong=stage != "fast")
+        if not isinstance(result["requests"], list) or not isinstance(result["toolTrace"], list):
+            raise ValueError("Invalid dialogue checkpoint receipts")
+        return result
+    except (OSError, ValueError, KeyError, TypeError):
+        pass
+    result = run()
+    write_json(path, {"result": result, "sha256": hashlib.sha256(canonical_json(result)).hexdigest()})
+    return result
+
+
+def _bounded_batches(jobs, run, max_workers, stopped, checkpoint):
+    """Admit only one worker window; failures stop paid follow-ups before draining."""
+    pool = ThreadPoolExecutor(max_workers=max_workers)
+    pending = {}
+    iterator = iter(jobs)
+    failure_lock = Lock()
+    failures = []
+
+    def guarded_run(job):
+        try:
+            if stopped.is_set():
+                raise DialogueContractError("Dialogue checks stopped after an incomplete batch")
+            return run(job)
+        except BaseException as error:
+            with failure_lock:
+                if not failures:
+                    failures.append(error)
+                stopped.set()
+            raise
+
+    try:
+
+        def submit_next():
+            if failures:
+                raise failures[0]
+            job = next(iterator, None)
+            if job is not None:
+                pending[pool.submit(guarded_run, job)] = job
+
+        for _ in range(max_workers):
+            submit_next()
+        while pending:
+            completed, _ = wait(pending, return_when=FIRST_COMPLETED)
+            if failures:
+                raise failures[0]
+            # Inspect the entire completed wave before admitting more work.
+            results = [(future, future.result()) for future in completed]
+            for future, result in results:
+                yield pending.pop(future), result
+            for _ in completed:
+                submit_next()
+    except BaseException:
+        stopped.set()
+        for future in pending:
+            future.cancel()
+        try:
+            checkpoint(0, "Stopping remaining speaker checks after an error or cancellation")
+        except Exception:
+            pass  # Preserve the original error, including cooperative cancellation.
+        raise
+    finally:
+        pool.shutdown(wait=True, cancel_futures=True)
 
 
 def _run_stage(
@@ -737,17 +884,20 @@ def _run_stage(
     policy: DualPassPolicy,
 ) -> dict[str, Any]:
     strong = stage == "strong"
-    return _run_agent(
-        api_call=api_call,
-        evidence=BookEvidence(pages, window, policy.max_tool_result_characters),
-        instructions=_STRONG_SYSTEM if strong else _FAST_SYSTEM,
-        prompt=_render_prompt(window, window["ownerIds"], full_scene=strong),
-        target_ids=window["ownerIds"],
-        schema=_STRONG_SCHEMA if strong else _FAST_SCHEMA,
-        tools=_STRONG_TOOLS if strong else _FAST_TOOLS,
-        max_tools=policy.strong_max_tools if strong else policy.fast_max_tools,
-        max_rounds=policy.max_tool_rounds,
-        strong=strong,
+    return _recover_batch(
+        window,
+        lambda selected: _run_agent(
+            api_call=api_call,
+            evidence=BookEvidence(pages, selected, policy.max_tool_result_characters),
+            instructions=_STRONG_SYSTEM if strong else _FAST_SYSTEM,
+            prompt=_render_prompt(selected, selected["ownerIds"], full_scene=strong),
+            target_ids=selected["ownerIds"],
+            schema=_STRONG_SCHEMA if strong else _FAST_SCHEMA,
+            tools=_STRONG_TOOLS if strong else _FAST_TOOLS,
+            max_tools=policy.strong_max_tools if strong else policy.fast_max_tools,
+            max_rounds=policy.max_tool_rounds,
+            strong=strong,
+        ),
     )
 
 
@@ -757,27 +907,68 @@ def _run_adjudicator(
     api_call: ApiCall,
     policy: DualPassPolicy,
 ) -> dict[str, Any]:
-    prompt = _render_prompt(window, window["ownerIds"], full_scene=True)
-    prompt += (
-        "\n\nINDEPENDENT-PASS DISAGREEMENTS:\n"
-        "Neither candidate is authoritative. Reconstruct the source turn sequence and choose a "
-        "candidate, ?, /, or a different supported proper identity.\n"
-    )
-    for target_id in window["ownerIds"]:
-        left, right = window["candidates"][target_id]
-        prompt += f"- {target_id}: candidate A={left!r}; candidate B={right!r}\n"
-    return _run_agent(
-        api_call=api_call,
-        evidence=BookEvidence(pages, window, policy.max_tool_result_characters),
-        instructions=_STRONG_SYSTEM,
-        prompt=prompt,
-        target_ids=window["ownerIds"],
-        schema=_STRONG_SCHEMA,
-        tools=_STRONG_TOOLS,
-        max_tools=policy.adjudicator_max_tools,
-        max_rounds=max(1, policy.max_tool_rounds - 1),
-        strong=True,
-    )
+    def run(selected):
+        prompt = _render_prompt(selected, selected["ownerIds"], full_scene=True)
+        prompt += (
+            "\n\nINDEPENDENT-PASS DISAGREEMENTS:\n"
+            "Neither candidate is authoritative. Reconstruct the source turn sequence and choose a "
+            "candidate, ?, /, or a different supported proper identity.\n"
+        )
+        for target_id in selected["ownerIds"]:
+            left, right = selected["candidates"][target_id]
+            prompt += f"- {target_id}: candidate A={left!r}; candidate B={right!r}\n"
+        return _run_agent(
+            api_call=api_call,
+            evidence=BookEvidence(pages, selected, policy.max_tool_result_characters),
+            instructions=_STRONG_SYSTEM,
+            prompt=prompt,
+            target_ids=selected["ownerIds"],
+            schema=_STRONG_SCHEMA,
+            tools=_STRONG_TOOLS,
+            max_tools=policy.adjudicator_max_tools,
+            max_rounds=max(1, policy.max_tool_rounds - 1),
+            strong=True,
+        )
+
+    return _recover_batch(window, run)
+
+
+class _InvalidDecisions(DialogueContractError):
+    def __init__(self, message, requests):
+        super().__init__(message)
+        self.requests = requests
+
+
+def _recover_batch(window, run):
+    """Retry only malformed decisions, then reduce a stubborn batch without losing targets."""
+    previous_requests = []
+    for _attempt in range(2):
+        try:
+            result = run(window)
+        except _InvalidDecisions as error:
+            previous_requests.extend(error.requests)
+        else:
+            return {**result, "requests": [*previous_requests, *result["requests"]]}
+    owners = window["ownerIds"]
+    if len(owners) == 1:
+        # Keep source text and require review; a missing answer never becomes a guessed voice.
+        return {
+            "decisions": [{"targetId": owners[0], "classification": "D", "speaker": "?"}],
+            "requests": previous_requests, "toolTrace": [], "toolCalls": 0,
+            "unavailableTargets": list(owners),
+        }
+    midpoint = len(owners) // 2
+    parts = [
+        _recover_batch({**window, "ownerIds": owners[:midpoint]}, run),
+        _recover_batch({**window, "ownerIds": owners[midpoint:]}, run),
+    ]
+    return {
+        "decisions": [row for part in parts for row in part["decisions"]],
+        "requests": previous_requests + [row for part in parts for row in part["requests"]],
+        "toolTrace": [row for part in parts for row in part["toolTrace"]],
+        "toolCalls": sum(part["toolCalls"] for part in parts),
+        "unavailableTargets": [target for part in parts for target in part.get("unavailableTargets", [])],
+    }
 
 
 def _run_agent(
@@ -830,11 +1021,15 @@ def _run_agent(
                 "responseId": response.get("id"),
                 "model": response.get("model"),
                 "serviceTier": response.get("service_tier"),
+                "status": response.get("status"),
+                "incompleteDetails": response.get("incomplete_details"),
             }
         )
+        if response.get("status") in {"incomplete", "failed", "cancelled"}:
+            raise _InvalidDecisions("Luna response did not complete", requests)
         output = response.get("output")
         if not isinstance(output, list):
-            raise DialogueContractError("Luna Responses output was missing")
+            raise _InvalidDecisions("Luna Responses output was missing", requests)
         function_calls = [
             item
             for item in output
@@ -843,12 +1038,15 @@ def _run_agent(
         if not function_calls:
             try:
                 parsed = json.loads(_response_text(response))
+                if not isinstance(parsed, Mapping):
+                    raise ValueError("Luna decisions must be a JSON object")
                 decisions = _validate_decisions(parsed, target_ids, strong=strong)
             except (json.JSONDecodeError, ValueError) as error:
                 validation_failures += 1
                 if validation_failures >= 2:
-                    raise DialogueContractError(
-                        f"Luna returned inconsistent structured decisions: {error}"
+                    raise _InvalidDecisions(
+                        f"Luna returned inconsistent structured decisions: {error}",
+                        requests,
                     ) from error
                 conversation.extend(dict(item) for item in output if isinstance(item, Mapping))
                 conversation.append(
@@ -856,7 +1054,7 @@ def _run_agent(
                         "role": "user",
                         "content": (
                             f"Correct the structured decision error: {error}. Return every "
-                            "required target. N requires speaker=\"\"; D requires a name or ?."
+                            'required target. N requires speaker=""; D requires a name or ?.'
                         ),
                     }
                 )
@@ -873,7 +1071,9 @@ def _run_agent(
         for item in function_calls:
             try:
                 arguments = json.loads(str(item.get("arguments") or "{}"))
-            except json.JSONDecodeError:
+                if not isinstance(arguments, Mapping):
+                    raise ValueError("Tool arguments must be an object")
+            except (json.JSONDecodeError, ValueError):
                 arguments = {}
             if tool_calls >= max_tools:
                 execution = ToolResult(
@@ -881,7 +1081,11 @@ def _run_agent(
                     error="tool budget exhausted",
                 )
             else:
-                execution = evidence.execute(str(item.get("name") or ""), arguments)
+                try:
+                    execution = evidence.execute(str(item.get("name") or ""), arguments)
+                except (TypeError, ValueError, AttributeError):
+                    execution = ToolResult("TOOL ERROR: invalid arguments. Correct the request.",
+                                           error="invalid arguments")
                 tool_calls += 1
             tool_trace.append(
                 {
@@ -918,6 +1122,7 @@ def _responses_api_call(
     usage_observer: UsageObserver | None,
     *,
     request_admission: RemoteRequestAdmission | None = None,
+    check_cancelled: Callable[[], None] | None = None,
 ) -> ApiCall:
     api_key = os.environ.get(config.api_key_env, "").strip()
     if not api_key:
@@ -940,6 +1145,9 @@ def _responses_api_call(
         encoded = json.dumps(payload, ensure_ascii=False).encode("utf-8")
         last_error = ""
         for attempt, delay in enumerate((2, 5, 10, 0), 1):
+            retry_delay = float(delay)
+            if check_cancelled is not None:
+                check_cancelled()
             request = urllib.request.Request(
                 endpoint,
                 data=encoded,
@@ -956,57 +1164,113 @@ def _responses_api_call(
                 max_output_tokens=payload.get("max_output_tokens"),
                 attempt=attempt,
             )
-            try:
-                with urllib.request.urlopen(request, timeout=600) as response:
-                    raw_response = response.read()
-            except urllib.error.HTTPError as error:
-                detail = error.read().decode("utf-8", errors="replace")[:2_000]
-                last_error = f"HTTP {error.code}: {detail}"
-                _observe_remote_call(
-                    config, usage_observer, completion=completion,
-                    outcome="http-error", attempt=attempt,
-                    ambiguous_billable=error.code in {408, 500, 502, 503, 504},
-                    http_status=error.code,
-                )
-                if error.code not in {429, 500, 502, 503, 504} or not delay:
-                    break
-            except (OSError, urllib.error.URLError) as error:
-                last_error = f"{type(error).__name__}: {error}"
-                _observe_remote_call(
-                    config, usage_observer, completion=completion,
-                    outcome="transport-error", attempt=attempt, ambiguous_billable=True,
-                )
-                if not delay:
-                    break
-            else:
+            with _request_completion_guard(config, usage_observer, completion, attempt) as completion:
                 try:
-                    result = json.loads(raw_response)
-                    if not isinstance(result, Mapping):
-                        raise ValueError("Response must be an object")
-                except (ValueError, TypeError) as error:
+                    if check_cancelled is not None:
+                        check_cancelled()
+                except BaseException:
+                    _observe_remote_call(config, usage_observer, completion=completion,
+                                         outcome="cancelled-before-send", attempt=attempt,
+                                         ambiguous_billable=False)
+                    raise
+                try:
+                    with urllib.request.urlopen(request, timeout=600) as response:
+                        raw_response = response.read()
+                except urllib.error.HTTPError as error:
+                    detail = error.read().decode("utf-8", errors="replace")[:2_000]
+                    last_error = f"HTTP {error.code}: {detail}"
+                    _observe_remote_call(
+                        config,
+                        usage_observer,
+                        completion=completion,
+                        outcome="http-error",
+                        attempt=attempt,
+                        ambiguous_billable=error.code in {408, 500, 502, 503, 504},
+                        http_status=error.code,
+                    )
+                    if error.code not in {429, 500, 502, 503, 504} or not delay:
+                        break
+                    server_delay = _retry_after_seconds(error.headers)
+                    if server_delay > 60:
+                        break  # Defer instead of retrying earlier than the server permits.
+                    retry_delay = max(retry_delay, server_delay)
+                except (OSError, urllib.error.URLError) as error:
                     last_error = f"{type(error).__name__}: {error}"
                     _observe_remote_call(
-                        config, usage_observer, completion=completion,
-                        outcome="invalid-response", attempt=attempt, ambiguous_billable=True,
+                        config,
+                        usage_observer,
+                        completion=completion,
+                        outcome="transport-error",
+                        attempt=attempt,
+                        ambiguous_billable=True,
                     )
                     if not delay:
                         break
-                else:
-                    usage = result.get("usage")
+                except BaseException:
                     _observe_remote_call(
-                        config, usage_observer, completion=completion,
-                        outcome="response", attempt=attempt,
-                        model=str(result.get("model") or config.model),
-                        reported_model=result.get("model"),
-                        service_tier=result.get("service_tier"),
-                        usage=usage if isinstance(usage, Mapping) else {},
-                        ambiguous_billable=not bool(usage), http_status=200,
+                        config, usage_observer, completion=completion, outcome="transport-error",
+                        attempt=attempt, ambiguous_billable=True,
                     )
-                    return result
-            time.sleep(delay)
+                    raise
+                else:
+                    try:
+                        result = json.loads(raw_response)
+                        if not isinstance(result, Mapping):
+                            raise ValueError("Response must be an object")
+                    except (ValueError, TypeError) as error:
+                        last_error = f"{type(error).__name__}: {error}"
+                        _observe_remote_call(
+                            config,
+                            usage_observer,
+                            completion=completion,
+                            outcome="invalid-response",
+                            attempt=attempt,
+                            ambiguous_billable=True,
+                        )
+                        if not delay:
+                            break
+                    else:
+                        usage = result.get("usage")
+                        _observe_remote_call(
+                            config,
+                            usage_observer,
+                            completion=completion,
+                            outcome="response",
+                            attempt=attempt,
+                            model=str(result.get("model") or config.model),
+                            reported_model=result.get("model"),
+                            service_tier=result.get("service_tier"),
+                            usage=usage if isinstance(usage, Mapping) else {},
+                            ambiguous_billable=not bool(usage),
+                            http_status=200,
+                        )
+                        return result
+                # Poll cancellation while respecting the server's minimum retry delay.
+                deadline = time.monotonic() + retry_delay + random.uniform(0, retry_delay / 4)
+                while time.monotonic() < deadline:
+                    if check_cancelled is not None:
+                        check_cancelled()
+                    time.sleep(min(0.1, max(0, deadline - time.monotonic())))
         raise DialogueContractError(f"Luna request failed: {last_error}")
 
     return call
+
+
+def _retry_after_seconds(headers) -> float:
+    value = headers.get("Retry-After") if headers is not None else None
+    if not value:
+        return 0.0
+    try:
+        seconds = float(value)
+    except ValueError:
+        try:
+            target = parsedate_to_datetime(value)
+            if target.tzinfo is None:
+                target = target.replace(tzinfo=timezone.utc)
+            seconds = (target - datetime.now(timezone.utc)).total_seconds()
+        except (ValueError, TypeError, OverflowError):
+            return 0.0
+    return max(0.0, seconds) if math.isfinite(seconds) else 0.0
 
 
 def _target_ids(
@@ -1016,7 +1280,10 @@ def _target_ids(
     targets = []
     seen_groups: set[str] = set()
     for span in spans:
-        if span.get("renderRole") != "dialogue" or span.get("speakerStatus") not in selected_statuses:
+        if (
+            span.get("renderRole") != "dialogue"
+            or span.get("speakerStatus") not in selected_statuses
+        ):
             continue
         logical = str(span.get("turnGroupId") or span["id"])
         if logical in seen_groups:
@@ -1113,7 +1380,11 @@ def _render_prompt(
     for index in selected:
         span = partition[index]
         span_id = str(span["id"])
-        marker = f">>> TARGET {span_id}" if span_id in target_set else str(span.get("renderRole") or "span").upper()
+        marker = (
+            f">>> TARGET {span_id}"
+            if span_id in target_set
+            else str(span.get("renderRole") or "span").upper()
+        )
         label = str(span.get("sourceSpeakerLabel") or "").strip()
         suffix = f" | explicit source label: {label}" if label else ""
         parts.extend(
@@ -1125,8 +1396,8 @@ def _render_prompt(
     parts.extend(
         (
             "",
-            "Return one decision per requested ID. N => speaker=\"\". Unresolved D => "
-            "speaker=\"?\". A role is not a proper identity.",
+            'Return one decision per requested ID. N => speaker="". Unresolved D => '
+            'speaker="?". A role is not a proper identity.',
         )
     )
     return "\n".join(parts)
@@ -1156,6 +1427,9 @@ def _validate_decisions(
             raise ValueError(f"N decision has a speaker: {target_id}")
         if classification == "D" and not speaker:
             raise ValueError(f"D decision has no speaker or ?: {target_id}")
+        if classification == "D":
+            speaker = parse_attribution_answer(speaker)
+            decision["speaker"] = speaker
         if classification not in {"D", "N"}:
             raise ValueError(f"invalid classification: {target_id}")
         if strong and _normal(speaker) in _GENERIC_ROLES:
@@ -1173,7 +1447,9 @@ def _validate_decisions(
 
 
 def _prediction(decision: Mapping[str, Any]) -> str:
-    return "/" if decision.get("classification") == "N" else str(decision.get("speaker") or "").strip()
+    return (
+        "/" if decision.get("classification") == "N" else str(decision.get("speaker") or "").strip()
+    )
 
 
 def _same_identity(left: str, right: str) -> bool:
@@ -1185,7 +1461,11 @@ def _same_identity(left: str, right: str) -> bool:
         return False
     left_tokens = set(re.findall(r"\w+", left_text, flags=re.UNICODE))
     right_tokens = set(re.findall(r"\w+", right_text, flags=re.UNICODE))
-    return bool(left_tokens and right_tokens and (left_tokens <= right_tokens or right_tokens <= left_tokens))
+    return bool(
+        left_tokens
+        and right_tokens
+        and (left_tokens <= right_tokens or right_tokens <= left_tokens)
+    )
 
 
 def _needs_adjudication(left: str, right: str) -> bool:
@@ -1218,7 +1498,9 @@ def _sum_usage(requests: Sequence[Mapping[str, Any]]) -> dict[str, int]:
         if not isinstance(usage, Mapping):
             continue
         totals["input_tokens"] += int(usage.get("input_tokens", usage.get("prompt_tokens", 0)) or 0)
-        totals["output_tokens"] += int(usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0)
+        totals["output_tokens"] += int(
+            usage.get("output_tokens", usage.get("completion_tokens", 0)) or 0
+        )
         details = usage.get("input_tokens_details", usage.get("prompt_tokens_details", {}))
         if isinstance(details, Mapping):
             totals["cached_input_tokens"] += int(details.get("cached_tokens", 0) or 0)
@@ -1272,4 +1554,6 @@ def _normal(value: Any) -> str:
 def _bounded(text: str, max_characters: int) -> str:
     if len(text) <= max_characters:
         return text
-    return text[: max(0, max_characters - 64)].rstrip() + "\n… tool result truncated by controller …"
+    return (
+        text[: max(0, max_characters - 64)].rstrip() + "\n… tool result truncated by controller …"
+    )

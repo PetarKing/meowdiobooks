@@ -535,6 +535,7 @@ function normalizeDialogueRouting(value: unknown): DialogueArtifact["routing"] {
       credentialConfigured: Boolean(remote.credentialConfigured),
       apiKeyEnvironmentVariable: String(remote.apiKeyEnvironmentVariable ?? ""),
       estimatedCostUsd: Number(remote.estimatedCostUsd ?? 0),
+      estimatedDurationSeconds: remote.estimatedDurationSeconds == null ? undefined : Number(remote.estimatedDurationSeconds),
       falseNamesReductionPercent: remote.falseNamesReductionPercent == null ? undefined : Number(remote.falseNamesReductionPercent),
       speakerRecallImprovementPercent: remote.speakerRecallImprovementPercent == null ? undefined : Number(remote.speakerRecallImprovementPercent),
     } : null,

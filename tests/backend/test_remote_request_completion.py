@@ -1,6 +1,7 @@
 """A completion belongs to one physical request, including transport retries."""
 
 import io
+import http.client
 import json
 import urllib.error
 from pathlib import Path
@@ -34,6 +35,48 @@ def success():
     }, "output": [{"type": "message", "content": [
         {"type": "output_text", "text": "valid"},
     ]}]}).encode()
+
+
+@pytest.mark.parametrize("kind", ["dialogue", "chat", "decisions"])
+@pytest.mark.parametrize("failure", ["incomplete-body", "incomplete-error-body", "deep-json"])
+def test_unexpected_exit_always_completes_admitted_request(kind, failure, monkeypatch):
+    from dataclasses import replace
+    from meowdiobooks.backend.remote_llm import remote_decisions_completion, RemoteModelUnavailableError
+
+    completed = []
+    admitted = []
+    config = load_model_registry(ROOT).remote_dialogue_model()
+    monkeypatch.setenv(config.api_key_env, "synthetic-key")
+
+    class BrokenResponse(Response):
+        def close(self):
+            pass
+
+        def read(self):
+            if failure != "deep-json":
+                raise http.client.IncompleteRead(b"partial")
+            return b"[" * 10000
+
+    def transport(*_args, **_kwargs):
+        if failure == "incomplete-error-body":
+            raise urllib.error.HTTPError("url", 503, "temporary", {}, BrokenResponse(None))
+        return BrokenResponse(None)
+
+    def admit(_config, metadata):
+        admitted.append(metadata)
+        return lambda event: completed.append(event)
+
+    monkeypatch.setattr("urllib.request.urlopen", transport)
+    monkeypatch.setattr('time.sleep', lambda _: None)
+    with pytest.raises((http.client.IncompleteRead, RecursionError, RemoteModelUnavailableError)):
+        if kind == "decisions":
+            remote_decisions_completion(ROOT, replace(config, engine="openai_decisions"), "prompt", [],
+                                       request_admission=admit)
+        else:
+            run(kind, monkeypatch, admit)
+    expected = 4 if kind == 'decisions' and failure == 'incomplete-error-body' else 1
+    assert len(admitted) == len(completed) == expected
+    assert completed[0]["ambiguousBillable"] is True
 
 
 def run(kind, monkeypatch, admission, observer=None):

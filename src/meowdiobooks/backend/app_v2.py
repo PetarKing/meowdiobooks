@@ -731,6 +731,7 @@ def create_app_v2(
                     attribution_targets,
                     usage_observer=remote_usage_observer,
                     request_admission=remote_request_admission,
+                    checkpoint_dir=package_for(book.id) / ".checkpoints" / "dialogue",
                 )
             else:
                 raise DialogueContractError(f"Unknown Dialogue attribution route: {route}")
