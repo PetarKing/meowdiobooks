@@ -263,6 +263,13 @@ for human review and narrator fallback; it never creates a guessed speaker or re
 Cancellation, denied admission and unrecoverable transport failures stop new work and drain active
 requests. Every admitted request completes its lifecycle even on unexpected transport failures.
 
+Compositions may set `dialogue_attribution.adjudication_remote_profile` to a registered
+OpenAI Responses profile for every conflict group. The initial independent passes keep the primary
+profile at low/medium reasoning; conflict resolution uses the optional profile's reasoning setting
+(or high when omitted). Without an override the primary model still adjudicates at high reasoning.
+Each request keeps its own profile for admission, usage observation and pricing. Changing the
+adjudicator recipe invalidates conflict checkpoints while preserving completed independent passes.
+
 Hosts may provide an initial `estimated_seconds_per_batch` duration hint. The Dialogue loader shows
 a range accounting for both independent passes, configured worker count and conflict headroom,
 then refines the estimate from measured progress. An estimate is not a completion guarantee.

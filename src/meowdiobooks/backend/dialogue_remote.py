@@ -596,11 +596,19 @@ def run_dialogue_remote(
     if not targets:
         return _empty_result(scan, strategy, attribution_targets)
 
-    config = load_model_registry(Path(repo_root)).remote_dialogue_model()
+    registry = load_model_registry(Path(repo_root))
+    config = registry.remote_dialogue_model()
     if config is None or config.engine != "openai_responses":
         raise DialogueContractError("Dual pass with tools requires an OpenAI Responses profile")
     if config.model not in {"gpt-5.6-luna", "gpt-6-luna"}:
         raise DialogueContractError("Dual pass with tools requires the configured Luna model")
+    configured_adjudicator = registry.remote_dialogue_adjudication_model()
+    adjudicator_config = configured_adjudicator or config
+    if adjudicator_config.engine != "openai_responses":
+        raise DialogueContractError("Dialogue adjudication requires an OpenAI Responses profile")
+    adjudicator_effort = "high"
+    if configured_adjudicator is not None:
+        adjudicator_effort = configured_adjudicator.reasoning_effort or "high"
     resolved_policy = DualPassPolicy(
         max_targets_per_batch=config.max_targets_per_batch,
         max_workers=config.max_concurrent_batches,
@@ -632,8 +640,15 @@ def run_dialogue_remote(
             request_admission=request_admission,
             check_cancelled=check_cancelled,
         )
-        for effort in ("low", "medium", "high")
+        for effort in ("low", "medium")
     }
+    adjudicator_call = _responses_api_call(
+        adjudicator_config,
+        adjudicator_effort,
+        usage_observer,
+        request_admission=request_admission,
+        check_cancelled=check_cancelled,
+    )
     windows = _dialogue_windows(
         scan.get("partition", []),
         targets,
@@ -654,6 +669,15 @@ def run_dialogue_remote(
             "tools": [_FAST_TOOLS, _STRONG_TOOLS],
         })).hexdigest()
         cache_root = Path(checkpoint_dir) / fingerprint
+    adjudication_cache_root = None
+    if cache_root is not None:
+        adjudication_fingerprint = hashlib.sha256(canonical_json({
+            "version": 1, "model": adjudicator_config.model,
+            "endpoint": adjudicator_config.base_url, "serviceTier": adjudicator_config.service_tier,
+            "reasoningEffort": adjudicator_effort,
+            "prompt": _STRONG_SYSTEM, "schema": _STRONG_SCHEMA, "tools": _STRONG_TOOLS,
+        })).hexdigest()
+        adjudication_cache_root = cache_root / "adjudication" / adjudication_fingerprint
     checkpoint(15, "Running Dual pass with tools")
 
     pass_results: dict[tuple[str, str], dict[str, Any]] = {}
@@ -685,6 +709,7 @@ def run_dialogue_remote(
     fast: dict[str, dict[str, Any]] = {}
     strong: dict[str, dict[str, Any]] = {}
     all_runs = list(pass_results.values())
+    priced_requests = [(config, request) for run in all_runs for request in run["requests"]]
     for (stage, _batch_id), run in pass_results.items():
         destination = fast if stage == "fast" else strong
         destination.update({str(row["targetId"]): row for row in run["decisions"]})
@@ -703,8 +728,8 @@ def run_dialogue_remote(
         for completed, (_window, run) in enumerate(
             _bounded_batches(
                 adjudication_windows,
-                lambda window: _cached_batch(cache_root, "adjudicate", window,
-                    lambda: _run_adjudicator(window, pages, calls["high"], resolved_policy)),
+                lambda window: _cached_batch(adjudication_cache_root, "adjudicate", window,
+                    lambda: _run_adjudicator(window, pages, adjudicator_call, resolved_policy)),
                 resolved_policy.max_workers,
                 stopped,
                 checkpoint,
@@ -712,6 +737,7 @@ def run_dialogue_remote(
             1,
         ):
             all_runs.append(run)
+            priced_requests.extend((adjudicator_config, request) for request in run["requests"])
             final_decisions.update({str(row["targetId"]): row for row in run["decisions"]})
             checkpoint(
                 82 + completed / len(adjudication_windows) * 13,
@@ -760,8 +786,8 @@ def run_dialogue_remote(
     try:
         estimated_cost = round(
             sum(
-                remote_usage_cost(config, request["usage"], service_tier=request.get("serviceTier"))
-                for request in requests
+                remote_usage_cost(request_config, request["usage"], service_tier=request.get("serviceTier"))
+                for request_config, request in priced_requests
             ),
             4,
         )
@@ -788,6 +814,11 @@ def run_dialogue_remote(
         "toolCalls": sum(int(run["toolCalls"]) for run in all_runs),
         "adjudicatedTargets": len(disagreements),
     }
+    if configured_adjudicator is not None:
+        result["remoteUsage"].update({
+            "adjudicatorProfile": adjudicator_config.id,
+            "adjudicatorReasoningEffort": adjudicator_effort,
+        })
     result["resultSummary"].update(attribution_summary(checks, len(requests)))
     notify(100, "Dialogue speaker attribution complete")
     return result
