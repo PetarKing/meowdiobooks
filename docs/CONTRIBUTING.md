@@ -96,6 +96,30 @@ the actual findings. Repository issues, commits, and pull-request evidence must 
 credentials, private user data, or unredistributable material. Maintainers may require additional
 evidence or a narrower change before merge.
 
+## Visual evidence attachments
+
+Every PR must include visual evidence attached directly to its description or a PR comment using
+GitHub CLI `--attach`. A local path, an unattached CI artifact, or a written claim that checks passed
+is not a substitute. Use a small set of screenshots or a short recording that demonstrates the
+changed behavior. For non-UI changes, show the relevant rendered documentation, output, or verification
+result. Keep the evidence useful to a reviewer rather than adding unrelated decoration.
+
+```bash
+gh pr edit 123 --attach './after.png#Updated screen at phone width'
+gh pr comment 123 --body-file evidence.md --attach ./before.png --attach ./after.png
+```
+
+When `evidence.md` references an attached local image, the CLI rewrites that reference to the
+uploaded GitHub asset URL. See [GitHub's attachment guide](https://docs.github.com/en/github-cli/github-cli/attaching-files-with-github-cli).
+
+Inspect every attachment before uploading. Caption the tested commit, scenario, viewport/appearance,
+and whether data is synthetic. Include the relevant loading, error and recovery states; use a short
+recording when timing or interaction matters. For sticky/fixed UI, include ordinary viewport captures
+and check scrolling; a full-page composite alone can misrepresent its screen position. Replace stale
+visuals after changes that affect what they demonstrate. Read back the PR and verify that the assets
+uploaded and render inline. Never publish secrets, private user data or unredistributable material.
+
+
 
 ## Skipping CI for documentation, copy and static assets
 

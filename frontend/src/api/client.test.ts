@@ -241,6 +241,23 @@ describe('HttpWizardApi', () => {
     }))
   })
 
+  it.each(['external', 'timeout'] as const)('aborts page preview on %s and cleans up its timer', async (cause) => {
+    vi.useFakeTimers()
+    try {
+      const fetchMock = vi.fn((_url: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true })
+      }))
+      const controller = new AbortController()
+      const request = new HttpWizardApi('/api', fetchMock).previewReviewTranscript('book-1', 'r1', 543, [], [], [], controller.signal)
+      const rejection = expect(request).rejects.toThrow('Aborted')
+      if (cause === 'external') controller.abort()
+      else await vi.advanceTimersByTimeAsync(30_000)
+      await rejection
+      expect(fetchMock.mock.calls[0][1]?.signal?.aborted).toBe(true)
+      expect(vi.getTimerCount()).toBe(0)
+    } finally { vi.useRealTimers() }
+  })
+
   it('serializes AI occurrence policies without expanding them to warning groups', async () => {
     const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ page: 1 }), { status: 200, headers: { 'Content-Type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
