@@ -155,3 +155,135 @@ def test_structural_candidate_with_protected_or_missing_chapter_role_is_retained
     chapter = {"assessments": [] if role is None else [{"boundaryId": draft["id"], "role": role}]}
     result = evidence(extraction, dialogue, chapter)
     assert "4" not in {r["blockId"] for r in result["occurrences"]}
+
+
+def cross_page_artifacts():
+    extraction, dialogue = artifacts(3)
+    header = "The Secret Garden"
+    for block, span in zip(extraction["blocks"], dialogue["spans"]):
+        block["text"] = header + "\n\n"
+        span.update(source=block["text"], sourceEnd=len(block["text"]))
+    before = {"id": "1-tail", "page": 1, "text": '"Give us a sign before we open the door,\n'}
+    after = {"id": "2-body", "page": 2, "text": 'and then wait for our answer."\n'}
+    extraction["blocks"][1]["text"] = header + "\n\n"
+    extraction["blocks"][1:1] = [before]
+    extraction["blocks"].insert(3, after)
+    middle = dialogue["spans"][1]
+    middle.update(source=header + "\n\n", sourceEnd=len(header) + 2)
+    for block, span in ((before, {}), (extraction["blocks"][2], middle), (after, {})):
+        span.update(blockId=block["id"], source=block["text"], sourceStart=0,
+                    sourceEnd=len(block["text"]), renderRole="dialogue", turnGroupId="quote-1",
+                    resolvedSpeakerLabel="Reader")
+        if span is not middle:
+            dialogue["spans"].append(span)
+    return extraction, dialogue
+
+
+def test_standalone_header_inside_cross_page_quote_is_individually_reviewed():
+    extraction, dialogue = cross_page_artifacts()
+    result = evidence(extraction, dialogue)
+    assert {r["blockId"] for r in result["occurrences"]} == {"2", "3"}
+    family = result["families"][0]
+    quote = next(r for r in family["representatives"] if r["blockId"] == "2")
+    assert 'Give us a sign' in quote["quoteContinuation"]["before"]
+    assert 'wait for our answer' in quote["quoteContinuation"]["after"]
+    assert validate_headers(extraction, dialogue, {}, result) == result["occurrences"]
+    # One uncertain quoted example vetoes the family, even when narrator titles match.
+    result["proofs"][0]["verification"]["assessments"][0]["role"] = "UNCERTAIN"
+    assert proposals(family, result["proofs"][0]["screen"], result["proofs"][0]["verification"]) == []
+
+
+@pytest.mark.parametrize("mutation", ["new-turn", "same-page", "no-continuation", "different-reader",
+                                     "inline-prose", "forged-source", "only-one-narrator", "chapter"])
+def test_ambiguous_or_authored_quote_title_stays_protected(mutation):
+    extraction, dialogue = cross_page_artifacts()
+    middle = next(s for s in dialogue["spans"] if s["blockId"] == "2")
+    before = next(s for s in dialogue["spans"] if s["blockId"] == "1-tail")
+    after = next(s for s in dialogue["spans"] if s["blockId"] == "2-body")
+    chapter = {}
+    if mutation == "new-turn":
+        middle["turnGroupId"] = "another-quote"
+    elif mutation == "same-page":
+        next(b for b in extraction["blocks"] if b["id"] == "1-tail")["page"] = 2
+    elif mutation == "no-continuation":
+        after.pop("turnGroupId")
+    elif mutation == "different-reader":
+        after["resolvedSpeakerLabel"] = "Another reader"
+    elif mutation == "inline-prose":
+        block = next(b for b in extraction["blocks"] if b["id"] == "2")
+        block["text"] += "is the name I whispered."
+        middle.update(source=block["text"], sourceEnd=len(block["text"]))
+    elif mutation == "forged-source":
+        before["source"] = "forged"
+    elif mutation == "only-one-narrator":
+        next(s for s in dialogue["spans"] if s["blockId"] == "3")["renderRole"] = "dialogue"
+    else:
+        chapter = {"boundaryCandidates": [{"blockId": "2", "sourceStart": 0, "sourceEnd": 17}]}
+    assert "2" not in {r["blockId"] for r in evidence(extraction, dialogue, chapter)["occurrences"]}
+
+
+def test_quote_candidates_cannot_inherit_unseen_family_verification():
+    extraction, dialogue = artifacts(12)
+    for block, span in zip(extraction["blocks"], dialogue["spans"]):
+        block["text"] = "The Secret Garden\n\n"
+        span.update(source=block["text"], sourceEnd=len(block["text"]))
+    for page in range(2, 11):
+        header = next(b for b in extraction["blocks"] if b["page"] == page)
+        before = {"id": f"before-{page}", "page": page - 1, "text": '"Continue speaking\n'}
+        after = {"id": f"after-{page}", "page": page, "text": 'until I answer."\n'}
+        index = extraction["blocks"].index(header)
+        extraction["blocks"][index:index] = [before]
+        extraction["blocks"].insert(index + 2, after)
+        owner = next(s for s in dialogue["spans"] if s["blockId"] == str(page))
+        for block, span in ((before, {}), (header, owner), (after, {})):
+            span.update(blockId=block["id"], source=block["text"], sourceStart=0,
+                        sourceEnd=len(block["text"]), renderRole="dialogue",
+                        turnGroupId=f"quote-{page}", resolvedSpeakerLabel="Reader")
+            if span is not owner:
+                dialogue["spans"].append(span)
+    family = evidence(extraction, dialogue)["families"][0]
+    assert len(family["representatives"]) == 6
+    represented = {r["windowId"] for r in family["representatives"]}
+    for row in family["members"]:
+        if "quoteContinuation" in row and row["windowId"] not in represented:
+            assert row["protected"]
+            assert row not in family["eligible"]
+
+
+def test_quote_header_preview_acceptance_changes_only_exact_title(monkeypatch):
+    import json
+    from pathlib import Path
+    from meowdiobooks.backend import cleanup_remote as cleanup
+    from meowdiobooks.backend.review import (
+        build_review_workspace, add_cleanup_proposals, accept_review_revision,
+        apply_review_render_policies,
+    )
+    extraction, dialogue = cross_page_artifacts()
+    extraction["revision"] = "e1"
+    dialogue.update(revision="d1", extractionRevision="e1")
+    blocks = {b["id"]: b for b in extraction["blocks"]}
+    for span in dialogue["spans"]:
+        span.update(id=span["blockId"], text=span["source"], page=blocks[span["blockId"]]["page"])
+    def decide(_root, _config, packet, questions, **kwargs):
+        if questions[0]["name"] == "family":
+            assert any(row.get("quoteContinuation") for row in json.loads(packet)["examples"])
+            return {"answers": [{"name": "family", "type": "choice", "choice": "HEADER"}]}
+        return {"answers": [{"name": n, "type": "choice", "choice": "clean"}
+                            for n in ("production", "word_damage")]}
+    def complete(_root, _config, _system, packet, **kwargs):
+        return {"text": json.dumps({"reason": "Printed running title.", "assessments": [
+            {"windowId": r["windowId"], "role": "HEADER"} for r in json.loads(packet)["examples"]]})}
+    monkeypatch.setattr(cleanup, "remote_decisions_completion", decide)
+    monkeypatch.setattr(cleanup, "remote_chat_completion", complete)
+    result = cleanup.run_cleanup_review(Path(__file__).resolve().parents[2], extraction, dialogue, lambda *a: None)
+    workspace = add_cleanup_proposals(build_review_workspace(extraction, dialogue), extraction, dialogue, result)
+    decisions = [{"occurrenceIds": [r["id"]], "action": "exclude"}
+                 for warning in workspace["warnings"] for r in warning["occurrences"]]
+    accepted = accept_review_revision(workspace, decisions, revision="r1")
+    rendered = apply_review_render_policies(dialogue, accepted)
+    for block_id, block in blocks.items():
+        spans = [s for s in rendered["spans"] if s["blockId"] == block_id]
+        assert "".join(s["source"] for s in spans) == block["text"]
+        expected = block["text"].replace("The Secret Garden", "") if block_id in {"2", "3"} else block["text"]
+        assert "".join(s["text"] for s in spans) == expected
+        assert all(s.get("resolvedSpeakerLabel") == "Reader" for s in spans if s["renderRole"] == "dialogue")
