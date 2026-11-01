@@ -229,12 +229,19 @@ There is no host-to-local parsing fallback. ZIP members are never unpacked; path
 per-member and cumulative expanded sizes, duplicate resources, XML entities, unsupported embedded
 content, invalid UTF-8 and empty text are validated. The new readers add no runtime dependencies.
 Import failure rolls back new extraction artifacts and restores pre-existing artifact pointers.
-Protected PDFs and EPUBs remain rejected. `DocumentImportError` carries a stable `code`
+PDFs requiring a non-empty opening password and protected EPUBs remain rejected.
+PDFs with supported encryption that open with an empty password are accepted; the original
+source bytes and hash are preserved, and the existing readers open them without rewriting.
+`DocumentImportError` carries a stable `code`
 (`encrypted-pdf`, `encrypted-epub`, or `unsupported-epub-compression`) and fixed public guidance;
 host document boundaries may preserve these classifications without forwarding parser diagnostics.
 PDF inspection uses the pinned pypdf 6.18.1 `_handle_encryption` hook, reached only after the
-parsed trailer identifies encryption, to reject before any password or security-handler processing.
-Parser upgrades must preserve this gate; standard, AES, and unsupported-handler fixtures verify it.
+parsed trailer identifies encryption, to try only an explicit empty password. Password failures,
+unsupported security handlers and unavailable crypto support retain the classified rejection.
+The pinned provider marker and normalized stream/string/embedded-file cipher fields also gate
+AES support before deferred object decryption. Malformed encryption dictionaries return the
+same validation error and source cleanup as other malformed PDFs.
+Parser upgrades must preserve this gate; RC4, AES, and unsupported-handler fixtures verify it.
 The default UI translates only the reviewed messages, optionally followed by a valid support reference.
 
 ### Book-list fault isolation
