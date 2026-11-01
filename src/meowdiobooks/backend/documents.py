@@ -12,7 +12,8 @@ from typing import Any
 
 import pdfplumber
 from pypdf import PdfReader
-from pypdf.errors import PyPdfError
+from pypdf._crypt_providers import crypt_provider
+from pypdf.errors import DependencyError, PyPdfError, WrongPasswordError
 
 from meowdiobooks.util import sha256_bytes
 
@@ -31,13 +32,26 @@ def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
 
 
 class _ImportPdfReader(PdfReader):
-    """Reject encrypted imports before choosing or invoking a security handler."""
+    """Allow encryption only when the document opens with an empty password."""
 
     def _handle_encryption(self, password: str | bytes | None) -> None:
-        # Pinned pypdf 6.18.1 invokes this hook only after its parsed trailer marks
-        # the document encrypted. Reject here before unsupported handlers or an
-        # unavailable crypto implementation can bypass import validation/cleanup.
-        raise DocumentImportError("encrypted-pdf")
+        # is_encrypted stays true after successful decryption. Supplying an
+        # explicit empty password makes pinned pypdf 6.18.1 raise on failure;
+        # its default None otherwise leaves a locked reader without raising.
+        try:
+            super()._handle_encryption(b"")
+        except (WrongPasswordError, DependencyError, NotImplementedError) as error:
+            raise DocumentImportError("encrypted-pdf") from error
+        except (KeyError, TypeError, ValueError, AttributeError) as error:
+            raise ValueError("The uploaded PDF is malformed or exceeds safe parsing limits") from error
+        # AES-128 password verification uses RC4; missing AES support would
+        # otherwise surface only when metadata or page content is decrypted.
+        encryption = self._encryption
+        if encryption is not None and crypt_provider[0] == "local_crypt_fallback" and any(
+            method in {"/AESV2", "/AESV3"}
+            for method in (encryption.StrF, encryption.StmF, encryption.EFF)
+        ):
+            raise DocumentImportError("encrypted-pdf")
 
 
 def inspect_source(path: Path) -> tuple[str, int]:
@@ -53,8 +67,6 @@ def inspect_source(path: Path) -> tuple[str, int]:
         raise ValueError("The uploaded file is not a valid PDF")
     try:
         reader = _ImportPdfReader(path)
-        if reader.is_encrypted:
-            raise DocumentImportError("encrypted-pdf")
         return "pdf", len(reader.pages)
     except PyPdfError as error:
         raise ValueError("The uploaded PDF is malformed or exceeds safe parsing limits") from error
