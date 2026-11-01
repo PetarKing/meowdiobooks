@@ -1,4 +1,10 @@
 const zhCN: Record<string, string> = {
+  "Use this correction?": "使用这项修改吗？",
+  "No correction was suggested for this passage. Choose whether to keep the original text.": "这段文字没有建议修改。请选择是否保留原文。",
+  "Apply remaining AI suggestions ({{count}})": "应用剩余 AI 建议（{{count}} 项）",
+  "{{remaining}} remaining · {{decided}} already decided · {{total}} suggested changes": "剩余 {{remaining}} 项 · 已决定 {{decided}} 项 · 共 {{total}} 项修改建议",
+  "Only the remaining suggested changes will be selected. Your existing choices stay as they are. Changes apply when you accept the review.": "仅选择尚未决定的修改建议，保留您已有的选择。接受审核时才会应用修改。",
+
   "Ready for their voices?": "准备好生成声音了吗？",
   "Generation method": "生成方式",
   "Cancel voice setup": "取消声音设置",

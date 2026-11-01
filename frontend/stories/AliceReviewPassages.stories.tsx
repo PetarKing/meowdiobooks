@@ -78,7 +78,7 @@ export const CreditsAiSuggestion: Story = {
     await expect(passage).toHaveTextContent("Other information and formats: www.gutenberg.org/ebooks/11");
     await expect(passage).toHaveTextContent("*** START OF THE PROJECT GUTENBERG EBOOK ALICE'S ADVENTURES IN WONDERLAND ***");
     await expect(within(passage).queryByText("Language: English")).not.toBeInTheDocument();
-    await expect(canvas.queryByRole("button", { name: /^Apply all suggested choices/ })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ })).not.toBeInTheDocument();
     await expect(canvas.getByRole("button", { name: /^Leave out(?: \(Suggested\))? This highlighted/ })).toHaveClass("review-recommended");
     await expect(canvas.queryByLabelText("Proposed correction")).not.toBeInTheDocument();
   },
@@ -103,6 +103,6 @@ export const MultipleAiSuggestions: Story = {
     await enterScenario(canvasElement, "review");
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Example 1 of 2")).toBeVisible();
-    await expect(canvas.getByRole("button", { name: "Apply all suggested choices (2)" })).toBeVisible();
+    await expect(canvas.getByRole("button", { name: "Apply remaining AI suggestions (2)" })).toBeVisible();
   },
 };

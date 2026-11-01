@@ -36,7 +36,18 @@ describe("page-boundary source preservation", () => {
     ]);
   });
 
-  it("preserves manual choices and does not default ordinary or malformed source checks", () => {
+  it("defaults non-actionable keep-only checks without requiring page-boundary metadata", async () => {
+    const [warning] = normalizeCandidateWarnings({ warnings: [{ ...candidate.warnings[0], occurrences: [
+      { id: "source-check", source: "example.comperson", page: 1, availableActions: ["keep"] },
+    ] }] });
+    expect(reviewDefaultDecisions([warning], {})).toEqual({ "source-check": "keep" });
+    expect(buildReviewPreviewPolicies([warning], {}).occurrencePolicies).toEqual([{ occurrenceId: "source-check", action: "keep" }]);
+    expect(await buildReviewWarningDecisions("b", "r", [warning], {}, vi.fn())).toEqual([
+      { occurrenceIds: ["source-check"], action: "keep", provenance: "user" },
+    ]);
+  });
+
+  it("preserves manual choices and leaves malformed source checks with alternatives undecided", () => {
     const [warning] = normalizeCandidateWarnings(candidate);
     const choices = { uncertain: "keep", verified: "keep" } as const;
     expect(reviewProposalDecisions(warning, reviewDefaultDecisions([warning], choices))).toEqual(choices);
@@ -46,7 +57,7 @@ describe("page-boundary source preservation", () => {
       { boundaryAnchors: [{ ...boundary.boundaryAnchors![0], sourceStart: -1 }, boundary.boundaryAnchors![1]] },
     ]) {
       const [invalid] = normalizeCandidateWarnings({ warnings: [{ ...candidate.warnings[0], occurrences: [
-        { ...candidate.warnings[0].occurrences[1], ...mutation },
+        { ...candidate.warnings[0].occurrences[1], ...mutation, availableActions: ["keep", "exclude"] },
       ] }] });
       expect(reviewHasBoundaryEvidence(invalid.occurrences[0])).toBe(false);
       expect(reviewDefaultDecisions([invalid], {})).toEqual({});

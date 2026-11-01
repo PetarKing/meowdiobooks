@@ -207,14 +207,21 @@ export function reviewPatternDecisions(warning: ReviewWarning, decisions: Record
   return next;
 }
 
-/** Uncertain page-boundary proposals preserve the source unless explicitly overridden. */
+/** Read-only source checks are not actionable AI suggestions. Keep them in acceptance inputs. */
+export function reviewIsInformationalSourceCheck(warning: ReviewWarning, row: WarningOccurrence) {
+  const actions = reviewOccurrenceActions(warning, row);
+  return warning.kind === "ai-cleanup" && actions.length === 1 && actions[0] === "keep";
+}
+
+/** Keep-only checks need no decision; uncertain page joins preserve the source by default. */
 export function reviewDefaultDecisions(warnings: ReviewWarning[], decisions: Record<string, ReviewCapability>) {
   const next = { ...decisions };
   for (const warning of warnings) {
     if (warning.kind !== "ai-cleanup") continue;
     for (const row of warning.occurrences) {
-      if (next[row.id] === undefined && reviewHasBoundaryEvidence(row) && ["NO_CONTINUATION", "UNSURE"].includes(row.boundaryDecision ?? "") && row.proposalStatus === "source_review" &&
-          row.replacement === undefined && reviewOccurrenceActions(warning, row).includes("keep")) next[row.id] = "keep";
+      if (next[row.id] === undefined && (reviewIsInformationalSourceCheck(warning, row) ||
+          (reviewHasBoundaryEvidence(row) && ["NO_CONTINUATION", "UNSURE"].includes(row.boundaryDecision ?? "") && row.proposalStatus === "source_review" &&
+          row.replacement === undefined && reviewOccurrenceActions(warning, row).includes("keep")))) next[row.id] = "keep";
     }
   }
   return next;
