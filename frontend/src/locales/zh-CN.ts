@@ -1045,6 +1045,8 @@ const zhCN: Record<string, string> = {
   "Loading page {{page}}…": "正在加载第 {{page}} 页…",
   "May miss a character and use Narrator": "可能遗漏角色并改用旁白",
   "Narrator": "旁白",
+  "Confirm Narrator assignments": "确认旁白分配",
+  "Review the labels assigned to Narrator. Pop any speaker back out to the cast, then confirm these assignments.": "检查分配给旁白的标签。若其中有角色发言，请先将其移回角色列表，再确认其余分配。",
   "Narrator routing": "旁白分配",
   "Narrator still reads the book’s normal prose.": "旁白仍会朗读书中的普通叙述。",
   "Narrator will read this line.": "这句将由旁白朗读。",

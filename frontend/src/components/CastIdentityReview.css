@@ -36,11 +36,15 @@
   box-shadow: 0 7px 20px rgb(var(--shadow-color) / 0.2);
 }
 
-.cast-merge-undo {
+.cast-merge-undo,
+.cast-merge-undo[data-presentation-root] {
   position: fixed;
   z-index: 1200;
-  right: 24px;
-  bottom: 24px;
+  left: 50%;
+  bottom: max(16px, calc(env(safe-area-inset-bottom, 0px) + 12px));
+  transform: translateX(-50%);
+  width: max-content;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -53,6 +57,11 @@
   font-size: 13px;
   font-weight: 700;
   box-shadow: 0 14px 38px rgb(var(--shadow-color) / 0.28);
+}
+
+.cast-merge-undo > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .cast-merge-undo button {
@@ -74,7 +83,7 @@
 @media (max-width: 600px) {
   .cast-drag-scroll-cue.up { top: 66px; }
   .cast-drag-scroll-cue.down { bottom: 68px; }
-  .cast-merge-undo { right: 14px; bottom: 84px; max-width: calc(100vw - 28px); }
+  .cast-merge-undo { max-width: calc(100vw - 28px); }
 }
 
 /* Match provenance uses the same plain treatment as review suggestions. */

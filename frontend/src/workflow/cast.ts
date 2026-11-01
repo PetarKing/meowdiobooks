@@ -1,5 +1,5 @@
 import type { CastArtifact, CastVoice, VoiceRoute } from "../api/contracts";
-import { strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
+import { narrateEditorialByDefault, strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
 import appI18n from "../i18n";
 
 export const defaultNarratorDirection = "Warm, clear audiobook narrator with precise, natural delivery.";
@@ -12,6 +12,9 @@ export function decisionsForCast(cast: CastArtifact): Record<string, IdentityDec
   const proposals = new Map(cast.proposals.map((row) => [key(row.label), row]));
   const dossiers = new Map(cast.dossiers.map((row) => [key(row.label), row]));
   const decisions = cast.proposals.map((row) => {
+    if (narrateEditorialByDefault(row, cast.proposals)) {
+      return { label: row.label, category: "narrator", canonicalName: "", aliases: [], primaryLabel: row.label };
+    }
     const reciprocal = (row.aliases ?? []).filter((alias) =>
       proposals.get(key(alias))?.aliases?.some((candidate) => key(candidate) === key(row.label)),
     );

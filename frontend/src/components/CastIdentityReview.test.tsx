@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CastArtifact } from "../api/contracts";
 import type { IdentityDecision } from "../castIdentity";
 import { castFor } from "../../design-kit/castFixtures";
+import { decisionsForCast, resolvedLabelsForCast } from "../workflow/cast";
 import { CastIdentityReview } from "./CastIdentityReview";
 
 const cast: CastArtifact = {
@@ -327,6 +328,7 @@ describe("CastIdentityReview", () => {
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Emilia");
 
     expect(screen.getByText("Merged Cecilus into Emilia.")).toBeInTheDocument();
+    expect(screen.getByText("Merged Cecilus into Emilia.").closest("[role=status]")?.parentElement).toBe(document.body);
     fireEvent.click(screen.getByRole("button", { name: "Undo" }));
     expect(screen.getByRole("button", { name: "Inspect Cecilus" })).toBeInTheDocument();
     expect(JSON.parse(screen.getByTestId("decisions").textContent ?? "{}").Cecilus.canonicalName).toBe("Cecilus");
@@ -437,4 +439,46 @@ describe("CastIdentityReview", () => {
     fireEvent.click(dialog.parentElement!);
     expect(screen.queryByRole("dialog", { name: "Inspect Cecilus" })).not.toBeInTheDocument();
   });
+});
+
+
+const editorialCast: CastArtifact = {
+  revision: "editorial-batch", phase: "identity-review",
+  dossiers: ["Production credit", "Record field"].map((label) => ({ label, occurrenceCount: 1, examples: [{ sourceText: `${label}: synthetic metadata` }] })),
+  proposals: ["Production credit", "Record field"].map((label) => ({ label, category: "editorial", canonicalName: "", reviewRequired: true })),
+};
+function EditorialHarness() {
+  const [decisions, setDecisions] = useState(() => decisionsForCast(editorialCast));
+  const [resolved, setResolved] = useState(() => resolvedLabelsForCast(editorialCast));
+  return <>
+    <CastIdentityReview cast={editorialCast} decisions={decisions} setDecisions={setDecisions} resolvedLabels={resolved} setResolvedLabels={setResolved} voiceModels={[]} voiceModel="" language="english" onVoiceModelChange={() => undefined} onLanguageChange={() => undefined} hideVoiceSettings />
+    <output data-testid="resolved">{JSON.stringify(resolved)}</output>
+  </>;
+}
+
+it("requires one Narrator review for all default editorial assignments", () => {
+  render(<EditorialHarness />);
+  expect(screen.queryByRole("button", { name: "Inspect Production credit" })).not.toBeInTheDocument();
+  const narrator = screen.getByRole("button", { name: "Inspect Narrator" });
+  expect(narrator).toHaveTextContent("Must review");
+  fireEvent.click(narrator);
+  const dialog = screen.getByRole("dialog", { name: "Inspect Narrator" });
+  expect(dialog).toHaveTextContent("Production credit: synthetic metadata");
+  expect(dialog).toHaveTextContent("Record field: synthetic metadata");
+  expect(screen.getByTestId("resolved")).toHaveTextContent("[]");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Confirm Narrator assignments" }));
+  expect(JSON.parse(screen.getByTestId("resolved").textContent!)).toEqual(expect.arrayContaining(["Production credit", "Record field"]));
+  expect(narrator).not.toHaveTextContent("Must review");
+});
+
+it("lets the user remove a mistaken default before confirming Narrator", () => {
+  render(<EditorialHarness />);
+  fireEvent.click(screen.getByRole("button", { name: "Inspect Narrator" }));
+  const dialog = screen.getByRole("dialog", { name: "Inspect Narrator" });
+  const card = within(dialog).getByText("Production credit").closest("article")!;
+  fireEvent.click(within(card).getByRole("button", { name: "Pop out to cast" }));
+  expect(screen.getByRole("button", { name: "Inspect Production credit" })).toBeInTheDocument();
+  expect(within(dialog).getByRole("button", { name: "Confirm Narrator assignments" })).toBeInTheDocument();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Confirm Narrator assignments" }));
+  expect(screen.getByRole("button", { name: "Inspect Narrator" })).not.toHaveTextContent("Must review");
 });

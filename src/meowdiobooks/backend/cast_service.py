@@ -101,8 +101,9 @@ Return exactly one JSON object:
 
 Definitions:
 - one-person: one individual speaks under the target label.
-- multiple-people: several people speak together under the target label.
-- not-a-speaker: a translator note, editor note, heading or production instruction.
+- multiple-people: several people actually speak together under the target label.
+- not-a-speaker: a translator note, editor note, credit, heading, record field, roster,
+  list or production instruction. Naming multiple people is not evidence of a speaking group.
 - identity-hidden: someone speaks, but the source label deliberately withholds their identity,
   such as ??? or Unknown Voice.
 
@@ -116,7 +117,10 @@ Rules:
 6. Similar spelling alone is not enough. Distinct roles or contexts are evidence to keep labels apart.
 7. identity-hidden uses empty relationship lists unless evidence directly reveals the hidden identity.
 8. When there are no RELATIONSHIP CANDIDATES, both relationship lists must be empty.
-9. Do not invent labels or facts. Return JSON only."""
+9. A colon, capital letters, or a list of names does not establish speech. Read the passage's
+   function: a class roster or student record is not-a-speaker; a crowd saying words together is
+   multiple-people. A heading naming a character is not that character speaking.
+10. Do not invent labels or facts. Return JSON only."""
 
 DISCOVERY_SYSTEM = """Discover plausible identity relationships in an audiobook cast ledger.
 
@@ -135,7 +139,10 @@ Rules:
 4. Similar context alone is insufficient. Do not pair two people merely because they share a scene.
 5. Return at most eight strongest candidates for each owned label. This is a safety ceiling, not a
    target; return every genuinely plausible candidate below it and no filler.
-6. Copy labels exactly from the ledger. Do not decide or merge identities here. Return JSON only."""
+6. Classify source function, not label appearance. Credits, record fields, headings and rosters
+   are not-a-speaker. A list naming multiple people is not multiple-people; that category requires
+   evidence of people actually speaking together. Colons and capitals alone never establish speech.
+7. Copy labels exactly from the ledger. Do not decide or merge identities here. Return JSON only."""
 
 PAIR_SYSTEM = """Adjudicate one possible audiobook identity pair using both dossiers.
 
