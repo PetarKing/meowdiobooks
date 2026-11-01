@@ -3508,6 +3508,14 @@ describe('v2 wizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review complete transcript →' }))
   }
 
+  it('makes the named transcript page keyboard focusable for scrolling', async () => {
+    await openFinalReview()
+    const transcript = await screen.findByRole('article', { name: 'Audiobook transcript page 1' })
+    expect(transcript).toHaveAttribute('tabindex', '0')
+    transcript.focus()
+    expect(transcript).toHaveFocus()
+  })
+
   it.each(['pending', 'failed'] as const)('accepts resolved review and advances while the first page preview is %s', async (state) => {
     vi.mocked(wizardApi.previewReviewTranscript).mockImplementation(() => state === 'failed' ? Promise.reject(new Error('preview unavailable')) : new Promise(() => {}))
     await openFinalReview()

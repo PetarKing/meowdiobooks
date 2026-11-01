@@ -1,5 +1,6 @@
 """Standard extraction recovers missing image text before Dialogue or Review."""
 from copy import deepcopy
+import threading
 import pytest
 
 from meowdiobooks.backend.documents import auto_recover_pdf_pages
@@ -219,6 +220,136 @@ def test_cancellation_interrupts_automatic_recovery_without_mutating_raw_pages(t
     assert rows == before
 
 
+def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tmp_path):
+    rows = [page(1, "A native page.", candidate=False), page(2, "", candidate=True),
+            page(3, "Another native page.", candidate=False),
+            *[page(number, "", candidate=True) for number in range(4, 9)]]
+    before = deepcopy(rows)
+    caller = threading.get_ident()
+    lock = threading.Lock()
+    first_pair = threading.Barrier(2)
+    release_first = threading.Event()
+    active = set()
+    calls, finished, callbacks = [], [], []
+    peak = 0
+
+    def extract(_source, _cache, number, method):
+        nonlocal peak
+        assert method == "ocr"
+        with lock:
+            active.add(number)
+            peak = max(peak, len(active))
+            calls.append(number)
+        try:
+            if number in {2, 4}:
+                first_pair.wait(timeout=5)
+            if number == 2:
+                assert release_first.wait(timeout=5)
+            return ocr(number, f"Useful recovered story for physical page {number}.")
+        finally:
+            with lock:
+                active.remove(number)
+                finished.append(number)
+
+    def report(progress, _message):
+        callbacks.append((threading.get_ident(), progress))
+        if progress > 60:
+            release_first.set()
+
+    result = auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", rows,
+                                    extract, report, max_workers=2)
+    assert peak == 2 and not active
+    assert sorted(calls) == [2, 4, 5, 6, 7, 8] and finished[0] == 4
+    assert [row["page"] for row in result] == list(range(1, 9))
+    assert result[0] == rows[0] and result[2] == rows[2]
+    assert all(f"page {row['page']}." in row["text"] for row in result if row["method"] == "ocr")
+    assert {thread for thread, _ in callbacks} == {caller}
+    assert [progress for _, progress in callbacks] == sorted(progress for _, progress in callbacks)
+    assert rows == before
+
+
+@pytest.mark.parametrize("cancel", [False, True])
+def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_workers(tmp_path, monkeypatch, cancel):
+    from concurrent.futures import ThreadPoolExecutor
+
+    class Cancelled(Exception):
+        pass
+
+    rows = [page(number, "", candidate=True) for number in range(1, 11)]
+    before = deepcopy(rows)
+    both_started = threading.Barrier(2)
+    started = threading.Event()
+    release = threading.Event()
+    lock = threading.Lock()
+    calls, finished, submitted = [], [], []
+    caller = threading.get_ident()
+
+    class ObservedExecutor(ThreadPoolExecutor):
+        def submit(self, function, *args, **kwargs):
+            submitted.append(args[2])
+            return super().submit(function, *args, **kwargs)
+
+        def shutdown(self, **kwargs):
+            # Let the other running adapter finish once failure cleanup starts.
+            release.set()
+            return super().shutdown(**kwargs)
+
+    monkeypatch.setattr("meowdiobooks.backend.documents.ThreadPoolExecutor", ObservedExecutor)
+
+    def extract(_source, _cache, number, _method):
+        with lock:
+            calls.append(number)
+        both_started.wait(timeout=5)
+        started.set()
+        try:
+            if cancel or number == 1:
+                assert release.wait(timeout=5)
+            if number == 2 and not cancel:
+                raise RuntimeError("Recognizer failed")
+            return ocr(number, "Useful recovered story text on this page.")
+        finally:
+            finished.append(number)
+
+    def report(_progress, _message):
+        assert threading.get_ident() == caller
+        if cancel and started.is_set():
+            release.set()
+            raise Cancelled()
+
+    with pytest.raises(Cancelled if cancel else RuntimeError):
+        auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", rows,
+                               extract, report, max_workers=2)
+    assert sorted(calls) == [1, 2]
+    assert submitted == [1, 2]
+    assert sorted(finished) == [1, 2] and rows == before
+    assert not any(thread.name.startswith("meowdiobooks-ocr") for thread in threading.enumerate())
+
+
+@pytest.mark.parametrize("preview, max_workers", [(False, 1), (True, 2)])
+def test_default_and_preview_recovery_do_not_create_parallel_workers(tmp_path, monkeypatch, preview, max_workers):
+    def unexpected_executor(**_kwargs):
+        pytest.fail("Default extraction and previews must remain serial")
+
+    monkeypatch.setattr("meowdiobooks.backend.documents.ThreadPoolExecutor", unexpected_executor)
+    rows = [page(7, "", candidate=True), page(9, "", candidate=True)]
+    calls = []
+
+    def extract(_source, _cache, number, _method):
+        calls.append(number)
+        return ocr(number, "Useful recovered text on this page.")
+
+    result = auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", rows,
+                                    extract, preview=preview, max_workers=max_workers)
+    assert calls == [7, 9] and [row["page"] for row in result] == [7, 9]
+
+
+@pytest.mark.parametrize("max_workers", [0, 3, -1, True, 2.0, "2", None])
+def test_recovery_rejects_invalid_or_excessive_parallelism(tmp_path, max_workers):
+    with pytest.raises(ValueError, match="parallelism"):
+        auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", [], None,
+                               max_workers=max_workers)
+
+
 @pytest.fixture
 def automatic_workflow(tmp_path):
     from io import BytesIO
@@ -323,12 +454,36 @@ def test_default_extraction_recovers_before_normal_speaker_detection_and_review(
 
 def test_standard_preview_uses_the_same_automatic_provider_and_preserves_physical_page(automatic_workflow):
     client, book_id, _package, processor = automatic_workflow
+    processor.ocr_parallelism = 2
     response = client.post(f"/api/books/{book_id}/extraction/preview", json={"page": 2, "method": "liteparse"})
     assert response.status_code == 200, response.text
     result = response.json()
     assert result["page"] == 2 and result["pageCount"] == 3
     assert result["text"] == processor.recovered and result["ocrEngine"] == "injected-paddle"
     assert processor.calls == [(2, "liteparse"), (2, "ocr"), (2, "render")]
+
+
+def test_complete_standard_extraction_honors_adapter_parallelism(automatic_workflow):
+    from tests.backend.test_app_v2 import _process
+
+    client, book_id, _package, processor = automatic_workflow
+    processor.ocr_parallelism = 2
+    processor.raw[2] = page(3, "", candidate=True)
+    extract = processor.extract_pdf_page
+    barrier = threading.Barrier(2)
+    worker_threads = set()
+
+    def concurrent_extract(*args):
+        worker_threads.add(threading.get_ident())
+        barrier.wait(timeout=5)
+        return extract(*args)
+
+    processor.extract_pdf_page = concurrent_extract
+    result = _process(client, book_id, "extract", {"method": "liteparse"})
+    assert result["revision"]
+    assert len(worker_threads) == 2
+    assert processor.calls[0] == ("full", "liteparse")
+    assert sorted(processor.calls[1:]) == [(2, "ocr"), (3, "ocr")]
 
 
 @pytest.mark.parametrize("method", ["native", "layout"])
@@ -349,6 +504,8 @@ def test_automatic_recognition_failure_preserves_the_accepted_extraction(automat
     _accept(client, book_id, "extract", candidate["revision"])
     original = deepcopy(read_artifact(package, "extraction"))
     before = artifact_history(package, "extraction")
+    processor.ocr_parallelism = 2
+    processor.raw[2] = page(3, "", candidate=True)
     processor.recovered = RuntimeError("Synthetic recognizer failure")
     queued = client.post(f"/api/books/{book_id}/stages/extract/process", json={"settings": {"method": "liteparse"}})
     assert queued.status_code == 202, queued.text

@@ -9,6 +9,7 @@ import tempfile
 import time
 from uuid import uuid4
 from collections.abc import Callable, Mapping
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any
 
@@ -205,12 +206,19 @@ def _flag_possible_image_text(source, cache_root, pages, command_runner, *, page
     }]} if row["page"] in suspects and row.get("method") != "ocr" else {**row, "ocrCandidate": False} for row in pages]
 
 
-def auto_recover_pdf_pages(source, cache_root, pages, extract_page, report=None, *, preview=False):
+def auto_recover_pdf_pages(
+    source, cache_root, pages, extract_page, report=None, *, preview=False, max_workers=1,
+):
     """Recover sparse image pages before any dialogue processing.
 
     Operates on adapter data only: hosted PDF parsing stays inside its sandbox.
-    Failure/cancellation propagates so no partial extraction is published.
+    Failure/cancellation propagates so no partial extraction is published. Adapters
+    may opt into two concurrent pages; previews and the local default stay serial.
     """
+    if type(max_workers) is not int or not 1 <= max_workers <= 2:
+        raise ValueError("OCR parallelism must be one or two workers")
+    if preview:
+        max_workers = 1
     notify = report or (lambda _progress, _message=None: None)
     def candidate(row):
         if row.get("method") == "ocr" or row.get("ocrCandidate") is False:
@@ -221,17 +229,11 @@ def auto_recover_pdf_pages(source, cache_root, pages, extract_page, report=None,
                        for w in row.get("warnings", []))
                 or not text or (preview and len(text) < 200))
 
-    targets = [row["page"] for row in pages if candidate(row)]
-    target_set = set(targets)
-    result = []
-    completed = 0
-    for original in pages:
-        if original["page"] not in target_set:
-            result.append(original)
-            continue
-        notify(60 + 35 * completed / len(targets),
-               f"Recovering text with OCR ({completed + 1}/{len(targets)})")
-        recovered = extract_page(source, cache_root, original["page"], "ocr")
+    targets = [index for index, row in enumerate(pages) if candidate(row)]
+    result = list(pages)
+
+    def accept(index, recovered):
+        original = pages[index]
         if (not isinstance(recovered, dict) or type(recovered.get("page")) is not int
                 or recovered["page"] != original["page"] or not isinstance(recovered.get("text"), str)):
             raise ValueError("OCR did not return the requested page")
@@ -253,11 +255,52 @@ def auto_recover_pdf_pages(source, cache_root, pages, extract_page, report=None,
                         and warning.get("code") not in {"empty", "empty-page", "possible-image-text"}
                         and warning not in warnings):
                     warnings.append(dict(warning))
-            result.append({**original, **recovered, "text": text, "method": "ocr",
-                           "warnings": warnings})
-        else:
-            result.append(original)
-        completed += 1
+            result[index] = {**original, **recovered, "text": text, "method": "ocr",
+                             "warnings": warnings}
+
+    def progress(completed):
+        notify(60 + 35 * completed / len(targets),
+               f"Recovering text with OCR ({min(completed + 1, len(targets))}/{len(targets)})")
+
+    if max_workers == 1 or len(targets) < 2:
+        for completed, index in enumerate(targets):
+            progress(completed)
+            accept(index, extract_page(source, cache_root, pages[index]["page"], "ocr"))
+        if targets:
+            progress(len(targets))
+        return result
+
+    progress(0)
+    executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="meowdiobooks-ocr")
+    pending = {}
+    remaining = iter(targets)
+    completed = 0
+
+    def submit_next():
+        index = next(remaining, None)
+        if index is not None:
+            pending[executor.submit(extract_page, source, cache_root, pages[index]["page"], "ocr")] = index
+
+    try:
+        for _ in range(max_workers):
+            submit_next()
+        while pending:
+            # Reporting stays on the job thread, including cancellation checks
+            # while recognizers run. Never enqueue the rest of the book at once.
+            progress(completed)
+            done, _ = wait(pending, timeout=.25, return_when=FIRST_COMPLETED)
+            for future in done:
+                accept(pending.pop(future), future.result())
+                completed += 1
+            progress(completed)
+            for _ in done:
+                submit_next()
+    finally:
+        for future in pending:
+            future.cancel()
+        # Running adapters retain their own deadlines. Join before returning or
+        # raising so failed/cancelled work leaves no executor threads behind.
+        executor.shutdown(wait=True, cancel_futures=True)
     return result
 
 

@@ -662,6 +662,7 @@ def create_app_v2(
                 source, package / "preview", pages,
                 file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
                 report,
+                max_workers=getattr(file_processor, "ocr_parallelism", 1),
             )
         blocks = pages_to_dialogue_blocks(pages)
         boundary_candidates = detect_chapter_candidates(blocks)
