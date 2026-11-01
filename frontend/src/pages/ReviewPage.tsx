@@ -296,8 +296,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   if (!reviewCandidate) return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("Check for issues")} copy={t("Check the text, reading order, and chapter starts before recording.")} />
     <section className="review-scan-scene" aria-label={t("Manuscript review")}>
       <div className="review-scan-copy">
-        <p>{t("We check passages from your book using an online service and suggest corrections. You review each suggestion before applying it.")}</p>
-        {busy && <p>{t("Checking source words, chapter openings and reading order. Your accepted version remains available while we prepare a new review.")}</p>}
+        <p>{t("We check your text and suggest corrections. You choose which changes to apply.")}</p>
+        {busy && <p>{t("Checking wording, chapter openings and reading order.")}</p>}
         {busy ? <div className="review-scan-progress" role="status" aria-label={t("Scanning for issues…")}><span className="review-scan-progress-track" aria-hidden="true"><i /></span>{t("Scanning for issues…")}</div>
           : <StageLaunch><button className="primary" onClick={() => void scanForIssues()}>{t("Scan for issues")} →</button></StageLaunch>}
       </div>
