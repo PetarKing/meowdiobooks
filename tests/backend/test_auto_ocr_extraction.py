@@ -220,14 +220,16 @@ def test_cancellation_interrupts_automatic_recovery_without_mutating_raw_pages(t
     assert rows == before
 
 
-def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tmp_path):
+@pytest.mark.parametrize("max_workers", [2, 3, 4])
+def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tmp_path, max_workers):
     rows = [page(1, "A native page.", candidate=False), page(2, "", candidate=True),
             page(3, "Another native page.", candidate=False),
             *[page(number, "", candidate=True) for number in range(4, 9)]]
     before = deepcopy(rows)
     caller = threading.get_ident()
     lock = threading.Lock()
-    first_pair = threading.Barrier(2)
+    first_batch = {2, *range(4, 3 + max_workers)}
+    first_started = threading.Barrier(max_workers)
     release_first = threading.Event()
     active = set()
     calls, finished, callbacks = [], [], []
@@ -241,8 +243,8 @@ def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tm
             peak = max(peak, len(active))
             calls.append(number)
         try:
-            if number in {2, 4}:
-                first_pair.wait(timeout=5)
+            if number in first_batch:
+                first_started.wait(timeout=5)
             if number == 2:
                 assert release_first.wait(timeout=5)
             return ocr(number, f"Useful recovered story for physical page {number}.")
@@ -257,9 +259,9 @@ def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tm
             release_first.set()
 
     result = auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", rows,
-                                    extract, report, max_workers=2)
-    assert peak == 2 and not active
-    assert sorted(calls) == [2, 4, 5, 6, 7, 8] and finished[0] == 4
+                                    extract, report, max_workers=max_workers)
+    assert peak == max_workers and not active
+    assert sorted(calls) == [2, 4, 5, 6, 7, 8] and finished[0] != 2
     assert [row["page"] for row in result] == list(range(1, 9))
     assert result[0] == rows[0] and result[2] == rows[2]
     assert all(f"page {row['page']}." in row["text"] for row in result if row["method"] == "ocr")
@@ -269,7 +271,8 @@ def test_parallel_recovery_is_bounded_skips_native_and_retains_physical_order(tm
 
 
 @pytest.mark.parametrize("cancel", [False, True])
-def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_workers(tmp_path, monkeypatch, cancel):
+@pytest.mark.parametrize("max_workers", [2, 3, 4])
+def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_workers(tmp_path, monkeypatch, cancel, max_workers):
     from concurrent.futures import ThreadPoolExecutor
 
     class Cancelled(Exception):
@@ -277,7 +280,7 @@ def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_wor
 
     rows = [page(number, "", candidate=True) for number in range(1, 11)]
     before = deepcopy(rows)
-    both_started = threading.Barrier(2)
+    all_started = threading.Barrier(max_workers)
     started = threading.Event()
     release = threading.Event()
     lock = threading.Lock()
@@ -299,12 +302,12 @@ def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_wor
     def extract(_source, _cache, number, _method):
         with lock:
             calls.append(number)
-        both_started.wait(timeout=5)
+        all_started.wait(timeout=5)
         started.set()
         try:
-            if cancel or number == 1:
+            if cancel or number != max_workers:
                 assert release.wait(timeout=5)
-            if number == 2 and not cancel:
+            if number == max_workers and not cancel:
                 raise RuntimeError("Recognizer failed")
             return ocr(number, "Useful recovered story text on this page.")
         finally:
@@ -318,14 +321,15 @@ def test_parallel_failure_or_cancellation_never_submits_whole_book_or_leaves_wor
 
     with pytest.raises(Cancelled if cancel else RuntimeError):
         auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", rows,
-                               extract, report, max_workers=2)
-    assert sorted(calls) == [1, 2]
-    assert submitted == [1, 2]
-    assert sorted(finished) == [1, 2] and rows == before
+                               extract, report, max_workers=max_workers)
+    expected = list(range(1, max_workers + 1))
+    assert sorted(calls) == expected
+    assert submitted == expected
+    assert sorted(finished) == expected and rows == before
     assert not any(thread.name.startswith("meowdiobooks-ocr") for thread in threading.enumerate())
 
 
-@pytest.mark.parametrize("preview, max_workers", [(False, 1), (True, 2)])
+@pytest.mark.parametrize("preview, max_workers", [(False, 1), (True, 2), (True, 4)])
 def test_default_and_preview_recovery_do_not_create_parallel_workers(tmp_path, monkeypatch, preview, max_workers):
     def unexpected_executor(**_kwargs):
         pytest.fail("Default extraction and previews must remain serial")
@@ -343,7 +347,7 @@ def test_default_and_preview_recovery_do_not_create_parallel_workers(tmp_path, m
     assert calls == [7, 9] and [row["page"] for row in result] == [7, 9]
 
 
-@pytest.mark.parametrize("max_workers", [0, 3, -1, True, 2.0, "2", None])
+@pytest.mark.parametrize("max_workers", [0, 5, -1, True, 4.0, "4", None])
 def test_recovery_rejects_invalid_or_excessive_parallelism(tmp_path, max_workers):
     with pytest.raises(ValueError, match="parallelism"):
         auto_recover_pdf_pages(tmp_path / "source.pdf", tmp_path / "cache", [], None,
@@ -463,11 +467,12 @@ def test_standard_preview_uses_the_same_automatic_provider_and_preserves_physica
     assert processor.calls == [(2, "liteparse"), (2, "ocr"), (2, "render")]
 
 
-def test_complete_standard_extraction_honors_adapter_parallelism(automatic_workflow):
+@pytest.mark.parametrize("max_workers", [2, 4])
+def test_complete_standard_extraction_honors_adapter_parallelism(automatic_workflow, max_workers):
     from tests.backend.test_app_v2 import _process
 
     client, book_id, _package, processor = automatic_workflow
-    processor.ocr_parallelism = 2
+    processor.ocr_parallelism = max_workers
     processor.raw[2] = page(3, "", candidate=True)
     extract = processor.extract_pdf_page
     barrier = threading.Barrier(2)

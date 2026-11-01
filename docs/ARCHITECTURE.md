@@ -194,9 +194,9 @@ text. Errors and cancellation propagate before the Extraction candidate is writt
 Recovered text then follows the ordinary Dialogue and Review pipeline; no special
 narrator policy or Review recovery decisions are needed. Explicit OCR uses a distinct
 cache identity. Hosted processing uses the injected adapter throughout.
-An adapter may expose `ocr_parallelism = 2` to recover up to two candidate pages
+An adapter may expose integer `ocr_parallelism` from one to four to recover candidate pages
 concurrently during complete Standard extraction. The default is one; previews
-stay serial. Only two calls are submitted at a time, results retain physical page
+stay serial. At most that many calls are submitted at a time, results retain physical page
 order, and progress/cancellation runs on the calling job thread. On failure or
 cancellation, pending calls are cancelled and running calls are joined before
 returning; adapters must enforce their own inference deadlines and shared admission.

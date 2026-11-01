@@ -213,10 +213,10 @@ def auto_recover_pdf_pages(
 
     Operates on adapter data only: hosted PDF parsing stays inside its sandbox.
     Failure/cancellation propagates so no partial extraction is published. Adapters
-    may opt into two concurrent pages; previews and the local default stay serial.
+    may opt into up to four concurrent pages; previews and the local default stay serial.
     """
-    if type(max_workers) is not int or not 1 <= max_workers <= 2:
-        raise ValueError("OCR parallelism must be one or two workers")
+    if type(max_workers) is not int or not 1 <= max_workers <= 4:
+        raise ValueError("OCR parallelism must be between one and four workers")
     if preview:
         max_workers = 1
     notify = report or (lambda _progress, _message=None: None)
