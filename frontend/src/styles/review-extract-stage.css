@@ -160,3 +160,7 @@
   .review-next-action.review-pending { display: none; }
   .review-next-action .primary { width: 100%; min-height: 48px; white-space: normal; }
 }
+
+.review-decision-reason, .review-bulk-help { color: var(--color-muted, var(--muted)); font-size: 13px; line-height: 1.6; }
+.review-bulk-summary { margin: 0 0 10px; font-size: 13px; line-height: 1.6; font-weight: 600; }
+.review-bulk-help { margin: 10px 0 0; }

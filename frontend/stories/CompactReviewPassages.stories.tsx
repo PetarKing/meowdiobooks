@@ -75,7 +75,7 @@ export const AiCorrection: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("broken")).toBeVisible();
     await expect(canvas.queryByText("A different scene.")).not.toBeInTheDocument();
-    await expect(canvas.queryByRole("button", { name: /^Apply all suggested choices/ })).not.toBeInTheDocument();
+    await expect(canvas.queryByRole("button", { name: /^(Apply remaining AI suggestions|Apply all suggested choices)/ })).not.toBeInTheDocument();
   },
 };
 export const ChapterHeading: Story = {
