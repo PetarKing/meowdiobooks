@@ -1,3 +1,5 @@
+import { usePresentationPortalAttributes } from "./presentationContext";
+import { createPortal } from "react-dom";
 import { userFacingDetail } from "../workflow/presentation";
 import { CollectionToolbar } from "./CollectionToolbar";
 import { CastRosterCard } from "./CastRosterCard";
@@ -17,7 +19,7 @@ import {
 } from "react";
 import { useTranslation } from "react-i18next";
 import type { CastArtifact, CastDossier, CastProposal } from "../api/contracts";
-import { strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
+import { narrateEditorialByDefault, strongConfirmationLabelsForCast, type IdentityDecision } from "../castIdentity";
 import "./CastIdentityReview.css";
 import { languageFlags as flags, LanguageFlags } from "./LanguagePicker";
 
@@ -67,11 +69,11 @@ function searchTokens(value: string) {
   return value.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
 }
 
-function fallbackDecision(proposal: CastProposal): IdentityDecision {
+function fallbackDecision(proposal: CastProposal, proposals: CastProposal[]): IdentityDecision {
   return {
     label: proposal.label,
-    category: proposal.category,
-    canonicalName: proposal.canonicalName ?? "",
+    category: narrateEditorialByDefault(proposal, proposals) ? "narrator" : proposal.category,
+    canonicalName: narrateEditorialByDefault(proposal, proposals) ? "" : proposal.canonicalName ?? "",
     aliases: [],
     primaryLabel: proposal.label,
   };
@@ -87,7 +89,7 @@ function makeGroups(
   const availableLabels = new Set(cast.proposals.map((proposal) => proposal.label));
   const groups = new Map<string, Omit<CastGroup, "primaryLabel" | "autoGrouped" | "qwenReview" | "hasSuggestions" | "advisoryReview">>();
   for (const proposal of cast.proposals) {
-    const decision = decisions[proposal.label] ?? fallbackDecision(proposal);
+    const decision = decisions[proposal.label] ?? fallbackDecision(proposal, cast.proposals);
     const narrator = decision.category === NARRATOR_KEY;
     const name = narrator ? "Narrator" : decision.canonicalName || proposal.label;
     const anchor = decision.primaryLabel || proposal.label;
@@ -245,6 +247,7 @@ export function CastIdentityReview({
   language, onVoiceModelChange, onLanguageChange, onReclassify, hideVoiceModel, hideVoiceSettings,
 }: Props) {
   const { t } = useTranslation();
+  const presentation = usePresentationPortalAttributes();
   const allGroups = useMemo(
     () => makeGroups(cast, decisions, resolvedLabels),
     [cast, decisions, resolvedLabels],
@@ -325,7 +328,7 @@ export function CastIdentityReview({
       const next = { ...current };
       for (const label of labels) {
         const proposal = cast.proposals.find((row) => row.label === label);
-        if (proposal) next[label] = update(current[label] ?? fallbackDecision(proposal));
+        if (proposal) next[label] = update(current[label] ?? fallbackDecision(proposal, cast.proposals));
       }
       return next;
     });
@@ -548,8 +551,9 @@ export function CastIdentityReview({
       <CastRosterCard
         name={t("Narrator")} symbol="♬"
         portraitContent={<svg className="cast-narrator-symbol" aria-hidden="true" viewBox="0 0 32 32"><path fill="currentColor" d="M12 7v17.3a5.5 4 0 1 1-3-3.6V6l18-4v19.3a5.5 4 0 1 1-3-3.6V8.8L12 11.5V7Z" /></svg>}
+        badge={narratorAssignments?.needsReview ? <span className="cast-review-badge required">{t("Must review")}</span> : undefined}
         portraitClassName="cast-narrator-tile"
-        cardClassName={`cast-narrator-tile ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
+        cardClassName={`cast-narrator-tile ${narratorAssignments?.needsReview ? "needs-review" : ""} ${dropTargetKey === NARRATOR_KEY ? "drop-target" : ""} ${mergeSuccessKey === NARRATOR_KEY ? "merge-success" : ""}`}
         inspectRef={(element) => { tileRefs.current[NARRATOR_KEY] = element; }}
         inspectProps={{ "aria-label": t("Inspect Narrator"), onClick: () => openInspector(NARRATOR_KEY), onDragOver: (event) => dragOver(event, NARRATOR_KEY), onDragLeave: dragLeave, onDrop: (event) => dropOn(event) }}
       />
@@ -566,13 +570,14 @@ export function CastIdentityReview({
     </section>
 
     {dragAutoScroll.direction && <div className={`cast-drag-scroll-cue ${dragAutoScroll.direction}`} aria-hidden="true"><span>{dragAutoScroll.direction === "up" ? `↑ ${t("Scroll up")}` : `↓ ${t("Scroll down")}`}</span></div>}
-    {mergeUndo && <div className="cast-merge-undo" role="status"><span>{mergeUndo.message}</span><button type="button" onClick={undoLastMerge}>{t("Undo")}</button></div>}
+    {mergeUndo && createPortal(<div {...presentation} className="cast-merge-undo" role="status"><span>{mergeUndo.message}</span><button type="button" onClick={undoLastMerge}>{t("Undo")}</button></div>, document.body)}
 
     {inspectingNarrator && <InspectorShell label={t("Inspect Narrator")} className="identity-inspector" closing={inspectorClosing} onClose={() => setInspectorOpen(false)} onClosed={finishInspectorClose}>
       <header className="cast-inspector-head">
-        <div><span className="cast-status-dot ready" /> <small>{t("Always available")}</small><h2>{t("Narrator")}</h2>{(narratorAssignments?.occurrenceCount ?? 0) > 0 && <p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p>}</div>
-        <button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button>
+        <div><span className={`cast-status-dot ${narratorAssignments?.needsReview ? "needs-review" : "ready"}`} /> <small>{t(narratorAssignments?.needsReview ? "Confirmation required" : "Always available")}</small><h2>{t("Narrator")}</h2>{(narratorAssignments?.occurrenceCount ?? 0) > 0 && <p>{t("Reads all prose plus {{count}} dialogue lines reassigned here.", { count: narratorAssignments?.occurrenceCount ?? 0 })}</p>}</div>
+        <div className="cast-inspector-actions">{narratorAssignments?.needsReview && <button type="button" className="primary" onClick={() => resolve(narratorAssignments.labels)}>{t("Confirm Narrator assignments")}</button>}<button type="button" className="cast-inspector-close" aria-label={t("Close cast member")} onClick={() => setInspectorOpen(false)}>×</button></div>
       </header>
+      {narratorAssignments?.needsReview && <p className="cast-review-explanation required"><strong>{t("Required before continuing")}</strong><span>{t("Review the labels assigned to Narrator. Pop any speaker back out to the cast, then confirm these assignments.")}</span></p>}
       <div className="cast-inspector-grid narrator-inspector-grid">
         <aside className="cast-member-controls">
           <section className="narrator-rule"><b>{t("Narrator routing")}</b><small>{t("Drag a cast member onto Narrator to use the narrator voice. Narrator cannot be merged into another character. Choose the narrator voice in the next step.")}</small></section>

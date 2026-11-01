@@ -1,4 +1,4 @@
-import type { CastArtifact } from "./api/contracts";
+import type { CastArtifact, CastProposal } from "./api/contracts";
 
 export interface IdentityDecision {
   label: string;
@@ -6,6 +6,14 @@ export interface IdentityDecision {
   canonicalName: string;
   aliases: string[];
   primaryLabel?: string;
+}
+
+/** Non-speaker text stays spoken by Narrator; identity conflicts still require review. */
+export function narrateEditorialByDefault(proposal: CastProposal, proposals: CastProposal[]) {
+  return proposal.category === "editorial"
+    && !proposal.aliases?.length && !proposal.competingLabels?.length
+    && !proposals.some((other) => [...(other.aliases ?? []), ...(other.competingLabels ?? [])]
+      .some((label) => comparisonKey(label) === comparisonKey(proposal.label)));
 }
 
 function comparisonKey(value: string) {
