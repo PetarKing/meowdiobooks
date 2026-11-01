@@ -193,6 +193,7 @@ def render_plan_audio(
                         _synthesize(model, text, member, package, language, recoveries=recoveries,
                                     target_characters=target_characters,
                                     terminal_pause=plan.get("timing") is None,
+                                    timing=plan.get("timing"),
                                     checkpoint=checkpoint,
                                     section_prefix=f"{index:05d}-{member_index:05d}",
                                     section_completed=section_completed)
@@ -460,6 +461,7 @@ def _synthesize(
     recoveries: list[dict[str, Any]] | None = None,
     target_characters: int = _SYNTHESIS_TARGET_CHARACTERS,
     terminal_pause: bool = True,
+    timing: Mapping[str, Any] | None = None,
     checkpoint: GenerationCheckpoint | None = None,
     section_prefix: str = "",
     section_completed: Callable[[], None] | None = None,
@@ -496,7 +498,7 @@ def _synthesize(
                     speech_samples = len(audio) - int(getattr(model, "sample_rate", 24_000) * pause)
                     receipt = _validate_unit_audio(
                         audio[:speech_samples], int(getattr(model, "sample_rate", 24_000)),
-                        unit, cached_quality.get("calls"),
+                        unit, cached_quality.get("calls"), timing=timing,
                     )
                     checkpoint.record_quality(section, receipt)
             except AudioQualityError:
@@ -526,6 +528,7 @@ def _synthesize(
         call_evidence: list[dict[str, Any]] = []
         quality_failures = 0
         no_result_attempts = 0
+        silent_attempts = 0
         for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
             try:
                 reference_args = {"ref_audio": str(reference)}
@@ -546,7 +549,7 @@ def _synthesize(
                                 part, lang_code=language, split_pattern="",
                                 **reference_args, **settings,
                             ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
-                                text=part, settings=settings, attempts=quality_attempts)
+                                text=part, settings=settings, attempts=quality_attempts, timing=timing)
                         finally:
                             for row in quality_attempts[before:]:
                                 row.update({"round": attempt, "partIndex": part_index,
@@ -570,7 +573,7 @@ def _synthesize(
                         **reference_args,
                         **settings,
                     ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
-                    text=unit, settings=settings, attempts=quality_attempts,
+                    text=unit, settings=settings, attempts=quality_attempts, timing=timing,
                 )
                 if chunks:
                     rendered.append(np.concatenate(chunks))
@@ -580,26 +583,31 @@ def _synthesize(
                 errors.append(f"attempt {attempt}: no usable samples ({summary})")
             except AudioQualityError as error:
                 quality_failures += 1
+                silent_attempts += bool(error.receipt["reasons"]) and set(
+                    error.receipt["reasons"]
+                ) <= {"silent", "silent-for-timing"}
                 errors.append(f"attempt {attempt}: {error}")
             except Exception as error:  # local model backends expose heterogeneous failures
                 quality_attempts.append({"settings": dict(settings), "error": type(error).__name__})
                 errors.append(f"attempt {attempt}: {type(error).__name__}: {error}")
         else:
-            # Some transcript-conditioned references immediately end a one-word
-            # request. The already-supported speaker-embedding route retains the
-            # exact accepted WAV and source word, without transcript prefill. This
+            # Some transcript-conditioned references immediately end a short
+            # request, sometimes returning a tiny silent waveform. The existing
+            # speaker-embedding route retains the
+            # exact accepted WAV and source text, without transcript prefill. This
             # is explicit per-unit recovery, never a change to accepted Cast state.
             recovered = False
             if (reference_mode == "transcript-conditioned"
-                    and len(unit) <= 32 and len(unit.split()) == 1
-                    and no_result_attempts == len(QWEN_GENERATION_ATTEMPTS)):
+                    and len(unit) <= 32
+                    and (len(unit.split()) == 1 or timing is not None)
+                    and no_result_attempts + silent_attempts == len(QWEN_GENERATION_ATTEMPTS)):
                 for attempt, settings in enumerate(QWEN_GENERATION_ATTEMPTS, 1):
                     try:
                         chunks, summary = _valid_chunks(model.generate(
                             unit, lang_code=language, split_pattern="",
                             ref_audio=str(reference), **settings,
                         ), sample_rate=int(getattr(model, "sample_rate", 24_000)),
-                            text=unit, settings=settings, attempts=quality_attempts)
+                            text=unit, settings=settings, attempts=quality_attempts, timing=timing)
                         if chunks:
                             rendered.append(np.concatenate(chunks))
                             call_evidence.append(_call_evidence(
@@ -612,7 +620,8 @@ def _synthesize(
                                     "unitIndex": unit_index,
                                     "originalReferenceMode": reference_mode,
                                     "effectiveReferenceMode": "speaker-embedding",
-                                    "reason": "no-results-after-transcript-conditioning",
+                                    "reason": ("silent-after-transcript-conditioning" if silent_attempts
+                                               else "no-results-after-transcript-conditioning"),
                                     "initialAttempts": len(QWEN_GENERATION_ATTEMPTS),
                                     "recoveryAttempts": attempt,
                                 })
@@ -630,7 +639,7 @@ def _synthesize(
                 )
         quality = _validate_unit_audio(np.concatenate(rendered[rendered_start:]),
                                        int(getattr(model, "sample_rate", 24_000)), unit,
-                                       call_evidence)
+                                       call_evidence, timing=timing)
         quality["attempts"] = quality_attempts
         pause = _pause_after(unit) if terminal_pause or unit_index < len(units) else 0.0
         if pause:
@@ -756,6 +765,7 @@ def _valid_chunks(
     results: Any, *, sample_rate: int = 24_000, text: str = "",
     settings: Mapping[str, Any] | None = None,
     attempts: list[dict[str, Any]] | None = None,
+    timing: Mapping[str, Any] | None = None,
 ) -> tuple[list[np.ndarray], _SampleSummary]:
     chunks = []
     result_count = empty_count = nonfinite_count = 0
@@ -780,7 +790,8 @@ def _valid_chunks(
         try:
             quality = validate_audio(np.concatenate(chunks), sample_rate, text,
                                      token_count=max(token_counts) if token_counts else None,
-                                     max_tokens=int((settings or {}).get("max_tokens", 4096)))
+                                     max_tokens=int((settings or {}).get("max_tokens", 4096)),
+                                     timing=timing)
         except AudioQualityError as error:
             if attempts is not None:
                 attempts.append({"settings": dict(settings or {}), **error.receipt})
@@ -800,7 +811,8 @@ def _call_evidence(text: str, audio: np.ndarray, receipt: Mapping[str, Any]) -> 
 
 
 def _validate_unit_audio(
-    audio: np.ndarray, sample_rate: int, text: str, calls: Any = None,
+    audio: np.ndarray, sample_rate: int, text: str, calls: Any = None, *,
+    timing: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Recheck real inference boundaries before exempting an assembled unit's cap.
 
@@ -809,7 +821,7 @@ def _validate_unit_audio(
     Legacy checkpoints with no boundary evidence retain the single-call backstop.
     """
     if calls is None:
-        return validate_audio(audio, sample_rate, text)
+        return validate_audio(audio, sample_rate, text, timing=timing)
     parts = [text] if isinstance(calls, list) and len(calls) == 1 else _recovery_parts(text)
     valid = isinstance(calls, list) and bool(calls) and len(calls) == len(parts)
     total = 0
@@ -829,9 +841,10 @@ def _validate_unit_audio(
     offset = 0
     for part, call in zip(parts, calls, strict=True):
         end = offset + call["samples"]
-        validate_audio(audio[offset:end], sample_rate, part, token_count=call.get("tokenCount"))
+        validate_audio(audio[offset:end], sample_rate, part, token_count=call.get("tokenCount"),
+                       timing=timing)
         offset = end
-    quality = validate_audio(audio, sample_rate, text, check_generation_limit=False)
+    quality = validate_audio(audio, sample_rate, text, check_generation_limit=False, timing=timing)
     quality["calls"] = calls
     return quality
 

@@ -237,3 +237,114 @@ def test_known_eos_token_count_survives_unit_validation_and_cache(tmp_path):
                              checkpoint=checkpoint, section_prefix="eos")
         np.testing.assert_array_equal(actual, wave)
     assert len(model.calls) == 1
+
+
+def short_silence():
+    # A one-token model result can be finite and nonzero but contain no speech.
+    return np.full(int(RATE * 0.08), 1.2e-5, dtype=np.float32)
+
+
+def test_timed_quality_rejects_short_silence_without_changing_legacy_policy():
+    from meowdiobooks.backend.pacing import timing_policy
+    wave = short_silence()
+    assert assess_audio(wave, RATE, "Then ring.")["accepted"]
+    receipt = assess_audio(wave, RATE, "Then ring.", timing=timing_policy())
+    assert receipt["reasons"] == ["silent-for-timing"]
+
+
+def test_timed_quality_checks_after_fades_and_does_not_hide_invalid_policy():
+    from meowdiobooks.backend.pacing import timing_policy
+    # Both samples are initially audible, but both become fade endpoints.
+    receipt = assess_audio(np.full(2, 0.1), RATE, "Yes", timing=timing_policy())
+    assert "silent-for-timing" in receipt["reasons"]
+    with pytest.raises(ValueError, match="finite nonnegative"):
+        assess_audio(speech(), RATE, TEXT, timing={**timing_policy(), "fadeInSeconds": -1})
+
+
+def test_timed_quality_preserves_audible_quiet_samples(tmp_path):
+    from meowdiobooks.backend.pacing import timing_policy
+    good = speech() * 0.001
+    model = model_for(iter([SimpleNamespace(audio=good)]))
+    actual = _synthesize(model, TEXT, setup_reference(tmp_path), tmp_path, "english",
+                         timing=timing_policy())
+    np.testing.assert_array_equal(actual, good)
+    assert len(model.calls) == 1
+
+
+def test_short_silence_retries_before_writing_checkpoint(tmp_path):
+    import json
+    from meowdiobooks.backend.pacing import timing_policy
+    good = speech(0.5)
+    model = model_for(iter([SimpleNamespace(audio=short_silence(), token_count=1),
+                           SimpleNamespace(audio=good, token_count=7)]))
+    checkpoint = GenerationCheckpoint(tmp_path / "checkpoints", "a" * 64, 1, RATE)
+    actual = _synthesize(model, "Then ring.", setup_reference(tmp_path), tmp_path, "english",
+                         checkpoint=checkpoint, section_prefix="short", timing=timing_policy())
+    np.testing.assert_array_equal(actual, good)
+    assert len(model.calls) == 2
+    receipt = json.loads((checkpoint.path / "short-00001.json").read_text())["quality"]
+    assert [row["accepted"] for row in receipt["attempts"]] == [False, True]
+    assert receipt["attempts"][0]["reasons"] == ["silent-for-timing"]
+
+
+def test_silent_checkpoint_regenerates_only_rejected_section(tmp_path):
+    from meowdiobooks.backend.pacing import timing_policy
+    good = speech(0.5)
+    model = model_for(iter([SimpleNamespace(audio=good)]))
+    checkpoint = GenerationCheckpoint(tmp_path / "checkpoints", "a" * 64, 2, RATE)
+    checkpoint.write("bad-00001", short_silence(), [], quality={"accepted": True})
+    checkpoint.write("good-00001", good, [])
+    healthy_bytes = (checkpoint.path / "good-00001.wav").read_bytes()
+    segment = setup_reference(tmp_path)
+    for prefix in ("good", "bad"):
+        actual = _synthesize(model, "Then ring.", segment, tmp_path, "english",
+                             checkpoint=checkpoint, section_prefix=prefix, timing=timing_policy())
+        np.testing.assert_array_equal(actual, good)
+    assert len(model.calls) == 1
+    assert checkpoint.restored == 1
+    assert (checkpoint.path / "good-00001.wav").read_bytes() == healthy_bytes
+
+
+def test_short_silent_fragment_recovers_with_same_voice_and_source(tmp_path):
+    from meowdiobooks.backend.pacing import timing_policy
+    good = speech(0.5)
+    model = model_for(iter([SimpleNamespace(audio=short_silence())] * 3
+                          + [SimpleNamespace(audio=good)]))
+    segment = setup_reference(tmp_path)
+    recoveries = []
+    actual = _synthesize(model, "Then ring", segment, tmp_path, "english",
+                         timing=timing_policy(), recoveries=recoveries)
+    np.testing.assert_array_equal(actual, good)
+    assert len(model.calls) == 4
+    assert all(text == "Then ring" for text, _ in model.calls)
+    assert all(kwargs["lang_code"] == "english" for _, kwargs in model.calls)
+    assert len({kwargs["ref_audio"] for _, kwargs in model.calls}) == 1
+    assert all("ref_text" in kwargs for _, kwargs in model.calls[:3])
+    assert "ref_text" not in model.calls[3][1]
+    assert recoveries[0]["reason"] == "silent-after-transcript-conditioning"
+    assert recoveries[0]["initialAttempts"] == 3
+    assert recoveries[0]["recoveryAttempts"] == 1
+
+
+@pytest.mark.parametrize("text,count", [("Then ring", 6), (TEXT, 3)])
+def test_silent_retry_exhaustion_is_bounded_and_never_checkpointed(tmp_path, text, count):
+    from meowdiobooks.backend.pacing import timing_policy
+    model = model_for(iter([SimpleNamespace(audio=short_silence())] * count))
+    checkpoint = GenerationCheckpoint(tmp_path / "checkpoints", "a" * 64, 1, RATE)
+    with pytest.raises(RuntimeError, match="silent-for-timing"):
+        _synthesize(model, text, setup_reference(tmp_path), tmp_path, "english",
+                    checkpoint=checkpoint, timing=timing_policy())
+    assert len(model.calls) == count
+    assert not list(checkpoint.path.glob("*.wav"))
+
+
+def test_short_quality_failures_do_not_expand_reference_fallback(tmp_path):
+    from meowdiobooks.backend.pacing import timing_policy
+    # Even when silent, a token-cap failure cannot qualify for short-speech recovery.
+    bad = SimpleNamespace(audio=short_silence(), token_count=4096)
+    model = model_for(iter([bad] * 3))
+    with pytest.raises(RuntimeError, match="generation-limit"):
+        _synthesize(model, "Then ring", setup_reference(tmp_path), tmp_path, "english",
+                    timing=timing_policy())
+    assert len(model.calls) == 3
+    assert all("ref_text" in kwargs for _, kwargs in model.calls)

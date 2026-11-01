@@ -27,6 +27,10 @@ _BOUNDARY_FIELDS = {
 }
 
 
+class SpeechSilenceError(ValueError):
+    """Speech cannot survive the requested boundary timing policy."""
+
+
 def timing_policy() -> dict[str, Any]:
     """Return the versioned recipe that consumers include in generation fingerprints."""
     return dict(_TIMING)
@@ -91,11 +95,11 @@ def prepare_speech_audio(
     margin = round(sample_rate * _duration(timing.get("edgeMarginSeconds")))
     active = np.flatnonzero(np.abs(audio) > threshold)
     if not len(active):
-        raise ValueError("Speech segment has no samples above the silence threshold")
+        raise SpeechSilenceError("Speech segment has no samples above the silence threshold")
     start = max(0, int(active[0]) - margin)
     end = min(len(audio), int(active[-1]) + 1 + margin)
     result = apply_edge_fades(audio[start:end], sample_rate, timing)
     active = np.flatnonzero(np.abs(result) > threshold)
     if not len(active):
-        raise ValueError("Speech segment is too quiet after edge fades")
+        raise SpeechSilenceError("Speech segment is too quiet after edge fades")
     return result, int(active[0]) / sample_rate, (len(result) - 1 - int(active[-1])) / sample_rate

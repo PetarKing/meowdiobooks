@@ -362,7 +362,12 @@ Timed native rendering retains every sample above the recipe's 16/32768 edge thr
 10 ms margins, then applies 15 ms sine-squared fade-in and 40 ms fade-out, each capped at half a
 short clip. Inserted zero samples complete the requested gap after accounting for retained quiet;
 interior quiet and above-threshold tail bursts are preserved. An all-silent clip fails before audio
-publication. Internal ellipsis pauses retain 0.25 seconds; a terminal ellipsis and following semantic
+publication. The same timing viability check runs inside bounded synthesis retries and when
+restoring cached speech, so a silent section cannot trap an identical retry. Timed fragments up to
+32 characters that exhaust every attempt with silence or no result may retry with the existing
+speaker-embedding route, retaining the exact accepted voice WAV and source text. The receipt records
+that recovery; accepted Cast state and default generation settings are unchanged.
+Internal ellipsis pauses retain 0.25 seconds; a terminal ellipsis and following semantic
 boundary use their maximum rather than adding two pauses. Existing receipts stay immutable and
 playable; legacy plans without timing retain their previous assembly. No background noise is added.
 

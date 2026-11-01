@@ -399,3 +399,36 @@ def test_quality_retry_exhaustion_preserves_last_playable_chapter(render_case):
     assert Path(result[0]["artifactPath"]).read_bytes() == prior_audio
     assert not list((case.package / "audio/chapter-1").glob(".*.staging"))
     assert not list((case.package / CHECKPOINT_DIRECTORY).glob("*/*.wav"))
+
+
+def test_timed_render_recovers_short_silence_before_checkpoint_and_publication(render_case):
+    case = render_case
+    case.plan["timing"] = timing_policy()
+    case.plan["chapters"][0]["segments"][0]["text"] = "Then ring"
+    original_generate = case.model.generate
+    attempts = []
+
+    def generate(text, **kwargs):
+        attempts.append((text, kwargs))
+        if "ref_text" in kwargs:
+            return iter([SimpleNamespace(audio=np.full(1920, 1.2e-5, dtype=np.float32))])
+        return original_generate(text, **kwargs)
+
+    case.model.generate = generate
+    rows = case.render()
+    rate, audio = wavfile.read(rows[0]["artifactPath"])
+    assert rate == 24_000
+    assert np.max(np.abs(audio)) > 0.01
+    assert len(attempts) == 4
+    metadata = json.loads(Path(rows[0]["metadataPath"]).read_text())
+    assert metadata["segments"][0]["synthesisRecoveries"][0]["reason"] == (
+        "silent-after-transcript-conditioning"
+    )
+    checkpoint = next((case.package / CHECKPOINT_DIRECTORY).glob("*/*-00001.json"))
+    receipt = json.loads(checkpoint.read_text())["quality"]
+    assert [row["accepted"] for row in receipt["attempts"]] == [False, False, False, True]
+    # Identical retry uses the recovered waveform; it must not synthesize again.
+    first_audio = Path(rows[0]["artifactPath"]).read_bytes()
+    rows = case.render()
+    assert len(attempts) == 4
+    assert Path(rows[0]["artifactPath"]).read_bytes() == first_audio
