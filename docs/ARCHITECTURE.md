@@ -34,8 +34,9 @@ Book decoration starts only after an 800 ms sustained wait, without
 delaying workflow readiness or imposing a minimum animation duration. Reloads hydrate authoritative snapshots and pending candidates before reattaching a job, and
 again when it settles; they never rerun a provider command. Review candidates reopen for inspection,
 and completed extraction candidates continue automatically when returning to Extract after any attached job settles.
-Acceptance failures retain the saved result for retry without rerunning extraction. Later-stage returns
-do not publish pending extraction replacements.
+Saved-result continuation checks the latest extraction job before acceptance, so a failed replacement
+cannot publish an older candidate after Retry or reload. Acceptance failures retain the saved result
+for retry without rerunning extraction. Later-stage returns do not publish pending extraction replacements.
 Explicit Home/Library navigation, including an initial Library URL, wins over
 a delayed restore. Missing or invalid books discard their hints; transient failures retain them with
 a Retry action. Extraction previews load only when the Extract view needs them. Browser storage is

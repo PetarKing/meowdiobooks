@@ -959,11 +959,36 @@ export function useWorkflowModel({
       && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway;
     setBusy(true);
     setError(undefined);
+    setReturnLocation(undefined);
     setExtractionTransition(true);
     setProcessMessage(extractionCandidate ? "Saving extracted text" : "Preparing complete extraction");
     setProgress(extractionCandidate ? 100 : 0);
     try {
-      const candidate = extractionCandidate ?? await processCandidate("extract", { method });
+      let candidate = extractionCandidate;
+      if (candidate) {
+        // A failed replacement may leave an older candidate on disk. Job history
+        // is authoritative even after Retry, reload, or another book replaces the
+        // browser's active-job marker. The gateway returns newest-created first.
+        const latest = (await gateway.listBookJobs(book.id)).find((job) => job.kind === "v2:extract");
+        if (!current()) return;
+        if (latest && ["queued", "running"].includes(latest.status)) {
+          const settled = await runJob(latest, async (job) => {
+            if (current() && job.status !== "succeeded") {
+              setExtractionCandidate(undefined);
+              setRevisingStages((previous) => [...new Set([...previous, "extract"])]);
+            }
+          }, current);
+          if (!current()) return;
+          candidate = await gateway.getStageCandidate(book.id, "extract", String(settled.result?.revision ?? ""));
+          if (!current()) return;
+        } else if (latest && (latest.status !== "succeeded" || latest.result?.revision !== candidate.revision)) {
+          setExtractionCandidate(undefined);
+          setRevisingStages((previous) => [...new Set([...previous, "extract"])]);
+          throw new Error(latest.error ?? "The previous extraction could not be continued. Process the book again.");
+        }
+      } else {
+        candidate = await processCandidate("extract", { method });
+      }
       if (!current()) return;
       if (!candidate.revision) throw new Error("extract did not return a candidate revision");
       // Keep a completed result available if acceptance fails; retry never reruns OCR.
