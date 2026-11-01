@@ -1,5 +1,6 @@
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import i18n from "../src/i18n";
+import { sourcePageNarration, sourcePageThought } from "../design-kit/syntheticContent";
 import {
   fixtureVoiceSample,
   metadataFor,
@@ -109,6 +110,8 @@ export async function enterScenario(
   if (scenario === "review-ocr-bulk") {
     await expect(canvas.queryByRole("button", { name: prefix("Use recovered text") })).not.toBeInTheDocument();
     await expect(canvas.getByText(t("OCR recovered text on {{count}} pages.", { count: 2 }), { exact: false })).toBeVisible();
+    await expect(await canvas.findByText(sourcePageNarration)).toBeVisible();
+    await expect(await canvas.findByText(sourcePageThought)).toBeVisible();
   } else if (metadata.snapshotVariant === "review-missing-pages") {
     await expect(await canvas.findByRole("img", { name: t("Original page {{page}}", { page: 7 }) })).toBeVisible();
     await expect(canvas.getByRole("button", { name: prefix("Recover this page with OCR") })).toBeEnabled();
@@ -131,7 +134,7 @@ export async function enterScenario(
       case "open-final-review":
         await click(prefix("Review complete transcript"));
         await waitFor(() => expect(page.queryByText(t("Opening the transcript…"))).toBeNull());
-        await expect(await page.findByText("Alice was beginning to get very tired of sitting by her sister on the bank.")).toBeVisible();
+        await expect(await page.findByText(sourcePageNarration)).toBeVisible();
         return;
       case "design-voices":
         await click(prefix("Next"));

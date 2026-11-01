@@ -4,8 +4,17 @@ import { castFor } from './castFixtures';
 import { strongConfirmationLabelsForCast } from '../src/castIdentity';
 import { buildReviewWarningDecisions } from '../src/reviewDecisions';
 import { decisionsForCast } from '../src/workflow/cast';
+import { sourcePageHeading, sourcePageLines } from './syntheticContent';
 
 describe('synthetic review gateway', () => {
+  it('shows every word from the displayed source page in the final transcript fixture', async () => {
+    const gateway = createFixtureGateway('review-ocr-bulk');
+    const preview = await gateway.previewReviewTranscript('kit-book', 'review-fixture', 7, []);
+    const transcript = preview.spans.map(span => span.text).join(' ');
+    expect(transcript).toBe([sourcePageHeading, ...sourcePageLines].join(' '));
+    expect(decodeURIComponent(preview.imageUrl!)).toContain('SYNTHETIC SOURCE PREVIEW · 7');
+    expect(preview.spans.every(span => span.sourceEnd - span.sourceStart === span.text.length)).toBe(true);
+  });
   it('accepts grouped review decisions through the production decision builder', async () => {
     const gateway = createFixtureGateway('review');
     const before = await gateway.getBookSnapshot('kit-book');

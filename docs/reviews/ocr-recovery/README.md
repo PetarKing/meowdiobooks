@@ -22,18 +22,25 @@ an additional source approval. Unit interaction tests exercise both scopes,
 per-page confirmation, preserved manual choices, skipped OCR results, correct
 physical targets and navigation to another book during an in-flight operation.
 
+The source image and final transcript fixture now share the complete heading,
+paragraph and quoted passage. A regression check compares every displayed source
+word with the fixture transcript; earlier abbreviated placeholder spans were
+removed before regenerating the inline PR screenshots.
+
 ![Phone decision](phone-light.png)
 
 ![Desktop decision](desktop-light.png)
 
 ![Phone after bulk OCR](bulk-transcript-phone-light.png)
 
+![Desktop source and complete transcript after bulk OCR](bulk-transcript-desktop-light.png)
+
 Validation on macOS arm64, Python 3.12 / Node 22:
 
 - `PYTHONPATH=src python -m pytest -q -m 'not uses_audio_decoder and not runs_models'`: 1,676 passed, 3 deselected.
 - `python -m ruff check src/meowdiobooks tests`: passed.
 - `python scripts/check_publication.py`: passed.
-- `npm --prefix frontend test`: 632 passed.
+- `npm --prefix frontend test`: 633 passed.
 - `npm --prefix frontend run lint`: no errors; two pre-existing refresh warnings.
 - `npm --prefix frontend run build` and `storybook:check`: passed.
 - `npm --prefix frontend run test-storybook`: 104 passed.

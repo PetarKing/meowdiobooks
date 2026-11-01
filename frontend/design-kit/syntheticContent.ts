@@ -8,7 +8,11 @@ export const fixtureBook: LocalBook = {
 };
 export const text =
   "Alice was beginning to get very tired of sitting by her sister on the bank. “What is the use of a book,” thought Alice, “without pictures or conversations?”";
-export const sourceImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="620" height="820" viewBox="0 0 620 820"><rect width="620" height="820" fill="#fffdf8"/><g fill="#29252b" font-family="Georgia"><text x="70" y="80" font-size="15">SYNTHETIC SOURCE PREVIEW · 1</text><text x="70" y="145" font-size="27">Down the Rabbit-Hole</text>${["Alice was beginning to get very tired of sitting", "by her sister on the bank, and of having nothing", "to do: once or twice she had peeped into the book", "her sister was reading, but it had no pictures", "or conversations in it.", "“What is the use of a book,” thought Alice,", "“without pictures or conversations?”"].map((line, i) => `<text x="70" y="${205 + i * 32}" font-size="18">${line}</text>`).join("")}</g></svg>`)}`;
+export const sourcePageLines = ["Alice was beginning to get very tired of sitting", "by her sister on the bank, and of having nothing", "to do: once or twice she had peeped into the book", "her sister was reading, but it had no pictures", "or conversations in it.", "“What is the use of a book,” thought Alice,", "“without pictures or conversations?”"];
+export const sourcePageHeading = "Down the Rabbit-Hole";
+export const sourcePageNarration = sourcePageLines.slice(0, 5).join(" ");
+export const sourcePageThought = sourcePageLines.slice(5).join(" ");
+export const sourceImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="620" height="820" viewBox="0 0 620 820"><rect width="620" height="820" fill="#fffdf8"/><g fill="#29252b" font-family="Georgia"><text x="70" y="80" font-size="15">SYNTHETIC SOURCE PREVIEW · 1</text><text x="70" y="145" font-size="27">${sourcePageHeading}</text>${sourcePageLines.map((line, i) => `<text x="70" y="${205 + i * 32}" font-size="18">${line}</text>`).join("")}</g></svg>`)}`;
 // Four seconds of synthetic silence make transport progress and seeking observable.
 // This is a player fixture, never a recording of the displayed transcript.
 function silentPlayerFixture(): string {
