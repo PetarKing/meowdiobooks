@@ -6,9 +6,11 @@ No inference, source text, or provider credentials are retained in receipts.
 """
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
 
 import numpy as np
+
+from .pacing import SpeechSilenceError, prepare_speech_audio
 
 QUALITY_CONTRACT = "meowdiobooks.audio-quality.v1"
 QWEN_AUDIO_TOKENS_PER_SECOND = 12.5
@@ -24,6 +26,7 @@ def assess_audio(
     audio: np.ndarray, sample_rate: int, text: str, *,
     token_count: int | None = None, max_tokens: int = 4096,
     check_generation_limit: bool = True,
+    timing: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Return bounded numeric evidence, using 100 ms windows at native sample rate.
 
@@ -44,6 +47,13 @@ def assess_audio(
     if not samples.size or not np.isfinite(samples).all():
         reasons.append("empty-or-nonfinite")
     else:
+        # Timed assembly must be possible before a section becomes resumable. Keep
+        # legacy/preview amplitude policy unchanged, and never alter the samples.
+        if timing is not None:
+            try:
+                prepare_speech_audio(samples, sample_rate, timing)
+            except SpeechSilenceError:
+                reasons.append("silent-for-timing")
         # Backstop also works for old checkpoint WAVs whose backend metadata was lost.
         if check_generation_limit and (
             (token_count is not None and token_count >= max_tokens)
