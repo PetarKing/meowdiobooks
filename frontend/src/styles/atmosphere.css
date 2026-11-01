@@ -18,6 +18,8 @@
   }
   /* Phone main already fills the width and begins below its progress strip. */
   .app-shell:not([data-presentation-palette="custom"]) .workspace:not(.home-workspace) > main {
+    /* Short phone pages must fade into the canvas, not end a tinted wash abruptly. */
+    --workflow-wash: none;
     background-image: var(--workflow-wash, none), linear-gradient(to bottom, color-mix(in srgb, var(--canvas) 66%, transparent), var(--canvas) 145px), url("../assets/brand/sanctuary-canopy.webp");
     background-size: 100% 100%, 100% 100%, min(270px, 100%) auto;
     background-position: 0 0, 0 0, right 0 top 0;
