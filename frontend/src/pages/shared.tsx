@@ -34,12 +34,13 @@ export function StageLaunch({ children }: { children: ReactNode; }) {
   return <WorkflowLaunch>{children}</WorkflowLaunch>;
 }
 
-export function PageComparison({ sourceText, imageUrl, imageAlt, imageZoom, imageControls, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
+export function PageComparison({ sourceText, imageUrl, imageAlt, imageZoom, imageControls, sourcePlaceholder, rightLabel, rightMeta, className = "", rightClassName = "", children }: {
   imageUrl?: string | null;
   sourceText?: string | null;
   imageAlt: string;
   imageZoom?: number;
   imageControls?: ReactNode;
+  sourcePlaceholder?: ReactNode;
   rightLabel: string;
   rightMeta?: ReactNode;
   className?: string;
@@ -47,23 +48,43 @@ export function PageComparison({ sourceText, imageUrl, imageAlt, imageZoom, imag
   children: ReactNode;
 }) {
   const { t } = useTranslation();
+  const [loadedImage, setLoadedImage] = useState<string>();
+  const [failedImage, setFailedImage] = useState<string>();
+  const imagePending = Boolean(sourcePlaceholder && imageUrl && imageUrl !== loadedImage && imageUrl !== failedImage);
   return <div className={`compare extract-compare page-comparison ${className}`.trim()}>
-    <div className="paper" tabIndex={0} role="region" aria-label={t("ORIGINAL PAGE")}>
+    <div className="paper" tabIndex={0} role="region" aria-label={t("ORIGINAL PAGE")} aria-busy={imagePending || undefined}>
       {imageControls ? <div className="paper-heading"><span>{t("ORIGINAL PAGE")}</span>{imageControls}</div> : <span>{t("ORIGINAL PAGE")}</span>}
+      {imagePending && <p className="visually-hidden" role="status">{t("Loading original page…")}</p>}
+      {sourcePlaceholder && sourceText == null && (!imageUrl || imagePending) && <div className="review-source-placeholder">{sourcePlaceholder}</div>}
+      {sourcePlaceholder && imageUrl && imageUrl === failedImage && <p role="status">{t("The original page could not load. The transcript preview is still available.")}</p>}
       {sourceText != null && <pre>{sourceText}</pre>}
       {imageUrl && (imageZoom
-        ? <div className="pdf-preview-frame"><img src={imageUrl} alt={imageAlt} style={{ width: `${imageZoom}%` }} /></div>
-        : <img src={imageUrl} alt={imageAlt} />)}
+        ? <div className="pdf-preview-frame"><img key={imageUrl} src={imageUrl} alt={imageAlt} onLoad={() => { setLoadedImage(imageUrl); setFailedImage((current) => current === imageUrl ? undefined : current); }} onError={() => setFailedImage(imageUrl)} style={{ width: `${imageZoom}%`, visibility: imagePending || (sourcePlaceholder && imageUrl === failedImage) ? "hidden" : undefined }} /></div>
+        : <img key={imageUrl} src={imageUrl} alt={imageAlt} onLoad={() => { setLoadedImage(imageUrl); setFailedImage((current) => current === imageUrl ? undefined : current); }} onError={() => setFailedImage(imageUrl)} style={{ visibility: imagePending || (sourcePlaceholder && imageUrl === failedImage) ? "hidden" : undefined }} />)}
     </div>
     <div className={`extracted ${rightClassName}`.trim()} tabIndex={0} role="region" aria-label={rightLabel}><div className="page-comparison-heading"><span>{rightLabel}</span>{rightMeta}</div>{children}</div>
   </div>;
 }
 
+function ReviewPreviewSkeleton({ source = false }: { source?: boolean }) {
+  return <div className={`review-preview-skeleton ${source ? "source" : "transcript"}`} aria-hidden="true">
+    {source ? <>
+      <span className="skeleton-line preview-skeleton-title" />
+      {Array.from({ length: 15 }, (_, index) => <span key={index} className="skeleton-line preview-skeleton-line" />)}
+    </> : Array.from({ length: 4 }, (_, index) => <div className="transcript-span narration" key={index}>
+      <span className="skeleton-line preview-skeleton-reader" />
+      <div className="preview-skeleton-passage">{Array.from({ length: index % 2 ? 3 : 4 }, (_, line) => <span className="skeleton-line preview-skeleton-line" key={line} />)}</div>
+    </div>)}
+  </div>;
+}
+
 const reviewPdfZoomLevels = [60, 80, 100, 125, 150] as const;
 
-export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, busy, onPageChange, onBack, onAccept }: {
+export function ReviewTranscriptFinalCheck({ preview, loading, failed, onRetry, page, pageCount, busy, onPageChange, onBack, onAccept }: {
   preview?: ReviewTranscriptPreview;
   loading: boolean;
+  failed: boolean;
+  onRetry: () => void;
   page: number;
   pageCount: number;
   busy: boolean;
@@ -77,25 +98,28 @@ export function ReviewTranscriptFinalCheck({ preview, loading, page, pageCount, 
   const pdfZoom = reviewPdfZoomLevels[pdfZoomIndex];
   const changePage = (next: number) => onPageChange(Math.min(safePageCount, Math.max(1, next)));
   return <>
-    <PageTitle stage="review" step={t("Step 3 · Final check")} title={t("Read it once like a listener.")} copy={t("Compare the source and audiobook transcript section by section. This preview does not change your book.")} />
+    <PageTitle stage="review" step={t("Step 3 · Final check")} title={t("Read it once like a listener.")} copy={t("Preview any page you want to check. Only the selected page loads, and you can continue without waiting for the preview.")} />
     <section className="panel review-transcript-panel">
       <div className="transcript-page-control">
-        <button type="button" aria-label={t("Previous transcript page")} disabled={page <= 1 || loading} onClick={() => changePage(page - 1)}>←</button>
+        <button type="button" aria-label={t("Previous transcript page")} disabled={page <= 1 || busy} onClick={() => changePage(page - 1)}>←</button>
         <label><span>{t("Browse the whole book")}</span><input aria-label={t("Transcript preview page")} type="range" min="1" max={safePageCount} value={page} onChange={(event) => changePage(Number(event.target.value))} /></label>
         <output aria-live="polite">{page} / {safePageCount}</output>
-        <button type="button" aria-label={t("Next transcript page")} disabled={page >= safePageCount || loading} onClick={() => changePage(page + 1)}>→</button>
+        <button type="button" aria-label={t("Next transcript page")} disabled={page >= safePageCount || busy} onClick={() => changePage(page + 1)}>→</button>
       </div>
-      <PageComparison sourceText={preview?.sourceText} imageUrl={preview?.imageUrl} imageAlt={t("Original PDF page {{page}}", { page: preview?.page ?? page })} imageZoom={pdfZoom} imageControls={preview?.imageUrl ? <div className="pdf-zoom-controls" role="group" aria-label={t("PDF preview zoom")}>
+      {loading && <p className="visually-hidden" role="status">{t("Loading page {{page}}…", { page })}</p>}
+      <div className="review-preview-stage" aria-busy={loading}>
+      <PageComparison sourcePlaceholder={!failed ? <ReviewPreviewSkeleton source /> : undefined} sourceText={preview?.sourceText} imageUrl={preview?.imageUrl} imageAlt={t("Original PDF page {{page}}", { page: preview?.page ?? page })} imageZoom={pdfZoom} imageControls={preview?.imageUrl ? <div className="pdf-zoom-controls" role="group" aria-label={t("PDF preview zoom")}>
         <button type="button" aria-label={t("Zoom out PDF preview")} disabled={pdfZoomIndex === 0} onClick={() => setPdfZoomIndex((current) => Math.max(0, current - 1))}>−</button>
         <output aria-live="polite">{pdfZoom}%</output>
         <button type="button" aria-label={t("Zoom in PDF preview")} disabled={pdfZoomIndex === reviewPdfZoomLevels.length - 1} onClick={() => setPdfZoomIndex((current) => Math.min(reviewPdfZoomLevels.length - 1, current + 1))}>+</button>
-      </div> : undefined} rightLabel={t("AUDIOBOOK TRANSCRIPT")} rightMeta={<small>{loading ? t("Loading page {{page}}…", { page }) : t("Read-only preview")}</small>} rightClassName="review-transcript-pane" className={`review-transcript-compare ${loading ? "loading" : ""}`}>
-        {preview?.spans.length ? <article aria-label={t("Audiobook transcript page {{page}}", { page: preview.page })} onCopy={(event) => event.preventDefault()}>
+      </div> : undefined} rightLabel={t("AUDIOBOOK TRANSCRIPT")} rightMeta={<small>{loading ? t("Loading page {{page}}…", { page }) : t("Read-only preview")}</small>} rightClassName="review-transcript-pane" className="review-transcript-compare">
+        {failed ? <div className="review-preview-unavailable" role="status"><p>{t("This page preview could not load. You can retry or accept your review and continue.")}</p><button type="button" className="ghost" onClick={onRetry}>{t("Retry page preview")}</button></div> : !preview ? <ReviewPreviewSkeleton /> : preview.spans.length ? <article aria-label={t("Audiobook transcript page {{page}}", { page: preview.page })} onCopy={(event) => event.preventDefault()}>
           {preview.spans.map((span) => <p key={span.id} className={`transcript-span ${span.reader === "Narrator" ? "narration" : span.kind}`} style={span.kind === "dialogue" && span.reader !== "Narrator" ? { "--speaker-accent": speakerAccent(span.reader) } as CSSProperties : undefined}><b>{t(span.reader, { defaultValue: span.reader })}{span.kind === "excluded" && span.warningKind ? <small> · {t(reviewWarningLabel(span.warningKind))}</small> : null}</b><span>{span.text}</span></p>)}
-        </article> : loading ? <div className="transcript-loading">{t("Opening the transcript…")}</div> : <div className="transcript-empty"><span aria-hidden="true">☾</span><b>{t("No spoken text on this page")}</b><small>{t("The source page may be blank or everything on it was excluded.")}</small></div>}
+        </article> : <div className="transcript-empty"><span aria-hidden="true">☾</span><b>{t("No spoken text on this page")}</b><small>{t("The source page may be blank or everything on it was excluded.")}</small></div>}
       </PageComparison>
+      </div>
     </section>
-    <div className="phase-action transcript-final-action"><button type="button" className="ghost" onClick={onBack}>← {t("Back to decisions")}</button><button type="button" className="primary" disabled={!preview || preview.page !== page || loading || busy} onClick={onAccept}>{t("Accept review and continue")} →</button></div>
+    <div className="phase-action transcript-final-action"><button type="button" className="ghost" onClick={onBack}>← {t("Back to decisions")}</button><button type="button" className="primary" disabled={busy} onClick={onAccept}>{t("Accept review and continue")} →</button></div>
   </>;
 }
 

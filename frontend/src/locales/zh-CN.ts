@@ -1548,6 +1548,11 @@ const zhCN: Record<string, string> = {
   "We couldn’t create this page preview. Please try again.": "无法创建页面预览。请重试。",
   "We couldn’t read this document. Please try again or upload another file.": "无法读取文档。请重试或上传其他文件。",
   "{{message}} Reference: {{reference}}.": "{{message}} 参考编号：{{reference}}。",
+  "Preview any page you want to check. Only the selected page loads, and you can continue without waiting for the preview.": "可以预览任何想检查的页面。每次只加载所选页面，无需等待预览即可继续。",
+  "This page preview could not load. You can retry or accept your review and continue.": "此页预览未能加载。您可以重试，也可以接受审核并继续。",
+  "Retry page preview": "重试页面预览",
+  "The original page could not load. The transcript preview is still available.": "原始页面未能加载。您仍可查看文稿预览。",
+  "Loading original page…": "正在加载原始页面…",
 };
 
 export default zhCN;

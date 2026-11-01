@@ -690,7 +690,7 @@ export interface WorkflowGateway {
   previewExtraction(bookId: string, page: number, method: ExtractionMethod): Promise<ExtractionPreview>;
   previewDialogue(bookId: string, settings: DialogueSettings): Promise<DialogueArtifact>;
   previewReviewBulk(bookId: string, revision: string, occurrenceId: string, action: ReviewCapability): Promise<Record<string, unknown>>;
-  previewReviewTranscript(bookId: string, revision: string, page: number, policies: ReviewTranscriptPolicy[], occurrencePolicies?: ReviewTranscriptOccurrencePolicy[], boundaryDecisions?: BoundaryDecision[]): Promise<ReviewTranscriptPreview>;
+  previewReviewTranscript(bookId: string, revision: string, page: number, policies: ReviewTranscriptPolicy[], occurrencePolicies?: ReviewTranscriptOccurrencePolicy[], boundaryDecisions?: BoundaryDecision[], signal?: AbortSignal): Promise<ReviewTranscriptPreview>;
   processStage<S extends ProcessableStage>(bookId: string, stage: S, settings: StageSettings[S]): Promise<Job>;
   previewCasting?(bookId: string, settings: CastProcessSettings): Promise<CastingPreview>;
   prepareRecordingScript(bookId: string): Promise<RecordingScriptArtifact>;
