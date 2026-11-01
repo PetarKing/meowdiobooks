@@ -454,6 +454,8 @@ const zhCN: Record<string, string> = {
   "Resolved {{current}} of {{count}} speaker conflicts": "已解决 {{current}} / {{count}} 项说话人冲突",
   "Finishing active requests…": "正在完成已开始的请求…",
   "Taking longer than expected; updating estimate…": "用时超过预期，正在更新估计…",
+  "{{progress}}% complete · {{time}}": "已完成 {{progress}}% · {{time}}",
+  "{{progress}}% complete · {{time}} left": "已完成 {{progress}}% · 剩余 {{time}}",
   "Estimated time left": "预计剩余时间",
   "Estimates update with progress and may change.": "预计时间会随进度更新，可能发生变化。",
   "Waiting to start": "等待开始",
