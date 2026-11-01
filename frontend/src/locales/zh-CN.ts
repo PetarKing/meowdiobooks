@@ -1551,6 +1551,7 @@ const zhCN: Record<string, string> = {
   "{{message}} Reference: {{reference}}.": "{{message}} 参考编号：{{reference}}。",
   "Preview any page you want to check. Only the selected page loads, and you can continue without waiting for the preview.": "可以预览任何想检查的页面。每次只加载所选页面，无需等待预览即可继续。",
   "This page preview could not load. You can retry or accept your review and continue.": "此页预览未能加载。您可以重试，也可以接受审核并继续。",
+  "This page preview could not load.": "无法加载此页预览。",
   "Retry page preview": "重试页面预览",
   "The original page could not load. The transcript preview is still available.": "原始页面未能加载。您仍可查看文稿预览。",
   "Loading original page…": "正在加载原始页面…",

@@ -429,7 +429,7 @@ describe('v2 wizard', () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] } }, undefined,
       [{ page: 1, reason: 'opening' }, { page: 60, reason: 'image text check', ocrCandidate: true }])
     expect(screen.getByRole('button', { name: /Standard Recommended Fast extraction with OCR recovery/ })).toHaveClass('selected')
-    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(1))
     expect(wizardApi.previewExtraction).toHaveBeenCalledWith('book-1', 1, 'liteparse')
     const methods = screen.getByRole('button', { name: /Standard Recommended Fast extraction with OCR recovery/ }).closest('.extraction-choices')!
     expect(within(methods as HTMLElement).getAllByRole('button').filter(button => button.classList.contains('choice')).map(button => button.querySelector('.choice-title')?.firstChild?.textContent)).toEqual(['Standard', 'Full OCR', 'Embedded text', 'Complex layout'])
@@ -445,53 +445,82 @@ describe('v2 wizard', () => {
     await waitFor(() => expect(wizardApi.processStage).toHaveBeenCalledWith('book-1', 'extract', { method: 'ocr' }))
   })
 
-  it('explains extraction methods without changing the selected parser', async () => {
+  it('keeps extraction choices concise without clipped information controls', async () => {
     await open({ ...base, book: { ...base.book, completedStages: ['import'] as WizardStage[] } })
-
-    const liteparseInfo = screen.getByRole('button', { name: 'About Standard' })
-    const nativeInfo = screen.getByRole('button', { name: 'About Embedded text' })
-    const layoutInfo = screen.getByRole('button', { name: 'About Complex layout' })
-    const liteparseTooltip = document.getElementById(liteparseInfo.getAttribute('aria-describedby')!)
-    const nativeTooltip = document.getElementById(nativeInfo.getAttribute('aria-describedby')!)
-    const layoutTooltip = document.getElementById(layoutInfo.getAttribute('aria-describedby')!)
-    const previewCalls = vi.mocked(wizardApi.previewExtraction).mock.calls.length
-
-    expect(liteparseTooltip).toHaveTextContent('Uses OCR where needed before speaker detection.')
-    expect(nativeTooltip).toHaveTextContent('Try this if the standard method')
-    expect(layoutTooltip).toHaveTextContent('Handles complex columns and spacing')
-    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'true')
-
-    fireEvent.mouseEnter(liteparseInfo)
-    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'false')
-    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'true')
-    fireEvent.mouseLeave(liteparseInfo)
-    expect(liteparseTooltip).toHaveAttribute('aria-hidden', 'true')
-
-    layoutInfo.focus()
-    fireEvent.focus(layoutInfo)
-    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'false')
-    fireEvent.mouseEnter(layoutInfo)
-    fireEvent.keyDown(layoutInfo, { key: 'Escape' })
-    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
-    expect(layoutInfo).toHaveAttribute('aria-expanded', 'false')
-    expect(document.activeElement).toBe(layoutInfo)
-    fireEvent.mouseLeave(layoutInfo)
-    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
-    layoutInfo.blur()
-    expect(layoutTooltip).toHaveAttribute('aria-hidden', 'true')
-
-    fireEvent.click(nativeInfo)
-    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'false')
-    fireEvent.click(nativeInfo)
-    expect(nativeTooltip).toHaveAttribute('aria-hidden', 'true')
-    expect(screen.getByRole('button', { name: /Standard Recommended Fast extraction with OCR recovery/ })).toHaveClass('selected')
-    expect(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ })).not.toHaveClass('selected')
-    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls)
-
+    expect(screen.queryByRole('button', { name: /^About (Standard|Full OCR|Embedded text|Complex layout)$/ })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ }))
     expect(screen.getByRole('button', { name: /Embedded text Specialized Reads text saved in the PDF/ })).toHaveClass('selected')
-    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(previewCalls + 1)
     expect(wizardApi.previewExtraction).toHaveBeenLastCalledWith('book-1', 1, 'native')
+  })
+
+  it('opens the first page without waiting for sample discovery', async () => {
+    let finishSamples!: (value: { page: number; reason: string }[]) => void
+    vi.mocked(wizardApi.getRepresentativePages).mockImplementationOnce(() => new Promise(resolve => { finishSamples = resolve }))
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] } })
+    await waitFor(() => expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(1))
+    expect(wizardApi.previewExtraction).toHaveBeenCalledWith('book-1', 1, 'liteparse')
+    await screen.findByText('Alice', { selector: 'pre' })
+    await act(async () => finishSamples([{ page: 1, reason: 'opening' }, { page: 60, reason: 'middle sample' }]))
+    expect(screen.getByRole('button', { name: /p\. 60 middle sample/ })).toBeInTheDocument()
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches extraction pages immediately and ignores late previews while reusing opened pages', async () => {
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] } }, undefined,
+      [{ page: 1, reason: 'opening' }, { page: 12, reason: 'early sample' }, { page: 60, reason: 'middle sample' }])
+    await screen.findByRole('button', { name: /p\. 12 early sample/ })
+    let finishEarly!: (value: Awaited<ReturnType<typeof wizardApi.previewExtraction>>) => void
+    let finishMiddle!: (value: Awaited<ReturnType<typeof wizardApi.previewExtraction>>) => void
+    vi.mocked(wizardApi.previewExtraction)
+      .mockImplementationOnce(() => new Promise(resolve => { finishEarly = resolve }))
+      .mockImplementationOnce(() => new Promise(resolve => { finishMiddle = resolve }))
+    fireEvent.click(screen.getByRole('button', { name: /p\. 12 early sample/ }))
+    expect(screen.getByRole('heading', { name: 'Page 12 of 120' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /p\. 12 early sample/ })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByText('Alice', { selector: 'pre' })).not.toBeInTheDocument()
+    expect(screen.getByText('Loading page 12…')).toBeInTheDocument()
+    expect(document.querySelector('.extraction-preview-stage')).toHaveAttribute('aria-busy', 'true')
+    expect(document.querySelectorAll('.extraction-preview-stage .review-preview-skeleton')).toHaveLength(2)
+    const sourceImage = screen.getByAltText('Original page 12')
+    expect(sourceImage).toHaveAttribute('src', '/api/books/book-1/pages/12/image')
+    fireEvent.load(sourceImage)
+    expect(sourceImage).toBeVisible()
+    expect(document.querySelectorAll('.extraction-preview-stage .review-preview-skeleton')).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /Process complete book/ })).toBeEnabled()
+    fireEvent.click(screen.getByRole('button', { name: /p\. 60 middle sample/ }))
+    const result = { page: 60, pageCount: 120, method: 'liteparse' as const, text: 'Middle page text', warnings: [], elapsedSeconds: .1, cached: false }
+    await act(async () => finishMiddle(result))
+    expect(screen.getByText('Middle page text')).toBeInTheDocument()
+    await act(async () => finishEarly({ ...result, page: 12, text: 'Early page text' }))
+    expect(screen.getByRole('heading', { name: 'Page 60 of 120' })).toBeInTheDocument()
+    expect(screen.queryByText('Early page text')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /p\. 12 early sample/ }))
+    await screen.findByText('Early page text')
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(3)
+  })
+
+  it('deduplicates a pending preview and retries failures without showing stale errors', async () => {
+    await open({ ...base, book: { ...base.book, completedStages: ['import'] } }, undefined,
+      [{ page: 1, reason: 'opening' }, { page: 12, reason: 'early sample' }, { page: 60, reason: 'middle sample' }])
+    await screen.findByRole('button', { name: /p\. 12 early sample/ })
+    let rejectEarly!: (reason: Error) => void
+    vi.mocked(wizardApi.previewExtraction).mockImplementationOnce(() => new Promise((_resolve, reject) => { rejectEarly = reject }))
+    const early = screen.getByRole('button', { name: /p\. 12 early sample/ })
+    fireEvent.click(early)
+    fireEvent.click(early)
+    expect(wizardApi.previewExtraction).toHaveBeenCalledTimes(2)
+    fireEvent.click(screen.getByRole('button', { name: /p\. 1 opening/ }))
+    await act(async () => rejectEarly(new Error('Older page failed')))
+    expect(screen.queryByText('This page preview could not load.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    vi.mocked(wizardApi.previewExtraction).mockRejectedValueOnce(new Error('Page unavailable'))
+    fireEvent.click(early)
+    await screen.findByText('This page preview could not load.')
+    expect(document.querySelector('.extraction-preview-stage')).toHaveAttribute('aria-busy', 'false')
+    vi.mocked(wizardApi.previewExtraction).mockResolvedValueOnce({ page: 12, pageCount: 120, method: 'liteparse', text: 'Retried page', warnings: [], elapsedSeconds: .1, cached: false })
+    fireEvent.click(screen.getByRole('button', { name: 'Retry page preview' }))
+    await screen.findByText('Retried page')
+    expect(screen.queryByText('This page preview could not load.')).not.toBeInTheDocument()
   })
 
   it('keeps the clicked extraction page mounted and focused while its preview loads', async () => {

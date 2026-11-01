@@ -1948,16 +1948,9 @@ def create_app_v2(
             book = require_book(book_id)
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        if book.source_kind != "pdf" or not book.source_name:
-            return representative_pages(book.page_count or 1)
-        source = source_path(root, book.id, book.source_name)
-        sampler = getattr(file_processor, "extraction_sample_pages", None)
-        if file_processor is not None and sampler is None:
-            return representative_pages(book.page_count or 1)
-        if sampler is None:
-            from .documents import extraction_sample_pages
-            sampler = extraction_sample_pages
-        return sampler(source, package_for(book.id) / "preview", book.page_count or 1)
+        # Samples are navigation, not extraction. Do not parse the document or
+        # add image probes before the user opens a page.
+        return representative_pages(book.page_count or 1)
 
     @app.post("/api/books/{book_id}/extraction/preview")
     def extraction_preview(book_id: str, body: ExtractionPreviewRequest) -> dict[str, Any]:

@@ -39,7 +39,9 @@ def runner(calls, *, root, recovered=RECOVERED, fail=False, full_pages=1):
             write_stub_png(root, command[-1] + '.png')
             return subprocess.CompletedProcess(command, 0)
         if command[1] == 'is-complex':
-            stats = [{'pageNumber': n, 'textLength': 1800} for n in range(1, int(command[-1]) + 1)]
+            numbers = ([int(command[command.index('--target-pages') + 1])]
+                       if '--target-pages' in command else range(1, int(command[-1]) + 1))
+            stats = [{'pageNumber': n, 'textLength': 1800} for n in numbers]
             return subprocess.CompletedProcess(command, 0, stdout=json.dumps(stats).encode())
         ocr = '--no-ocr' not in command
         if ocr:
@@ -368,3 +370,207 @@ def test_standard_full_extraction_rejects_truncation_instead_of_publishing_it(tm
         extract_full_document(pdf, cache, 'liteparse', command_runner=runner([], root=tmp_path, full_pages=1))
     assert not list(cache.rglob('full.json'))
     assert len(extract_full_document(pdf, cache, 'liteparse', command_runner=runner([], root=tmp_path, full_pages=2))) == 2
+
+
+def test_preview_screens_only_requested_high_page_and_reuses_the_screen(tmp_path):
+    pdf, cache = source(tmp_path, pages=1101), tmp_path / 'cache'
+    calls = []
+    delegate = runner(calls, root=tmp_path)
+
+    def run(command, **options):
+        if command[1] != 'is-complex':
+            return delegate(command, **options)
+        calls.append(command)
+        assert command[command.index('--target-pages') + 1] == '1101'
+        assert command[command.index('--max-pages') + 1] == '1101'
+        return subprocess.CompletedProcess(command, 1, stdout=json.dumps([
+            {'pageNumber': 1101, 'textLength': 45, 'fullPageImage': True},
+        ]).encode())
+
+    row = extract_pdf_page(pdf, cache, 1101, 'liteparse', command_runner=run)
+    assert row['page'] == 1101 and row['ocrCandidate'] is True
+    again = extract_pdf_page(pdf, cache, 1101, 'liteparse', command_runner=run)
+    assert again['ocrCandidate'] is True and again['cached'] is True
+    assert len(calls) == 2  # one native parse and one page-local screen, no OCR.
+    assert all('--no-ocr' in call or call[1] == 'is-complex' for call in calls)
+    assert not (cache / 'extraction/ocr-samples-v2.json').exists()
+
+
+def test_preview_reuses_complete_screen_but_does_not_limit_full_extraction_to_preview(tmp_path):
+    from meowdiobooks.backend.documents import auto_recover_pdf_pages
+    pdf, cache, calls = source(tmp_path, pages=3), tmp_path / 'cache', []
+    delegate = runner(calls, root=tmp_path, full_pages=3)
+    screens = []
+
+    def run(command, **options):
+        if command[1] != 'is-complex':
+            return delegate(command, **options)
+        screens.append(command)
+        numbers = ([int(command[command.index('--target-pages') + 1])]
+                   if '--target-pages' in command else [1, 2, 3])
+        return subprocess.CompletedProcess(command, 1, stdout=json.dumps([
+            {'pageNumber': n, 'textLength': 40, 'fullPageImage': n in {2, 3}}
+            for n in numbers
+        ]).encode())
+
+    preview = extract_pdf_page(pdf, cache, 2, 'liteparse', command_runner=run)
+    assert preview['ocrCandidate'] is True
+    full = extract_full_document(pdf, cache, 'liteparse', command_runner=run)
+    assert [row['page'] for row in full if row['ocrCandidate']] == [2, 3]
+    recovered = []
+
+    def recognize(_source, _cache, number, _method):
+        recovered.append(number)
+        return {'page': number, 'text': RECOVERED, 'method': 'ocr', 'warnings': []}
+
+    auto_recover_pdf_pages(pdf, cache, full, recognize)
+    assert recovered == [2, 3]
+    assert len(screens) == 2 and '--target-pages' not in screens[1]
+    assert extract_pdf_page(pdf, cache, 3, 'liteparse', command_runner=run)['ocrCandidate'] is True
+    assert len(screens) == 2  # The complete screen also serves future previews.
+
+
+@pytest.mark.skipif(shutil.which('liteparse') is None, reason='LiteParse is not installed')
+def test_real_long_document_screen_keeps_all_image_candidates(tmp_path):
+    from meowdiobooks.backend.documents import extraction_sample_pages
+    pdf, cache = source(tmp_path, pages=248), tmp_path / 'cache'
+    extraction_sample_pages(pdf, cache, 248)
+    screened = json.loads((cache / 'extraction/ocr-samples-v2.json').read_text())
+    assert sorted(screened['imagePages']) == list(range(1, 249))
+
+
+@pytest.mark.parametrize('first_fails', [False, True])
+def test_concurrent_page_render_never_exposes_partial_png_or_removes_other_result(tmp_path, first_fails):
+    from concurrent.futures import ThreadPoolExecutor
+    import threading
+    from meowdiobooks.backend.documents import render_pdf_page
+
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+    output = cache / 'pages/page-0001.png'
+    started, finish = threading.Event(), threading.Event()
+    commands = []
+
+    def slow(command, **_options):
+        commands.append(command)
+        write_stub_text(tmp_path, command[-1] + '.png', 'incomplete PNG')
+        started.set()
+        assert finish.wait(5), 'Test renderer was not released'
+        if first_fails:
+            raise subprocess.CalledProcessError(1, command)
+        write_stub_png(tmp_path, command[-1] + '.png')
+        return subprocess.CompletedProcess(command, 0)
+
+    def fast(command, **_options):
+        commands.append(command)
+        write_stub_png(tmp_path, command[-1] + '.png')
+        return subprocess.CompletedProcess(command, 0)
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first = executor.submit(render_pdf_page, pdf, cache, 1, command_runner=slow)
+        try:
+            assert started.wait(5)
+            assert not output.exists(), 'An in-progress image became visible to cache readers'
+            second = render_pdf_page(pdf, cache, 1, command_runner=fast)
+            assert second == output and len(commands) == 2
+            assert commands[0][-1] != commands[1][-1]
+            with Image.open(second) as image:
+                image.verify()
+        finally:
+            finish.set()
+        if first_fails:
+            with pytest.raises(subprocess.CalledProcessError):
+                first.result(timeout=5)
+        else:
+            assert first.result(timeout=5) == output
+    with Image.open(output) as image:
+        image.verify()
+    assert list(output.parent.iterdir()) == [output]
+
+
+def test_failed_page_render_cleans_partial_image_and_can_retry(tmp_path):
+    from meowdiobooks.backend.documents import render_pdf_page
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+
+    def broken(command, **_options):
+        write_stub_text(tmp_path, command[-1] + '.png', 'partial image')
+        raise subprocess.TimeoutExpired(command, 60)
+
+    with pytest.raises(subprocess.TimeoutExpired):
+        render_pdf_page(pdf, cache, 1, command_runner=broken)
+    assert not list((cache / 'pages').iterdir())
+    output = render_pdf_page(pdf, cache, 1, command_runner=runner([], root=tmp_path))
+    with Image.open(output) as image:
+        image.verify()
+
+
+@pytest.mark.parametrize('page_count,target', [(True, None), (0, None), (-1, None),
+                                              ('3', None), (3, True), (3, 4), (3, '--help')])
+def test_image_screen_rejects_non_numeric_or_out_of_range_cli_values(tmp_path, page_count, target):
+    from meowdiobooks.backend.documents import _image_screen_stats
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail('Invalid CLI values reached the command runner')
+
+    with pytest.raises(ValueError):
+        _image_screen_stats(tmp_path / 'source.pdf', page_count, forbidden, target_page=target)
+
+
+def test_native_image_screen_keeps_option_looking_filename_as_absolute_argument(tmp_path, monkeypatch):
+    from meowdiobooks.backend.documents import _image_screen_stats
+    monkeypatch.chdir(tmp_path)
+    commands = []
+
+    def run(command, **options):
+        commands.append(command)
+        assert command == ['liteparse', 'is-complex', str(tmp_path / '--config=other.json'),
+                           '--compact', '--quiet', '--target-pages', '2', '--max-pages', '3']
+        assert not options.get('shell', False)
+        options['stdout'].write(b'[]')
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr(subprocess, 'run', run)
+    assert _image_screen_stats(Path('--config=other.json'), 3, None, target_page=2) == []
+    assert len(commands) == 1
+
+
+@pytest.mark.parametrize('escape', ['directory', 'file'])
+def test_page_renderer_rejects_cache_symlink_escape_before_running(tmp_path, escape):
+    from meowdiobooks.backend.documents import render_pdf_page
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+    outside = tmp_path / 'cache-other'
+    outside.mkdir()
+    outside_image = outside / 'page-0001.png'
+    outside_image.write_bytes(b'untouched')
+    cache.mkdir()
+    if escape == 'directory':
+        (cache / 'pages').symlink_to(outside, target_is_directory=True)
+    else:
+        (cache / 'pages').mkdir()
+        (cache / 'pages/page-0001.png').symlink_to(outside_image)
+
+    def forbidden(*_args, **_kwargs):
+        pytest.fail('An escaping cache reached the renderer')
+
+    with pytest.raises(ValueError, match='outside the cache'):
+        render_pdf_page(pdf, cache, 1, command_runner=forbidden)
+    assert outside_image.read_bytes() == b'untouched'
+
+
+def test_renderer_cannot_publish_or_clean_up_a_symlink_target_outside_cache(tmp_path):
+    import os
+    from meowdiobooks.backend.documents import render_pdf_page
+    pdf, cache = source(tmp_path), tmp_path / 'cache'
+    outside = tmp_path / 'untouched.png'
+    outside.write_bytes(b'untouched')
+
+    def renderer(command, **_options):
+        candidate = os.path.realpath(command[-1] + '.png')
+        if not candidate.startswith(os.path.realpath(cache) + os.sep):
+            raise ValueError('Test output escaped the cache')
+        Path(candidate).symlink_to(outside)
+        return subprocess.CompletedProcess(command, 0)
+
+    with pytest.raises(ValueError, match='outside the cache'):
+        render_pdf_page(pdf, cache, 1, command_runner=renderer)
+    assert outside.read_bytes() == b'untouched'
+    assert not (cache / 'pages/page-0001.png').exists()

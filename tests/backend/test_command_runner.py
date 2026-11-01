@@ -52,11 +52,20 @@ def operation(tmp_path):
 
 
 def _successful_command(command, **options):
-    assert options['check'] is (command[1] != 'is-complex') and options['capture_output'] is True
+    assert options['check'] is (command[1] != 'is-complex')
+    if 'stdout' in options:
+        assert command[:2] == ['liteparse', 'is-complex']
+        assert options['stderr'] == subprocess.PIPE
+        assert 'capture_output' not in options
+    else:
+        assert options['capture_output'] is True
     assert options['timeout'] > 0
     if command[0] == 'pdftoppm':
         Path(command[-1] + '.png').write_bytes(b'host-rendered-png')
     elif command[0] == 'liteparse' and command[1] == 'is-complex':
+        if 'stdout' in options:
+            options['stdout'].write(b'[]')
+            return subprocess.CompletedProcess(command, 0, stderr=b'')
         return subprocess.CompletedProcess(command, 0, stdout=b'[]', stderr=b'')
     elif command[0] == 'liteparse':
         pages = [{'page': 2, 'text': 'The second page.'}] if '--target-pages' in command else [
@@ -91,6 +100,10 @@ def test_injected_runner_retains_default_arguments_without_subprocess_fallback(
 
         def __call__(self, command, **options):
             host_calls.append((command, options))
+            # Hosts retain their original byte-output contract, even when the
+            # local implementation uses a regular file for large screen JSON.
+            assert options.get('capture_output') is True
+            assert 'stdout' not in options and 'stderr' not in options
             return _successful_command(command, **options)
 
     def forbidden(*_args, **_kwargs):
@@ -98,10 +111,21 @@ def test_injected_runner_retains_default_arguments_without_subprocess_fallback(
 
     monkeypatch.setattr(subprocess, 'run', forbidden)
     result = invoke(name, command_runner=Runner())
-    # Parser output paths are unique per invocation to avoid preview races.
+    # Parser and renderer output paths are unique to avoid concurrent cache writes.
+    # Only native image screening changes stdout transport; execution policy,
+    # command selection, timeout and injected-runner contract stay identical.
     def stable_calls(calls):
-        return [(command[:-1] + ["<parser-output>"] if command[0] == 'liteparse' else command,
-                 options) for command, options in calls]
+        result = []
+        for command, options in calls:
+            options = dict(options)
+            if 'stdout' in options:
+                options.pop('stdout')
+                options.pop('stderr')
+                options['capture_output'] = True
+            if command[0] in {'liteparse', 'pdftoppm'} and command[1] != 'is-complex':
+                command = [*command[:-1], '<unique-output>']
+            result.append((command, options))
+        return result
 
     assert stable_calls(host_calls) == stable_calls(default_calls)
     assert len(host_calls) == (2 if name in {'mp3', 'page', 'full'} else 1)

@@ -140,6 +140,9 @@ def _screened_raw_fixture(tmp_path):
             stats = [{"pageNumber": number, "textLength": len(row["text"]),
                       "imageCoverage": .7 if number == 2 else 0}
                      for number, row in enumerate(rows, 1)]
+            if "--target-pages" in arguments:
+                target = int(arguments[arguments.index("--target-pages") + 1])
+                stats = [row for row in stats if row["pageNumber"] == target]
             return subprocess.CompletedProcess(arguments, 1, stdout=json.dumps(stats).encode())
         assert "--no-ocr" in arguments
         selected = rows
@@ -170,10 +173,10 @@ def test_raw_preview_and_full_screen_use_same_physical_candidates_and_recovery(t
     recovered_full = auto_recover_pdf_pages(source, cache, raw, recognize)
     assert recovered_preview[0]["text"] == recovered_full[1]["text"]
     assert calls == [(2, "ocr"), (2, "ocr")]
-    assert len([row for row in commands if row[1] == "is-complex"]) == 1
+    assert len([row for row in commands if row[1] == "is-complex"]) == 2
 
 
-def test_old_raw_page_cache_gets_full_document_screen_before_automatic_preview(tmp_path):
+def test_old_raw_page_cache_gets_only_requested_page_screen_before_automatic_preview(tmp_path):
     import json
     from meowdiobooks.backend.documents import _LITEPARSE_CACHE_KEY, extract_pdf_page
 
@@ -185,6 +188,7 @@ def test_old_raw_page_cache_gets_full_document_screen_before_automatic_preview(t
     result = extract_pdf_page(source, cache, 2, "liteparse", command_runner=command)
     assert result["cached"] is True and result["ocrCandidate"] is True
     assert [row[1] for row in commands] == ["is-complex"]
+    assert commands[0][commands[0].index("--target-pages") + 1] == "2"
 
 
 @pytest.mark.parametrize("bad", [None, {"page": 3, "text": "Words on wrong page."},
@@ -517,3 +521,21 @@ def test_automatic_recognition_failure_preserves_the_accepted_extraction(automat
     assert _wait(client, queued.json()["id"])["status"] == "failed"
     assert read_artifact(package, "extraction") == original
     assert artifact_history(package, "extraction") == before
+
+
+def test_sample_navigation_never_parses_or_uses_legacy_image_probes(automatic_workflow, monkeypatch):
+    from meowdiobooks.backend.documents import representative_pages
+    client, book_id, package, processor = automatic_workflow
+
+    def forbidden(*_args, **_kwargs):
+        raise AssertionError("Opening sample navigation must not parse or OCR the book")
+
+    monkeypatch.setattr(processor, 'extraction_sample_pages', forbidden, raising=False)
+    cache = package / 'preview/extraction/ocr-samples-v2.json'
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    cache.write_text('{"pages":[{"page":2,"reason":"image text check","ocrCandidate":true}],"imagePages":[2]}')
+    before = list(processor.calls)
+    response = client.get(f'/api/books/{book_id}/extraction/representative-pages')
+    assert response.status_code == 200
+    assert response.json() == representative_pages(3)
+    assert processor.calls == before
