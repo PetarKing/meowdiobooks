@@ -1051,6 +1051,89 @@ def review_source_validation_view(
     return {**dict(dialogue), "spans": spans}
 
 
+def _transcript_preview_context(dialogue, review, page, block_pages):
+    """Project source-linked decisions before rendering, retaining their conflict context.
+
+    Load complete blocks for coverage checks, but expand dependencies by overlapping
+    occurrence ranges, not by every unrelated correction on a neighboring page.
+    Acceptance still validates and resolves the complete immutable book separately.
+    """
+    spans = dialogue.get("spans", [])
+    selected = [span for span in spans
+                if int(span.get("page") or block_pages.get(str(span.get("blockId", "")), 1)) == page]
+    influence = [(str(span["blockId"]), int(span["sourceStart"]), int(span["sourceEnd"]))
+                 for span in selected]
+    rows = [row for warning in review["warningSnapshot"] for row in warning.get("occurrences", [])]
+    included = set()
+    source_notes = None
+    if any(row.get("kind") == "footnote" for row in rows):
+        from .review_resolution import _source_blocks
+        source_notes = {(row["blockId"], row["sourceStart"]): row
+                        for row in _footnote_occurrences(_source_blocks(dialogue))}
+    span_positions = {str(span["id"]): index for index, span in enumerate(spans)}
+    # Validate the original proof before taking a disposable, reindexed subset.
+    evidence = review.get("boundaryReviewEvidence")
+    if evidence is not None:
+        accepted_boundary_repairs({**review, "decisions": [
+            {**decision, "action": "keep"} for decision in review["decisions"]]})
+
+    def ranges(row):
+        return [(str(anchor["blockId"]), int(anchor["sourceStart"]), int(anchor["sourceEnd"]))
+                for anchor in [row, *row.get("boundaryAnchors", [])]]
+
+    while True:
+        added = []
+        blocks = {block for block, _, _ in influence}
+        for row in rows:
+            if row["id"] in included:
+                continue
+            context = ranges(row)
+            # Other policies on an anchor's source block can split its span ID,
+            # invalidating a seam even when their ranges do not overlap its token.
+            # Boundary-to-boundary dependencies still follow exact token ranges.
+            if ((row.get("boundaryDecision") is None and str(row["blockId"]) in blocks)
+                    or any(block == other and max(start, left) < min(end, right)
+                           for block, start, end in context
+                           for other, left, right in influence)):
+                included.add(row["id"])
+                added.extend(context)
+                anchors = row.get("boundaryAnchors", [])
+                positions = [span_positions[str(anchor["spanId"])] for anchor in anchors
+                             if str(anchor["spanId"]) in span_positions]
+                if len(positions) == 2:
+                    # Never make distant anchors adjacent by dropping intervening text.
+                    added.extend((str(span["blockId"]), int(span["sourceStart"]), int(span["sourceEnd"]))
+                                 for span in spans[min(positions) + 1:max(positions)])
+                if row.get("kind") == "footnote":
+                    added.extend((str(span["blockId"]), int(span["sourceStart"]), int(span["sourceEnd"]))
+                                 for span in spans if span["blockId"] == row["blockId"])
+        if not added:
+            break
+        influence.extend(added)
+
+    blocks = {block for block, _, _ in influence}
+    scoped_spans = [span for span in spans if str(span["blockId"]) in blocks]
+    scoped_review = {**review, "warningSnapshot": [
+        {**warning, "occurrences": [row for row in warning.get("occurrences", []) if row["id"] in included]}
+        for warning in review["warningSnapshot"]],
+        "decisions": [decision for decision in review["decisions"] if decision["occurrenceId"] in included]}
+    if evidence is not None:
+        from .boundary_review import BATCH_SIZE
+        window_ids = {row.get("boundaryWindowId") for row in rows if row["id"] in included}
+        pairs = [(window, occurrence) for window, occurrence in
+                 zip(evidence["windows"], evidence["occurrences"], strict=True)
+                 if window["windowId"] in window_ids]
+        windows = []
+        for index, (window, _) in enumerate(pairs):
+            copied = {**window, "response": {**window["response"], "name": f"boundary{index % BATCH_SIZE}"}}
+            if window.get("verification") is not None:
+                copied["verification"] = {**window["verification"], "name": f"verify{index % BATCH_SIZE}"}
+            windows.append(copied)
+        scoped_review["boundaryReviewEvidence"] = {
+            **evidence, "windows": windows, "occurrences": [occurrence for _, occurrence in pairs]}
+    return {**dialogue, "spans": scoped_spans}, scoped_review, source_notes
+
+
 def preview_review_transcript_page(
     extraction: Mapping[str, Any],
     dialogue: Mapping[str, Any],
@@ -1132,7 +1215,8 @@ def preview_review_transcript_page(
     tentative = {"warningSnapshot": list(warnings.values()), "decisions": decisions,
                  "boundaryReviewEvidence": workspace.get("boundaryReviewEvidence")}
     from .review_resolution import resolve_review_revision
-    tentative, _audit = resolve_review_revision(dialogue, tentative)
+    dialogue, tentative, source_notes = _transcript_preview_context(dialogue, tentative, page, block_pages)
+    tentative, _audit = resolve_review_revision(dialogue, tentative, source_notes=source_notes)
     rendered = apply_review_render_policies(dialogue, tentative)
     boundary_repairs = accepted_boundary_repairs(tentative)
     if boundary_repairs:

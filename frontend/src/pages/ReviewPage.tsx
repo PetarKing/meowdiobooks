@@ -31,14 +31,16 @@ import {
   reviewIsPatternGroup,
   reviewPatternDecisions,
   reviewSuggestedAction,
+  reviewIsInformationalSourceCheck,
 } from "../workflow/review";
 
-export type ReviewPageModel = Pick<WorkflowModel, "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
+export type ReviewPageModel = Pick<WorkflowModel, "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewFailed" | "retryReviewPreview" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
 
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
-  const { reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
-  const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
-  const reviewDecisions = reviewDefaultDecisions(candidateWarnings, selectedReviewDecisions);
+  const { reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewFailed, retryReviewPreview, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const allCandidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
+  const candidateWarnings = allCandidateWarnings.map((group) => ({ ...group, occurrences: group.occurrences.filter((row) => !reviewIsInformationalSourceCheck(group, row)) })).filter((group) => group.occurrences.length > 0);
+  const reviewDecisions = reviewDefaultDecisions(allCandidateWarnings, selectedReviewDecisions);
   const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
   const keptScriptCount = Number.isSafeInteger(scriptSummary?.kept) && Number(scriptSummary?.kept) > 0 ? Number(scriptSummary?.kept) : 0;
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
@@ -55,6 +57,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const actionWarning = warning && occurrence ? { ...warning, kind: hasCleanupSuggestion && !isPatternGroup ? "ai-cleanup" : warning.kind, readerState: occurrence.readerState ?? warning.readerState, occurrences: perOccurrence ? [occurrence] : warning.occurrences } : warning;
   const selectedAction = occurrence && perOccurrence ? reviewDecisions[occurrence.id] : warning && reviewDecisions[warning.id];
   const occurrenceActions = warning && occurrence ? reviewOccurrenceActions(warning, occurrence) : [];
+  const originalChoiceText = (boundaryEvidence ? occurrence?.boundarySource : occurrence?.source)?.replace(/[ \t]*[\r\n]+[ \t]*/g, " ");
   const deletionSuggestion = hasCleanupSuggestion && occurrence?.replacement === "" && occurrenceActions.includes("repair");
   const visibleActions = isAiCleanup || isPatternGroup
     ? (["keep", "exclude", "repair"] as ReviewCapability[]).filter((action) => occurrenceActions.includes(action) && (action !== "repair" || !deletionSuggestion))
@@ -64,6 +67,8 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   const pendingSuggestionCount = isPatternGroup ? pendingPatternCount : isScriptCue ? pendingCueCount : pendingProposalCount;
   const suggestionCount = isPatternGroup ? warning.occurrences.length : isScriptCue ? warning.occurrences.filter((row) => reviewOccurrenceActions(warning, row).includes("exclude")).length : proposals.length;
   const showBulkSuggestions = (isPatternGroup || isScriptCue || isAiCleanup) && suggestionCount > 1;
+  const suggestionReason = userFacingDetail(occurrence?.cleanupReason ?? occurrence?.reason, "Compare the highlighted text with your source document.");
+  const sourceOnly = hasCleanupSuggestion && occurrence && !reviewSuggestedAction(warning, occurrence);
   const bulkHelp = t(pendingSuggestionCount > 0 ? "Your manual choices are preserved." : "No undecided suggestions remain. You can still change individual choices.");
   const boundary = boundaries[Math.min(activeBoundary, Math.max(0, boundaries.length - 1))];
   const showingBoundary = boundaries.length > 0 && (activeReviewGroup === "chapters" || candidateWarnings.length === 0);
@@ -249,7 +254,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   }
 
   async function acceptReview() {
-    if (!book || !reviewCandidate?.revision) return;
+    if (!book || !reviewCandidate?.revision || !complete || busy || reviewTransition) return;
     setReviewTransition(true);
     setProcessMessage("Applying review decisions");
     setProgress(25);
@@ -257,7 +262,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
       const decisions: AcceptanceDecision[] = [...await buildReviewWarningDecisions(
         book.id,
         String(reviewCandidate.revision),
-        candidateWarnings,
+        allCandidateWarnings,
         reviewDecisions,
         gateway.previewReviewBulk.bind(gateway),
       )];
@@ -304,9 +309,11 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   if (reviewFinalCheck) return <ReviewTranscriptFinalCheck
     preview={reviewTranscriptPreview}
     loading={reviewPreviewLoading}
+    failed={reviewPreviewFailed}
+    onRetry={retryReviewPreview}
     page={reviewPreviewPage}
     pageCount={reviewTranscriptPreview?.pageCount ?? book?.pageCount ?? 1}
-    busy={busy || reviewTransition}
+    busy={busy || reviewTransition || !complete}
     onPageChange={setReviewPreviewPage}
     onBack={() => setReviewFinalCheck(false)}
     onAccept={() => void acceptReview().catch((reason) => setError(message(reason)))}
@@ -349,22 +356,26 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
             {!isPatternGroup && <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>}
-            <h3>{t(hasCleanupSuggestion && occurrence.cueVerification !== "verified" && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
+            <h3>{t(sourceOnly ? "Does this text match the source?" : isAiCleanup && !deletionSuggestion && typeof occurrence.replacement === "string" ? "Use this correction?" : reviewQuestion(actionWarning.kind))}</h3>
+            {hasCleanupSuggestion && <p className="review-decision-reason">{t(suggestionReason, { defaultValue: suggestionReason })}</p>}
+            {sourceOnly && <p className="evidence-help">{t("No correction was suggested for this passage. Choose whether to keep the original text.")}</p>}
             <div className="resolution-options">
               {visibleActions.map((action) => {
                 const recommended = ((isScriptCue || isAiCleanup) && occurrence.recommendedAction === action)
                   || (hasCleanupSuggestion && (deletionSuggestion ? action === "exclude" : action === "repair"));
                 const selected = selectedAction === action || (deletionSuggestion && action === "exclude" && selectedAction === "repair");
                 return <button key={action} aria-pressed={selected} aria-description={recommended ? t("Suggested choice for this passage") : undefined} className={[recommended ? "review-recommended" : "", recommended && selectedAction && !selected ? "review-recommended-muted" : "", selected ? "selected" : ""].filter(Boolean).join(" ")} onClick={() => perOccurrence ? chooseOccurrenceAction(action) : chooseReviewAction(warning.id, action)}>
-                  <span className="review-choice-title"><b>{t(reviewActionTitle(action, actionWarning))}</b>{selected ? <span className="review-choice-check" aria-hidden="true">✓</span> : recommended && <span className="review-choice-suggestion" aria-hidden="true">✧</span>}</span>
-                  <small className={action === "repair" ? "cleanup-replacement" : undefined}>{action === "repair" && typeof occurrence.replacement === "string" && occurrence.replacement !== "" ? occurrence.replacement : reviewConsequence(action, actionWarning, t)}</small>
+                  <span className="review-choice-title"><b>{t(reviewActionTitle(action, actionWarning))}</b>{selected ? <span className="review-choice-check" aria-hidden="true">✓</span> : recommended && <span className="review-choice-suggestion" aria-hidden="true">✧ {t("AI suggestion")}</span>}</span>
+                  <small className={action === "repair" || (action === "keep" && hasCleanupSuggestion) ? "cleanup-replacement" : undefined}>{action === "keep" && hasCleanupSuggestion ? originalChoiceText : action === "repair" && typeof occurrence.replacement === "string" && occurrence.replacement !== "" ? occurrence.replacement : reviewConsequence(action, actionWarning, t)}</small>
                 </button>;
               })}
               {showBulkSuggestions && <div className="review-bulk-area">
+                {isAiCleanup && <p className="review-bulk-summary" role="status">{t("{{remaining}} remaining · {{decided}} already decided · {{total}} suggested changes", { remaining: pendingSuggestionCount, decided: suggestionCount - pendingSuggestionCount, total: suggestionCount })}</p>}
                 <button className="cleanup-bulk-warning" title={bulkHelp} aria-description={bulkHelp} disabled={pendingSuggestionCount === 0} onClick={isPatternGroup ? applyPatternSuggestions : isScriptCue ? applyScriptSuggestions : applyAllProposals}>
-                  <span aria-hidden="true">{pendingSuggestionCount > 0 ? "⚠" : "✓"}</span>
-                  <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t("Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("All suggestions decided")}</b>
+                  <span aria-hidden="true">{pendingSuggestionCount > 0 ? "✧" : "✓"}</span>
+                  <b>{isPatternGroup && pendingSuggestionCount > 0 ? t("Apply all AI suggestions") : pendingSuggestionCount > 0 ? t(isAiCleanup ? "Apply remaining AI suggestions ({{count}})" : "Apply all suggested choices ({{count}})", { count: pendingSuggestionCount }) : t("All suggestions decided")}</b>
                 </button>
+                {isAiCleanup && <p className="review-bulk-help">{t("Only the remaining suggested changes will be selected. Your existing choices stay as they are. Changes apply when you accept the review.")}</p>}
               </div>}
             </div>
           </section>

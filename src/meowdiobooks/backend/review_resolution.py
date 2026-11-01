@@ -134,8 +134,12 @@ def _source_blocks(dialogue):
     return result
 
 
-def resolve_review_revision(dialogue: Mapping, requested: Mapping):
-    """Resolve a preview/new acceptance. Never call this on historical accepted renders."""
+def resolve_review_revision(dialogue: Mapping, requested: Mapping, *, source_notes: Mapping | None = None):
+    """Resolve a preview/new acceptance, never a historical accepted render.
+
+    Page projections supply notes detected in original book order so stateful note
+    continuation remains identical after unrelated source blocks are removed.
+    """
     review = deepcopy(dict(requested))
     review['renderPolicyVersion'] = POLICY_VERSION
     review['decisions'] = sorted(review.get('decisions', []), key=lambda d: d['occurrenceId'])
@@ -160,7 +164,8 @@ def resolve_review_revision(dialogue: Mapping, requested: Mapping):
 
     # Recover saved pre-fix candidates only where the current deterministic detector
     # proves the same isolated note continues through a physically wrapped word.
-    notes = {(r['blockId'], r['sourceStart']): r for r in _footnote_occurrences(blocks)}
+    notes = source_notes if source_notes is not None else {
+        (r['blockId'], r['sourceStart']): r for r in _footnote_occurrences(blocks)}
     for key, row in rows.items():
         note = notes.get((row['blockId'], row['sourceStart']))
         if (row.get('kind') == 'footnote' and note and row['sourceEnd'] < note['sourceEnd']

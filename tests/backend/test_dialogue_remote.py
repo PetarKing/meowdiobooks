@@ -674,3 +674,100 @@ def test_incomplete_response_retries_fresh_even_if_partial_text_is_valid_json(mo
     assert _single_dialogue(result)["resolvedSpeakerLabel"] == "Alice"
     assert result["remoteUsage"]["physicalRequests"] == 4
     assert all(len(payload["input"]) == 1 for _, payload in calls)
+
+
+def _adjudicator_registry(monkeypatch, **changes):
+    from dataclasses import replace
+    from meowdiobooks.backend.model_config import load_model_registry
+
+    registry = load_model_registry(REPO_ROOT)
+    primary = registry.remote_dialogue_model()
+    resolver = replace(
+        primary, id="conflict-resolver", model="test-resolver", service_tier="default",
+        reasoning_effort="medium", input_usd_per_million_tokens=1,
+        cached_input_usd_per_million_tokens=0.05,
+        cache_write_input_usd_per_million_tokens=1.25, output_usd_per_million_tokens=5,
+        default_service_tier_price_multiplier=1, **changes,
+    )
+    registry = replace(
+        registry,
+        remote_text_models={**registry.remote_text_models, resolver.id: resolver},
+        dialogue_attribution=replace(registry.dialogue_attribution,
+                                     adjudication_remote_profile=resolver.id),
+    )
+    monkeypatch.setattr(dialogue_remote, "load_model_registry", lambda _root: registry)
+    return registry
+
+
+def _install_mixed_models(monkeypatch, *, agree=False):
+    calls = []
+
+    def factory(config, effort, observer, *, request_admission=None, check_cancelled=None):
+        def call(payload):
+            calls.append((config.id, effort, payload))
+            speaker = "Alice" if agree or config.id == "conflict-resolver" or effort == "low" else "Bob"
+            response = _response(_target_ids(payload), speaker)
+            response.update(model=config.model, service_tier=config.service_tier)
+            response["usage"] = {
+                "input_tokens": 1000,
+                "input_tokens_details": {"cached_tokens": 200, "cache_write_tokens": 300},
+                "output_tokens": 100,
+            }
+            return response
+        return call
+
+    monkeypatch.setattr(dialogue_remote, "_responses_api_call", factory)
+    return calls
+
+
+@pytest.mark.parametrize("agree", [True, False])
+def test_optional_adjudicator_changes_only_conflicts_and_uses_its_own_prices(monkeypatch, agree):
+    registry = _adjudicator_registry(monkeypatch)
+    calls = _install_mixed_models(monkeypatch, agree=agree)
+    scan = scan_dialogue([{"page": 1, "text": '“Hello,” Alice said.'}])
+    result = dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps")
+    assert sorted(row[:2] for row in calls[:2]) == [("luna-dialogue", "low"), ("luna-dialogue", "medium")]
+    assert [row[:2] for row in calls[2:]] == ([] if agree else [("conflict-resolver", "medium")])
+    assert result["remoteUsage"]["estimatedCostUsd"] == (0.0006 if agree else 0.0019)
+    assert result["remoteUsage"]["adjudicatorProfile"] == "conflict-resolver"
+    assert result["remoteUsage"]["providerModels"] == sorted(
+        [registry.remote_dialogue_model().model] + ([] if agree else ["test-resolver"]))
+    assert _single_dialogue(result)["resolvedSpeakerLabel"] == "Alice"
+    assert ''.join(s['source'] for s in result['partition']) == ''.join(s['source'] for s in scan['partition'])
+
+
+@pytest.mark.parametrize("field,value", [
+    ("model", "different-resolver"), ("reasoning_effort", "high"),
+    ("base_url", "https://another.example/v1"), ("service_tier", "fast"),
+])
+def test_adjudicator_recipe_change_reuses_passes_but_reruns_conflict(monkeypatch, tmp_path, field, value):
+    from dataclasses import replace
+
+    registry = _adjudicator_registry(monkeypatch)
+    calls = _install_mixed_models(monkeypatch)
+    scan = scan_dialogue([{"page": 1, "text": '“Hello,” Alice said.'}])
+    dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps", checkpoint_dir=tmp_path)
+    assert len(calls) == 3
+    resolver = registry.remote_dialogue_adjudication_model()
+    changed = replace(registry, remote_text_models={
+        **registry.remote_text_models, resolver.id: replace(resolver, **{field: value}),
+    })
+    monkeypatch.setattr(dialogue_remote, "load_model_registry", lambda _root: changed)
+    dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps", checkpoint_dir=tmp_path)
+    assert len(calls) == 4
+    assert calls[-1][0] == "conflict-resolver"
+    # A corrupted nested adjudicator checkpoint must not invalidate either initial pass.
+    for path in tmp_path.glob('*/adjudication/*/*.json'):
+        path.write_text('{}')
+    dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps", checkpoint_dir=tmp_path)
+    assert len(calls) == 5
+    assert calls[-1][0] == "conflict-resolver"
+
+
+def test_unsupported_adjudicator_engine_fails_before_any_request(monkeypatch):
+    _adjudicator_registry(monkeypatch, engine="openai_compatible")
+    calls = _install_mixed_models(monkeypatch)
+    scan = scan_dialogue([{"page": 1, "text": '“Hello,” Alice said.'}])
+    with pytest.raises(ValueError, match="adjudication requires an OpenAI Responses"):
+        dialogue_remote.run_dialogue_remote(REPO_ROOT, scan, "fill-gaps")
+    assert calls == []

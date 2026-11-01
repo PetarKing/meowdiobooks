@@ -6,6 +6,15 @@ const zhCN: Record<string, string> = {
   "Reads each page as an image. Slower.": "将每一页作为图片读取，速度较慢。",
   "Extracted text": "提取的文字",
   "Specialized": "专项方法",
+  "Use this correction?": "使用这项修改吗？",
+  "No correction was suggested for this passage. Choose whether to keep the original text.": "这段文字没有建议修改。请选择是否保留原文。",
+  "Apply remaining AI suggestions ({{count}})": "应用剩余 AI 建议（{{count}} 项）",
+  "{{remaining}} remaining · {{decided}} already decided · {{total}} suggested changes": "剩余 {{remaining}} 项 · 已决定 {{decided}} 项 · 共 {{total}} 项修改建议",
+  "Only the remaining suggested changes will be selected. Your existing choices stay as they are. Changes apply when you accept the review.": "仅选择尚未决定的修改建议，保留您已有的选择。接受审核时才会应用修改。",
+
+  "Your account has reached its monthly processing limit. Your saved work is still available. You can continue next month, or contact support.": "您的账户已达到本月处理限额。已保存的工作仍然可用。您可以下个月继续，或联系支持。",
+  "Audiobook processing has reached the service’s weekly limit. Your saved work is still available. Please try again later or contact support.": "有声书处理已达到服务的每周限额。已保存的工作仍然可用。请稍后重试或联系支持。",
+  "Audiobook processing has reached the service’s monthly limit. Your saved work is still available. Please try again next month or contact support.": "有声书处理已达到服务的每月限额。已保存的工作仍然可用。请下个月重试或联系支持。",
   "Ready for their voices?": "准备好生成声音了吗？",
   "Generation method": "生成方式",
   "Cancel voice setup": "取消声音设置",
@@ -1540,6 +1549,11 @@ const zhCN: Record<string, string> = {
   "We couldn’t create this page preview. Please try again.": "无法创建页面预览。请重试。",
   "We couldn’t read this document. Please try again or upload another file.": "无法读取文档。请重试或上传其他文件。",
   "{{message}} Reference: {{reference}}.": "{{message}} 参考编号：{{reference}}。",
+  "Preview any page you want to check. Only the selected page loads, and you can continue without waiting for the preview.": "可以预览任何想检查的页面。每次只加载所选页面，无需等待预览即可继续。",
+  "This page preview could not load. You can retry or accept your review and continue.": "此页预览未能加载。您可以重试，也可以接受审核并继续。",
+  "Retry page preview": "重试页面预览",
+  "The original page could not load. The transcript preview is still available.": "原始页面未能加载。您仍可查看文稿预览。",
+  "Loading original page…": "正在加载原始页面…",
 };
 
 export default zhCN;
