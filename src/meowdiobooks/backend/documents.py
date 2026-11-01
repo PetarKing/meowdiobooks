@@ -22,7 +22,7 @@ from .document_errors import DocumentImportError
 from .text_documents import TEXT_SUFFIXES, read_text_document
 
 SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
-EXTRACTION_METHOD_VERSION = "documents-v3"
+EXTRACTION_METHOD_VERSION = "documents-v4"
 _LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
 _OCR_CACHE_KEY = "liteparse-ocr-eng-v1"
 
@@ -119,7 +119,7 @@ def extraction_sample_pages(
     Complexity's generic verdict also includes vector decorations on normal
     prose pages. Only sparse text plus substantial raster content is evidence
     for an image-text probe. Blank digital pages never qualify. A blank scan or
-    illustration can qualify; users inspect the page before choosing recovery.
+    illustration can qualify; recovery retains native text when OCR adds nothing.
     """
     ordinary = representative_pages(page_count)
     if source.suffix.lower() in TEXT_SUFFIXES:
@@ -190,18 +190,74 @@ def _read_image_screen_cache(cache, page_count):
         return None
 
 
-def _flag_possible_image_text(source, cache_root, pages, command_runner):
-    # The screen is cheap; this never OCRs a complete book. Persist suspect
-    # physical pages in extraction so Review can inspect even footer-only misses.
-    extraction_sample_pages(source, cache_root, len(pages), command_runner=command_runner)
+def _flag_possible_image_text(source, cache_root, pages, command_runner, *, page_count=None):
+    # Persist physical candidates for automatic recovery before Dialogue.
+    count = len(pages) if page_count is None else page_count
+    extraction_sample_pages(source, cache_root, count, command_runner=command_runner)
     cache = cache_root / "extraction" / "ocr-samples-v2.json"
-    cached = _read_image_screen_cache(cache, len(pages))
+    cached = _read_image_screen_cache(cache, count)
     if cached is None:
         return pages
     suspects = set(cached["imagePages"])
-    return [{**row, "warnings": [*row.get("warnings", []), {
+    return [{**row, "ocrCandidate": True, "warnings": [*row.get("warnings", []), {
         "code": "possible-image-text", "label": "This image may contain unextracted text.",
-    }]} if row["page"] in suspects and row.get("method") != "ocr" else row for row in pages]
+    }]} if row["page"] in suspects and row.get("method") != "ocr" else {**row, "ocrCandidate": False} for row in pages]
+
+
+def auto_recover_pdf_pages(source, cache_root, pages, extract_page, report=None, *, preview=False):
+    """Recover sparse image pages before any dialogue processing.
+
+    Operates on adapter data only: hosted PDF parsing stays inside its sandbox.
+    Failure/cancellation propagates so no partial extraction is published.
+    """
+    notify = report or (lambda _progress, _message=None: None)
+    def candidate(row):
+        if row.get("method") == "ocr" or row.get("ocrCandidate") is False:
+            return False
+        text = row["text"].strip()
+        return (row.get("ocrCandidate") is True
+                or any(isinstance(w, Mapping) and w.get("code") == "possible-image-text"
+                       for w in row.get("warnings", []))
+                or not text or (preview and len(text) < 200))
+
+    targets = [row["page"] for row in pages if candidate(row)]
+    target_set = set(targets)
+    result = []
+    completed = 0
+    for original in pages:
+        if original["page"] not in target_set:
+            result.append(original)
+            continue
+        notify(60 + 35 * completed / len(targets),
+               f"Recovering text with OCR ({completed + 1}/{len(targets)})")
+        recovered = extract_page(source, cache_root, original["page"], "ocr")
+        if (not isinstance(recovered, dict) or type(recovered.get("page")) is not int
+                or recovered["page"] != original["page"] or not isinstance(recovered.get("text"), str)):
+            raise ValueError("OCR did not return the requested page")
+        text = recovered["text"].strip()
+        old = original["text"].strip()
+        def letters(value):
+            return sum(char.isalnum() for char in value)
+        words = re.findall(r"[^\W\d_]{2,}", text, re.UNICODE)
+        cjk = sum("\u3400" <= char <= "\u9fff" for char in text)
+        new_words = set(word.casefold() for word in words) - set(
+            word.casefold() for word in re.findall(r"[^\W\d_]{2,}", old, re.UNICODE))
+        new_cjk = set(char for char in text if "\u3400" <= char <= "\u9fff") - set(old)
+        useful = ((len(words) >= 2 or cjk >= 4) and letters(text) > letters(old)
+                  and bool(new_words or new_cjk))
+        if useful:
+            warnings = _warnings(text)
+            for warning in recovered.get("warnings", []):
+                if (isinstance(warning, Mapping)
+                        and warning.get("code") not in {"empty", "empty-page", "possible-image-text"}
+                        and warning not in warnings):
+                    warnings.append(dict(warning))
+            result.append({**original, **recovered, "text": text, "method": "ocr",
+                           "warnings": warnings})
+        else:
+            result.append(original)
+        completed += 1
+    return result
 
 
 def render_default_cover(cache_root: Path) -> Path:
@@ -309,7 +365,9 @@ def extract_pdf_page(
     if cache.is_file():
         result = json.loads(cache.read_text(encoding="utf-8"))
         result["cached"] = True
-        return result
+        return (_flag_possible_image_text(source, cache_root, [result], command_runner,
+                                         page_count=len(PdfReader(source).pages))[0]
+                if method == "liteparse" else result)
     cache.parent.mkdir(parents=True, exist_ok=True)
     if method in {"liteparse", "ocr"}:
         raw = cache.with_name(f"{cache.stem}-{uuid4().hex}.raw.json")
@@ -362,7 +420,9 @@ def extract_pdf_page(
         "cached": False,
     }
     _write_extraction_cache(cache, result)
-    return result
+    return (_flag_possible_image_text(source, cache_root, [result], command_runner,
+                                     page_count=len(PdfReader(source).pages))[0]
+            if method == "liteparse" else result)
 
 
 def _write_extraction_cache(path: Path, result: dict[str, Any]) -> None:

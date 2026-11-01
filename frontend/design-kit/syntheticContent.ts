@@ -6,8 +6,6 @@ export const fixtureBook: LocalBook = {
   source_kind: "pdf",
   page_count: 120,
 };
-export const text =
-  "Alice was beginning to get very tired of sitting by her sister on the bank. “What is the use of a book,” thought Alice, “without pictures or conversations?”";
 export const sourcePageThoughtParts = [
   "“What is the use of a book,”", "thought Alice,", "“without pictures or conversations?”",
 ] as const;
@@ -23,6 +21,7 @@ export const sourcePageLines = [
 export const sourcePageHeading = "Down the Rabbit-Hole";
 export const sourcePageNarration = sourcePageLines.slice(0, 5).join(" ");
 export const sourcePageThought = sourcePageLines.slice(5).join(" ");
+export const text = [sourcePageHeading, sourcePageNarration, sourcePageThought].join("\n\n");
 export const sourceImage = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="620" height="820" viewBox="0 0 620 820"><rect width="620" height="820" fill="#fffdf8"/><g fill="#29252b" font-family="Georgia"><text x="70" y="80" font-size="15">SYNTHETIC SOURCE PREVIEW · 1</text><text x="70" y="145" font-size="27">${sourcePageHeading}</text>${sourcePageLines.map((line, i) => `<text x="70" y="${205 + i * 32}" font-size="18">${line}</text>`).join("")}</g></svg>`)}`;
 // Four seconds of synthetic silence make transport progress and seeking observable.
 // This is a player fixture, never a recording of the displayed transcript.

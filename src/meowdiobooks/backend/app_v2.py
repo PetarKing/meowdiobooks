@@ -99,6 +99,7 @@ from .dialogue_ai import apply_dialogue_corrections, run_dialogue_qwen
 from .dialogue_remote import run_dialogue_remote
 from .documents import (
     EXTRACTION_METHOD_VERSION,
+    auto_recover_pdf_pages,
     extract_full_document,
     extract_pdf_page,
     SUPPORTED_SUFFIXES,
@@ -648,72 +649,18 @@ def create_app_v2(
                 public_message="Import the source document again before continuing.",
             )
         method = command.settings.method if book.source_kind == "pdf" else "text"
+        report(2, "Extracting the complete document")
         package = package_for(book.id)
-        repair_provenance: dict[str, Any] = {}
-        if command.settings.ocrPages is not None:
-            if book.source_kind != "pdf":
-                raise WorkflowInputError("Targeted OCR requires a PDF source.")
-            base = extraction_payload(book.id)
-            if base.get("revision") != command.settings.baseExtractionRevision:
-                raise WorkflowInputError(
-                    "The extracted text changed. Open the current review before recovering pages.",
-                )
-            if base.get("sourceHash") != book.source_hash:
-                raise WorkflowInputError(
-                    "The accepted extraction does not match this source. Extract the document again.",
-                )
-            original_pages = base.get("pages")
-            expected_pages = list(range(1, (book.page_count or 0) + 1))
-            if (not expected_pages or not isinstance(original_pages, list)
-                    or base.get("pageCount") != len(expected_pages)
-                    or any(not isinstance(row, dict) or type(row.get("page")) is not int
-                           or not isinstance(row.get("text"), str) for row in original_pages)
-                    or [row["page"] for row in original_pages] != expected_pages):
-                raise WorkflowInputError(
-                    "The accepted extraction is missing source pages. Extract the document again.",
-                )
-            requested = command.settings.ocrPages
-            expected_page_set = set(expected_pages)
-            if any(page not in expected_page_set for page in requested):
-                raise WorkflowInputError("An OCR page is outside this document.")
-            pages = deepcopy(original_pages)
-            report(2, "Recovering selected pages with OCR")
-            extract_page = file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page
-            for index, page_number in enumerate(requested, 1):
-                recovered = extract_page(source, package / "preview", page_number, "ocr")
-                text = recovered.get("text")
-                if (type(recovered.get("page")) is not int or recovered["page"] != page_number
-                        or not isinstance(text, str)):
-                    raise WorkflowInputError("OCR returned an invalid page. Please try again.")
-                if not text.strip():
-                    raise WorkflowInputError(
-                        f"OCR found no text on page {page_number}",
-                        public_message="OCR found no text on the selected page. Check the source before confirming it is empty.",
-                    )
-                if " ".join(text.split()) == " ".join(pages[page_number - 1]["text"].split()):
-                    raise WorkflowInputError(
-                        f"OCR found no additional text on page {page_number}",
-                        public_message="OCR found no additional text on the selected page. Compare the source or try another reading method.",
-                    )
-                pages[page_number - 1] = {
-                    **pages[page_number - 1], **recovered, "page": page_number,
-                    "text": text, "method": "ocr", "warnings": recovered.get("warnings", []),
-                }
-                report(5 + index / len(requested) * 85, f"Recovered page {page_number}")
-            method = str(base.get("method", "liteparse"))
-            prior_ocr_pages = [page for page in base.get("ocrPages", [])
-                               if type(page) is int and page in expected_page_set]
-            repair_provenance = {
-                "baseExtractionRevision": base["revision"],
-                "ocrPages": sorted(set(prior_ocr_pages) | set(requested)),
-                "recoveredPages": sorted(requested),
-            }
-        else:
-            report(2, "Extracting the complete document")
-            pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
-                source,
-                package / "preview",
-                method,
+        pages = (file_processor.extract_full_document if file_processor is not None else extract_full_document)(
+            source,
+            package / "preview",
+            method,
+            (lambda progress, message: report(progress * .6, message)) if method == "liteparse" else report,
+        )
+        if method == "liteparse":
+            pages = auto_recover_pdf_pages(
+                source, package / "preview", pages,
+                file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
                 report,
             )
         blocks = pages_to_dialogue_blocks(pages)
@@ -727,7 +674,6 @@ def create_app_v2(
                 "method": method,
                 "methodVersion": "text-v1" if method == "text" else EXTRACTION_METHOD_VERSION,
                 "sourceHash": book.source_hash,
-                **repair_provenance,
                 "pageCount": len(pages),
                 "pages": pages,
                 "blocks": blocks,
@@ -817,45 +763,8 @@ def create_app_v2(
 
     def process_review(command: RunReview, report) -> dict[str, object]:
         book = require_book(command.book_id)
-        package = package_for(book.id)
         extraction = extraction_payload(book.id)
-        dialogue = read_artifact(package, "dialogue")
-        recovery_outcome = None
-        base_extraction = extraction
-        base_dialogue = dialogue
-
-        def check_recovery_inputs(*, verify_source: bool = False) -> None:
-            current_book = require_book(book.id)
-            if (current_book.source_kind != "pdf" or not current_book.source_name
-                    or current_book.source_name != book.source_name
-                    or current_book.source_hash != book.source_hash):
-                raise WorkflowInputError("The OCR recovery does not match the current source.")
-            if extraction_payload(book.id).get("revision") != command.settings.baseExtractionRevision:
-                raise WorkflowInputError("The extracted text changed. Open the current review before recovering pages.")
-            if read_artifact(package, "dialogue").get("revision") != command.settings.baseDialogueRevision:
-                raise WorkflowInputError("Speaker assignments changed. Open the current review before recovering pages.")
-            if verify_source:
-                source = source_path(root, book.id, current_book.source_name)
-                digest = hashlib.sha256()
-                with source.open("rb") as stream:
-                    while chunk := stream.read(1024 * 1024):
-                        digest.update(chunk)
-                if not book.source_hash or digest.hexdigest() != book.source_hash:
-                    raise WorkflowInputError("Import the source document again before continuing.")
-
-        if command.settings.ocrPages is not None:
-            if book.source_kind != "pdf" or not book.source_name:
-                raise WorkflowInputError("Targeted OCR requires a PDF source.")
-            check_recovery_inputs(verify_source=True)
-            source = source_path(root, book.id, book.source_name)
-            from .ocr_recovery import prepare_review_ocr
-
-            extraction, dialogue, recovery_outcome = prepare_review_ocr(
-                source, package / "preview", extraction, dialogue, command.settings.ocrPages,
-                page_count=book.page_count or 0, source_hash=book.source_hash,
-                extract_page=file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
-                report=report,
-            )
+        dialogue = read_artifact(package_for(book.id), "dialogue")
         report(1, "Checking the transcript for issues")
         workspace = build_review_workspace(extraction, dialogue)
         if workspace.get("recovery") is None:
@@ -867,42 +776,19 @@ def create_app_v2(
                 request_admission=cleanup_request_admission,
             )
             workspace = add_cleanup_proposals(workspace, extraction, dialogue, cleanup)
-        payload = {**workspace, "revision": uuid4().hex, "status": "candidate"}
-        if recovery_outcome is None:
-            path, artifact = write_artifact(package, "review", payload, publish=False)
-            report(100, "Review warnings ready")
-            return _candidate_result(book.id, WizardStage.REVIEW, path, artifact)
-        payload["ocrRecovery"] = recovery_outcome
-        report(97, "Finishing recovered transcript review")
-
-        def publish_recovered_review() -> dict[str, object]:
-            check_recovery_inputs(verify_source=True)
-            written: list[Path] = []
-            try:
-                paths = {}
-                if recovery_outcome["recoveredPages"]:
-                    for kind, value in [("extraction", extraction), ("dialogue", dialogue)]:
-                        path, _artifact = write_artifact(package, kind, value, publish=False)
-                        paths[kind] = path
-                        written.append(path)
-                path, artifact = write_artifact(package, "review", payload, publish=False)
-                written.append(path)
-                result = _candidate_result(book.id, WizardStage.REVIEW, path, artifact)
-                if paths:
-                    workspace_for(book.id).publish_many(paths, expected_revisions={
-                        "extraction": str(base_extraction["revision"]),
-                        "dialogue": str(base_dialogue["revision"]),
-                    })
-                return result
-            except BaseException:
-                # Failed preparation/publication cannot leave a pending source
-                # candidate that opens as if recovery had succeeded after reload.
-                for path in reversed(written):
-                    path.unlink(missing_ok=True)
-                raise
-
-        commit = getattr(report, "commit", None)
-        return commit(publish_recovered_review) if callable(commit) else publish_recovered_review()
+        revision = uuid4().hex
+        path, artifact = write_artifact(
+            package_for(book.id),
+            "review",
+            {
+                **workspace,
+                "revision": revision,
+                "status": "candidate",
+            },
+            publish=False,
+        )
+        report(100, "Review warnings ready")
+        return _candidate_result(book.id, WizardStage.REVIEW, path, artifact)
 
     def process_cast(command: BuildCast, report) -> dict[str, object]:
         package = package_for(command.book_id)
@@ -1879,7 +1765,6 @@ def create_app_v2(
                 row
                 for row in reversed(extraction_history[active_extraction_index + 1 :])
                 if str(row.get("revision") or "") not in accepted_revisions["extraction"]
-                and row.get("publicationOwner") != "review-ocr"
                 and book.source_hash
                 and row.get("sourceHash") == book.source_hash
             ),
@@ -1900,7 +1785,6 @@ def create_app_v2(
                 row
                 for row in reversed(dialogue_history[active_dialogue_index + 1 :])
                 if str(row.get("revision") or "") not in accepted_revisions["dialogue"]
-                and row.get("publicationOwner") != "review-ocr"
                 and str(row.get("extractionRevision") or "") == active_extraction_revision
             ),
             None,
@@ -2063,12 +1947,13 @@ def create_app_v2(
             book = require_book(book_id)
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        source = source_path(root, book.id, book.source_name or "original.pdf")
-        if file_processor is not None:
-            sampler = getattr(file_processor, "extraction_sample_pages", None)
-            if sampler is None:
-                return representative_pages(book.page_count or 1)
-        else:
+        if book.source_kind != "pdf" or not book.source_name:
+            return representative_pages(book.page_count or 1)
+        source = source_path(root, book.id, book.source_name)
+        sampler = getattr(file_processor, "extraction_sample_pages", None)
+        if file_processor is not None and sampler is None:
+            return representative_pages(book.page_count or 1)
+        if sampler is None:
             from .documents import extraction_sample_pages
             sampler = extraction_sample_pages
         return sampler(source, package_for(book.id) / "preview", book.page_count or 1)
@@ -2083,6 +1968,12 @@ def create_app_v2(
             result = (file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page)(
                 source, package_for(book.id) / "preview", body.page, body.method
             )
+            if book.source_kind == "pdf" and body.method == "liteparse":
+                result = auto_recover_pdf_pages(
+                    source, package_for(book.id) / "preview", [result],
+                    file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
+                    preview=True,
+                )[0]
             if book.source_kind == "pdf":
                 (file_processor.render_pdf_page if file_processor is not None else render_pdf_page)(
                     source, package_for(book.id) / "preview", body.page,
@@ -2945,19 +2836,7 @@ def create_app_v2(
         if candidate is None:
             raise HTTPException(status_code=404, detail=f"{stage.title()} candidate not found")
         try:
-            expected_revisions: dict[str, str] = {}
-            if parsed == WizardStage.EXTRACT and candidate.get("baseExtractionRevision"):
-                expected_revisions["extraction"] = str(candidate["baseExtractionRevision"])
-                extraction = read_artifact(package_for(book_id), "extraction")
-                if candidate["baseExtractionRevision"] != extraction.get("revision"):
-                    raise WorkflowInputError(
-                        "The extracted text changed. Recover the pages again from the current review.",
-                    )
-                if (book.source_kind != "pdf" or candidate.get("sourceHash") != book.source_hash
-                        or extraction.get("sourceHash") != book.source_hash):
-                    raise WorkflowInputError("The OCR recovery does not match the current source.")
             if parsed == WizardStage.DIALOGUE:
-                expected_revisions["extraction"] = str(candidate.get("extractionRevision", ""))
                 extraction = read_artifact(package_for(book_id), "extraction")
                 if candidate.get("extractionRevision") != extraction.get("revision"):
                     raise DialogueContractError(
@@ -2967,20 +2846,12 @@ def create_app_v2(
                 if blockers:
                     raise DialogueContractError("; ".join(blockers))
             if parsed == WizardStage.REVIEW:
-                expected_revisions.update({
-                    "extraction": str(candidate.get("extractionRevision", "")),
-                    "dialogue": str(candidate.get("dialogueRevision", "")),
-                })
                 dialogue = read_artifact(package_for(book_id), "dialogue")
                 if candidate.get("dialogueRevision") != dialogue.get("revision"):
                     raise ReviewContractError(
                         "Review candidate references a superseded Dialogue revision"
                     )
             if parsed == WizardStage.CAST:
-                expected_revisions.update({
-                    "dialogue": str(candidate.get("dialogueRevision", "")),
-                    "review": str(candidate.get("reviewRevision", "")),
-                })
                 dialogue = read_artifact(package_for(book_id), "dialogue")
                 review = read_artifact(package_for(book_id), "review")
                 if candidate.get("dialogueRevision") != dialogue.get("revision") or candidate.get(
@@ -3082,7 +2953,7 @@ def create_app_v2(
             else:
                 path = package_for(book_id) / "artifacts" / kind / f"{body.revision}.json"
             workspace = workspace_for(book_id)
-            workspace.publish_many({kind: path}, expected_revisions=expected_revisions)
+            workspace.publish(kind, path)
             published_revision = workspace.read(kind)["revision"]
         except (
             CastContractError,

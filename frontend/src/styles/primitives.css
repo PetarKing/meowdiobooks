@@ -77,6 +77,7 @@
 .choice.selected { padding: 19px; border-color: var(--color-action, var(--poppy)); background: var(--surface-soft); box-shadow: none; }
 .choice-title { min-height: 25px; flex-wrap: wrap; font-family: var(--font-sans); font-size: 14px; font-weight: 650; letter-spacing: -.015em; }
 .choice-title small { padding: 4px 6px; border-radius: 4px; font: 600 11px var(--font-sans); letter-spacing: .04em; background: var(--color-action, var(--poppy)); }
+.choice-title small.choice-badge-muted { background: var(--surface-soft); color: var(--color-muted, var(--muted)); border: 1px solid var(--color-border, var(--line)); font-weight: 500; text-transform: none; letter-spacing: .01em; }
 .choice-info { top: 10px; right: 10px; }
 .choice-info-trigger { width: 32px; height: 32px; border: 1px solid var(--color-border, var(--line)); font-size: 12px; font-weight: 600; background: var(--color-paper, var(--surface-raised)); color: var(--color-muted, var(--muted)); box-shadow: none; }
 .choice-tooltip { top: auto; right: 10px; bottom: calc(100% + 8px); left: 10px; padding: 12px 14px; border-color: transparent; border-radius: 10px; background: var(--inverse-surface); color: var(--inverse-ink); font-size: 13px; font-weight: 400; line-height: 1.55; transform: translateY(4px); }

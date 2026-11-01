@@ -31,39 +31,22 @@ tested Apple Silicon setup; users who already manage these tools elsewhere may u
 
 ## OCR for image text
 
-Standard, Embedded text and Complex layout read the PDF's saved text. The explicit
-OCR option also recognizes printed English text in images using LiteParse's
-bundled Tesseract engine. Compare its preview for recognition mistakes before
-processing a complete book. English OCR does not imply scanned-language support
-for every language the ordinary text extractor can read.
+Standard reads saved PDF text and automatically tries OCR on sparse image pages,
+including pages where only a footer was extracted. Preview samples receive recovery
+as well. Embedded text and Complex layout remain text-only; the explicit OCR option
+recognizes every page. Recovered text goes through normal speaker detection and review.
 
-Tesseract needs English language data. LiteParse can download it on first use;
-prepare it before offline use. Restricted hosts must provision and grant access
-to language data outside the document parser instead of allowing parser network
-access. See [LiteParse's OCR guide](https://github.com/run-llama/liteparse/blob/main/docs/src/content/docs/liteparse/guides/ocr.md).
+The default engine is LiteParse's bundled English Tesseract. It needs English language
+data, which LiteParse can download on first use; prepare it before offline use.
+Restricted hosts must provision that data outside the parser. Hosts may supply another
+OCR engine through the file-processing adapter.
 
-Standard remains the recommended method. A cheap scan of the complete PDF's
-native text and raster coverage selects up to two sparse-text image pages for
-inspection and flags all such pages for Review, including footer-only extraction.
-It does not run OCR. Blank digital pages do not qualify; an illustration or blank
-scan can qualify because metadata cannot establish whether it contains useful text.
-
-Review shows each suspect original page. Choose **Recover this page with OCR** or
-**Recover all flagged pages with OCR** for all remaining missing-text pages. This
-choice applies the best OCR result automatically and returns to ordinary transcript
-review; there is no separate OCR acceptance screen. Untouched pages and their
-accepted reader assignments remain unchanged. New text initially uses the narrator.
-
-Empty or unchanged OCR results keep their saved text and appear in the result
-summary. They do not fail a bulk batch containing successful pages. Technical
-failures or cancellation publish nothing. Changed Extraction/Dialogue revisions
-publish together after complete preparation; later artifacts are invalidated.
-Review choices carry only when their exact source evidence is unchanged. Choosing
-OCR already chooses its best-effort outcome; the user checks it in the normal
-transcript review. OCR outcome counts never claim complete visual text coverage.
-
-The separate OCR extraction option can read an entire scanned book when explicitly
-selected. No whole-book OCR runs proactively.
+A cheap whole-PDF text/image scan chooses likely missing-text pages and up to two
+representative examples. Digital blank pages do not qualify; artwork or blank scans
+can qualify. Empty, unchanged or unhelpful OCR results retain the original text.
+Recognition remains imperfect, so inspect the normal transcript before continuing.
+Errors or cancellation leave the accepted extraction unchanged. Existing books need
+re-extraction to benefit from automatic recovery.
 
 ## Model assets
 

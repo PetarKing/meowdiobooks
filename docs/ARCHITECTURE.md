@@ -183,26 +183,17 @@ page_count)` to choose preview pages using a cheap whole-PDF text/image screen.
 It returns ordinary representative-page rows with optional `ocrCandidate: true`
 for at most two pages. Hosts without this optional method retain the fixed
 representative pages; Core never bypasses a host processor to inspect a PDF.
-The screen never runs OCR. Standard stays recommended; all sparse-image page
-signals survive in extraction warnings so Review can offer physical-page recovery.
-`ReviewSettings` optionally accepts `ocrPages`, `baseExtractionRevision`, and
-`baseDialogueRevision`. A single-page or bulk OCR choice prepares replacement
-source pages, preserves accepted readers on unchanged blocks, and narrates newly
-recovered text. The ordinary Review workspace and cleanup finish before a commit
-atomically publishes related Extraction/Dialogue revisions and invalidates later
-artifacts. Stale input revisions, technical failures and cancellation cannot
-publish partial recovery. Empty/unchanged OCR pages retain their saved text and
-are reported alongside successful peers; a wholly unchanged batch creates only a
-normal Review candidate. There is no additional source-acceptance screen.
+The screen never runs OCR. Standard extraction uses its sparse-image signals
+(including footer-only pages) to recover text through the processor's `ocr` method
+before building Dialogue blocks. Sparse preview pages use the same recovery helper.
+A successful screen marks blank digital pages as non-candidates. When screening is
+unavailable, empty extracted pages still receive a recovery attempt.
 
-Continuation artifacts are marked as owned by Review and cannot reopen as
-standalone pending Extraction/Dialogue after a crash. Acceptance checks upstream
-revisions inside the publication lock. Existing per-page Review decisions carry
-only if their exact source evidence is unchanged; a chosen OCR outcome can be
-inspected in the normal transcript review. The separate targeted Extraction API
-retains its existing candidate/acceptance contract for programmatic callers.
-Explicit OCR uses a distinct cache identity and the same per-page algorithm for
-preview and complete extraction; failed pages do not publish a partial candidate.
+Recovery retains the original page when OCR is empty, unchanged or adds no useful
+text. Errors and cancellation propagate before the Extraction candidate is written.
+Recovered text then follows the ordinary Dialogue and Review pipeline; no special
+narrator policy or Review recovery decisions are needed. Explicit OCR uses a distinct
+cache identity. Hosted processing uses the injected adapter throughout.
 
 The document rendering/LiteParse and audio packaging helpers also accept an optional keyword-only
 `command_runner`. Hosts can supply a callable compatible with `subprocess.run` to execute the

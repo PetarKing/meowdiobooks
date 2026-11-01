@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..models import WizardStage
 
@@ -15,19 +15,6 @@ class CommandModel(BaseModel):
 
 class ExtractionSettings(CommandModel):
     method: Literal["liteparse", "native", "layout", "ocr", "text"] = "liteparse"
-    ocrPages: list[Annotated[int, Field(strict=True, ge=1, le=10000)]] | None = Field(
-        default=None, min_length=1, max_length=10000,
-    )
-    baseExtractionRevision: str | None = Field(default=None, min_length=1, max_length=128)
-
-    @model_validator(mode="after")
-    def targeted_ocr_requires_base(self):
-        if self.ocrPages is not None or self.baseExtractionRevision is not None:
-            if self.method != "ocr" or self.ocrPages is None or self.baseExtractionRevision is None:
-                raise ValueError("Targeted OCR requires OCR pages and an accepted extraction revision")
-            if len(set(self.ocrPages)) != len(self.ocrPages):
-                raise ValueError("Targeted OCR pages must be unique")
-        return self
 
 
 class RegexProfile(CommandModel):
@@ -55,21 +42,7 @@ class DialogueSettings(CommandModel):
 
 
 class ReviewSettings(CommandModel):
-    ocrPages: list[Annotated[int, Field(strict=True, ge=1, le=10000)]] | None = Field(
-        default=None, min_length=1, max_length=10000,
-    )
-    baseExtractionRevision: str | None = Field(default=None, min_length=1, max_length=128)
-    baseDialogueRevision: str | None = Field(default=None, min_length=1, max_length=128)
-
-    @model_validator(mode="after")
-    def targeted_ocr_requires_upstream_revisions(self):
-        fields = (self.ocrPages, self.baseExtractionRevision, self.baseDialogueRevision)
-        if any(value is not None for value in fields):
-            if any(value is None for value in fields):
-                raise ValueError("Review OCR requires pages and accepted extraction/dialogue revisions")
-            if len(set(self.ocrPages)) != len(self.ocrPages):
-                raise ValueError("Review OCR pages must be unique")
-        return self
+    pass
 
 
 class SourceVoiceSelection(CommandModel):

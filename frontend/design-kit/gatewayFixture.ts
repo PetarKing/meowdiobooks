@@ -16,7 +16,6 @@ import {
   sourceImage,
   sourcePageHeading,
   sourcePageNarration,
-  sourcePageThought,
   sourcePageThoughtParts,
   libraryCoverImage,
   silentWav,
@@ -40,8 +39,6 @@ const library: LibraryExport[] = [false, true].map((partial, i) => ({
 export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const metadata = metadataFor(id);
   const { gatewayVariant } = metadata;
-  const sourcePagePreview = (page: number) => metadata.snapshotVariant === "review-missing-pages"
-    ? sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)) : sourceImage;
   const snapshot = snapshotFor(id);
   if (id === "export-default-cover") snapshot.book.sourceKind = "text";
   if (gatewayVariant === "dialogue-running" && snapshot.dialogue) {
@@ -70,7 +67,6 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
   const canceledJobs = new Set<string>();
   let castCandidate: CastArtifact | undefined;
   let auditionSequence = 0;
-  let ocrOutcome: import("../src/api/contracts").OcrRecoveryResult | undefined;
   const exports = collectionSize !== undefined ? collectionBooks.slice(0, collectionSize).map((book, i): LibraryExport => ({
     ...library[i % library.length], id: `collection-export-${i}`, bookId: book.id, title: book.title,
     author: ["Lewis Carroll", "Hana Mori", "Antoine de Saint-Exupéry", "M. A. Rivers", "夏野 みどり", "Frances Hodgson Burnett"][i % 6],
@@ -189,15 +185,6 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
           })),
         ];
       }
-      if (stage === "review" && "ocrPages" in settings && Array.isArray(settings.ocrPages)) {
-        const pages = settings.ocrPages as number[];
-        ocrOutcome = { requestedPages: [...pages], recoveredPages: [...pages], emptyPages: [], unchangedPages: [] };
-        snapshot.activeArtifacts.extraction = "extraction-ocr";
-        snapshot.activeArtifacts.dialogue = "dialogue-ocr";
-        snapshot.warnings = snapshot.warnings.map((row) => ({ ...row,
-          occurrences: row.occurrences.filter((occurrence) => !pages.includes(occurrence.page)),
-        })).filter((row) => row.occurrences.length > 0);
-      }
       return {
         id: `fixture-job-${stage}`,
         kind: `v2:${stage}`,
@@ -249,7 +236,6 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
               revision,
               warnings: snapshot.warnings,
               boundaryCandidates: snapshot.boundaryCandidates,
-              ...(ocrOutcome ? { ocrRecovery: ocrOutcome } : {}),
               ...(metadata.snapshotVariant === "review-recovery"
                 ? {
                     recovery: {
@@ -294,16 +280,12 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       ],
       elapsedSeconds: 0.24,
       cached: true,
-      imageUrl: sourcePagePreview(page),
+      imageUrl: sourceImage,
     }),
     previewDialogue: async () => structuredClone(snapshot.dialogue!),
     previewReviewTranscript: async (_book, _revision, page) => {
-      const recovered = ocrOutcome?.recoveredPages.includes(page);
       let offset = 0;
-      const thoughtSpans: ReviewTranscriptSpan[] = recovered ? [{
-        id: "recovered-thought", kind: "narration", reader: "Narrator", text: sourcePageThought,
-        blockId: "p2", sourceStart: 0, sourceEnd: sourcePageThought.length,
-      }] : sourcePageThoughtParts.map((part, index) => {
+      const thoughtSpans: ReviewTranscriptSpan[] = sourcePageThoughtParts.map((part, index) => {
         const sourceStart = offset;
         offset += part.length + 1;
         return {
@@ -315,9 +297,9 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       return {
       page,
       pageCount: 120,
-      imageUrl: sourcePagePreview(page),
+      imageUrl: sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)),
       published: false,
-      summary: { spoken: 2 + thoughtSpans.length, dialogue: recovered ? 0 : 2, excluded: 0 },
+      summary: { spoken: 5, dialogue: 2, excluded: 0 },
       spans: [
         {
           id: "heading", kind: "narration", reader: "Narrator", text: sourcePageHeading,

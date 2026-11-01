@@ -104,7 +104,7 @@ def test_injected_runner_retains_default_arguments_without_subprocess_fallback(
                  options) for command, options in calls]
 
     assert stable_calls(host_calls) == stable_calls(default_calls)
-    assert len(host_calls) == (2 if name in {'mp3', 'full'} else 1)
+    assert len(host_calls) == (2 if name in {'mp3', 'page', 'full'} else 1)
     if name == 'render':
         assert result.read_bytes() == b'host-rendered-png'
     elif name == 'page':

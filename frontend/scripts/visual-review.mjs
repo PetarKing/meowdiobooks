@@ -10,7 +10,7 @@ const site = path.join(root, 'storybook-static');
 const out = path.resolve(process.argv[2] ?? '/tmp/meowdiobooks-visual-review');
 const cases = ['home', 'library', 'library-empty', 'library-error', 'library-refresh-error',
   'extract', 'dialogue', 'dialogue-results', 'dialogue-running', 'review', 'review-final',
-  'review-recovery', 'review-missing-pages', 'review-ocr-bulk', 'cast-identities', 'cast-reuse-review', 'cast-review-states', 'cast-voice-review-states',
+  'review-recovery', 'cast-identities', 'cast-reuse-review', 'cast-review-states', 'cast-voice-review-states',
   'cast-inspector', 'cast-voices-dense', 'generate', 'generate-long-book', 'generate-running',
   'generate-failed', 'export', 'export-long-book', 'phase-help'];
 const mime = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',

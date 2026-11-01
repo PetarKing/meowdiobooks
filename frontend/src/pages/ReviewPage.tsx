@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { ocrReviewDecisions, remainingOcrPages } from "../workflow/ocrReview";
 import type {
   AcceptanceDecision,
   ReviewCapability,
@@ -35,48 +33,17 @@ import {
   reviewSuggestedAction,
 } from "../workflow/review";
 
-export type ReviewPageModel = Pick<WorkflowModel, "recoverExtractionPages" | "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
-
-function MissingTextSourceImage({ bookId, page, gateway, t, onError }: {
-  bookId: string; page: number; gateway: WorkflowModel["gateway"];
-  t: WorkflowModel["t"]; onError: WorkflowModel["setError"];
-}) {
-  const [sourceImage, setSourceImage] = useState<{ bookId: string; page: number; url: string }>();
-  useEffect(() => {
-    if (!bookId || !page) return;
-    let disposed = false;
-    void gateway.previewExtraction(bookId, page, "native").then((preview) => {
-      if (!disposed && preview.imageUrl) setSourceImage({ bookId, page, url: preview.imageUrl });
-    }).catch((reason) => { if (!disposed) onError(message(reason)); });
-    return () => { disposed = true; };
-  }, [bookId, page, gateway, onError]);
-  const url = sourceImage?.bookId === bookId && sourceImage?.page === page ? sourceImage.url : undefined;
-  return <div className="review-missing-page-preview">{url
-    ? <img src={url} alt={t("Original page {{page}}", { page })} />
-    : <p role="status">{t("Loading original page…")}</p>}</div>;
-}
+export type ReviewPageModel = Pick<WorkflowModel, "reviewQueueSelection" | "setReviewQueueSelection" | "acceptCandidate" | "activeBoundary" | "activeOccurrence" | "activeReviewGroup" | "activeWarning" | "book" | "boundaryDecisions" | "busy" | "completed" | "gateway" | "processCandidate" | "reviewCandidate" | "reviewDecisions" | "reviewFinalCheck" | "reviewPreviewLoading" | "reviewPreviewPage" | "reviewStripRef" | "reviewTranscriptPreview" | "reviewTransition" | "revisingStages" | "setActiveBoundary" | "setActiveOccurrence" | "setActiveReviewGroup" | "setActiveWarning" | "setBoundaryDecisions" | "setError" | "setProcessMessage" | "setProgress" | "setReviewCandidate" | "setReviewDecisions" | "setReviewFinalCheck" | "setReviewPreviewPage" | "setReviewTransition" | "setRevisingStages" | "setStage" | "snapshot" | "stageIndex" | "t">;
 
 export function ReviewPage({ model }: { model: ReviewPageModel; }) {
-  const { recoverExtractionPages, reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
+  const { reviewQueueSelection, setReviewQueueSelection, acceptCandidate, activeBoundary, activeOccurrence, activeReviewGroup, activeWarning, book, boundaryDecisions, busy, completed, gateway, processCandidate, reviewCandidate, reviewDecisions: selectedReviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setBoundaryDecisions, setError, setProcessMessage, setProgress, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setStage, snapshot, stageIndex, t } = model;
   const candidateWarnings = normalizeCandidateWarnings(reviewCandidate ?? { warnings: snapshot?.warnings }).map((warning) => ({ ...warning, availableActions: reviewDecisionActions(warning) }));
-  const reviewDecisions = reviewDefaultDecisions(candidateWarnings, ocrReviewDecisions(reviewCandidate, selectedReviewDecisions));
-  const bulkOcrPages = remainingOcrPages(candidateWarnings, reviewDecisions);
-  const ocrResult = reviewCandidate?.ocrRecovery;
-  const ocrUnchangedPages = [...(ocrResult?.emptyPages ?? []), ...(ocrResult?.unchangedPages ?? [])].sort((a, b) => a - b);
-  const ocrNotice = ocrResult && <div className="ocr-review-result"><p className="panel-copy" role="status">
-    {t("OCR recovered text on {{count}} pages.", { count: ocrResult.recoveredPages.length })}{" "}
-    {ocrUnchangedPages.length > 0 && t("Pages {{pages}} returned no additional text; their saved text was kept.", { pages: ocrUnchangedPages.join(", ") })}{" "}
-    {t("Review the OCR results with the complete transcript.")}
-  </p><div className="sample-reasons">{ocrResult.requestedPages.map((page) => <button key={page} onClick={() => {
-    setReviewPreviewPage(page); setReviewFinalCheck(true);
-  }}>{t("p. {{page}}", { page })}</button>)}</div></div>;
+  const reviewDecisions = reviewDefaultDecisions(candidateWarnings, selectedReviewDecisions);
   const scriptSummary = reviewCandidate?.scriptDirectionsSummary as { kept?: number } | undefined;
   const keptScriptCount = Number.isSafeInteger(scriptSummary?.kept) && Number(scriptSummary?.kept) > 0 ? Number(scriptSummary?.kept) : 0;
   const boundaries = reviewCandidate && Array.isArray(reviewCandidate.boundaryCandidates) ? reviewCandidate.boundaryCandidates as WizardSnapshot["boundaryCandidates"] : snapshot?.boundaryCandidates ?? [];
   const warning = candidateWarnings[Math.min(activeWarning, Math.max(0, candidateWarnings.length - 1))];
   const occurrence = warning?.occurrences[Math.min(activeOccurrence, Math.max(0, warning.occurrences.length - 1))];
-  const missingText = warning && ["empty-page", "missing-image-text"].includes(warning.kind)
-    && !["epub", "text"].includes(book?.sourceKind ?? "pdf");
   const boundaryEvidence = occurrence && reviewHasBoundaryEvidence(occurrence);
   const isPatternGroup = warning && reviewIsPatternGroup(warning);
   const pendingPatternCount = isPatternGroup ? warning.occurrences.filter((row) => reviewDecisions[row.id] === undefined).length : 0;
@@ -334,7 +301,7 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
   </>;
   const recovery = reviewCandidate?.recovery;
   if (recovery) { const recoveryMessage = userFacingDetail(recovery.message == null ? undefined : String(recovery.message), "Rebuild Dialogue before continuing."); return <><PageTitle stage="review" step={t("Step 3 · Review")} title={t("The transcript needs rebuilding before review.")} copy={t("The transcript needs to be rebuilt to match the text from your source document.")} /><Panel eyebrow={t("Source safety check")} title={t("Nothing was lost or accepted incorrectly")} actions={<Tag tone="rose">{t("Needs rebuild")}</Tag>}><p className="panel-copy">{t(recoveryMessage, { defaultValue: recoveryMessage })}</p><div className="strategy-list two"><button className="strategy-card" onClick={() => { setRevisingStages([...new Set([...revisingStages, "dialogue"])]); setStage(stageIndex("dialogue")); }}><strong>{t("Rebuild Dialogue")}</strong><small>{t("Keep your extracted text and rebuild the transcript.")}</small></button></div></Panel></>; }
-  if (reviewFinalCheck) return <>{ocrNotice}<ReviewTranscriptFinalCheck
+  if (reviewFinalCheck) return <ReviewTranscriptFinalCheck
     preview={reviewTranscriptPreview}
     loading={reviewPreviewLoading}
     page={reviewPreviewPage}
@@ -343,10 +310,9 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
     onPageChange={setReviewPreviewPage}
     onBack={() => setReviewFinalCheck(false)}
     onAccept={() => void acceptReview().catch((reason) => setError(message(reason)))}
-  /></>;
+  />;
   return <>
     <PageTitle stage="review" step={t("Step 3 · Review")} title={t("Review your manuscript")} copy={t("Check the examples and choose what to keep or skip. Changes apply when you accept the review.")} />
-    {ocrNotice}
     {keptScriptCount > 0 && <p className="evidence-help" role="status">{t("{{count}} bracketed passages kept spoken. No individual decisions needed.", { count: keptScriptCount })}</p>}
     {totalGroups === 0 ? <WorkflowEmpty className="review-empty" symbol="✓" title={t("Nothing needs review")} copy={t("No chapter starts or text issues need your attention.")} /> : <>
 
@@ -378,20 +344,13 @@ export function ReviewPage({ model }: { model: ReviewPageModel; }) {
           <section className="review-evidence">
             <div className="review-group-heading"><span><h2 tabIndex={-1}>{t(reviewWarningLabel(warning.kind))}</h2><p>{t(reviewGuidance(warning), { defaultValue: reviewGuidance(warning) })}</p></span>{isScriptCue ? <Tag tone="good">{t("AI checked")}</Tag> : warning.severity === "blocking" && <Tag tone="rose">{t("blocking")}</Tag>}</div>
             <div className="occurrence-meta"><b>{t("Example {{current}} of {{total}}", { current: activeOccurrence + 1, total: warning.occurrences.length })}</b><span>{boundaryEvidence ? occurrence.boundaryAnchors!.map((anchor) => t("Page {{page}}", { page: anchor.page })).join(" → ") : t("Page {{page}}", { page: occurrence.page })}</span></div>
-            {missingText ? <MissingTextSourceImage bookId={book?.id ?? ""} page={occurrence.page} gateway={gateway} t={t} onError={setError} /> : <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />}
+            <SourceExcerpt compact className="review-source-excerpt" layout={occurrence.contextLayout === "continuous" ? "passage" : "separate"} label={t("Manuscript context")} source={(boundaryEvidence ? occurrence.boundarySource : occurrence.source) || t("No text was extracted here")} contextBefore={occurrence.contextBefore} contextAfter={occurrence.contextAfter} />
             <div className="warning-nav"><button disabled={activeOccurrence === 0} onClick={() => openOccurrence(activeOccurrence - 1)}>← {t("Previous example")}</button><button disabled={activeOccurrence >= warning.occurrences.length - 1} onClick={() => openOccurrence(activeOccurrence + 1)}>{t("Next example")} →</button></div>
           </section>
           <section className={`resolution-panel${showBulkSuggestions ? " has-bulk-choice" : ""}`}>
             {!isPatternGroup && <div className="review-scope"><b>{t(perOccurrence || warning.occurrences.length === 1 ? "Applies to this occurrence" : "Applies to all {{count}} occurrences in this group", { count: warning.occurrences.length })}</b><small>{t(perOccurrence ? "Each suggestion keeps its own decision. Changes apply when you accept the review." : "Review each example on the left before choosing once.")}</small></div>}
             <h3>{t(hasCleanupSuggestion && occurrence.cueVerification !== "verified" && typeof occurrence.replacement !== "string" ? "Does this text match the source?" : reviewQuestion(actionWarning.kind))}</h3>
             <div className="resolution-options">
-              {missingText && <button disabled={busy} onClick={() => void recoverExtractionPages([occurrence.page])}>
-                <b>{t("Recover this page with OCR")}</b><small>{t("Read only page {{page}} again and add the best OCR result to your transcript.", { page: occurrence.page })}</small>
-              </button>}
-              {missingText && bulkOcrPages.length > 1 && <button disabled={busy} onClick={() => void recoverExtractionPages(bulkOcrPages)}>
-                <b>{t("Recover all {{count}} flagged pages with OCR", { count: bulkOcrPages.length })}</b>
-                <small>{t("Read every remaining page marked as empty or possible image text. Review the results with the complete transcript.")}</small>
-              </button>}
               {visibleActions.map((action) => {
                 const recommended = ((isScriptCue || isAiCleanup) && occurrence.recommendedAction === action)
                   || (hasCleanupSuggestion && (deletionSuggestion ? action === "exclude" : action === "repair"));

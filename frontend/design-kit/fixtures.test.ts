@@ -8,30 +8,17 @@ import { sourcePageHeading, sourcePageLines, sourcePageThoughtParts } from './sy
 
 describe('synthetic review gateway', () => {
   it('shows every word from the displayed source page in the final transcript fixture', async () => {
-    const gateway = createFixtureGateway('review-ocr-bulk');
-    const preview = await gateway.previewReviewTranscript('kit-book', 'review-fixture', 7, []);
-    const transcript = preview.spans.map(span => span.text).join(' ');
-    expect(transcript).toBe([sourcePageHeading, ...sourcePageLines].join(' '));
+    const preview = await createFixtureGateway('review-final').previewReviewTranscript('kit-book', 'review-fixture', 7, []);
+    expect(preview.spans.map(span => span.text).join(' ')).toBe([sourcePageHeading, ...sourcePageLines].join(' '));
     expect(decodeURIComponent(preview.imageUrl!)).toContain('SYNTHETIC SOURCE PREVIEW · 7');
-    expect(preview.spans.every(span => span.sourceEnd - span.sourceStart === span.text.length)).toBe(true);
   });
   it('keeps the narrative interruption with Narrator between Alice’s two quoted parts', async () => {
-    const gateway = createFixtureGateway('review-final');
-    const preview = await gateway.previewReviewTranscript('kit-book', 'review-fixture', 7, []);
+    const preview = await createFixtureGateway('review-final').previewReviewTranscript('kit-book', 'review-fixture', 7, []);
     expect(preview.spans.slice(-3).map(span => [span.text, span.reader, span.kind])).toEqual([
       [sourcePageThoughtParts[0], 'Alice', 'dialogue'],
       [sourcePageThoughtParts[1], 'Narrator', 'narration'],
       [sourcePageThoughtParts[2], 'Alice', 'dialogue'],
     ]);
-  });
-  it('starts newly recovered OCR text as narration, matching the real Review continuation', async () => {
-    const gateway = createFixtureGateway('review-ocr-bulk');
-    await gateway.processStage('kit-book', 'review', {
-      ocrPages: [7, 12], baseExtractionRevision: 'e1', baseDialogueRevision: 'd1',
-    });
-    const preview = await gateway.previewReviewTranscript('kit-book', 'review-fixture', 7, []);
-    expect(preview.spans.every(span => span.reader === 'Narrator' && span.kind === 'narration')).toBe(true);
-    expect(preview.spans.map(span => span.text).join(' ')).toBe([sourcePageHeading, ...sourcePageLines].join(' '));
   });
   it('accepts grouped review decisions through the production decision builder', async () => {
     const gateway = createFixtureGateway('review');

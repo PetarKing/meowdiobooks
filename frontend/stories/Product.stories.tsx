@@ -58,7 +58,3 @@ export const CastSamplePending: Story = scenario("cast-sample-pending");
 export const ReviewRecovery: Story = scenario("review-recovery");
 
 export const ExportDefaultCover: Story = scenario("export-default-cover");
-
-export const ReviewMissingPages: Story = scenario("review-missing-pages");
-
-export const ReviewOcrBulk: Story = scenario("review-ocr-bulk");

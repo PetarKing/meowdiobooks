@@ -230,9 +230,6 @@ export type ReviewCapability =
   | "rerun-dialogue";
 
 export interface WarningOccurrence {
-  blockId?: string;
-  sourceStart?: number;
-  sourceEnd?: number;
   /** Source-anchored page-boundary evidence; acceptance validates the saved candidate. */
   boundaryDecision?: "SPACE" | "JOIN" | "HYPHEN" | "NO_CONTINUATION" | "UNSURE";
   boundaryAnchors?: Array<{ blockId: string; spanId: string; sourceStart: number; sourceEnd: number; source: string; page: number }>;
@@ -566,8 +563,6 @@ export type ProcessableStage = Exclude<WizardStage, "import">;
 
 export interface ExtractionProcessSettings {
   method: ExtractionMethod;
-  ocrPages?: number[];
-  baseExtractionRevision?: string;
 }
 
 export interface SourceVoice { bookId: string; characterId: string; revision: string }
@@ -605,7 +600,7 @@ export interface GenerationProcessSettings {
 export interface StageSettings {
   extract: ExtractionProcessSettings;
   dialogue: DialogueSettings;
-  review: { ocrPages?: number[]; baseExtractionRevision?: string; baseDialogueRevision?: string };
+  review: Record<never, never>;
   cast: CastProcessSettings;
   generate: GenerationProcessSettings;
 }
@@ -631,15 +626,7 @@ export interface RawDialogueCandidate extends ArtifactCandidate {
   userCorrections?: Array<Record<string, unknown>>;
 }
 
-export interface OcrRecoveryResult {
-  requestedPages: number[];
-  recoveredPages: number[];
-  emptyPages: number[];
-  unchangedPages: number[];
-}
-
 export interface ReviewCandidate extends ArtifactCandidate {
-  ocrRecovery?: OcrRecoveryResult;
   unifiedSuggestions?: boolean;
   warnings?: Array<Record<string, unknown>>;
   boundaryCandidates?: BoundaryCandidate[];

@@ -1,6 +1,5 @@
 import { buildReviewPreviewPolicies } from "../reviewDecisions";
-import { normalizeCandidateWarnings, reviewWarningResolved } from "../workflow/review";
-import { carryOcrReviewDecisions, ocrReviewDecisions } from "../workflow/ocrReview";
+import { normalizeCandidateWarnings } from "../workflow/review";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { wizardApi as defaultWorkflowGateway, normalizeDialogueArtifact } from "../api/client";
@@ -657,9 +656,7 @@ export function useWorkflowModel({
       if (disposed || request !== extractionPreviewRequest.current) return;
       setRepresentatives(pages);
       const preview = await gateway.previewExtraction(book.id, pages[0]?.page ?? 1, method);
-      if (!disposed && request === extractionPreviewRequest.current) {
-        setExtractionPreview(preview);
-      }
+      if (!disposed && request === extractionPreviewRequest.current) setExtractionPreview(preview);
     }).catch((reason) => { if (!disposed && request === extractionPreviewRequest.current) setError(message(reason)); });
     return () => { disposed = true; };
   // Preview controls fetch their own chosen pages and methods.
@@ -727,7 +724,7 @@ export function useWorkflowModel({
     setDialogueInitialDecisions([]);
     setEditingAcceptedDialogue(false);
     setReviewCandidate(pendingReview);
-    setReviewDecisions(ocrReviewDecisions(pendingReview, {}));
+    setReviewDecisions({});
     setBoundaryDecisions({});
     setReviewFinalCheck(false);
     setReviewPreviewPage(1);
@@ -876,7 +873,7 @@ export function useWorkflowModel({
     }
   }
 
-  async function processCandidate<S extends ProcessableStage>(stageId: S, settings: StageSettings[S], showProcessingOverlay = true, current?: () => boolean): Promise<StageCandidate[S]> {
+  async function processCandidate<S extends ProcessableStage>(stageId: S, settings: StageSettings[S], showProcessingOverlay = true): Promise<StageCandidate[S]> {
     if (!book) throw new Error("No book selected");
     setBusy(true);
     setProcessingOverlaySuppressed(!showProcessingOverlay);
@@ -888,25 +885,20 @@ export function useWorkflowModel({
     setError(undefined);
     try {
       const initialJob = await gateway.processStage(book.id, stageId, settings);
-      if (current && !current()) throw new Error("Workflow view changed");
       setCastLaunchPending(false);
-      const job = await runJob(initialJob, undefined, current);
-      if (current && !current()) throw new Error("Workflow view changed");
+      const job = await runJob(initialJob);
       const revision = String(job.result?.revision ?? "");
       if (!revision) throw new Error(`${stageId} did not return a candidate revision`);
       const candidate = await gateway.getStageCandidate(book.id, stageId, revision);
-      if (current && !current()) throw new Error("Workflow view changed");
       if (stageId === "cast") setCastGenerationPaused(false);
       return candidate;
     } catch (reason) {
       if (stageId === "cast") setCastGenerationPaused(true);
       throw reason;
     } finally {
-      if (!current || current()) {
-        setBusy(false);
-        setProcessingOverlaySuppressed(false);
-        setCastLaunchPending(false);
-      }
+      setBusy(false);
+      setProcessingOverlaySuppressed(false);
+      setCastLaunchPending(false);
     }
   }
 
@@ -931,48 +923,6 @@ export function useWorkflowModel({
       setError(message(reason));
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function recoverExtractionPages(pages: number[]) {
-    if (!book || !snapshot?.activeArtifacts.extraction || !snapshot.activeArtifacts.dialogue || busy) return;
-    const requested = [...new Set(pages)].filter((page) => Number.isInteger(page) && page > 0).sort((a, b) => a - b);
-    if (!requested.length) return;
-    const version = navigationVersion.current;
-    const current = () => navigationVersion.current === version && mounted.current
-      && scopeRef.current === workflowPersistenceNamespace && gatewayRef.current === gateway;
-    const previous = reviewCandidate;
-    const choices = { ...reviewDecisions };
-    const chapterChoices = { ...boundaryDecisions };
-    const previousBoundaries = previous?.boundaryCandidates ?? snapshot.boundaryCandidates;
-    setProcessMessage("Recovering selected pages with OCR");
-    try {
-      const candidate = await processCandidate("review", {
-        ocrPages: requested, baseExtractionRevision: snapshot.activeArtifacts.extraction,
-        baseDialogueRevision: snapshot.activeArtifacts.dialogue,
-      }, true, current);
-      if (!current()) return;
-      await hydrate(book.id, current);
-      if (!current()) return;
-      const kept = carryOcrReviewDecisions(previous, candidate, choices);
-      const changed = new Set(candidate.ocrRecovery?.recoveredPages ?? []);
-      const keptChapters = Object.fromEntries((candidate.boundaryCandidates ?? []).filter((row) =>
-        !changed.has(row.page) && chapterChoices[row.id] && previousBoundaries.some((old) =>
-          old.id === row.id && old.page === row.page && old.source === row.source))
-        .map((row) => [row.id, chapterChoices[row.id]]));
-      setReviewCandidate(candidate);
-      setReviewDecisions(kept);
-      setBoundaryDecisions(keptChapters);
-      setActiveWarning(0);
-      setActiveOccurrence(0);
-      setActiveBoundary(0);
-      setActiveReviewGroup(candidate.boundaryCandidates?.length ? "chapters" : "warnings");
-      setStage(stageIndex("review"));
-      setReviewPreviewPage(candidate.ocrRecovery?.recoveredPages[0] ?? requested[0]);
-      setReviewFinalCheck(normalizeCandidateWarnings(candidate).every((row) => reviewWarningResolved(row, kept))
-        && (candidate.boundaryCandidates ?? []).every((row) => Boolean(keptChapters[row.id])));
-    } catch (reason) {
-      if (current()) setError(message(reason));
     }
   }
 
@@ -1105,13 +1055,11 @@ export function useWorkflowModel({
     setBusy(true);
     try {
       const preview = await gateway.previewExtraction(book.id, page, selectedMethod);
-      if (request === extractionPreviewRequest.current) {
-        setExtractionPreview(preview);
-      }
+      if (request === extractionPreviewRequest.current) setExtractionPreview(preview);
     } catch (reason) {
-      if (request === extractionPreviewRequest.current) setError(message(reason));
+      setError(message(reason));
     } finally {
-      if (request === extractionPreviewRequest.current) setBusy(false);
+      setBusy(false);
     }
   }
 
@@ -1471,7 +1419,7 @@ export function useWorkflowModel({
       setError(message(reason));
     }
   }
-  return { recoverExtractionPages, reviewQueueSelection, setReviewQueueSelection, continueAcceptedDialogue, castLaunchPending, importLimitMB, extractionCandidate, retryWorkflowReturn, returnLocation, restoringLocation, restoringJobScope, castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationError, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
+  return { reviewQueueSelection, setReviewQueueSelection, continueAcceptedDialogue, castLaunchPending, importLimitMB, extractionCandidate, retryWorkflowReturn, returnLocation, restoringLocation, restoringJobScope, castingPreviewFingerprint, acceptCandidate, activeBoundary, activeJob, activeJourneyStep, activeOccurrence, activeReviewGroup, activeWarning, attributionTargets, book, bookPendingDeletion, books, booksError, booksLoading, refreshBooks: loadBooks, boundaryDecisions, busy, cancelActiveJobLabel, cancelActiveStageJob, cancelRequestPending, capabilities, castCandidate, castGenerationPaused, castingPreviewReady, chapterFilter, completed, confirmDefaultVoices, confirmedVoiceRoutes, continueToExport, conflictChoices, deleteBook, deletingBookId, deletingVoiceRevision, designingVoices, dialogue, dialogueCandidate, dialogueInitialDecisions, dialogueLaunchPending, dialogueProcessing, dialogueProcessingRoute, dialogueRouteChoiceOpen, dialogueRulesOpen, dialogueStrategy, editingAcceptedDialogue, editingCast, error, exportAuthor, exportChapterIds, exportCover, exportCoverPage, exportCoverPreviewUrl, exportDescription, exportCurrent, exportPreset, exportTitle, exporting, extractionPreview, extractionTransition, file, gateway, generateChapters, generateComplete, generationError, generationEstimatePolicy, generationInProgress, generationReady, generationRemaining, generationRun, generationSamples, hasDraft, home, hydrate, identityDecisions, importBook, language, libraryError, libraryExports, libraryLoading, libraryReady, refreshLibrary: loadLibrary, listeningChapterId, method, narrationLanguageConfirmed, narratorDirection, navigateProduct, openBook, openLibraryItem, openingBookId, previewPage, processAndPublishExtraction, processCandidate, processMessage, processingOverlaySuppressed, productView, progress, rebuildDialogueFromRecovery, recoveringDownstreamDialogue, refreshDialogue, regeneratingCharacterId, renderHeader, renderLibraryActions, reopenAcceptedDialogueReview, representatives, requestDialogueTranscript, resolvedLabels, revealLibraryItem, reviewCandidate, reviewDecisions, reviewFinalCheck, reviewPreviewLoading, reviewPreviewPage, reviewStripRef, reviewTranscriptPreview, reviewTransition, revisingStages, routeStage, runDialogueTranscript, selectedChapters, setActiveBoundary, setActiveOccurrence, setActiveReviewGroup, setActiveWarning, setAttributionTargets, setBookPendingDeletion, setBoundaryDecisions, setCastCandidate, setCastGenerationPaused, setChapterFilter, setConfirmDefaultVoices, setConfirmedVoiceRoutes, setConflictChoices, setDeletingVoiceRevision, setDesigningVoices, setDialogue, setDialogueCandidate, setDialogueInitialDecisions, setDialogueRouteChoiceOpen, setDialogueRulesOpen, setDialogueStrategy, setEditingAcceptedDialogue, setEditingCast, setError, setExportAuthor, setExportChapterIds, setExportCover, setExportCoverPage, setExportDescription, setExportPreset, setExportTitle, setFile, setHome, setIdentityDecisions, setLanguage, setListeningChapterId, setMethod, setNarrationLanguageConfirmed, setNarratorDirection, setProcessMessage, setProgress, setRegeneratingCharacterId, setResolvedLabels, setReviewCandidate, setReviewDecisions, setReviewFinalCheck, setReviewPreviewPage, setReviewTransition, setRevisingStages, setSelectedChapters, setSplitChapterId, setStage, setStructuralChoices, setUploadingCharacterId, setVoiceModel, setVoiceRoutes, setVoiceSelections, showCancelActiveJob, showWizard, sidebarCollapsed, snapshot, splitChapterId, splitLongChapter, stage, stageIndex, stages, stepOverrides, structuralChoices, t, toggleSidebar, uiLocale, unlockedThrough, updateCastingPreview, uploadingCharacterId, voiceModel, voiceRoutes, voiceSelections };
 }
 
 export type WorkflowModel = ReturnType<typeof useWorkflowModel>;

@@ -47,18 +47,19 @@ def runner(calls, *, recovered=RECOVERED, fail=False, full_pages=1):
     return run
 
 
-def test_standard_never_runs_ocr_and_explicit_ocr_uses_separate_cache(tmp_path):
+def test_raw_standard_parser_stays_ocr_free_before_automatic_fallback_and_caches_separately(tmp_path):
     pdf, cache, calls = source(tmp_path), tmp_path / 'cache', []
     run = runner(calls)
     preview = extract_pdf_page(pdf, cache, 1, 'liteparse', command_runner=run)
     assert preview['text'] == 'Page 115 Publisher'
-    assert preview['method'] == 'liteparse' and len(calls) == 1
+    assert preview['method'] == 'liteparse' and len(calls) == 2
+    assert calls[1][1] == 'is-complex'
     ocr = extract_pdf_page(pdf, cache, 1, 'ocr', command_runner=run)
     assert ocr['text'] == RECOVERED
-    assert '--no-ocr' in calls[0] and '--no-ocr' not in calls[1]
+    assert '--no-ocr' in calls[0] and '--no-ocr' not in calls[2]
     assert extract_pdf_page(pdf, cache, 1, 'liteparse', command_runner=run)['text'] == preview['text']
     assert extract_pdf_page(pdf, cache, 1, 'ocr', command_runner=run)['cached'] is True
-    assert len(calls) == 2
+    assert len(calls) == 3
 
 
 def test_failed_explicit_ocr_does_not_damage_standard_and_can_retry(tmp_path):

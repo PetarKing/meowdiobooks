@@ -40,7 +40,6 @@ WARNING_CONFIG: dict[str, dict[str, Any]] = {
         "severity": "blocking",
         "actions": ("keep",),
     },
-    "missing-image-text": {"severity": "warning", "actions": ("keep",)},
     "suspicious-extraction": {
         "severity": "warning",
         "actions": ("keep", "narrate", "exclude"),
@@ -113,8 +112,6 @@ def build_review_workspace(
     spans = list(dialogue.get("spans") or dialogue.get("partition") or [])
     occurrences: list[dict[str, Any]] = []
     coverage_failures = _coverage_occurrences(blocks, spans)
-    occurrences.extend(_empty_occurrences(blocks))
-    occurrences.extend(_image_text_occurrences(extraction, blocks))
     occurrences.extend(_text_occurrences(blocks, spans))
     occurrences.extend(_metadata_occurrences(extraction, blocks))
     occurrences = _deduplicate_occurrences(occurrences)
@@ -690,7 +687,13 @@ def accept_review_revision(
             }
 
     for key, occurrence in occurrence_index.items():
-        if key not in accepted and ( _is_verified_cue(occurrence) or
+        if key not in accepted and occurrence.get("kind") == "empty-page":
+            # Empty-page decisions have moved out of Review. Saved candidates
+            # retain their source-preserving receipt without an invisible UI gate.
+            accepted[key] = {"occurrenceId": key, "warningId": occurrence["warningId"],
+                             "action": "keep", "consequence": _consequence("keep", 1),
+                             "provenance": "preserve-empty-page"}
+        elif key not in accepted and ( _is_verified_cue(occurrence) or
                 (occurrence.get("boundaryDecision") is not None
                  and occurrence.get("proposalStatus") == "source_review")):
             accepted[key] = {"occurrenceId": key, "warningId": occurrence["warningId"],
@@ -1084,7 +1087,7 @@ def preview_review_transcript_page(
         warning = warnings.get(warning_id)
         if warning is None:
             raise ReviewContractError(f"Unknown Review warning group: {warning_id}")
-        if warning.get("decisionScope") == "occurrence" or warning.get("kind") in {"ai-cleanup", "empty-page", "missing-image-text"}:
+        if warning.get("decisionScope") == "occurrence" or warning.get("kind") == "ai-cleanup":
             raise ReviewContractError("Occurrence-scoped warnings require individual preview policies")
         for occurrence in warning.get("occurrences", []):
             _validate_action(occurrence, action)
@@ -1092,7 +1095,7 @@ def preview_review_transcript_page(
 
     occurrence_groups = {key for key, warning in warnings.items()
                          if warning.get("decisionScope") == "occurrence"
-                         or warning.get("kind") in {"ai-cleanup", "empty-page", "missing-image-text"}}
+                         or warning.get("kind") == "ai-cleanup"}
     ai_occurrences = {str(row["id"]): row for key in occurrence_groups
                       for row in warnings[key].get("occurrences", [])}
     ai_chosen: dict[str, str] = {}
@@ -1104,12 +1107,16 @@ def preview_review_transcript_page(
         _validate_action(ai_occurrences[key], action)
         ai_chosen[key] = action
     for key, occurrence in ai_occurrences.items():
-        if key not in ai_chosen and (_is_verified_cue(occurrence) or
+        if key not in ai_chosen and (occurrence.get("kind") == "empty-page"
+                or _is_verified_cue(occurrence) or
                 (occurrence.get("boundaryDecision") is not None
                  and occurrence.get("proposalStatus") == "source_review")):
             ai_chosen[key] = "keep"
     if set(ai_chosen) != set(ai_occurrences):
         raise ReviewContractError("Every cleanup proposal must be decided before preview")
+    for key, warning in warnings.items():
+        if key not in chosen and key not in occurrence_groups and warning.get("kind") == "empty-page":
+            chosen[key] = "keep"
     missing = sorted(key for key in warnings if key not in chosen and key not in occurrence_groups)
     if missing:
         raise ReviewContractError(
@@ -1336,42 +1343,6 @@ def _coverage_occurrences(
                     reason,
                 )
             )
-    return result
-
-
-def _empty_occurrences(blocks: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
-    """Report one warning for a wholly empty page, not empty layout fragments."""
-    by_page: dict[int, list[Mapping[str, Any]]] = defaultdict(list)
-    for block in blocks:
-        by_page[int(block["page"])].append(block)
-    return [
-        _occurrence(
-            "empty-page",
-            str(page_blocks[0]["id"]),
-            0,
-            0,
-            "",
-            page,
-            "No text was extracted from this page.",
-        )
-        for page, page_blocks in by_page.items()
-        if not any(str(block["text"]).strip() for block in page_blocks)
-    ]
-
-
-
-def _image_text_occurrences(extraction, blocks):
-    by_page = defaultdict(list)
-    for block in blocks:
-        by_page[int(block["page"])].append(block)
-    result = []
-    for page in extraction.get("pages", []):
-        rows = by_page.get(int(page["page"]), [])
-        if (rows and any(str(row["text"]).strip() for row in rows)
-                and any(w.get("code") == "possible-image-text" for w in page.get("warnings", []))):
-            result.append(_occurrence("missing-image-text", str(rows[0]["id"]), 0, 0, "",
-                                      int(page["page"]),
-                                      "A large image may contain text missing from extraction."))
     return result
 
 
@@ -1894,7 +1865,7 @@ def _group_occurrences(
                     "severity": WARNING_CONFIG[kind]["severity"],
                     "occurrenceCount": len(evidence_group),
                     "decisionScope": (
-                        "occurrence" if kind in {"ai-cleanup", "hyphenation", "empty-page", "missing-image-text"} or all(_is_verified_cue(row) for row in evidence_group) else
+                        "occurrence" if kind in {"ai-cleanup", "hyphenation"} or all(_is_verified_cue(row) for row in evidence_group) else
                         "identical-evidence"
                         if kind == "repeated-matter"
                         else "warning-kind"

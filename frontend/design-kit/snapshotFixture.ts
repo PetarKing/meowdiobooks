@@ -67,11 +67,7 @@ export function snapshotFor(id: ScenarioId): WizardSnapshot {
     dialogue: dialogueFor(metadata.dialogueFixture),
     cast: castFor(metadata.castFixture),
     warnings:
-      metadata.snapshotVariant === "review-missing-pages" ? [{
-        id: "empty-pages", kind: "empty-page", severity: "blocking", decisionScope: "occurrence",
-        detail: "No text was extracted from this page.", availableActions: ["keep"],
-        occurrences: [{ id: "empty-7", page: 7, source: "", text: "" }, { id: "empty-12", page: 12, source: "", text: "" }],
-      }] : metadata.snapshotVariant === "review-warnings"
+      metadata.snapshotVariant === "review-warnings"
         ? [
             {
               id: "repeated",

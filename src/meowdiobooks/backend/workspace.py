@@ -4,15 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from collections.abc import Mapping
-from threading import RLock
 
 from meowdiobooks.util import write_json
 
 from .artifact_registry import ArtifactRegistry, PUBLIC_ARTIFACTS
 from .artifacts import active_artifacts, artifact_history, read_artifact, write_artifact
-
-_PUBLICATION_LOCK = RLock()
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,26 +74,11 @@ class BookWorkspace:
     def publish(self, kind: str, path: Path) -> None:
         """Atomically publish one revision and invalidate only active downstream pointers."""
 
-        self.publish_many({kind: path})
-
-    def publish_many(
-        self, paths: Mapping[str, Path], *, expected_revisions: Mapping[str, str] | None = None,
-    ) -> None:
-        """Publish related revisions with one pointer replacement and stale-input check."""
-
-        if not paths:
-            raise ValueError("At least one artifact is required for publication")
-        with _PUBLICATION_LOCK:
-            for kind, path in paths.items():
-                self.artifacts.spec(kind)
-                if not path.is_file():
-                    raise ValueError(f"Cannot publish missing {kind} artifact: {path}")
-            for kind, revision in (expected_revisions or {}).items():
-                if self.read(kind).get("revision") != revision:
-                    raise ValueError("The accepted source changed before publication")
-            active = self.active()
-            for kind in paths:
-                for downstream_kind in self.artifacts.downstream(kind):
-                    active.pop(downstream_kind, None)
-            active.update({kind: str(path) for kind, path in paths.items()})
-            write_json(self.root / "artifacts" / "latest.json", active)
+        if not path.is_file():
+            raise ValueError(f"Cannot publish missing {kind} artifact: {path}")
+        downstream = self.artifacts.downstream(kind)
+        active = self.active()
+        active[kind] = str(path)
+        for downstream_kind in downstream:
+            active.pop(downstream_kind, None)
+        write_json(self.root / "artifacts" / "latest.json", active)

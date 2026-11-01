@@ -84,7 +84,7 @@ export function Panel({ title, eyebrow, children, actions, variant = 'surface', 
   return <section {...props} className={['panel', `panel-${variant}`, className].filter(Boolean).join(' ')}><header className="panel-head"><div>{eyebrow && <div className="eyebrow">{eyebrow}</div>}<h2>{title}</h2></div>{actions}</header>{children}</section>
 }
 
-export function Choice({ selected, title, text, onClick, badge, detail, detailLabel }: { selected?: boolean; title: string; text: string; onClick?: () => void; badge?: string; detail?: string; detailLabel?: string }) {
+export function Choice({ selected, title, text, onClick, badge, badgeTone, detail, detailLabel }: { selected?: boolean; title: string; text: string; onClick?: () => void; badge?: string; badgeTone?: "muted"; detail?: string; detailLabel?: string }) {
   const tooltipId = useId()
   const shellRef = useRef<HTMLDivElement>(null)
   const [hovered, setHovered] = useState(false)
@@ -106,7 +106,7 @@ export function Choice({ selected, title, text, onClick, badge, detail, detailLa
   }, [clicked])
 
   return <div ref={shellRef} className={`choice-shell ${detail ? 'has-detail' : ''}`}>
-    <Button variant="unstyled" type="button" className={`choice ${selected ? 'selected' : ''}`} aria-pressed={Boolean(selected)} onClick={onClick}><span className="choice-title">{title}{badge && <small>{badge}</small>}</span><span>{text}</span></Button>
+    <Button variant="unstyled" type="button" className={`choice ${selected ? 'selected' : ''}`} aria-pressed={Boolean(selected)} onClick={onClick}><span className="choice-title">{title}{badge && <small className={badgeTone === "muted" ? "choice-badge-muted" : undefined}>{badge}</small>}</span><span>{text}</span></Button>
     {detail && <>
       <span className="choice-info">
         <button
