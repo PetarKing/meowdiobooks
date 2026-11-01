@@ -32,7 +32,7 @@
 .dialogue-route-unavailable { margin: 0; color: var(--ink); font-size: 12px; line-height: 1.5; }
 
 /* Source comparison is the main event. */
-.extraction-choices { gap: 10px; margin-bottom: 14px; }
+.extraction-choices { grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; margin-bottom: 14px; }
 .extraction-choices .choice { min-height: 0; padding: 14px 16px; border-radius: 7px; background: var(--paper); box-shadow: none; }
 .extraction-choices .choice.selected { background: var(--blush); border-color: var(--poppy); }
 .sample-reasons { display: flex; gap: 8px; flex-wrap: wrap; margin: 14px 0; }

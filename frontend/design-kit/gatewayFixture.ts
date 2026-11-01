@@ -5,6 +5,7 @@ import type {
   LibraryExport,
   LocalBook,
   StageCandidate,
+  ReviewTranscriptSpan,
   WorkflowGateway,
 } from "../src/api/contracts";
 import { metadataFor, type ScenarioId } from "./scenarioRegistry";
@@ -13,6 +14,9 @@ import { snapshotFor } from "./snapshotFixture";
 import {
   fixtureBook,
   sourceImage,
+  sourcePageHeading,
+  sourcePageNarration,
+  sourcePageThoughtParts,
   libraryCoverImage,
   silentWav,
   text,
@@ -279,33 +283,40 @@ export function createFixtureGateway(id: ScenarioId): WorkflowGateway {
       imageUrl: sourceImage,
     }),
     previewDialogue: async () => structuredClone(snapshot.dialogue!),
-    previewReviewTranscript: async (_book, _revision, page) => ({
+    previewReviewTranscript: async (_book, _revision, page) => {
+      let offset = 0;
+      const thoughtSpans: ReviewTranscriptSpan[] = sourcePageThoughtParts.map((part, index) => {
+        const sourceStart = offset;
+        offset += part.length + 1;
+        return {
+          id: `thought-${index}`, kind: index === 1 ? "narration" : "dialogue",
+          reader: index === 1 ? "Narrator" : "Alice", text: part, blockId: "p2",
+          sourceStart, sourceEnd: sourceStart + part.length,
+        };
+      });
+      return {
       page,
       pageCount: 120,
-      imageUrl: sourceImage,
+      imageUrl: sourceImage.replace(encodeURIComponent("PREVIEW · 1"), encodeURIComponent(`PREVIEW · ${page}`)),
       published: false,
-      summary: { spoken: 2, dialogue: 1, excluded: 0 },
+      summary: { spoken: 5, dialogue: 2, excluded: 0 },
       spans: [
+        {
+          id: "heading", kind: "narration", reader: "Narrator", text: sourcePageHeading,
+          blockId: "heading", sourceStart: 0, sourceEnd: sourcePageHeading.length,
+        },
         {
           id: "n1",
           kind: "narration",
           reader: "Narrator",
-          text: "Alice was beginning to get very tired of sitting by her sister on the bank.",
+          text: sourcePageNarration,
           blockId: "p1",
           sourceStart: 0,
-          sourceEnd: 75,
+          sourceEnd: sourcePageNarration.length,
         },
-        {
-          id: "d1",
-          kind: "dialogue",
-          reader: "Alice",
-          text: "What is the use of a book without pictures or conversations?",
-          blockId: "p1",
-          sourceStart: 76,
-          sourceEnd: 134,
-        },
+        ...thoughtSpans,
       ],
-    }),
+    }; },
     previewCasting: async (_book, settings) => ({
       fingerprint: "fixture-quote",
       sources: [

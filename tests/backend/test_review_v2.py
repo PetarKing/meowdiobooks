@@ -159,11 +159,8 @@ def test_empty_layout_fragments_are_not_reported_as_missing_content():
 
     workspace = build_review_workspace(extraction, dialogue)
 
-    missing = _warning(workspace, "empty-page")["occurrences"]
-    assert len(missing) == 1
-    assert missing[0]["page"] == 2
-    assert missing[0]["reason"] == "No text was extracted from this page."
-    assert missing[0]["contextBefore"] == "Story text."
+    assert not any(row["kind"] in {"empty-page", "missing-image-text"} for row in workspace["warnings"])
+    assert workspace["sourceReconstruction"]["status"] == "exact"
 
 
 def test_numbered_chapter_list_is_not_misclassified_as_footnotes():
@@ -332,7 +329,7 @@ def test_unanchored_page_warning_does_not_turn_whole_prose_block_into_editable_e
     assert not any(row["kind"] == "suspicious-extraction" for row in workspace["warnings"])
 
 
-def test_empty_source_and_malformed_dialogue_coverage_are_unwaivable_blockers():
+def test_malformed_dialogue_coverage_remains_blocking_without_an_empty_page_queue():
     blocks = [
         {"id": "p1", "page": 1, "text": "Alpha beta"},
         {"id": "p2", "page": 2, "text": ""},
@@ -344,7 +341,7 @@ def test_empty_source_and_malformed_dialogue_coverage_are_unwaivable_blockers():
     workspace = build_review_workspace(extraction, dialogue)
 
     assert workspace["sourceReconstruction"]["status"] == "failed"
-    assert _warning(workspace, "empty-page")["severity"] == "blocking"
+    assert not any(row["kind"] == "empty-page" for row in workspace["warnings"])
     assert workspace["recovery"]["kind"] == "source-coverage"
     assert workspace["recovery"]["availableActions"] == [
         "rerun-dialogue",
@@ -652,19 +649,19 @@ def test_every_declared_local_action_is_executable(kind, action):
     assert review["decisions"][0]["consequence"]["sourcePreserved"] is True
 
 
-def test_user_can_confirm_an_intentionally_blank_page_after_visual_review():
+def test_blank_page_needs_no_review_confirmation_after_extraction():
     extraction, dialogue = _artifacts([{"id": "p1", "page": 1, "text": ""}])
     workspace = build_review_workspace(extraction, dialogue)
-    occurrence = _warning(workspace, "empty-page")["occurrences"][0]
+    assert not any(row["kind"] in {"empty-page", "missing-image-text"} for row in workspace["warnings"])
 
     review = accept_review_revision(
         workspace,
-        [{"occurrenceIds": [occurrence["id"]], "action": "keep"}],
+        [],
         revision="review-blank-confirmed",
     )
 
     assert review["canStartCast"] is True
-    assert review["decisions"][0]["action"] == "keep"
+    assert review["decisions"] == []
 
 
 def test_review_exclude_splits_narration_source_exactly_and_marks_only_target_range():

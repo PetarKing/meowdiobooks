@@ -7,7 +7,7 @@ export function formatApiCost(value: number) {
 
 
 export function methodLabel(method: ExtractionMethod) {
-  return method === "liteparse" ? "Standard" : method === "native" ? "Embedded text" : "Complex layout";
+  return method === "ocr" ? "Full OCR" : method === "liteparse" ? "Standard" : method === "native" ? "Embedded text" : "Complex layout";
 }
 
 export type DialogueConflictGroup = {

@@ -29,6 +29,25 @@ npm install --global @llamaindex/liteparse
 Meowdiobooks does not install system packages or change Homebrew/npm state. The commands above are the
 tested Apple Silicon setup; users who already manage these tools elsewhere may use compatible paths.
 
+## OCR for image text
+
+Standard reads saved PDF text and automatically tries OCR on sparse image pages,
+including pages where only a footer was extracted. Preview samples receive recovery
+as well. Embedded text and Complex layout remain text-only; the explicit OCR option
+recognizes every page. Recovered text goes through normal speaker detection and review.
+
+The default engine is LiteParse's bundled English Tesseract. It needs English language
+data, which LiteParse can download on first use; prepare it before offline use.
+Restricted hosts must provision that data outside the parser. Hosts may supply another
+OCR engine through the file-processing adapter.
+
+A cheap whole-PDF text/image scan chooses likely missing-text pages and up to two
+representative examples. Digital blank pages do not qualify; artwork or blank scans
+can qualify. Empty, unchanged or unhelpful OCR results retain the original text.
+Recognition remains imperfect, so inspect the normal transcript before continuing.
+Errors or cancellation leave the accepted extraction unchanged. Existing books need
+re-extraction to benefit from automatic recovery.
+
 ## Model assets
 
 V1 deliberately does not install AI runtimes or model weights automatically. The default

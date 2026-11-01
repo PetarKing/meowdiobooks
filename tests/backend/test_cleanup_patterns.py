@@ -55,8 +55,10 @@ def mocks(monkeypatch, *, verdict="FOOTER", veto=None, damage=None):
     return calls
 
 
-def test_large_family_needs_one_verifier_and_keeps_distinct_source_choices(monkeypatch):
+@pytest.mark.parametrize("method", ["native", "layout", "liteparse", "ocr"])
+def test_large_family_needs_one_verifier_and_keeps_distinct_source_choices(monkeypatch, method):
     extraction, dialogue = artifacts(30)
+    extraction["method"] = method
     original = deepcopy((extraction, dialogue))
     calls = mocks(monkeypatch)
     result = cleanup.run_cleanup_review(ROOT, extraction, dialogue, lambda *a: None)

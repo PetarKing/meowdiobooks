@@ -4,8 +4,22 @@ import { castFor } from './castFixtures';
 import { strongConfirmationLabelsForCast } from '../src/castIdentity';
 import { buildReviewWarningDecisions } from '../src/reviewDecisions';
 import { decisionsForCast } from '../src/workflow/cast';
+import { sourcePageHeading, sourcePageLines, sourcePageThoughtParts } from './syntheticContent';
 
 describe('synthetic review gateway', () => {
+  it('shows every word from the displayed source page in the final transcript fixture', async () => {
+    const preview = await createFixtureGateway('review-final').previewReviewTranscript('kit-book', 'review-fixture', 7, []);
+    expect(preview.spans.map(span => span.text).join(' ')).toBe([sourcePageHeading, ...sourcePageLines].join(' '));
+    expect(decodeURIComponent(preview.imageUrl!)).toContain('SYNTHETIC SOURCE PREVIEW · 7');
+  });
+  it('keeps the narrative interruption with Narrator between Alice’s two quoted parts', async () => {
+    const preview = await createFixtureGateway('review-final').previewReviewTranscript('kit-book', 'review-fixture', 7, []);
+    expect(preview.spans.slice(-3).map(span => [span.text, span.reader, span.kind])).toEqual([
+      [sourcePageThoughtParts[0], 'Alice', 'dialogue'],
+      [sourcePageThoughtParts[1], 'Narrator', 'narration'],
+      [sourcePageThoughtParts[2], 'Alice', 'dialogue'],
+    ]);
+  });
   it('accepts grouped review decisions through the production decision builder', async () => {
     const gateway = createFixtureGateway('review');
     const before = await gateway.getBookSnapshot('kit-book');

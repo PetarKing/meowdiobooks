@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import tempfile
 import time
+from uuid import uuid4
 from collections.abc import Callable, Mapping
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from pathlib import Path
 from typing import Any
 
@@ -21,8 +24,9 @@ from .document_errors import DocumentImportError
 from .text_documents import TEXT_SUFFIXES, read_text_document
 
 SUPPORTED_SUFFIXES = {".pdf", *TEXT_SUFFIXES}
-EXTRACTION_METHOD_VERSION = "documents-v3"
+EXTRACTION_METHOD_VERSION = "documents-v4"
 _LITEPARSE_CACHE_KEY = "liteparse-geometry-v1"
+_OCR_CACHE_KEY = "liteparse-ocr-eng-v2"
 
 
 def source_path(data_root: Path, book_id: str, source_name: str) -> Path:
@@ -106,6 +110,197 @@ def representative_pages(page_count: int) -> list[dict[str, Any]]:
         if page not in seen:
             result.append({"page": page, "reason": reason})
             seen.add(page)
+    return result
+
+
+def extraction_sample_pages(
+    source: Path, cache_root: Path, page_count: int, *, command_runner=None,
+) -> list[dict[str, Any]]:
+    """Screen every text layer cheaply; offer at most two image-page examples.
+
+    Complexity's generic verdict also includes vector decorations on normal
+    prose pages. Only sparse text plus substantial raster content is evidence
+    for an image-text probe. Blank digital pages never qualify. A blank scan or
+    illustration can qualify; recovery retains native text when OCR adds nothing.
+    """
+    ordinary = representative_pages(page_count)
+    if source.suffix.lower() in TEXT_SUFFIXES:
+        return ordinary
+    cache = cache_root / "extraction" / "ocr-samples-v2.json"
+    cached = _read_image_screen_cache(cache, page_count)
+    if cached is not None:
+        return cached["pages"]
+    try:
+        result = (command_runner if command_runner is not None else subprocess.run)(
+            ["liteparse", "is-complex", str(source), "--compact", "--quiet",
+             "--max-pages", str(page_count)],
+            check=False, capture_output=True, timeout=60,
+        )
+        stats = json.loads(result.stdout)
+        if result.returncode not in {0, 1} or not isinstance(stats, list) or [
+            row.get("pageNumber") for row in stats
+        ] != list(range(1, page_count + 1)):
+            return ordinary
+        candidates = [row for row in stats if row.get("textLength", 1000) < 200 and (
+            row.get("fullPageImage") or row.get("imageCoverage", 0) >= .15
+            or row.get("largestImageCoverage", 0) >= .15
+        )]
+        # Prefer strong image coverage with little saved text, then choose a
+        # distant second page rather than probing adjacent front-matter scans.
+        def interior(row):
+            return page_count * .05 < row["pageNumber"] < page_count * .95
+
+        candidates.sort(key=lambda row: (
+            interior(row), bool(row.get("fullPageImage")), row.get("imageCoverage", 0),
+            -row.get("textLength", 0), -abs(row["pageNumber"] - page_count / 2),
+        ), reverse=True)
+        selected = candidates[:1]
+        if len(candidates) > 1:
+            selected.append(max(candidates[1:], key=lambda row: (
+                interior(row), abs(row["pageNumber"] - selected[0]["pageNumber"]),
+            )))
+        probes = [{"page": row["pageNumber"], "reason": "image text check", "ocrCandidate": True}
+                  for row in selected]
+        probe_pages = {row["page"] for row in probes}
+        pages = probes + [row for row in ordinary if row["page"] not in probe_pages]
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        _write_extraction_cache(cache, {"pages": pages,
+                                        "imagePages": [row["pageNumber"] for row in candidates]})
+        return pages
+    except (OSError, ValueError, TypeError, AttributeError, RuntimeError, subprocess.SubprocessError):
+        # Older/missing tools must not prevent manual preview or extraction.
+        return ordinary
+
+
+
+
+def _read_image_screen_cache(cache, page_count):
+    try:
+        result = json.loads(cache.read_text(encoding="utf-8"))
+        pages, suspects = result["pages"], result["imagePages"]
+        if (not isinstance(pages, list) or not 1 <= len(pages) <= 7
+                or any(not isinstance(row, dict) or type(row.get("page")) is not int
+                       or not 1 <= row["page"] <= page_count
+                       or not isinstance(row.get("reason"), str) for row in pages)
+                or len({row["page"] for row in pages}) != len(pages)
+                or not isinstance(suspects, list)
+                or any(type(page) is not int or not 1 <= page <= page_count for page in suspects)
+                or len(set(suspects)) != len(suspects)):
+            return None
+        return result
+    except (OSError, ValueError, KeyError, TypeError):
+        return None
+
+
+def _flag_possible_image_text(source, cache_root, pages, command_runner, *, page_count=None):
+    # Persist physical candidates for automatic recovery before Dialogue.
+    count = len(pages) if page_count is None else page_count
+    extraction_sample_pages(source, cache_root, count, command_runner=command_runner)
+    cache = cache_root / "extraction" / "ocr-samples-v2.json"
+    cached = _read_image_screen_cache(cache, count)
+    if cached is None:
+        return pages
+    suspects = set(cached["imagePages"])
+    return [{**row, "ocrCandidate": True, "warnings": [*row.get("warnings", []), {
+        "code": "possible-image-text", "label": "This image may contain unextracted text.",
+    }]} if row["page"] in suspects and row.get("method") != "ocr" else {**row, "ocrCandidate": False} for row in pages]
+
+
+def auto_recover_pdf_pages(
+    source, cache_root, pages, extract_page, report=None, *, preview=False, max_workers=1,
+):
+    """Recover sparse image pages before any dialogue processing.
+
+    Operates on adapter data only: hosted PDF parsing stays inside its sandbox.
+    Failure/cancellation propagates so no partial extraction is published. Adapters
+    may opt into up to four concurrent pages; previews and the local default stay serial.
+    """
+    if type(max_workers) is not int or not 1 <= max_workers <= 4:
+        raise ValueError("OCR parallelism must be between one and four workers")
+    if preview:
+        max_workers = 1
+    notify = report or (lambda _progress, _message=None: None)
+    def candidate(row):
+        if row.get("method") == "ocr" or row.get("ocrCandidate") is False:
+            return False
+        text = row["text"].strip()
+        return (row.get("ocrCandidate") is True
+                or any(isinstance(w, Mapping) and w.get("code") == "possible-image-text"
+                       for w in row.get("warnings", []))
+                or not text or (preview and len(text) < 200))
+
+    targets = [index for index, row in enumerate(pages) if candidate(row)]
+    result = list(pages)
+
+    def accept(index, recovered):
+        original = pages[index]
+        if (not isinstance(recovered, dict) or type(recovered.get("page")) is not int
+                or recovered["page"] != original["page"] or not isinstance(recovered.get("text"), str)):
+            raise ValueError("OCR did not return the requested page")
+        text = recovered["text"].strip()
+        old = original["text"].strip()
+        def letters(value):
+            return sum(char.isalnum() for char in value)
+        words = re.findall(r"[^\W\d_]{2,}", text, re.UNICODE)
+        cjk = sum("\u3400" <= char <= "\u9fff" for char in text)
+        new_words = set(word.casefold() for word in words) - set(
+            word.casefold() for word in re.findall(r"[^\W\d_]{2,}", old, re.UNICODE))
+        new_cjk = set(char for char in text if "\u3400" <= char <= "\u9fff") - set(old)
+        useful = ((len(words) >= 2 or cjk >= 4) and letters(text) > letters(old)
+                  and bool(new_words or new_cjk))
+        if useful:
+            warnings = _warnings(text)
+            for warning in recovered.get("warnings", []):
+                if (isinstance(warning, Mapping)
+                        and warning.get("code") not in {"empty", "empty-page", "possible-image-text"}
+                        and warning not in warnings):
+                    warnings.append(dict(warning))
+            result[index] = {**original, **recovered, "text": text, "method": "ocr",
+                             "warnings": warnings}
+
+    def progress(completed):
+        notify(60 + 35 * completed / len(targets),
+               f"Recovering text with OCR ({min(completed + 1, len(targets))}/{len(targets)})")
+
+    if max_workers == 1 or len(targets) < 2:
+        for completed, index in enumerate(targets):
+            progress(completed)
+            accept(index, extract_page(source, cache_root, pages[index]["page"], "ocr"))
+        if targets:
+            progress(len(targets))
+        return result
+
+    progress(0)
+    executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="meowdiobooks-ocr")
+    pending = {}
+    remaining = iter(targets)
+    completed = 0
+
+    def submit_next():
+        index = next(remaining, None)
+        if index is not None:
+            pending[executor.submit(extract_page, source, cache_root, pages[index]["page"], "ocr")] = index
+
+    try:
+        for _ in range(max_workers):
+            submit_next()
+        while pending:
+            # Reporting stays on the job thread, including cancellation checks
+            # while recognizers run. Never enqueue the rest of the book at once.
+            progress(completed)
+            done, _ = wait(pending, timeout=.25, return_when=FIRST_COMPLETED)
+            for future in done:
+                accept(pending.pop(future), future.result())
+                completed += 1
+            progress(completed)
+            for _ in done:
+                submit_next()
+    finally:
+        for future in pending:
+            future.cancel()
+        # Running adapters retain their own deadlines. Join before returning or
+        # raising so failed/cancelled work leaves no executor threads behind.
+        executor.shutdown(wait=True, cancel_futures=True)
     return result
 
 
@@ -208,36 +403,72 @@ def extract_pdf_page(
     if method == "text":
         raise ValueError("Use a PDF extraction method for PDF sources")
     started = time.perf_counter()
-    cache_method = _LITEPARSE_CACHE_KEY if method == "liteparse" else method
+    cache_method = (_LITEPARSE_CACHE_KEY if method == "liteparse" else
+                    _OCR_CACHE_KEY if method == "ocr" else method)
     cache = cache_root / "extraction" / cache_method / f"page-{page:04d}.json"
     if cache.is_file():
         result = json.loads(cache.read_text(encoding="utf-8"))
         result["cached"] = True
-        return result
+        return (_flag_possible_image_text(source, cache_root, [result], command_runner,
+                                         page_count=len(PdfReader(source).pages))[0]
+                if method == "liteparse" else result)
     cache.parent.mkdir(parents=True, exist_ok=True)
-    if method == "liteparse":
-        raw = cache.with_suffix(".raw.json")
-        (command_runner if command_runner is not None else subprocess.run)(
-            [
-                "liteparse",
-                "parse",
-                str(source),
-                "--format",
-                "json",
-                "--target-pages",
-                str(page),
-                "--no-ocr",
-                "--quiet",
-                "-o",
-                str(raw),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=90,
-        )
-        parsed = json.loads(raw.read_text(encoding="utf-8"))
-        text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
-        raw.unlink(missing_ok=True)
+    if method in {"liteparse", "ocr"}:
+        raw = cache.with_name(f"{cache.stem}-{uuid4().hex}.raw.json")
+        raster_work = None
+        try:
+            parser_source, parser_page = source, page
+            if method == "ocr":
+                from PIL import Image
+
+                # OCR must read the visible page, even when the PDF carries a
+                # conflicting/incomplete saved text layer. Keep no native text
+                # in the one-page parser input and map its page 1 back below.
+                raster_work = tempfile.TemporaryDirectory(prefix="ocr-render-", dir=cache.parent)
+                raster_root = Path(raster_work.name)
+                cached_image = cache_root / "pages" / f"page-{page:04d}.png"
+                render_cache = cache_root if cached_image.is_file() else raster_root
+                image_path = render_pdf_page(source, render_cache, page, command_runner=command_runner)
+                parser_source, parser_page = raster_root / "visible-page.pdf", 1
+                try:
+                    with Image.open(image_path) as image:
+                        if image.format != "PNG" or image.width * image.height > 16_000_000:
+                            raise ValueError("OCR page image exceeds safe processing limits")
+                        with image.convert("RGB") as rgb:
+                            rgb.save(parser_source, "PDF", resolution=145.0, quality=100, subsampling=0)
+                except Image.DecompressionBombError as error:
+                    raise ValueError("OCR page image exceeds safe processing limits") from error
+            (command_runner if command_runner is not None else subprocess.run)(
+                [
+                    "liteparse",
+                    "parse",
+                    str(parser_source),
+                    "--format",
+                    "json",
+                    "--target-pages",
+                    str(parser_page),
+                    *(["--no-ocr"] if method == "liteparse" else ["--ocr-language", "eng", "--max-pages", "1"]),
+                    "--quiet",
+                    "-o",
+                    str(raw),
+                ],
+                check=True,
+                capture_output=True,
+                timeout=90,
+            )
+            parsed = json.loads(raw.read_text(encoding="utf-8"))
+            if method == "ocr":
+                pages = parsed.get("pages", [])
+                number = (pages[0].get("page", pages[0].get("pageNum"))
+                          if isinstance(pages, list) and len(pages) == 1 and isinstance(pages[0], dict)
+                          else None)
+                if type(number) is not int or number != 1:
+                    raise ValueError("OCR did not return the requested page")
+            text = _normalise_liteparse_page_text(parsed["pages"][0]) if parsed.get("pages") else ""
+        finally:
+            raw.unlink(missing_ok=True)
+            if raster_work is not None:
+                raster_work.cleanup()
     elif method == "native":
         pdf_page = PdfReader(source).pages[page - 1]
         try:
@@ -258,33 +489,54 @@ def extract_pdf_page(
         "elapsedSeconds": round(time.perf_counter() - started, 3),
         "cached": False,
     }
-    cache.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    return result
+    _write_extraction_cache(cache, result)
+    return (_flag_possible_image_text(source, cache_root, [result], command_runner,
+                                     page_count=len(PdfReader(source).pages))[0]
+            if method == "liteparse" else result)
+
+
+def _write_extraction_cache(path: Path, result: dict[str, Any]) -> None:
+    pending = path.with_name(f"{path.stem}-{uuid4().hex}.pending.json")
+    try:
+        pending.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+        pending.replace(path)
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def extract_full_liteparse(
     source: Path, cache_root: Path, *, command_runner=None,
 ) -> list[dict[str, Any]]:
     cache = cache_root / "extraction" / _LITEPARSE_CACHE_KEY / "full.json"
-    if not cache.is_file():
-        cache.parent.mkdir(parents=True, exist_ok=True)
+    page_count = len(PdfReader(source).pages)
+
+    def complete(parsed):
+        rows = parsed.get("pages")
+        return isinstance(rows, list) and [row.get("page", row.get("pageNum")) for row in rows] == list(
+            range(1, page_count + 1))
+
+    if cache.is_file():
+        try:
+            parsed = json.loads(cache.read_text(encoding="utf-8"))
+            if complete(parsed):
+                return parsed["pages"]
+        except (OSError, ValueError, TypeError, AttributeError):
+            pass
+    cache.parent.mkdir(parents=True, exist_ok=True)
+    pending = cache.with_name(f"{cache.stem}-{uuid4().hex}.pending.json")
+    try:
         (command_runner if command_runner is not None else subprocess.run)(
-            [
-                "liteparse",
-                "parse",
-                str(source),
-                "--format",
-                "json",
-                "--no-ocr",
-                "--quiet",
-                "-o",
-                str(cache),
-            ],
-            check=True,
-            capture_output=True,
-            timeout=300,
+            ["liteparse", "parse", str(source), "--format", "json", "--no-ocr",
+             "--max-pages", str(page_count), "--quiet", "-o", str(pending)],
+            check=True, capture_output=True, timeout=300,
         )
-    return json.loads(cache.read_text(encoding="utf-8"))["pages"]
+        parsed = json.loads(pending.read_text(encoding="utf-8"))
+        if not complete(parsed):
+            raise ValueError("Extraction did not return every source page in order")
+        pending.replace(cache)
+        return parsed["pages"]
+    finally:
+        pending.unlink(missing_ok=True)
 
 
 def extract_full_document(
@@ -317,10 +569,10 @@ def extract_full_document(
                 "page": int(page.get("page", index)),
                 "text": text,
                 "warnings": list(page.get("warnings") or _warnings(text)),
-                "method": "liteparse",
+                "method": method,
             })
         notify(90, f"Extracted {len(pages)} pages")
-        return pages
+        return _flag_possible_image_text(source, cache_root, pages, command_runner)
 
     reader = PdfReader(source)
     pages: list[dict[str, Any]] = []
@@ -340,7 +592,8 @@ def extract_full_document(
             5 + page_number / len(reader.pages) * 90,
             f"Extracted page {page_number} of {len(reader.pages)}",
         )
-    return pages
+    return (_flag_possible_image_text(source, cache_root, pages, command_runner)
+            if method != "ocr" else pages)
 
 
 def _warnings(text: str) -> list[dict[str, str]]:

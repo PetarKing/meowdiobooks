@@ -493,12 +493,7 @@
           "text": ""
         }
       ],
-      "expected": [
-        {
-          "kind": "empty-page",
-          "source": ""
-        }
-      ]
+      "expected": []
     },
     {
       "id": "credit-no-cross-block-guess",

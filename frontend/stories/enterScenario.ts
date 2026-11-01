@@ -1,5 +1,6 @@
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import i18n from "../src/i18n";
+import { sourcePageNarration } from "../design-kit/syntheticContent";
 import {
   fixtureVoiceSample,
   metadataFor,
@@ -119,7 +120,7 @@ export async function enterScenario(
       case "open-final-review":
         await click(prefix("Review complete transcript"));
         await waitFor(() => expect(page.queryByText(t("Opening the transcript…"))).toBeNull());
-        await expect(await page.findByText("Alice was beginning to get very tired of sitting by her sister on the bank.")).toBeVisible();
+        await expect(await page.findByText(sourcePageNarration)).toBeVisible();
         return;
       case "design-voices":
         await click(prefix("Next"));

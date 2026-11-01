@@ -99,6 +99,7 @@ from .dialogue_ai import apply_dialogue_corrections, run_dialogue_qwen
 from .dialogue_remote import run_dialogue_remote
 from .documents import (
     EXTRACTION_METHOD_VERSION,
+    auto_recover_pdf_pages,
     extract_full_document,
     extract_pdf_page,
     SUPPORTED_SUFFIXES,
@@ -654,8 +655,15 @@ def create_app_v2(
             source,
             package / "preview",
             method,
-            report,
+            (lambda progress, message: report(progress * .6, message)) if method == "liteparse" else report,
         )
+        if method == "liteparse":
+            pages = auto_recover_pdf_pages(
+                source, package / "preview", pages,
+                file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
+                report,
+                max_workers=getattr(file_processor, "ocr_parallelism", 1),
+            )
         blocks = pages_to_dialogue_blocks(pages)
         boundary_candidates = detect_chapter_candidates(blocks)
         revision = uuid4().hex
@@ -1940,7 +1948,16 @@ def create_app_v2(
             book = require_book(book_id)
         except ValueError as error:
             raise HTTPException(status_code=404, detail=str(error)) from error
-        return representative_pages(book.page_count or 1)
+        if book.source_kind != "pdf" or not book.source_name:
+            return representative_pages(book.page_count or 1)
+        source = source_path(root, book.id, book.source_name)
+        sampler = getattr(file_processor, "extraction_sample_pages", None)
+        if file_processor is not None and sampler is None:
+            return representative_pages(book.page_count or 1)
+        if sampler is None:
+            from .documents import extraction_sample_pages
+            sampler = extraction_sample_pages
+        return sampler(source, package_for(book.id) / "preview", book.page_count or 1)
 
     @app.post("/api/books/{book_id}/extraction/preview")
     def extraction_preview(book_id: str, body: ExtractionPreviewRequest) -> dict[str, Any]:
@@ -1952,6 +1969,12 @@ def create_app_v2(
             result = (file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page)(
                 source, package_for(book.id) / "preview", body.page, body.method
             )
+            if book.source_kind == "pdf" and body.method == "liteparse":
+                result = auto_recover_pdf_pages(
+                    source, package_for(book.id) / "preview", [result],
+                    file_processor.extract_pdf_page if file_processor is not None else extract_pdf_page,
+                    preview=True,
+                )[0]
             if book.source_kind == "pdf":
                 (file_processor.render_pdf_page if file_processor is not None else render_pdf_page)(
                     source, package_for(book.id) / "preview", body.page,

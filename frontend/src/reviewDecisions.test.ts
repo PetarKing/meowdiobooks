@@ -6,6 +6,14 @@ import { normalizeCandidateWarnings, reviewOccurrenceActions, reviewProposalDeci
 
 import { cleanupWarning, consolidatedCleanupWarning } from "../design-kit/cleanupFixture";
 
+it('omits obsolete empty-page QA categories while preserving ordinary review suggestions', () => {
+  const warnings = ['empty-page', 'missing-content', 'missing-image-text', 'page-number'].map(kind => ({
+    id: kind, kind, severity: 'warning', availableActions: ['keep', 'exclude'],
+    occurrences: [{ id: kind + '-1', source: kind === 'page-number' ? '115' : '', page: 7 }],
+  }));
+  expect(normalizeCandidateWarnings({ warnings }).map(warning => warning.kind)).toEqual(['page-number']);
+});
+
 describe("AI cleanup decisions", () => {
   it("retains deletion and row-specific capabilities when a candidate is restored", () => {
     const restored = normalizeCandidateWarnings(JSON.parse(JSON.stringify({ warnings: [cleanupWarning] })))[0];

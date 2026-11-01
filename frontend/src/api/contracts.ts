@@ -6,7 +6,7 @@ export type WizardStage =
   | "cast"
   | "generate";
 
-export type ExtractionMethod = "liteparse" | "native" | "layout" | "text";
+export type ExtractionMethod = "liteparse" | "native" | "layout" | "ocr" | "text";
 export type DialogueStrategy = "fill-gaps" | "narrate";
 export type DialogueAttributionTarget = "open-speakers" | "unlabelled-candidates";
 export type DialogueAttributionRoute = "local" | "remote";
@@ -31,7 +31,7 @@ export interface Book {
   completedStages: readonly WizardStage[];
 }
 
-export interface RepresentativePage { page: number; reason: string }
+export interface RepresentativePage { page: number; reason: string; ocrCandidate?: boolean }
 
 export interface ImportResult {
   book: LocalBook;

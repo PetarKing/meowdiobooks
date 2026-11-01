@@ -178,6 +178,29 @@ default remains unchanged. The host owns process isolation, deadlines, resource 
 of untrusted worker results; this interface alone is not a sandbox. A metadata failure rejects a new
 import and removes its newly written source, just like inspection failure.
 
+A processor may additionally implement `extraction_sample_pages(source, cache_root,
+page_count)` to choose preview pages using a cheap whole-PDF text/image screen.
+It returns ordinary representative-page rows with optional `ocrCandidate: true`
+for at most two pages. Hosts without this optional method retain the fixed
+representative pages; Core never bypasses a host processor to inspect a PDF.
+The screen never runs OCR. Standard extraction uses its sparse-image signals
+(including footer-only pages) to recover text through the processor's `ocr` method
+before building Dialogue blocks. Sparse preview pages use the same recovery helper.
+A successful screen marks blank digital pages as non-candidates. When screening is
+unavailable, empty extracted pages still receive a recovery attempt.
+
+Recovery retains the original page when OCR is empty, unchanged or adds no useful
+text. Errors and cancellation propagate before the Extraction candidate is written.
+Recovered text then follows the ordinary Dialogue and Review pipeline; no special
+narrator policy or Review recovery decisions are needed. Explicit OCR uses a distinct
+cache identity. Hosted processing uses the injected adapter throughout.
+An adapter may expose integer `ocr_parallelism` from one to four to recover candidate pages
+concurrently during complete Standard extraction. The default is one; previews
+stay serial. At most that many calls are submitted at a time, results retain physical page
+order, and progress/cancellation runs on the calling job thread. On failure or
+cancellation, pending calls are cancelled and running calls are joined before
+returning; adapters must enforce their own inference deadlines and shared admission.
+
 The document rendering/LiteParse and audio packaging helpers also accept an optional keyword-only
 `command_runner`. Hosts can supply a callable compatible with `subprocess.run` to execute the
 existing command arguments, capture/check options and deadlines through a separate execution
