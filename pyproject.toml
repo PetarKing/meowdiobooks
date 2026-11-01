@@ -1,6 +1,6 @@
 [project]
 name = "meowdiobooks"
-version = "1.0.3"
+version = "1.0.4"
 description = "A local, dialogue-first audiobook studio for Apple Silicon Macs."
 readme = "README.md"
 license = { file = "LICENSE" }

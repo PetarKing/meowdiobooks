@@ -158,3 +158,25 @@ def test_explicit_catalog_path_honors_alternate_filename_without_changing_defaul
 def test_explicit_missing_catalog_does_not_silently_use_default():
     with pytest.raises(ModelConfigError, match="Cannot read"):
         load_model_registry(REPO_ROOT, models_path=REPO_ROOT / "missing-registry.toml")
+
+
+@pytest.mark.parametrize("profile", ['"missing"', '""', '12'])
+def test_invalid_adjudication_profile_is_rejected(tmp_path, profile):
+    source = (REPO_ROOT / "models.toml").read_text()
+    (tmp_path / "models.toml").write_text(source.replace(
+        'remote_profile = "luna-dialogue"',
+        f'remote_profile = "luna-dialogue"\nadjudication_remote_profile = {profile}',
+    ))
+    with pytest.raises(ModelConfigError):
+        load_model_registry(tmp_path)
+
+
+def test_optional_adjudication_profile_is_resolved_without_changing_primary(tmp_path):
+    source = (REPO_ROOT / "models.toml").read_text()
+    assert load_model_registry(REPO_ROOT).remote_dialogue_adjudication_model() is None
+    (tmp_path / "models.toml").write_text(source.replace(
+        'remote_profile = "luna-dialogue"',
+        'remote_profile = "luna-dialogue"\nadjudication_remote_profile = "luna-dialogue"',
+    ))
+    registry = load_model_registry(tmp_path)
+    assert registry.remote_dialogue_adjudication_model() == registry.remote_dialogue_model()

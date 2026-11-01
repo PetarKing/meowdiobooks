@@ -81,6 +81,7 @@ class DialogueAttributionConfig:
     large_review_threshold: int
     local_policy: str
     remote_profile: str | None
+    adjudication_remote_profile: str | None = None
 
 
 @dataclass(frozen=True)
@@ -149,6 +150,17 @@ class ModelRegistry:
             raise ModelConfigError(f"Unknown remote Dialogue model: {selected}") from error
 
 
+    def remote_dialogue_adjudication_model(self) -> RemoteTextModelConfig | None:
+        """Optional conflict-only profile; omission preserves the primary model."""
+        selected = self.dialogue_attribution.adjudication_remote_profile
+        if selected is None:
+            return None
+        try:
+            return self.remote_text_models[selected]
+        except KeyError as error:
+            raise ModelConfigError(f"Unknown remote Dialogue adjudication model: {selected}") from error
+
+
 def load_model_registry(repo_root: Path, *, models_path: Path | None = None) -> ModelRegistry:
     """Load an explicit registry file, local override, or packaged model contract.
 
@@ -207,6 +219,14 @@ def load_model_registry(repo_root: Path, *, models_path: Path | None = None) -> 
     ):
         raise ModelConfigError(
             f"Dialogue remote_profile is not registered: {dialogue_attribution.remote_profile}"
+        )
+    if (
+        dialogue_attribution.adjudication_remote_profile is not None
+        and dialogue_attribution.adjudication_remote_profile not in remote_text_models
+    ):
+        raise ModelConfigError(
+            "Dialogue adjudication_remote_profile is not registered: "
+            f"{dialogue_attribution.adjudication_remote_profile}"
         )
     return ModelRegistry(
         default_text,
@@ -384,6 +404,7 @@ def _dialogue_attribution(value: Any) -> DialogueAttributionConfig:
         large_review_threshold=_positive_int(row, "large_review_threshold"),
         local_policy=_optional_string(row, "local_policy") or "selective-exact-consensus",
         remote_profile=_optional_string(row, "remote_profile"),
+        adjudication_remote_profile=_optional_string(row, "adjudication_remote_profile"),
     )
 
 
