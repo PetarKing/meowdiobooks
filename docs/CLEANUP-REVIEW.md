@@ -31,7 +31,8 @@ selected repairs before publication.
 Exact repeated page-top titles can be suggested for removal after two model checks; the first
 occurrence remains. A standalone title accidentally included in a quote that continues across a
 physical page break can also be reviewed when the same family has at least two narrator-owned
-occurrences. Each quoted occurrence needs its own surrounding quote evidence and verification;
+occurrences. A mechanically grouped quote does not prove that every included word was authored speech. Each
+quoted occurrence needs its own surrounding quote evidence and preservation verification;
 ordinary spoken titles, inline prose, chapter headings and ambiguous cases stay protected. Checks
 are bounded to six examples per family, so additional unverified quoted occurrences remain spoken.
 
