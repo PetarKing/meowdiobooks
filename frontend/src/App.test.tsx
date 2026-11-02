@@ -1367,7 +1367,7 @@ describe('v2 wizard', () => {
       expect(dialog.querySelectorAll('.phase-help-path li')).toHaveLength(3)
       expect(dialog.querySelectorAll('.phase-help-moves li')).toHaveLength(3)
       for (const cue of dialog.querySelectorAll('.phase-help-cue')) {
-        if ([...(cue.textContent ?? '')].length > 3) expect(cue).toHaveClass('is-compact')
+        if ([...(cue.textContent ?? '')].length > 2) expect(cue).toHaveClass('is-compact')
       }
       if (label === 'Generate') {
         expect(dialog).toHaveTextContent('recording script uses your approved transcript')
