@@ -1,0 +1,278 @@
+{
+  "extract-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "A→B",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": -3.7
+      },
+      {
+        "cue": "≠",
+        "fits": true,
+        "insetLeft": 14.8,
+        "insetRight": 14.8
+      },
+      {
+        "cue": "▦",
+        "fits": true,
+        "insetLeft": 13.5,
+        "insetRight": 13.5
+      }
+    ]
+  },
+  "extract-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "A→B",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": -7.7
+      },
+      {
+        "cue": "≠",
+        "fits": true,
+        "insetLeft": 12.8,
+        "insetRight": 12.8
+      },
+      {
+        "cue": "▦",
+        "fits": true,
+        "insetLeft": 11.5,
+        "insetRight": 11.5
+      }
+    ]
+  },
+  "dialogue-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "“…”",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": 2.1
+      },
+      {
+        "cue": "?→AI",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": 4.1
+      },
+      {
+        "cue": "✎",
+        "fits": true,
+        "insetLeft": 14.2,
+        "insetRight": 14.2
+      }
+    ]
+  },
+  "dialogue-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "“…”",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": -1.9
+      },
+      {
+        "cue": "?→AI",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": 0.1
+      },
+      {
+        "cue": "✎",
+        "fits": true,
+        "insetLeft": 12.2,
+        "insetRight": 12.2
+      }
+    ]
+  },
+  "review-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "▰",
+        "fits": true,
+        "insetLeft": 16.5,
+        "insetRight": 16.5
+      },
+      {
+        "cue": "1×N",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": 0.1
+      },
+      {
+        "cue": "✓",
+        "fits": true,
+        "insetLeft": 15.3,
+        "insetRight": 15.3
+      }
+    ]
+  },
+  "review-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "▰",
+        "fits": true,
+        "insetLeft": 14.5,
+        "insetRight": 14.5
+      },
+      {
+        "cue": "1×N",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": -3.9
+      },
+      {
+        "cue": "✓",
+        "fits": true,
+        "insetLeft": 13.3,
+        "insetRight": 13.3
+      }
+    ]
+  },
+  "cast-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "A → B",
+        "fits": true,
+        "insetLeft": 3.6,
+        "insetRight": 3.6
+      },
+      {
+        "cue": "A → N",
+        "fits": true,
+        "insetLeft": 2.8,
+        "insetRight": 2.8
+      },
+      {
+        "cue": "▶︎ A+B",
+        "fits": false,
+        "insetLeft": 2,
+        "insetRight": 0.6
+      }
+    ]
+  },
+  "cast-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "A → B",
+        "fits": false,
+        "insetLeft": 2,
+        "insetRight": 1.2
+      },
+      {
+        "cue": "A → N",
+        "fits": false,
+        "insetLeft": 2,
+        "insetRight": -0.3
+      },
+      {
+        "cue": "▶︎ A+B",
+        "fits": false,
+        "insetLeft": 2,
+        "insetRight": -3.4
+      }
+    ]
+  },
+  "generate-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "☑",
+        "fits": true,
+        "insetLeft": 8,
+        "insetRight": 8
+      },
+      {
+        "cue": "🔒",
+        "fits": true,
+        "insetLeft": 8,
+        "insetRight": 8
+      },
+      {
+        "cue": "↻",
+        "fits": true,
+        "insetLeft": 11.4,
+        "insetRight": 11.4
+      }
+    ]
+  },
+  "generate-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "☑",
+        "fits": true,
+        "insetLeft": 6,
+        "insetRight": 6
+      },
+      {
+        "cue": "🔒",
+        "fits": true,
+        "insetLeft": 6,
+        "insetRight": 6
+      },
+      {
+        "cue": "↻",
+        "fits": true,
+        "insetLeft": 9.4,
+        "insetRight": 9.4
+      }
+    ]
+  },
+  "export-1280": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "☑",
+        "fits": true,
+        "insetLeft": 11.9,
+        "insetRight": 11.9
+      },
+      {
+        "cue": "Aa",
+        "fits": true,
+        "insetLeft": 10,
+        "insetRight": 10
+      },
+      {
+        "cue": "M4B",
+        "fits": true,
+        "insetLeft": 6.9,
+        "insetRight": 6.9
+      }
+    ]
+  },
+  "export-390": {
+    "surfaceScrollsX": true,
+    "cues": [
+      {
+        "cue": "☑",
+        "fits": true,
+        "insetLeft": 9.9,
+        "insetRight": 9.9
+      },
+      {
+        "cue": "Aa",
+        "fits": true,
+        "insetLeft": 8,
+        "insetRight": 8
+      },
+      {
+        "cue": "M4B",
+        "fits": false,
+        "insetLeft": 6,
+        "insetRight": 3.8
+      }
+    ]
+  }
+}

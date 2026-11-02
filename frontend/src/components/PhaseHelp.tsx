@@ -95,7 +95,7 @@ export function PhaseHelp({ stage }: { stage: GuideStage }) {
   const cueClassName = (move: HelpMove) => [
     "phase-help-cue",
     move.cueSub ? "has-subcue" : "",
-    [...move.cue].length > 3 ? "is-compact" : "",
+    [...move.cue].length > 2 ? "is-compact" : "",
   ].filter(Boolean).join(" ");
 
   const close = () => setOpen(false);
