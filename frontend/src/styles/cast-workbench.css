@@ -98,7 +98,7 @@
 .voice-source-choices button, .voice-route-choices button { padding: 14px; border-radius: 7px; }
 .voice-source-choices b, .voice-route-choices b { font: 600 13px var(--font-sans); }.voice-source-choices small, .voice-route-choices small { font-size: 11px; line-height: 1.4; }
 .cast-inspector-grid { grid-template-columns: 280px minmax(0,1fr); }.cast-member-controls { background: var(--surface-soft); }.cast-evidence-panel { padding: 24px; }
-.cast-inspector.identity-inspector { width: min(1040px, calc(100vw - 80px)); height: auto; max-height: calc(100dvh - 56px); flex: 0 1 auto; align-self: center; margin: auto; overflow: auto; border: 1px solid var(--line); border-radius: 12px; }
+.cast-inspector.identity-inspector { width: min(1040px, calc(100vw - 80px)); height: auto; max-height: calc(100dvh - 56px); flex: 0 1 auto; align-self: center; margin: auto; overflow: auto; overscroll-behavior: none; border: 1px solid var(--line); border-radius: 12px; }
 .identity-inspector .cast-inspector-grid { flex: 0 1 auto; grid-template-columns: minmax(250px, 310px) minmax(0,1fr); }
 .identity-inspector .cast-member-controls { padding: 28px 24px; }
 .identity-inspector .cast-aliases-and-lines { padding: 28px; }
