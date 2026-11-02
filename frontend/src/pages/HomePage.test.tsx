@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { HomePage, type HomePageModel } from "./HomePage";
+import { changeAppLocale } from "../i18n";
 
 const original = new File(["%PDF sample"], "the-play-radio-drama-script.pdf", { type: "application/pdf" });
 
@@ -16,6 +17,15 @@ function ImportPage({ importing = vi.fn(), busy = false }: { importing?: HomePag
 }
 
 describe("Selected PDF import", () => {
+  it.each(["en", "zh-CN"] as const)("shows the home heading without a studio eyebrow in %s", async locale => {
+    await changeAppLocale(locale);
+    try {
+      render(<ImportPage />);
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent(locale === "en" ? "From pageto performance." : "从书页走向演绎。");
+      expect(screen.queryByText("Your audiobook studio")).not.toBeInTheDocument();
+      expect(screen.queryByText("你的有声书工作室")).not.toBeInTheDocument();
+    } finally { await changeAppLocale("en"); }
+  });
   it("replaces the chosen PDF directly, preserving the current file when the picker is cancelled", () => {
     render(<ImportPage />);
     const replacementInput = screen.getByLabelText("Choose another file");
