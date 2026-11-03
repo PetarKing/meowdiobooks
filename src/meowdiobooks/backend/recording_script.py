@@ -57,7 +57,7 @@ def build_recording_script(
     retained: dict[str, bool] = {}
     for span in spans:
         span_id = str(span["id"])
-        delimiter = is_narration_delimiter(span)
+        delimiter = is_narration_delimiter(span) or _empty_source_narration(span)
         keep = span.get("reviewAction") != "exclude" and not delimiter
         text = str(span.get("text", span.get("source", ""))) if keep else ""
         if keep and not text:
@@ -425,6 +425,21 @@ def _summary(
         "chapters": chapter_rows,
         "estimationMethod": "15-render-characters-per-second",
     }
+
+
+def _empty_source_narration(span: Mapping[str, Any]) -> bool:
+    """Keep a blank source block in coverage without requiring playable text."""
+    return (
+        span.get("renderRole") == "narration"
+        and span.get("source") == ""
+        and span.get("text") == ""
+        and type(span.get("sourceStart")) is int
+        and span["sourceStart"] >= 0
+        and type(span.get("sourceEnd")) is int
+        and span["sourceEnd"] == span["sourceStart"]
+        and span.get("spokenStart", span["sourceStart"]) == span["sourceStart"]
+        and span.get("spokenEnd", span["sourceEnd"]) == span["sourceEnd"]
+    )
 
 
 def _uses_narrator_fallback(span: Mapping[str, Any], cast: Mapping[str, Any]) -> bool:

@@ -20,9 +20,12 @@ def test_spoken_narration_and_invalid_empty_spans_are_not_delimiters(text):
     assert not is_narration_delimiter({"renderRole": "narration", "text": text})
 
 
-def test_dialogue_only_source_keeps_delimiter_coverage_without_a_narrator_voice():
+@pytest.mark.parametrize("blank_position", [0, 1, 2])
+def test_dialogue_only_source_keeps_delimiter_coverage_without_a_narrator_voice(blank_position):
     source = "ALICE: Hello.\n\nBOB: Goodbye.\n"
-    spans = scan_dialogue([{"page": 1, "text": source}])["partition"]
+    pages = [{"text": "ALICE: Hello.\n\n"}, {"text": "BOB: Goodbye.\n"}]
+    pages.insert(blank_position, {"text": ""})
+    spans = scan_dialogue([{**row, "page": index + 1} for index, row in enumerate(pages)])["partition"]
     dialogue = {"revision": "dialogue-1", "spans": spans}
     review = {"revision": "review-1", "dialogueRevision": "dialogue-1"}
     identities = [

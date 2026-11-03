@@ -208,3 +208,33 @@ def test_splits_a_long_script_chapter_into_balanced_source_safe_chapters():
     assert {row["chapterId"] for row in split["entries"]} == {
         row["id"] for row in split["chapters"]
     }
+
+
+@pytest.mark.parametrize("changes", [
+    {"source": "Lost words", "sourceEnd": 10},
+    {"sourceEnd": 1},
+    {"sourceStart": -1, "sourceEnd": -1},
+    {"sourceStart": None},
+    {"spokenEnd": 1},
+    {"renderRole": "dialogue"},
+])
+def test_empty_playable_text_without_valid_empty_source_still_fails(changes):
+    dialogue, review, cast = _upstream()
+    empty = _span("blank", "")
+    empty.update(changes)
+    dialogue["spans"].insert(0, empty)
+    with pytest.raises(RecordingScriptContractError):
+        build_recording_script(dialogue, review, cast, revision="script-empty")
+
+
+def test_blank_source_chapter_preserves_coverage_and_is_not_playable():
+    dialogue, review, cast = _upstream()
+    empty = _span("blank", "", chapter="blank-page")
+    dialogue["spans"].insert(0, empty)
+    script = build_recording_script(dialogue, review, cast, revision="script-empty")
+    assert script["entries"][0]["kind"] == "omission"
+    assert script["entries"][0]["provenance"] == "source-delimiter"
+    assert script["entries"][0]["sourceSpanIds"] == ["blank"]
+    assert script["sourceCoverage"]["sourceSpanIds"] == ["blank", "s1", "s2", "s3"]
+    assert script["summary"]["emptyChapterIds"] == ["blank-page"]
+    assert recording_script_matches(script, dialogue, review, cast)
