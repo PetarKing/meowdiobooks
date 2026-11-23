@@ -1,8 +1,10 @@
 <p align="center"><img src="frontend/src/assets/brand/meowdiobooks-social.png" alt="Meowdiobooks" width="100%"></p>
 
 <p align="center">
+  <a href="https://alpha.meowdiobooks.com/"><img src="https://img.shields.io/badge/Try%20it-alpha.meowdiobooks.com-E07A5F" alt="Try the hosted alpha"></a>
+  <a href="https://ko-fi.com/meowdiobooks"><img src="https://img.shields.io/badge/Ko--fi-Support%20us-FF5E5B?logo=ko-fi&amp;logoColor=white" alt="Support Meowdiobooks on Ko-fi"></a><br>
   <a href="https://discord.gg/JAfaNUc9yB"><img src="https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&amp;logoColor=white" alt="Discord community"></a>
-  <a href="https://discord.gg/wfrjrvgSNH"><img src="https://img.shields.io/badge/Discord-Support%20%26%20bugs-5865F2?logo=discord&amp;logoColor=white" alt="Support and bugs on Discord"></a>
+  <a href="https://discord.gg/wfrjrvgSNH"><img src="https://img.shields.io/badge/Discord-Support%20%26%20bugs-5865F2?logo=discord&amp;logoColor=white" alt="Support and bugs on Discord"></a><br>
   <a href="https://github.com/PetarKing/meowdiobooks/releases/latest"><img src="https://img.shields.io/github/v/release/PetarKing/meowdiobooks?color=40634A" alt="Latest release"></a>
   <a href="#安装"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-40634A?logo=apple&amp;logoColor=white" alt="macOS on Apple Silicon"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-40634A" alt="License: PolyForm Noncommercial"></a>
@@ -11,6 +13,10 @@
 <p align="center"><strong>让书中的角色，拥有自己的声音。</strong><br>在 Mac 上，将 PDF、EPUB 和文本制作成多角色有声书。</p>
 
 <p align="center"><a href="README.md">English</a> · 简体中文<br><a href="#试听">试听</a> · <a href="#看看界面">界面</a> · <a href="#按你的喜好配置">模型</a> · <a href="#安装">安装</a> · <a href="docs/README.md">文档</a> · <a href="#一起改进">社区</a></p>
+
+<h3 align="center">🐱 在浏览器中试用：<a href="https://alpha.meowdiobooks.com/">alpha.meowdiobooks.com</a></h3>
+
+<p align="center">托管 Alpha 版，无需 Mac，无需安装。</p>
 
 Meowdiobooks 识别书中的对话，协助你整理角色，并为每个角色设计或克隆声音。
 审核文本、试听声音后，即可生成章节，导出 M4B 或 MP3 有声书。声音制作在 Apple Silicon Mac 本地完成。
@@ -110,6 +116,8 @@ uv run meowdiobooks serve
 
 欢迎提交问题报告、改进模型支持、完善文档和贡献代码。社区的改进可以惠及个人用户和付费用户，
 我们对共用引擎的改进也会惠及双方。阅读[我们的承诺](docs/COMMUNITY.md)，或[参与贡献](docs/CONTRIBUTING.md)。
+
+如果 Meowdiobooks 对你有帮助，也欢迎[在 Ko-fi 上支持我们](https://ko-fi.com/meowdiobooks)。
 
 ## 许可证
 
