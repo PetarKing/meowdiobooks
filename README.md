@@ -14,7 +14,9 @@
 
 <p align="center">English · <a href="README.zh-CN.md">简体中文</a><br><a href="#hear-it">Hear it</a> · <a href="#see-it">See it</a> · <a href="#make-it-yours">Models</a> · <a href="#install">Install</a> · <a href="docs/README.md">Docs</a> · <a href="#built-together">Community</a></p>
 
-<p align="center"><strong>Try it in your browser:</strong> <a href="https://alpha.meowdiobooks.com/">alpha.meowdiobooks.com</a> — the hosted alpha, no Mac or setup needed.</p>
+<h3 align="center">🐱 Try it in your browser: <a href="https://alpha.meowdiobooks.com/">alpha.meowdiobooks.com</a></h3>
+
+<p align="center">The hosted alpha. No Mac or setup needed.</p>
 
 Meowdiobooks finds the dialogue, helps you build the cast, and gives each character a voice you
 can design or clone. Review the text, audition the voices, then generate chapters and export an

@@ -14,7 +14,9 @@
 
 <p align="center"><a href="README.md">English</a> · 简体中文<br><a href="#试听">试听</a> · <a href="#看看界面">界面</a> · <a href="#按你的喜好配置">模型</a> · <a href="#安装">安装</a> · <a href="docs/README.md">文档</a> · <a href="#一起改进">社区</a></p>
 
-<p align="center"><strong>在浏览器中试用：</strong><a href="https://alpha.meowdiobooks.com/">alpha.meowdiobooks.com</a>——托管 Alpha 版，无需 Mac，无需安装。</p>
+<h3 align="center">🐱 在浏览器中试用：<a href="https://alpha.meowdiobooks.com/">alpha.meowdiobooks.com</a></h3>
+
+<p align="center">托管 Alpha 版，无需 Mac，无需安装。</p>
 
 Meowdiobooks 识别书中的对话，协助你整理角色，并为每个角色设计或克隆声音。
 审核文本、试听声音后，即可生成章节，导出 M4B 或 MP3 有声书。声音制作在 Apple Silicon Mac 本地完成。
