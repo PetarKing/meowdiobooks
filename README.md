@@ -2,9 +2,9 @@
 
 <p align="center">
   <a href="https://alpha.meowdiobooks.com/"><img src="https://img.shields.io/badge/Try%20it-alpha.meowdiobooks.com-E07A5F" alt="Try the hosted alpha"></a>
+  <a href="https://ko-fi.com/meowdiobooks"><img src="https://img.shields.io/badge/Ko--fi-Support%20us-FF5E5B?logo=ko-fi&amp;logoColor=white" alt="Support Meowdiobooks on Ko-fi"></a><br>
   <a href="https://discord.gg/JAfaNUc9yB"><img src="https://img.shields.io/badge/Discord-Community-5865F2?logo=discord&amp;logoColor=white" alt="Discord community"></a>
-  <a href="https://discord.gg/wfrjrvgSNH"><img src="https://img.shields.io/badge/Discord-Support%20%26%20bugs-5865F2?logo=discord&amp;logoColor=white" alt="Support and bugs on Discord"></a>
-  <a href="https://ko-fi.com/meowdiobooks"><img src="https://img.shields.io/badge/Ko--fi-Support%20us-FF5E5B?logo=ko-fi&amp;logoColor=white" alt="Support Meowdiobooks on Ko-fi"></a>
+  <a href="https://discord.gg/wfrjrvgSNH"><img src="https://img.shields.io/badge/Discord-Support%20%26%20bugs-5865F2?logo=discord&amp;logoColor=white" alt="Support and bugs on Discord"></a><br>
   <a href="https://github.com/PetarKing/meowdiobooks/releases/latest"><img src="https://img.shields.io/github/v/release/PetarKing/meowdiobooks?color=40634A" alt="Latest release"></a>
   <a href="#install"><img src="https://img.shields.io/badge/macOS-Apple%20Silicon-40634A?logo=apple&amp;logoColor=white" alt="macOS on Apple Silicon"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-PolyForm%20Noncommercial-40634A" alt="License: PolyForm Noncommercial"></a>
